@@ -1,0 +1,245 @@
+May-02 14:58:04.094 [main] DEBUG nextflow.cli.Launcher - $> nextflow run main.nf --input samplesheet.csv --output test --coassembly -resume
+May-02 14:58:04.436 [main] INFO  nextflow.cli.CmdRun - N E X T F L O W  ~  version 23.10.1
+May-02 14:58:04.488 [main] DEBUG nextflow.plugin.PluginsFacade - Setting up plugin manager > mode=prod; embedded=false; plugins-dir=/home/ffuentes/.nextflow/plugins; core-plugins: nf-amazon@2.1.4,nf-azure@1.3.3,nf-cloudcache@0.3.0,nf-codecommit@0.1.5,nf-console@1.0.6,nf-ga4gh@1.1.0,nf-google@1.8.3,nf-tower@1.6.3,nf-wave@1.0.1
+May-02 14:58:04.508 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Enabled plugins: []
+May-02 14:58:04.510 [main] INFO  o.pf4j.DefaultPluginStatusProvider - Disabled plugins: []
+May-02 14:58:04.515 [main] INFO  org.pf4j.DefaultPluginManager - PF4J version 3.4.1 in 'deployment' mode
+May-02 14:58:04.536 [main] INFO  org.pf4j.AbstractPluginManager - No plugins
+May-02 14:58:04.572 [main] DEBUG nextflow.config.ConfigBuilder - Found config local: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/nextflow.config
+May-02 14:58:04.574 [main] DEBUG nextflow.config.ConfigBuilder - Parsing config file: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/nextflow.config
+May-02 14:58:04.627 [main] DEBUG nextflow.config.ConfigBuilder - Applying config profile: `standard`
+May-02 14:58:06.226 [main] DEBUG nextflow.cli.CmdRun - Applied DSL=2 from script declararion
+May-02 14:58:06.260 [main] INFO  nextflow.cli.CmdRun - Launching `main.nf` [disturbed_volhard] DSL2 - revision: 6ea5b5c2d0
+May-02 14:58:06.261 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins default=[]
+May-02 14:58:06.262 [main] DEBUG nextflow.plugin.PluginsFacade - Plugins resolved requirement=[]
+May-02 14:58:06.279 [main] DEBUG n.secret.LocalSecretsProvider - Secrets store: /home/ffuentes/.nextflow/secrets/store.json
+May-02 14:58:06.285 [main] DEBUG nextflow.secret.SecretsLoader - Discovered secrets providers: [nextflow.secret.LocalSecretsProvider@630390b9] - activable => nextflow.secret.LocalSecretsProvider@630390b9
+May-02 14:58:06.405 [main] DEBUG nextflow.Session - Session UUID: 2edd2e23-1168-4952-9a95-530ec24d839f
+May-02 14:58:06.406 [main] DEBUG nextflow.Session - Run name: disturbed_volhard
+May-02 14:58:06.407 [main] DEBUG nextflow.Session - Executor pool size: 80
+May-02 14:58:06.420 [main] DEBUG nextflow.file.FilePorter - File porter settings maxRetries=3; maxTransfers=50; pollTimeout=null
+May-02 14:58:06.428 [main] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'FileTransfer' minSize=10; maxSize=240; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-02 14:58:06.469 [main] DEBUG nextflow.cli.CmdRun - 
+  Version: 23.10.1 build 5891
+  Created: 12-01-2024 22:01 UTC 
+  System: Linux 5.15.0-47-generic
+  Runtime: Groovy 3.0.19 on OpenJDK 64-Bit Server VM 11.0.1-internal+0-adhoc..src
+  Encoding: UTF-8 (UTF-8)
+  Process: 3510720@arrakis [127.0.1.1]
+  CPUs: 80 - Mem: 2 TB (21.9 GB) - Swap: 8 GB (0)
+May-02 14:58:06.587 [main] DEBUG nextflow.Session - Work-dir: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/work [ext2/ext3]
+May-02 14:58:06.588 [main] DEBUG nextflow.Session - Script base path does not exist or is not a directory: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/bin
+May-02 14:58:06.607 [main] DEBUG nextflow.executor.ExecutorFactory - Extension executors providers=[]
+May-02 14:58:06.655 [main] DEBUG nextflow.Session - Observer factory: DefaultObserverFactory
+May-02 14:58:06.724 [main] DEBUG nextflow.cache.CacheFactory - Using Nextflow cache factory: nextflow.cache.DefaultCacheFactory
+May-02 14:58:06.748 [main] DEBUG nextflow.util.CustomThreadPool - Creating default thread pool > poolSize: 81; maxThreads: 1000
+May-02 14:58:06.940 [main] DEBUG nextflow.Session - Session start
+May-02 14:58:07.631 [main] DEBUG nextflow.script.ScriptRunner - > Launching execution
+May-02 14:58:07.650 [main] INFO  nextflow.script.BaseScript - 
+    _________________       __  __ _                _     _       _
+  / -.--.------.--.-- \    |  \/  (_) ___ _ __ ___ | |__ (_) __ _| |
+ /-/  o--o     o--o  \-\   | |\/| | |/ __| °__/ _ \|  _ \| |/ _° | |
+/-/  o--o       o--o  \-\  | |  | | | (__| | | (_) | |_) | | (_| | |
+|-|   o--o     o--o   |-|  |_|  |_|_|\___|_|  \___/|_.__/|_|\____|_|
+|-|    o--o   o--o    |-|   ____     °  _    °     ____    °  _         °
+|-|       o---o       |-|  |  _ \° __ _| |_ __ _ °/ ___|  ___(_) ___°_ __  °___ ___
+|-|     o--o o--o     |-|  | | | |/ _° | __/ _° | \___ \ / __| |/ _ \ °_ \ / __/ _ \
+|-|    o--o   o--o    |-|  | |_| | (_| | || (_| |  ___) | (__| |  __/ | | | (_|  __/
+|-|   o--o     o--o   |-|  |____/ \____|\__\____| |____/ \___|_|\___|_| |_|\___\___|
+
+May-02 14:58:10.271 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:FASTP` matches process FASTP
+May-02 14:58:10.286 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.286 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.295 [main] DEBUG nextflow.executor.Executor - [warm up] executor > local
+May-02 14:58:10.304 [main] DEBUG n.processor.LocalPollingMonitor - Creating local task monitor for executor 'local' > cpus=80; memory=2 TB; capacity=80; pollInterval=100ms; dumpInterval=5m
+May-02 14:58:10.308 [main] DEBUG n.processor.TaskPollingMonitor - >>> barrier register (monitor: local)
+May-02 14:58:10.436 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.436 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.453 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BOWTIE2` matches process BOWTIE2_PHYX
+May-02 14:58:10.455 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.455 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.465 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:BOWTIE2` matches process BOWTIE2_HUMAN
+May-02 14:58:10.467 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.467 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.499 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.499 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.509 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:KRAKEN2` matches process KRAKEN2_GTDB
+May-02 14:58:10.511 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.511 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.530 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.530 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.540 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.540 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.553 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.553 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.560 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.560 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.570 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.571 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.581 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.581 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.598 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.598 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.606 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.606 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.616 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.617 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.627 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.627 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.640 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.640 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.647 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.647 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.669 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.670 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.680 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.681 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.688 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.688 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.696 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.696 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.706 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.706 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.713 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.713 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.719 [main] DEBUG nextflow.script.ProcessConfig - Config settings `withName:MMSEQS2` matches process MMSEQS2
+May-02 14:58:10.720 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.720 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.727 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.727 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.733 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.734 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.744 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.745 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.756 [main] DEBUG nextflow.executor.ExecutorFactory - << taskConfig executor: null
+May-02 14:58:10.757 [main] DEBUG nextflow.executor.ExecutorFactory - >> processorType: 'local'
+May-02 14:58:10.761 [main] DEBUG nextflow.Session - Workflow process names [dsl2]: CALCULATE_DEPTH, KARGVA, GTDB_TK, MEGAHIT, AUTOMETA, MMSEQS2, FASTP, BRACKEN_GTDB, METAWRAP, CLUSTERING, KRAKEN2_GTDB, BINS_REPORT, BOWTIE2_SAMTOOLS, TAX_REPORT, READS_REPORT, KRAKEN_TO_PHYLOSEQ, MEGAHIT_COASSEMBLY, CHECKM2, BEST_HITS_TO_FASTA, BOWTIE2_HUMAN, KARGA, KRAKEN_BIOM, PRODIGAL, KRAKEN2, METABAT2, KRAKEN_BIOM_GTDB, BOWTIE2_PHYX, BOWTIE2, BIN_TAX_REPORT, SEMIBIN, BBMAP, QFILTER, BRACKEN
+May-02 14:58:10.763 [main] DEBUG nextflow.Session - Igniting dataflow network (30)
+May-02 14:58:10.767 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > FASTP
+May-02 14:58:10.768 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > QFILTER
+May-02 14:58:10.771 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BOWTIE2_PHYX
+May-02 14:58:10.772 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BOWTIE2_HUMAN
+May-02 14:58:10.772 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > READS_REPORT
+May-02 14:58:10.773 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > KRAKEN2_GTDB
+May-02 14:58:10.775 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > TAX_REPORT
+May-02 14:58:10.779 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BRACKEN_GTDB
+May-02 14:58:10.780 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > KRAKEN_BIOM_GTDB
+May-02 14:58:10.780 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > KRAKEN_TO_PHYLOSEQ
+May-02 14:58:10.781 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > MEGAHIT_COASSEMBLY
+May-02 14:58:10.783 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > MEGAHIT
+May-02 14:58:10.783 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BBMAP
+May-02 14:58:10.784 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BOWTIE2_SAMTOOLS
+May-02 14:58:10.785 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > CALCULATE_DEPTH
+May-02 14:58:10.788 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > METABAT2
+May-02 14:58:10.788 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > SEMIBIN
+May-02 14:58:10.789 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > AUTOMETA
+May-02 14:58:10.790 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > METAWRAP
+May-02 14:58:10.792 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > CHECKM2
+May-02 14:58:10.793 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BINS_REPORT
+May-02 14:58:10.793 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > GTDB_TK
+May-02 14:58:10.794 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BIN_TAX_REPORT
+May-02 14:58:10.798 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > PRODIGAL
+May-02 14:58:10.799 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > MMSEQS2
+May-02 14:58:10.800 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > BEST_HITS_TO_FASTA
+May-02 14:58:10.802 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > CLUSTERING
+May-02 14:58:10.802 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > KARGVA
+May-02 14:58:10.804 [main] DEBUG nextflow.processor.TaskProcessor - Starting process > KARGA
+May-02 14:58:10.812 [main] DEBUG nextflow.script.ScriptRunner - Parsed script files:
+  Script_64cdfa38602f06c8: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/megahit/main_co.nf
+  Script_b54f301926bfd24c: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/kargva/main.nf
+  Script_bbff5b6044058ead: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bbmap/main.nf
+  Script_43718a1ff7926b16: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bins_report/main.nf
+  Script_7d8a7aa31bd3631c: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/metabat2/main.nf
+  Script_e168bb70089612ed: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/megahit/main_sin.nf
+  Script_99f881c562fbd5a0: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/best_hits_to_fasta/main.nf
+  Script_be9e08af52e21ea8: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/prodigal/main.nf
+  Script_b16597a7ad74d3d9: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bowtie2_samtools/main.nf
+  Script_69d4af300fd43b29: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/tax_report/main.nf
+  Script_e581e031f1528e6b: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bracken/main.nf
+  Script_e58a06d5962d15dc: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/fastp/main.nf
+  Script_03c6390b585aca46: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/checkm2/main.nf
+  Script_cfee368f678b5fdc: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/kraken2/main.nf
+  Script_009a1bff76c65b3c: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/autometa/main.nf
+  Script_2b922660430139ee: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/qfilter/main.nf
+  Script_a82f082295dbd747: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/reads_report/main.nf
+  Script_be29097bf1b13ac0: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/main.nf
+  Script_8a58df63187a2a94: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bin_tax_report/main.nf
+  Script_b9f16f0b5cddedfa: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/semibin/main.nf
+  Script_8a634b6614d928e7: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/calculate_depth/main.nf
+  Script_cced8b92de1f2f38: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/kraken_to_phyloseq/main.nf
+  Script_873ec9c04eea23d8: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/gtdb-tk/main.nf
+  Script_52915db2f0f0264d: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/bowtie2/main.nf
+  Script_9ddbf6ced751199e: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/karga/main.nf
+  Script_3addaab69ef0118c: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/clustering/main.nf
+  Script_fa9d9653441f98a3: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/kraken_biom/main.nf
+  Script_862ec95e5752e2b8: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/metawrap/main.nf
+  Script_578a823c8cd26b5f: /home/ffuentes/Gut_paper_metagenomes/Nextflow_workflow/Gut_pipeline_nf/./modules/mmseqs2/main.nf
+May-02 14:58:10.813 [main] DEBUG nextflow.script.ScriptRunner - > Awaiting termination 
+May-02 14:58:10.813 [main] DEBUG nextflow.Session - Session await
+May-02 14:58:11.273 [Actor Thread 53] INFO  nextflow.processor.TaskProcessor - [da/4ab03d] Cached process > FASTP (1)
+May-02 14:58:11.274 [Actor Thread 55] INFO  nextflow.processor.TaskProcessor - [b6/2d49ec] Cached process > FASTP (2)
+May-02 14:58:11.338 [Actor Thread 62] INFO  nextflow.processor.TaskProcessor - [21/bfa0b8] Cached process > QFILTER (2)
+May-02 14:58:11.341 [Actor Thread 60] INFO  nextflow.processor.TaskProcessor - [85/44237b] Cached process > QFILTER (1)
+May-02 14:58:11.370 [Actor Thread 74] INFO  nextflow.processor.TaskProcessor - [00/45f554] Cached process > BOWTIE2_PHYX (2)
+May-02 14:58:11.381 [Actor Thread 72] INFO  nextflow.processor.TaskProcessor - [5f/ab4e8c] Cached process > BOWTIE2_PHYX (1)
+May-02 14:58:11.411 [Actor Thread 80] INFO  nextflow.processor.TaskProcessor - [98/076d0b] Cached process > BOWTIE2_HUMAN (2)
+May-02 14:58:11.411 [Actor Thread 81] INFO  nextflow.processor.TaskProcessor - [5c/86f790] Cached process > BOWTIE2_HUMAN (1)
+May-02 14:58:11.447 [Actor Thread 79] INFO  nextflow.processor.TaskProcessor - [4b/ff53c8] Cached process > KARGVA (2)
+May-02 14:58:11.452 [Actor Thread 64] INFO  nextflow.processor.TaskProcessor - [37/a05de7] Cached process > MEGAHIT (1)
+May-02 14:58:11.461 [Actor Thread 74] INFO  nextflow.processor.TaskProcessor - [44/416b7d] Cached process > MEGAHIT (2)
+May-02 14:58:11.462 [Actor Thread 71] INFO  nextflow.processor.TaskProcessor - [3d/6fdbbf] Cached process > KARGVA (1)
+May-02 14:58:11.466 [Actor Thread 65] INFO  nextflow.processor.TaskProcessor - [04/629a59] Cached process > KRAKEN2_GTDB (1)
+May-02 14:58:11.476 [Actor Thread 65] DEBUG nextflow.util.ThreadPoolBuilder - Creating thread pool 'PublishDir' minSize=10; maxSize=240; workQueue=LinkedBlockingQueue[10000]; allowCoreThreadTimeout=false
+May-02 14:58:11.478 [Actor Thread 70] INFO  nextflow.processor.TaskProcessor - [dd/904433] Cached process > KRAKEN2_GTDB (2)
+May-02 14:58:11.519 [Actor Thread 64] INFO  nextflow.processor.TaskProcessor - [6c/c5d70a] Cached process > KARGA (2)
+May-02 14:58:11.522 [Actor Thread 77] INFO  nextflow.processor.TaskProcessor - [cf/bd5c60] Cached process > READS_REPORT
+May-02 14:58:11.522 [Actor Thread 79] INFO  nextflow.processor.TaskProcessor - [91/0b4e86] Cached process > BBMAP (2)
+May-02 14:58:11.524 [Actor Thread 67] INFO  nextflow.processor.TaskProcessor - [30/a6c43d] Cached process > BBMAP (1)
+May-02 14:58:11.524 [Actor Thread 68] INFO  nextflow.processor.TaskProcessor - [c6/ecb6b7] Cached process > KARGA (1)
+May-02 14:58:11.538 [Actor Thread 75] INFO  nextflow.processor.TaskProcessor - [c4/e4c9a0] Cached process > BRACKEN_GTDB (1)
+May-02 14:58:11.539 [Actor Thread 74] INFO  nextflow.processor.TaskProcessor - [9b/205b8b] Cached process > BRACKEN_GTDB (2)
+May-02 14:58:11.543 [Actor Thread 71] INFO  nextflow.processor.TaskProcessor - [1c/785c71] Cached process > BOWTIE2_SAMTOOLS (2)
+May-02 14:58:11.543 [Actor Thread 81] INFO  nextflow.processor.TaskProcessor - [22/d50895] Cached process > BOWTIE2_SAMTOOLS (1)
+May-02 14:58:11.556 [Actor Thread 74] INFO  nextflow.processor.TaskProcessor - [9e/0e4b54] Cached process > KRAKEN_BIOM_GTDB
+May-02 14:58:11.559 [Actor Thread 64] INFO  nextflow.processor.TaskProcessor - [96/88f48e] Cached process > TAX_REPORT
+May-02 14:58:11.560 [Actor Thread 78] INFO  nextflow.processor.TaskProcessor - [ea/919f79] Cached process > CALCULATE_DEPTH (2)
+May-02 14:58:11.560 [Actor Thread 77] INFO  nextflow.processor.TaskProcessor - [df/898bca] Cached process > CALCULATE_DEPTH (1)
+May-02 14:58:11.563 [Actor Thread 79] INFO  nextflow.processor.TaskProcessor - [f9/0eb092] Cached process > AUTOMETA (1)
+May-02 14:58:11.564 [Actor Thread 60] INFO  nextflow.processor.TaskProcessor - [d5/01f003] Cached process > AUTOMETA (2)
+May-02 14:58:11.570 [Actor Thread 75] INFO  nextflow.processor.TaskProcessor - [53/d8ecdd] Cached process > KRAKEN_TO_PHYLOSEQ
+May-02 14:58:11.571 [Actor Thread 78] INFO  nextflow.processor.TaskProcessor - [a0/68803c] Cached process > METABAT2 (2)
+May-02 14:58:11.573 [Actor Thread 69] INFO  nextflow.processor.TaskProcessor - [4d/881644] Cached process > METABAT2 (1)
+May-02 14:58:11.577 [Actor Thread 66] INFO  nextflow.processor.TaskProcessor - [45/d8328f] Cached process > SEMIBIN (2)
+May-02 14:58:11.581 [Actor Thread 72] INFO  nextflow.processor.TaskProcessor - [69/6e305f] Cached process > SEMIBIN (1)
+May-02 14:58:11.613 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+May-02 14:58:11.617 [Task submitter] INFO  nextflow.Session - [e6/386534] Submitted process > MEGAHIT_COASSEMBLY
+May-02 14:58:11.624 [Actor Thread 64] INFO  nextflow.processor.TaskProcessor - [a6/a94c26] Cached process > METAWRAP (1)
+May-02 14:58:11.624 [Actor Thread 75] INFO  nextflow.processor.TaskProcessor - [f2/a59a73] Cached process > METAWRAP (2)
+May-02 14:58:11.634 [Actor Thread 78] INFO  nextflow.processor.TaskProcessor - [8c/9b7244] Cached process > PRODIGAL (2)
+May-02 14:58:11.635 [Actor Thread 60] INFO  nextflow.processor.TaskProcessor - [74/5fe316] Cached process > PRODIGAL (1)
+May-02 14:58:11.638 [Actor Thread 77] INFO  nextflow.processor.TaskProcessor - [40/eecc1c] Cached process > GTDB_TK (2)
+May-02 14:58:11.639 [Actor Thread 71] INFO  nextflow.processor.TaskProcessor - [d4/eafa66] Cached process > GTDB_TK (1)
+May-02 14:58:11.639 [Actor Thread 69] INFO  nextflow.processor.TaskProcessor - [59/b74bc8] Cached process > CHECKM2 (1)
+May-02 14:58:11.641 [Actor Thread 79] INFO  nextflow.processor.TaskProcessor - [4e/e00a87] Cached process > CHECKM2 (2)
+May-02 14:58:11.646 [Actor Thread 75] INFO  nextflow.processor.TaskProcessor - [8e/8e50c6] Cached process > MMSEQS2 (1)
+May-02 14:58:11.646 [Actor Thread 68] INFO  nextflow.processor.TaskProcessor - [6c/845f93] Cached process > MMSEQS2 (2)
+May-02 14:58:11.649 [Actor Thread 64] INFO  nextflow.processor.TaskProcessor - [18/272422] Cached process > BIN_TAX_REPORT
+May-02 14:58:11.653 [Actor Thread 69] INFO  nextflow.processor.TaskProcessor - [2f/1367b4] Cached process > BINS_REPORT
+May-02 14:58:11.662 [Task submitter] DEBUG n.executor.local.LocalTaskHandler - Launch cmd line: /bin/bash -ue .command.run
+May-02 14:58:11.663 [Task submitter] INFO  nextflow.Session - [42/01a44e] Submitted process > BEST_HITS_TO_FASTA
+May-02 14:58:13.878 [SIGINT handler] DEBUG nextflow.Session - Session aborted -- Cause: SIGINT
+May-02 14:58:13.909 [SIGINT handler] DEBUG nextflow.Session - The following nodes are still active:
+[process] CLUSTERING
+  status=ACTIVE
+  port 0: (value) OPEN  ; channel: mmseq_results
+  port 1: (cntrl) -     ; channel: $
+
+May-02 14:58:13.913 [main] DEBUG nextflow.Session - Session await > all processes finished
+May-02 14:58:13.924 [main] DEBUG nextflow.Session - Session await > all barriers passed
+May-02 14:58:13.932 [Task monitor] DEBUG n.processor.TaskPollingMonitor - <<< barrier arrives (monitor: local) - terminating tasks monitor poll loop
+May-02 14:58:13.944 [main] INFO  nextflow.script.BaseScript - Pipeline complete
+May-02 14:58:13.945 [main] INFO  nextflow.script.BaseScript - Vamos bien mi king
+May-02 14:58:13.957 [main] WARN  n.processor.TaskPollingMonitor - Killing running tasks (2)
+May-02 14:58:13.989 [main] DEBUG n.trace.WorkflowStatsObserver - Workflow completed > WorkflowStats[succeededCount=0; failedCount=0; ignoredCount=0; cachedCount=46; pendingCount=0; submittedCount=0; runningCount=0; retriesCount=0; abortedCount=2; succeedDuration=0ms; failedDuration=0ms; cachedDuration=32d 3h 31m 8s;loadCpus=0; loadMemory=0; peakRunning=2; peakCpus=6; peakMemory=0; ]
+May-02 14:58:14.100 [main] DEBUG nextflow.cache.CacheDB - Closing CacheDB done
+May-02 14:58:14.146 [main] DEBUG nextflow.script.ScriptRunner - > Execution complete -- Goodbye
