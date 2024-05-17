@@ -56,7 +56,7 @@ The file **always** has to include the header `sample,r1,r2,s`, "s" column can b
 The file `nextflow.config` contains all the parameteres used by the pipeline, including path to database files. Currently the path work in our server (_Arrakis_), but if you are running elsewhere, these need to be updated. 
 
 #### Starting the pipeline
-
+$${\color{red}Red}$$
 Usage:
 
 The typical command for running the pipeline is as follows:
