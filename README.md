@@ -1,6 +1,6 @@
 ## Introducción
 
-**Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Rapid**
+**Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Reproducible**
 
 **BUGBUSTER** is a bioinformatics best-practice analysis pipeline for microbial metagenomic analysis pipeline.
 
