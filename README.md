@@ -64,7 +64,7 @@ The typical command for running the pipeline is as follows:
 nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -resume (recomended)
 
 Mandatory arguments:
-   \color{green}--input                        Input csv file with: samples names, path of all fastq files, and optionaly singletons.
+   $\color{#D29922}--input$                       Input csv file with: samples names, path of all fastq files, and optionaly singletons.
                                   colnames required: "sample,r1,r2,s" if don't have singletons colname "s" can be empty
 
    --output                       Path to output dir
