@@ -54,7 +54,7 @@ The file **always** has to include the header `sample,r1,r2,s`, "s" column can b
 # Pipeline parameters
 
 The file `nextflow.config` contains all the parameteres used by the pipeline, including path to database files. Currently the path work in our server (_Arrakis_), but if you are running elsewhere, these need to be updated. 
- $\color{#D29922}{\textsf{--input}}$
+
 #### Starting the pipeline
 
 ```
