@@ -49,7 +49,7 @@ sample,r1,r2,s
 SRR9040400,/home/ffuentes/Raw_data/SRR9040400_1.fastq.gz,/home/ffuentes/Raw_data/SRR9040400_2.fastq.gz,/home/ffuentes/Raw_data/SRR9040400.fastq.gz
 ```
 
-The file **always** has to include the header `sample,r1,r2,s`, "s" column can be empty 
+The file **always** has to include the header `sample,r1,r2,s` but also "s" column can be empty 
 
 # Pipeline parameters
 
