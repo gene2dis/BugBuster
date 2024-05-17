@@ -58,6 +58,8 @@ The file `nextflow.config` contains all the parameteres used by the pipeline, in
 #### Starting the pipeline
 
 ```
+\u001B[36m    _________________   \u001B[0m    \u001B[33m__  __\u001B[0m \u001B[36m _                _     _       _\u001B[0m
+\u001B[36m  / -.--.------.--.-- \\\u001B[0m    \u001B[33m|  \\/  |\u001B[0m\u001B[36m(_) ___ _ __ ___ | |__ (_) __ _| |\u001B[0m
 Usage:
 
 The typical command for running the pipeline is as follows:
