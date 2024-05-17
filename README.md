@@ -12,21 +12,22 @@ On release, automated continuous integration tests run the pipeline on a full-si
 
 ## Pipeline summary
 
-1. Read QC, clean, and filter reads. ([`FastP`](https://github.com/OpenGene/fastp))
+1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Remove all samples that not have at least 1.000.000 reads after quality filter
-3. Remove host contamintant reads. ([`Bowtie2`](https://github.com/BenLangmead/bowtie2))
-4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA ([`KARGA`](https://github.com/DataIntellSystLab/KARGA)), ([`KARGVA`](https://github.com/DataIntellSystLab/KARGVA))
-5. Taxonomic profile ([`Kraken2`](https://ccb.jhu.edu/software/kraken2/))
-6. Abundance estimation ([`Bracken`](https://github.com/jenniferlu717/Bracken)
+3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
+4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
+5. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/)
+6. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
 7. Read traceback and taxonomic reports
-8. Genome assembly ([`Megahit`](https://github.com/voutcn/megahit))
-9. Contig filter ([`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/))
-10. Binning ([`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/)), ([`SemiBin`](https://github.com/BigDataBiology/SemiBin)) and ([`Autometa`](https://autometa.readthedocs.io/en/latest/getting-started.html))
-11. Antibiotic resistance prediction using AMRFinderPlus. If the organism is on the list provided by AMRFinderPlus, also point mutations are evaluated ([`AMRFinderPLus`](https://github.com/ncbi/amr))
-12. Prophage and plasmid search using [`Genomad`](https://github.com/apcamargo/genomad)
-13. For _Klebsiella_, evaluation of the genome using [`Kleborate`](https://github.com/klebgenomics/Kleborate)
-14. For _S. aureus_, SCCmec classification using [`staphophia-sccmec`](https://github.com/staphopia/staphopia-sccmec)
-15. 
-16. 
+8. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+9. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+10. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`Autometa`](https://autometa.readthedocs.io/en/latest/getting-started.html)
+11. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
+12. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+13. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+14. Bin reports
+15. If requested functional anotation of Reads, Contigs or/and Bins [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+16. If requested **(work in progress)** ARG clustering and horizontal gene transfer inference [`mmseqs2`](https://github.com/soedinglab/MMseqs2), [`galaxy-tool-lca`](https://github.com/naturalis/galaxy-tool-lca)
+17. Assembly modes: "coassembly", "assembly"
 
 ![](https://pbs.twimg.com/media/DwoSzyiWkAA2ywL.jpg)
