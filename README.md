@@ -56,8 +56,8 @@ The file **always** has to include the header `sample,r1,r2,s`, "s" column can b
 The file `nextflow.config` contains all the parameteres used by the pipeline, including path to database files. Currently the path work in our server (_Arrakis_), but if you are running elsewhere, these need to be updated. 
 
 #### Starting the pipeline
-
-$${\color{green}Usage:}$$
+```
+Usage:
 
 The typical command for running the pipeline is as follows:
 
@@ -91,9 +91,8 @@ Optional arguments:
                                   (default: false)
 
    --help                         Print this usage statement.
-
+```
 Additionally, all options can be modified in nextflow.config file
-
 ## Credits
 
 gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes
