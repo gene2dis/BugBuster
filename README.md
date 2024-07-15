@@ -1,4 +1,4 @@
-![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/2d2efbec-515d-4ade-b06f-4510b9e74a32)## Introducción
+## Introducción
 
 **Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Reproducible** (name with work in progress :P)
 
