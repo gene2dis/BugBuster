@@ -1,4 +1,4 @@
-## Introducción
+![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/2d2efbec-515d-4ade-b06f-4510b9e74a32)## Introducción
 
 **Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Reproducible** (name with work in progress :P)
 
@@ -9,6 +9,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources.
 
 ## Pipeline summary
+![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/9e54f1e8-9f6b-4181-a075-8bd2f6ebe078)
 
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Remove all samples that not have at least 1.000.000 reads after quality filter
