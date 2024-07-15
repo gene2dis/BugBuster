@@ -100,16 +100,16 @@ Optional arguments:
    --single_assembly              If coassembly type is choosen, single assembly will aditionaly generate indivdual assembly for all samples
                                   (default: false)
 
-   --arg_clustering               ARG gene prediction and clustering for horizontal gene transfer inference
-                                  (default: false)
-
    --read_arg_prediction          ARG and ARGV gene prediction at read level using KARGA and KARGVA
                                   (default: false)
 
-   --read_level_metacerberus      Read level functional annotation with metacerberus
+   --contig_level_metacerberus    Contig level functional annotation with metacebeus
                                   (default: false)
 
-   --contig_level_metacerberus    Contig level functional annotation with metacebeus
+   --contig_tax_and_arg           Contig taxonomí and ARG prediction
+                                  (default: false)
+
+   --arg_clustering               ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
                                   (default: false)
 
    --help                         Print this usage statement.
