@@ -12,22 +12,29 @@ On release, automated continuous integration tests run the pipeline on a full-si
 ![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/9e54f1e8-9f6b-4181-a075-8bd2f6ebe078)
 
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
-2. Remove all samples that not have at least 1.000.000 reads after quality filter
+2. Remove all samples that not have at least 10.000.000 reads after quality filter. **Can be modified by the user**
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
-5. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/)
-6. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
-7. Read traceback and taxonomic reports
-8. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
-9. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-10. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`Autometa`](https://autometa.readthedocs.io/en/latest/getting-started.html)
-11. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
-12. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
-13. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-14. Bin reports
-15. If requested functional anotation of Reads, Contigs or/and Bins [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-16. If requested **(work in progress)** ARG clustering and horizontal gene transfer inference [`mmseqs2`](https://github.com/soedinglab/MMseqs2), [`galaxy-tool-lca`](https://github.com/naturalis/galaxy-tool-lca)
-17. Assembly modes: "coassembly", "assembly"
+5. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+6. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/)
+7. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
+8. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
+9. Read traceback and taxonomic reports.
+10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+14. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
+15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+17. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`COMEBin`](https://github.com/ziyewang/COMEBin)
+18. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
+19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+21. Bin reports.
+22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+23. If requested **(work in progress)** ARG clustering and horizontal gene transfer inference [`mmseqs2`](https://github.com/soedinglab/MMseqs2), [`galaxy-tool-lca`](https://github.com/naturalis/galaxy-tool-lca)
+24. Assembly modes: "coassembly" **(work in progress)**, "assembly"
 
 ## Quick Start
 
