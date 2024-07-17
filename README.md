@@ -76,7 +76,7 @@ All database paths must be modified in the configuration file.
 
 9. karga_db = must be a fasta with ARG genes. recomended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
 
-10. **KARGVA database for ARGV genes it's included in KARGVA container**
+**¡KARGVA database for ARGV genes it's included in KARGVA container!**
 
 **AUTOMETA, This is obsolete until future updates.**
 
