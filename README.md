@@ -167,4 +167,3 @@ We thank the following people for their extensive assistance in the development 
 
 - Francisco A. Fuentes
 - Juan A. Ugalde
-- Shrek
