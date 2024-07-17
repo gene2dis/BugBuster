@@ -55,30 +55,38 @@ All database paths must be modified in the configuration file.
 2. phyX_db = recomended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
 
 **Kraken2:**
-3. k2_gtdb_db = recomended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
+
+     3. k2_gtdb_db = recomended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
 
 **BBlobTools:**
-4. ncbi_nodes_dmp = recomended download from ziped dir taxdump.tar.gz: [`nodes.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-5. ncbi_names_dmp = recomended download from ziped dir taxdump.tar.gz: [`names.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+
+     4. ncbi_nodes_dmp = recomended download from ziped dir taxdump.tar.gz: [`nodes.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+     5. ncbi_names_dmp = recomended download from ziped dir taxdump.tar.gz: [`names.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 
 **CheckM for Metawrap:**
-6. metawrap_db = recomended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
+
+     6. metawrap_db = recomended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
 
 **BlastDB for contig taxonomic annotation:**
-7. nt_db = recomended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
-8. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
+
+     7. nt_db = recomended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+     8. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
 
 **KARGA:**
-9. karga_db = must be a fasta with ARG genes. recomended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta) **KARGVA database for ARGV genes it's included in KARGVA container**
+
+     9. karga_db = must be a fasta with ARG genes. recomended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta) **KARGVA database for ARGV genes it's included in KARGVA container**
 
 **AUTOMETA, This is obsolete until future updates.**
-10. ncbi_db = follow the instructions from [`Autometa_db_docs`](https://autometa.readthedocs.io/en/latest/databases.html) and generate a single directory with all files.
+
+     10. ncbi_db = follow the instructions from [`Autometa_db_docs`](https://autometa.readthedocs.io/en/latest/databases.html) and generate a single directory with all files.
 
 **CheckM2**
-11. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+
+     11. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 
 **GTDB-TK**
-12. gtdbtk-db = recomended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
+
+     12. gtdbtk-db = recomended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
 
 ## Running the pipeline
 
