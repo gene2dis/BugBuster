@@ -64,6 +64,7 @@ All database paths must be modified in the configuration file.
 
 4. ncbi_nodes_dmp = recommended download: nodes.dmp from zipped dir taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 5. ncbi_names_dmp = recommended download: names.dmp from the same zipped dir of nodes.dmp
+
 **CheckM for Metawrap:**
 
 6. metawrap_db = recommended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
