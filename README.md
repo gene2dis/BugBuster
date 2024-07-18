@@ -60,8 +60,8 @@ All database paths must be modified in the configuration file.
 
 **BBlobTools:**
 
-4. ncbi_nodes_dmp = recomended download from ziped dir taxdump.tar.gz: [`nodes.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-5. ncbi_names_dmp = recomended download from ziped dir taxdump.tar.gz: [`names.dmp`](http://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+4. ncbi_nodes_dmp = recomended download from ziped dir taxdump.tar.gz: [`nodes.dmp`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+5. ncbi_names_dmp = recomended download from ziped dir taxdump.tar.gz: [`names.dmp`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 
 **CheckM for Metawrap:**
 
