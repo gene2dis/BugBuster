@@ -51,30 +51,29 @@ Currently the pipeline has been tested with Docker.
 All database paths must be modified in the configuration file.
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. human_db = recomended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
-2. phyX_db = recomended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
+1. human_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
+2. phyX_db = recommended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
 
 **Kraken2:**
 
-3. k2_gtdb_db = recomended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
+3. k2_gtdb_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
 
 **BBlobTools:**
 
-4. ncbi_nodes_dmp = recomended download from ziped dir taxdump.tar.gz: [`nodes.dmp`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-5. ncbi_names_dmp = recomended download from ziped dir taxdump.tar.gz: [`names.dmp`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-
+4. ncbi_nodes_dmp = recommended download: nodes.dmp from zipped dir taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+5. ncbi_names_dmp = recommended download: names.dmp from the same zipped dir of nodes.dmp
 **CheckM for Metawrap:**
 
-6. metawrap_db = recomended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
+6. metawrap_db = recommended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
 
 **BlastDB for contig taxonomic annotation:**
 
-7. nt_db = recomended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+7. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
 8. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
 
 **KARGA:**
 
-9. karga_db = must be a fasta with ARG genes. recomended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
+9. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
 
 **¡KARGVA database for ARGV genes it's included in KARGVA container!**
 
@@ -88,7 +87,7 @@ All database paths must be modified in the configuration file.
 
 **GTDB-TK**
 
-12. gtdbtk-db = recomended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
+12. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
 
 ## Running the pipeline
 
