@@ -1,3 +1,4 @@
+![image](https://github.com/user-attachments/assets/a10c01f6-ef6c-40c4-a4ac-26a0c4f87564)
 ## Introduction
 
 **Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Reproducible** (name with work in progress :P)
