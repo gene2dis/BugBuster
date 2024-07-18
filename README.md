@@ -1,4 +1,4 @@
-## Introducción
+## Introduction
 
 **Bacterial Unraveling and Genomic Binning with Up-Scale Throughput, Efficient and Reproducible** (name with work in progress :P)
 
