@@ -46,6 +46,8 @@ Currently the pipeline has been tested with Docker.
 
 3. Download the pipeline, either cloning the repository or downloading the zip file
 
+4. Download databases and modify their paths in 'nextflow.config' file.
+
 ## Databases
 
 All database paths must be modified in the configuration file.
