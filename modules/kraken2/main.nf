@@ -1,7 +1,7 @@
 process KRAKEN2 {
     container 'quay.io/biocontainers/kraken2:2.1.3--pl5321hdcf5f25_0'
 
-    maxForks 4
+    maxForks 2
     label 'process_medium'
 
     publishDir "${params.output}/workflow/${meta.id}/kraken2_${db_name}", mode: 'copy', pattern: '*_kraken_report'
