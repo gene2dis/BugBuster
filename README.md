@@ -126,7 +126,7 @@ Mandatory arguments:
    --output                       Path to output dir
 
 Optional arguments:
-   --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly"
+   --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly", "none"
                                   (default: assembly)
                                   coassembly: all samples are processing in one only data set
                                   assembly: all samples are processing individualy
