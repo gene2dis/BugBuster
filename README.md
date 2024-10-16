@@ -35,7 +35,7 @@ On release, automated continuous integration tests run the pipeline on a full-si
 21. Bin reports.
 22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
 23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Assembly modes: "coassembly" **(work in progress)**, "assembly", "none"
+24. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
