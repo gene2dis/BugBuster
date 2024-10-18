@@ -83,10 +83,6 @@ All database paths must be modified in the configuration file.
 
 10. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
 
-**AUTOMETA, This is obsolete until future updates.**
-
-10. ncbi_db = follow the instructions from [`Autometa_db_docs`](https://autometa.readthedocs.io/en/latest/databases.html) and generate a single directory with all files.
-
 **CheckM2**
 
 11. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
