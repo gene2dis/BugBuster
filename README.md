@@ -17,7 +17,7 @@ On release, automated continuous integration tests run the pipeline on a full-si
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
-6. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/)
+6. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
 7. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
 8. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
 9. Read traceback and taxonomic reports.
