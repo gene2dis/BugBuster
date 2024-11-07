@@ -23,7 +23,6 @@ process GTDB_TK {
         gtdbtk classify_wf \\
                --genome_dir ${metawrap} \\
                --out_dir ${prefix}_gtdb \\
-               --mash_db ${gtdbtk_db}/mash \\
                --cpus $task.cpus \\
                --extension .fa \\
                --pplacer_cpus $task.cpus
@@ -61,7 +60,6 @@ process GTDB_TK_COASSEMBLY {
         gtdbtk classify_wf \\
                --genome_dir ${metawrap} \\
                --out_dir ${prefix}_gtdb \\
-               --mash_db ${gtdbtk_db}/mash \\
                --cpus $task.cpus \\
                --extension .fa \\
                --pplacer_cpus $task.cpus
