@@ -21,7 +21,6 @@ process METAWRAP {
         def contamination = "${params.metawrap_contamination}"
 
         """
-	echo ${metawrap_db} | checkm data setRoot ${metawrap_db}
         cp -rL ${metabat2_bins} metabat_wp_bins
 	cp -rL ${semibin_bins} semibin_wp_bins
         cp -rL ${comebin_bins} comebin_wp_bins
@@ -64,7 +63,6 @@ process METAWRAP_COASSEMBLY {
         def contamination = "${params.metawrap_contamination}"
 
         """
-	echo ${metawrap_db} | checkm data setRoot ${metawrap_db}
         cp -rL ${bins[0]} metabat_wp_bins
 	cp -rL ${bins[1]} semibin_wp_bins
         cp -rL ${bins[2]} comebin_wp_bins
