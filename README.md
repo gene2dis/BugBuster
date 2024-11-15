@@ -66,30 +66,26 @@ All database paths must be modified in the configuration file.
 4. ncbi_nodes_dmp = recommended download: nodes.dmp from zipped dir taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 5. ncbi_names_dmp = recommended download: names.dmp from the same zipped dir of nodes.dmp
 
-**CheckM for Metawrap:**
-
-6. metawrap_db = recommended download: [`checkM_db_dir`](https://data.ace.uq.edu.au/public/CheckM_databases/checkm_data_2015_01_16.tar.gz)
-
 **BlastDB for contig taxonomic annotation:**
 
-7. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
-8. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
+6. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+7. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
 
 **KARGA:**
 
-9. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
+8. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
 
 **KARGVA:**
 
-10. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
+9. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
 
 **CheckM2**
 
-11. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+10. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 
 **GTDB-TK**
 
-12. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
+11. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
 
 ## Running the pipeline
 
