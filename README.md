@@ -125,9 +125,6 @@ Optional arguments:
                                   coassembly: all samples are processing in one only data set
                                   assembly: all samples are processing individualy
 
-   --single_assembly              If coassembly type is choosen, single assembly will aditionaly generate indivdual assembly for all samples
-                                  (default: false)
-
    --read_arg_prediction          ARG and ARGV gene prediction at read level using KARGA and KARGVA
                                   (default: false)
 
