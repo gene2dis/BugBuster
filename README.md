@@ -54,6 +54,8 @@ Currently the pipeline has been tested with Docker.
 
 All database paths must be modified in the configuration file.
 
+Note: You don't need to download all databases if you don't want to use all the features of the pipeline
+
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
 1. human_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
 2. phyX_db = recommended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
