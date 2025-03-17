@@ -2,6 +2,7 @@ process READS_REPORT {
 
     container 'quay.io/ffuentessantander/r_reports:1.1'
 
+    publishDir "${params.output}/reports/read_level", mode: 'copy', pattern: '*.csv'
     publishDir "${params.output}/reports/read_level", mode: 'copy', pattern: '*.png'
 
     label 'process_single'
@@ -10,7 +11,7 @@ process READS_REPORT {
         path(reports)
 
     output:
-	path("All_reads_report.csv"), emit: report
+	path("*.csv"), emit: report
 	path("*.png"), emit: figure
 
     script:
