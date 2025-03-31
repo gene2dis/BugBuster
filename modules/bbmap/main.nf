@@ -3,7 +3,6 @@ process BBMAP {
 
     label 'process_single'
 
-    publishDir "${params.output}/workflow/${meta.id}/bbmap", pattern: '*_filtered_contigs.fa'
     publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*_filtered_contigs.fa'
     publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*_contig.stats'
 
@@ -30,7 +29,6 @@ process BBMAP_COASSEMBLY {
 
     label 'process_single'
 
-    publishDir "${params.output}/workflow/co_assembly/bbmap", pattern: '*_filtered_contigs.fa'
     publishDir "${params.output}/contigs_and_bins/co_assembly/contigs", mode: 'copy', pattern: '*_contig.stats'
     publishDir "${params.output}/contigs_and_bins/co_assembly/contigs", mode: 'copy', pattern: '*_filtered_contigs.fa'
 

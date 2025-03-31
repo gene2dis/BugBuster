@@ -1,6 +1,6 @@
 process QFILTER {
 
-    cpus 1
+    label 'process_single'
 
     input:
         tuple val(meta), path(reads), path(json)

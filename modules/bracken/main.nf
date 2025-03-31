@@ -4,8 +4,6 @@ process BRACKEN {
     maxForks 4
     label 'process_single'
 
-    publishDir "${params.output}/workflow/${meta.id}/bracken", pattern: '*.report'
-
     input:
         tuple val(meta), path(kraken_report)
         path db

@@ -3,7 +3,6 @@ process PRODIGAL_BINS {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/prodigal_bins", pattern: '*_bins_proteins'
     publishDir "${params.output}/contigs_and_bins/${meta.id}/refined_bins_proteins", mode: 'copy', pattern: '*_bins_proteins'
 
     input:
@@ -55,7 +54,6 @@ process PRODIGAL_CONTIGS {
 
     label 'process_single'
 
-    publishDir "${params.output}/workflow/${meta.id}/prodigal_contigs", pattern: '*contigs*'
     publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*contigs*'
 
     input:

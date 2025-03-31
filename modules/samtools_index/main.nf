@@ -3,8 +3,6 @@ process SAMTOOLS_INDEX {
 
     cpus 1
 
-    publishDir "${params.output}/workflow/${meta.id}/samtool_index", pattern: '*_all_reads.bam'
-
     input:
         tuple val(meta), path(sorted_bam)
 

@@ -3,8 +3,6 @@ process KARGA {
 
     label 'process_low'
 
-    publishDir "${params.output}/workflow/${meta.id}/karga", pattern: '*KARGA_mappedGenes.csv'
-
     input:
         tuple val(meta), path(report), path(reads)
 	path(params.karga_db)	    

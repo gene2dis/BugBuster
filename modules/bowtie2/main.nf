@@ -3,12 +3,13 @@ process BOWTIE2 {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/bowtie_${db_alias}", pattern: '*_map_*.fastq.gz'
+    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('R1_map_host.fastq.gz') ? "${meta.id}_R1_clean_reads.fastq.gz" : null }
+    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('R2_map_host.fastq.gz') ? "${meta.id}_R2_clean_reads.fastq.gz" : null }
+    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('_Singleton_map_host.fastq.gz') ? "${meta.id}_Singleton_clean_reads.fastq.gz" : null }
 
     input:
         tuple val(meta), path(reads)
 	path index_db
-	val index_basename
 	val db_alias
 
     output:
@@ -24,9 +25,11 @@ process BOWTIE2 {
         def prefix = "${meta.id}"
 
         """
+        basename=`ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | uniq`
+
         bowtie2 \\
         $args \\
-        -x ${index_db}/${index_basename} \\
+        -x ${index_db}/\${basename} \\
         -p $task.cpus \\
         -1 ${reads[0]} \\
         -2 ${reads[1]} \\
@@ -36,16 +39,13 @@ process BOWTIE2 {
         mv ${prefix}_${db_alias}.2 ${prefix}_R2_map_${db_alias}.fastq.gz &&
 
         R1_in_count=`zcat ${prefix}_R1_map_${db_alias}.fastq.gz | wc -l`
-        R2_in_count=`zcat ${prefix}_R2_map_${db_alias}.fastq.gz | wc -l`
         R1_r_count=`echo \$((\${R1_in_count}/4))`
-        R2_r_count=`echo \$((\${R2_in_count}/4))`
-        final_reads_count=`echo \$((\${R1_r_count}+\${R2_r_count}))`
-
+        final_reads_count=`echo \$((\${R1_r_count}*2))`
 
 	if [[ ${reads[2]} != null ]]; then
 		bowtie2 \\
                 $args \\
-		-x ${index_db}/${index_basename} \\
+		-x ${index_db}/\${basename} \\
 		-p $task.cpus \\
 		-U ${reads[2]} \\
 		--un-gz ${prefix}_${db_alias} > ${prefix}_bowtie_singleton_map_${db_alias}

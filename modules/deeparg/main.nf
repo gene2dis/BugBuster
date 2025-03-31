@@ -44,8 +44,6 @@ process DEEPARG_BINS {
 process DEEPARG_CONTIGS {
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
 
-    publishDir "${params.output}/workflow/${meta.id}/deeparg_contigs", pattern: "*.out.mapping.ARG"
-
     label 'process_low'
 
     input:

@@ -26,6 +26,7 @@ println logo
 
 include {FASTP} from "./modules/fastp/main"
 include {QFILTER} from "./modules/qfilter/main"
+include {COUNT_READS} from "./modules/count_reads/main"
 
 include {BOWTIE2 as BOWTIE2_HUMAN} from "./modules/bowtie2/main"
 include {BOWTIE2 as BOWTIE2_PHYX} from "./modules/bowtie2/main"
@@ -196,49 +197,62 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
                        }
                    }
 
+    switch ( params.reads_filter ) {
+       case "illumina":
 
-        // LIMPIEZA DE LECTURAS POR CALIDAD
+	        // LIMPIEZA DE LECTURAS POR CALIDAD
 
-    ch_fastp_reads = FASTP(ch_reads)
+	    ch_fastp_reads = FASTP(ch_reads)
 
-        // EXTRAIGO Y FORMATEO REPORTES
+	        // EXTRAIGO Y FORMATEO REPORTES
 
-    ch_fastp_reads_report = QFILTER(ch_fastp_reads)
+	    ch_fastp_reads_report = QFILTER(ch_fastp_reads)
 
-	// EXTRAIGO EL NUMERO DE LECTURAS
+		// EXTRAIGO EL NUMERO DE LECTURAS
 
-    ch_fastp_reads_num = ch_fastp_reads_report.qfilter.map{ 
-			       def after_reads = it[2].text
-			       if( Integer.parseInt(after_reads) >= params.min_read_sample ) {
-					def reads = it[1]
-					def meta = it[0]
-					return [meta, reads]
-			       }
-			       else {
-					return 
-			       }
-			  }
+	    ch_fastp_reads_num = ch_fastp_reads_report.qfilter.map{ 
+				       def after_reads = it[2].text
+				       if( Integer.parseInt(after_reads) >= params.min_read_sample ) {
+						def reads = it[1]
+						def meta = it[0]
+						return [meta, reads]
+				       }
+				       else {
+						return 
+				       }
+				}
 
-        // MAPEO DE LECTURAS CONTRA BASES DE DATOS
+	        // MAPEO DE LECTURAS CONTRA BASES DE DATOS
+		// SE INTRODUCE EL PATH DEL INDEX, EL INDEX BASENAME Y UN ALIAS DE LA BASE DE DATOS PARA LA SALIDA QUE NO CONTENGA PUNTOS
 
-	// SE INTRODUCE EL PATH DEL INDEX, EL INDEX BASENAME Y UN ALIAS DE LA BASE DE DATOS PARA LA SALIDA QUE NO CONTENGA PUNTOS
+	    ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num, params.phyX_db, "phiX")
+	    ch_host_clean_reads = BOWTIE2_HUMAN(ch_phyx_clean_reads.reads, params.host_db, "host")
 
-    ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num, params.phyX_db, "phiX_refseq", "phiX")
-    ch_human_clean_reads = BOWTIE2_HUMAN(ch_phyx_clean_reads.reads, params.human_db, "chm13.draft_v1.0_plusY", "human")
+	        // UNIFICACIÓN DE REPORTES
 
-        // UNIFICACIÓN DE REPORTES
+	    ch_reads_report = READS_REPORT(ch_phyx_clean_reads.report
+	                                .concat(ch_host_clean_reads.report)
+	                                .concat(ch_fastp_reads_report.reads_report)
+	                                .collect(),"phiX host")
+       break;
 
-            ch_reads_report = READS_REPORT(ch_phyx_clean_reads.report
-                                    .concat(ch_human_clean_reads.report)
-                                    .concat(ch_fastp_reads_report.reads_report)
-                                    .collect())
+       case "none":
 
-        // PREDICCIÓN TAXONOMICA
+            ch_host_clean_reads = COUNT_READS(ch_reads)
 
+            ch_reads_report = READS_REPORT(ch_host_clean_reads.reads_report
+                                        .collect(), "none")
+  
+       break;
+
+       default:
+
+        exit 1, "ERROR: Not valid assembly mode, please check nextflow.config file"
+    }
     switch ( params.taxonomic_profiler ) {
        case "kraken2":
 
-            ch_k2_taxonomy = KRAKEN2_GTDB(ch_human_clean_reads.reads, params.k2_gtdb_db, params.kraken_db_used)
+            ch_k2_taxonomy = KRAKEN2_GTDB(ch_host_clean_reads.reads, params.k2_gtdb_db, params.kraken_db_used)
 
             TAX_REPORT_KRAKEN2(ch_k2_taxonomy.report
                            .concat(ch_reads_report)
@@ -262,7 +276,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
        case "sourmash":
 
-            ch_sm_taxonomy = SOURMASH(ch_human_clean_reads.reads, params.sourmash_db, params.sourmash_tax_file, params.sourmash_db_name, params.sourmash_tax_rank)
+            ch_sm_taxonomy = SOURMASH(ch_host_clean_reads.reads, params.sourmash_db, params.sourmash_tax_file, params.sourmash_db_name, params.sourmash_tax_rank)
 
             TAX_REPORT_SOURMASH(ch_sm_taxonomy.report
                            .concat(ch_reads_report)
@@ -286,10 +300,10 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.read_arg_prediction) {
 
-        ch_args_oap = ARGS_OAP(ch_human_clean_reads.reads)
-        ch_argv_prediction = KARGVA(ch_human_clean_reads.reads, params.kargva_db)
+        ch_args_oap = ARGS_OAP(ch_host_clean_reads.reads)
+        ch_argv_prediction = KARGVA(ch_host_clean_reads.reads, params.kargva_db)
         ch_arg_prediction = KARGA(ch_argv_prediction.kargva_reads, params.karga_db)
-        ARG_NORM_REPORT(ch_arg_prediction.concat(ch_argv_prediction.kargva_reports).concat(ch_args_oap).concat(ch_reads_report.report).collect())
+        ARG_NORM_REPORT(ch_arg_prediction.concat(ch_argv_prediction.kargva_reports).concat(ch_args_oap).collect())
 
     }
 
@@ -298,12 +312,12 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
         // ENSAMBLE DE LECTURAS, FILTRADO DE CONTIGS Y CALCULO DE PROFUNDIDAD
 
-         ch_assembly_co = MEGAHIT_COASSEMBLY(ch_human_clean_reads.reads_coassembly.collect())
+         ch_assembly_co = MEGAHIT_COASSEMBLY(ch_host_clean_reads.reads_coassembly.collect())
          ch_filtered_contigs_co = BBMAP_COASSEMBLY(ch_assembly_co)
 
          if ( params.include_binning || params.contig_tax_and_arg ) { 
 
-              ch_bowtie2_samtools = BOWTIE2_SAMTOOLS_COASSEMBLY(ch_human_clean_reads.reads.combine(ch_filtered_contigs_co.contigs)) 
+              ch_bowtie2_samtools = BOWTIE2_SAMTOOLS_COASSEMBLY(ch_host_clean_reads.reads.combine(ch_filtered_contigs_co.contigs)) 
               ch_contigs_blastn = ch_filtered_contigs_co.contigs.map{
                                         def meta = [:]
                                             meta.id = "coassembly"
@@ -336,7 +350,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
               ch_checkm = CHECKM2_COASSEMBLY(ch_all_bins.combine(ch_metawrap_co), params.checkm_db)
               ch_gtdb_tk = GTDB_TK_COASSEMBLY(ch_metawrap_co, params.gtdbtk_db)
-              ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(ch_human_clean_reads.reads.combine(ch_metawrap_co))
+              ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(ch_host_clean_reads.reads.combine(ch_metawrap_co))
               ch_bin_cov = BEDTOOLS(ch_bin_depth)
 
               BIN_SUMMARY(ch_bin_cov.collect().combine(ch_gtdb_tk.report.collect()).combine(ch_checkm.metawrap_report.collect()))
@@ -348,7 +362,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
         // ENSAMBLE DE LECTURAS, FILTRADO DE CONTIGS Y CALCULO DE PROFUNDIDAD
 
-         ch_assembly = MEGAHIT(ch_human_clean_reads.reads)
+         ch_assembly = MEGAHIT(ch_host_clean_reads.reads)
          ch_filtered_contigs = BBMAP(ch_assembly)
 
         // BINNING Y REFINAMIENTO DE BINS
