@@ -197,8 +197,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
                        }
                    }
 
-    switch ( params.reads_filter ) {
-       case "illumina":
+      if ( params.quality_control ) {
 
 	        // LIMPIEZA DE LECTURAS POR CALIDAD
 
@@ -234,21 +233,14 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 	                                .concat(ch_host_clean_reads.report)
 	                                .concat(ch_fastp_reads_report.reads_report)
 	                                .collect(),"phiX host")
-       break;
-
-       case "none":
+       } else {
 
             ch_host_clean_reads = COUNT_READS(ch_reads)
 
             ch_reads_report = READS_REPORT(ch_host_clean_reads.reads_report
                                         .collect(), "none")
-  
-       break;
+       }
 
-       default:
-
-        exit 1, "ERROR: Not valid assembly mode, please check nextflow.config file"
-    }
     switch ( params.taxonomic_profiler ) {
        case "kraken2":
 
