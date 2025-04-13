@@ -72,7 +72,7 @@ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin 
 sudo docker run hello-world
 ```
 
-Once docker is installed and the pipeline is used for the first time, it will automatically download all the containers required for the execution of the pipeline with the desired configuration.
+**Once docker is installed and the pipeline is used for the first time, it will automatically download all the containers required for the execution of the pipeline with the desired configuration.**
 
 3. Download the pipeline, either cloning the repository or downloading the zip file
 
