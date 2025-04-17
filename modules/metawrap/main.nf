@@ -8,7 +8,6 @@ process METAWRAP {
 
     input:
         tuple val(meta), path(metabat2_bins), path(semibin_bins), path(comebin_bins)
-	path(metawrap_db)
 
     output:
         tuple val(meta), path("*metawrap*bins"), emit: metawrap
@@ -50,7 +49,6 @@ process METAWRAP_COASSEMBLY {
 
     input:
         path(bins)
-	path(metawrap_db)
 
     output:
         path("*metawrap*bins"), emit: metawrap
