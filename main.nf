@@ -336,7 +336,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
               ch_comebin = COMEBIN_COASSEMBLY(ch_bowtie2_samtools.collect().combine(ch_filtered_contigs_co.contigs))
 
               ch_all_bins = ch_metabat2.combine(ch_semibin).combine(ch_comebin)
-              ch_metawrap_co = METAWRAP_COASSEMBLY(ch_all_bins, params.metawrap_db)
+              ch_metawrap_co = METAWRAP_COASSEMBLY(ch_all_bins)
 
         // ESTIMACIÓN DE CALIDAD, ASIGNACIÓN TAXONOMICA Y GENERACIÓN DE REPORTES
 
@@ -375,7 +375,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
              ch_comebin = COMEBIN(ch_bowtie2_samtools.contigs_and_bam)
 
              ch_all_bins = ch_metabat2.join(ch_semibin).join(ch_comebin)
-             ch_metawrap = METAWRAP(ch_all_bins, params.metawrap_db)
+             ch_metawrap = METAWRAP(ch_all_bins)
 
         // ESTIMACIÓN DE CALIDAD Y ASIGNACIÓN TAXONOMICA
 
