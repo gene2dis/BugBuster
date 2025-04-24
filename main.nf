@@ -188,7 +188,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
                            meta.id = row.sample
                        def r1 = row.r1
                        def r2 = row.r2
-                       if( row.s != null ) {
+                       if( row.s ) {
                             def s = row.s
                             return [meta, [r1, r2, s]]
                        }
