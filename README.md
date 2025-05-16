@@ -80,7 +80,7 @@ sudo docker run hello-world
 
 ## Databases
 
-All database paths must be modified in the configuration file. **WIP Some databases can be automatically download** 
+All database paths must be modified in the configuration file. **🚧WIP🚧 Some databases can be automatically download** 
 
 **Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
 
