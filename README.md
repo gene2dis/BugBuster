@@ -143,7 +143,7 @@ Usage:
 
 The typical command for running the pipeline is as follows:
 
-nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -resume (recomended)
+nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -profile local_docker -resume (recomended)
 
 Mandatory arguments:
    --input                        Input csv file with: samples names, path of all fastq files, and optionaly singletons.
