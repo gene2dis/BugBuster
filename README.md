@@ -80,43 +80,42 @@ sudo docker run hello-world
 
 ## Databases
 
-All database paths must be modified in the configuration file.
+All database paths must be modified in the configuration file. **WIP Some databases can be automatically download** 
 
 **Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. human_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
+1. host_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
 2. phyX_db = recommended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
 
 **Kraken2:**
 
-3. k2_gtdb_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
+3. kraken2_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
 
 **BBlobTools:**
 
-4. ncbi_nodes_dmp = recommended download: nodes.dmp from zipped dir taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-5. ncbi_names_dmp = recommended download: names.dmp from the same zipped dir of nodes.dmp
+4. taxdump_files = must be a dir with nodes.dmp and names.dmp files. recommended download: dir from taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 
 **BlastDB for contig taxonomic annotation:**
 
-6. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
-7. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
+5. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+6. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
 
 **KARGA:**
 
-8. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
+7. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
 
 **KARGVA:**
 
-9. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
+8. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
 
 **CheckM2**
 
-10. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+9. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 
 **GTDB-TK**
 
-11. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
+10. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
 
 ## Running the pipeline
 
