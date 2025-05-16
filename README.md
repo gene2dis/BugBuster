@@ -76,38 +76,39 @@ sudo docker run hello-world
 
 3. Download the pipeline, either cloning the repository or downloading the zip file
 
-4. Download databases and modify their paths in 'nextflow.config' file.
+4. Download databases and modify their paths in 'nextflow.config' file or 🚧WIP🚧 use one of the default databases from config/databases.config and modify the variable in the nextflow.config file.
 
 ## Databases
 
-All database paths must be modified in the configuration file. **🚧WIP🚧 Some databases can be automatically download** 
+All database paths must be modified in the configuration file. 
+**🚧WIP🚧 Some databases can be automatically download. Variables with custom_ from below can be void (ej: custom_host_db = ''). You can choice one from config/databases.config for the same variable without custom_ extension, ej: host_db = "human". In this example, the workflow will download human index and prepare it required process** 
 
 **Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. host_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
+1. custom_host_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
 2. phyX_db = recommended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
 
 **Kraken2:**
-
-3. kraken2_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
+    
+3. custom_kraken2_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
 
 **BBlobTools:**
 
-4. taxdump_files = must be a dir with nodes.dmp and names.dmp files. recommended download: dir from taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+4. custom_taxdump_files = must be a dir with nodes.dmp and names.dmp files. recommended download: dir from taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 
 **BlastDB for contig taxonomic annotation:**
 
-5. nt_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+5. custom_blast_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
 6. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
 
 **KARGA:**
 
-7. karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
+7. custom_karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
 
 **KARGVA:**
 
-8. kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
+8. custom_kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
 
 **CheckM2**
 
