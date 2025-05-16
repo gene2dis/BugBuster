@@ -8,8 +8,7 @@ process BOWTIE2 {
     publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('_Singleton_map_host.fastq.gz') ? "${meta.id}_Singleton_clean_reads.fastq.gz" : null }
 
     input:
-        tuple val(meta), path(reads)
-	path index_db
+        tuple val(meta), path(reads), path(index_db)
 	val db_alias
 
     output:

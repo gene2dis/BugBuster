@@ -22,20 +22,28 @@ logo='''
 
 println logo 
 
+	// FORMATEO DE BASES DE DATOS
+
+include {FORMAT_SM_DB} from "./modules/format_db/main"
+include {FORMAT_KRAKEN_DB} from "./modules/format_db/main"
+include {FORMAT_BOWTIE_INDEX as FORMAT_BOWTIE_HOST} from "./modules/format_db/main"
+include {FORMAT_NT_BLAST_DB} from "./modules/format_db/main"
+include {FORMAT_TAXDUMP_FILES} from "./modules/format_db/main"
+
 	// FILTRADO DE SECUENCIAS
 
 include {FASTP} from "./modules/fastp/main"
 include {QFILTER} from "./modules/qfilter/main"
 include {COUNT_READS} from "./modules/count_reads/main"
 
-include {BOWTIE2 as BOWTIE2_HUMAN} from "./modules/bowtie2/main"
+include {BOWTIE2 as BOWTIE2_HOST} from "./modules/bowtie2/main"
 include {BOWTIE2 as BOWTIE2_PHYX} from "./modules/bowtie2/main"
 
 	// PREDICCION TAXONOMICA EN READS
 
-include {KRAKEN2 as KRAKEN2_GTDB} from "./modules/kraken2/main"
-include {BRACKEN as BRACKEN_GTDB} from "./modules/bracken/main"
-include {KRAKEN_BIOM as KRAKEN_BIOM_GTDB} from "./modules/kraken_biom/main"
+include {KRAKEN2 as KRAKEN2} from "./modules/kraken2/main"
+include {BRACKEN as BRACKEN} from "./modules/bracken/main"
+include {KRAKEN_BIOM as KRAKEN_BIOM} from "./modules/kraken_biom/main"
 include {KRAKEN_TO_PHYLOSEQ} from "./modules/kraken_to_phyloseq/main"
 
 
@@ -174,8 +182,81 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 \u001B[33mAdditionally, all options can be modified in nextflow.config file\u001B[0m
 
    '''
-        println(help_info)
-        exit 0
+    println(help_info)
+}
+
+    switch ( params.taxonomic_profiler ) {
+
+       case "kraken2":
+
+       if ( params.custom_kraken_db?.trim() ) {
+             ch_kraken_ref_db_formated = Channel.from(path(params.custom_kraken_db))
+       } else {
+             ch_kraken_ref_db = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["file"])
+             ch_kraken_ref_db_formated = FORMAT_KRAKEN_DB(ch_kraken_ref_db)
+       }
+
+       break;
+
+       case "sourmash":
+
+       if ( params.custom_sourmash_db?.trim() ) {
+             ch_sourmash_db = Channel.fromList(params.custom_sourmash_db).map { file(it) }
+       } else {
+             ch_sourmash_db = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["file"]).map { file(it) }
+       }
+
+       break;
+
+       case "none":
+
+       break;
+
+       default:
+
+       exit 0
+    }
+
+    if ( params.read_arg_prediction ) {
+       if ( params.custom_karga_db?.trim() ) {
+             ch_karga_db = Channel.from(file(params.custom_karga_db))
+       } else {
+             ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["file"]).map { file(it) }
+       }
+    }
+       if ( params.custom_kargva_db?.trim() ) {
+             ch_kargva_db = Channel.from(file(params.custom_kargva_db))
+       } else {
+             ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["file"]).map { file(it) }
+       }
+    }
+
+    if ( params.quality_control ) {
+
+       if ( params.custom_bowtie_host_index?.trim() ) {
+            ch_bowtie_host_index_formated = Channel.from(path(params.custom_bowtie_host_index))
+       } else {
+            ch_bowtie_host_index = Channel.fromList(params.bowtie_ref_host_index[params.host_db]["file"])
+            ch_bowtie_host_index_formated = FORMAT_BOWTIE_HOST(ch_bowtie_host_index)
+       }
+       ch_bowtie_phiX_index_formated = Channel.from(file(params.phyX_db))
+
+    }
+
+    if ( params.contig_tax_and_arg ) {
+
+       if ( params.custom_blast_db?.trim() ) {
+           ch_blast_db_formated = Channel.from(path(params.custom_blast_db))
+       } else {
+           ch_blast_db =  Channel.fromList(params.blast_ref_db[params.blast_db]["url"])
+           ch_blast_db_formated = FORMAT_NT_BLAST_DB(ch_blast_db)
+       }
+       if ( params.custom_taxdump_files?.trim() ) {
+           ch_taxdump_files_formated = Channel.from(path(params.custom_taxdump_files))
+       } else {
+           ch_taxdump_files = Channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
+           ch_taxdump_files_formated = FORMAT_TAXDUMP_FILES(ch_taxdump_files)
+       }
     }
 
 	// LEER EL ARCHIVO DE MUESTRAS Y GENERAR EL CANAL
@@ -224,8 +305,8 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 	        // MAPEO DE LECTURAS CONTRA BASES DE DATOS
 		// SE INTRODUCE EL PATH DEL INDEX, EL INDEX BASENAME Y UN ALIAS DE LA BASE DE DATOS PARA LA SALIDA QUE NO CONTENGA PUNTOS
 
-	    ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num, params.phyX_db, "phiX")
-	    ch_host_clean_reads = BOWTIE2_HUMAN(ch_phyx_clean_reads.reads, params.host_db, "host")
+	    ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num.combine(ch_bowtie_phiX_index_formated), "phiX")
+	    ch_host_clean_reads = BOWTIE2_HOST(ch_phyx_clean_reads.reads.combine(ch_bowtie_host_index_formated), "host")
 
 	        // UNIFICACIÓN DE REPORTES
 
@@ -244,7 +325,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
     switch ( params.taxonomic_profiler ) {
        case "kraken2":
 
-            ch_k2_taxonomy = KRAKEN2_GTDB(ch_host_clean_reads.reads, params.k2_gtdb_db, params.kraken_db_used)
+            ch_k2_taxonomy = KRAKEN2(ch_host_clean_reads.reads.combine(ch_kraken_ref_db_formated), params.kraken_db_used)
 
             TAX_REPORT_KRAKEN2(ch_k2_taxonomy.report
                            .concat(ch_reads_report)
@@ -254,11 +335,11 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
         // UN ALIAS PARA LA SALIDA, EL TAMAÑO MINIMO DE READ Y EL NIVEL TAXONOMICO
         // SI FALLA ESTA PARTE, SE DEBE CAMBIAR EL NIVEL TAXONOMICO
 
-            ch_taxonomy_estimation_gtdb = BRACKEN_GTDB(ch_k2_taxonomy.kraken, params.k2_gtdb_db, params.kraken_db_used)
+            ch_taxonomy_estimation = BRACKEN(ch_k2_taxonomy.kraken.combine(ch_kraken_ref_db_formated), params.kraken_db_used)
 
         // GENERAR ARCHIVO .BIOM
 
-            ch_kraken_biom = KRAKEN_BIOM_GTDB(ch_taxonomy_estimation_gtdb.collect(), params.kraken_db_used)
+            ch_kraken_biom = KRAKEN_BIOM(ch_taxonomy_estimation.collect(), params.kraken_db_used)
 
         // GENERAR OBJETO PHYLOSEQ Y GRAFICOS DE ABUNDANCIA
 
@@ -268,7 +349,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
        case "sourmash":
 
-            ch_sm_taxonomy = SOURMASH(ch_host_clean_reads.reads, params.sourmash_db, params.sourmash_tax_file, params.sourmash_db_name, params.sourmash_tax_rank)
+            ch_sm_taxonomy = SOURMASH(ch_host_clean_reads.reads.combine(ch_sourmash_db.collect()), params.sourmash_db_name, params.sourmash_tax_rank)
 
             TAX_REPORT_SOURMASH(ch_sm_taxonomy.report
                            .concat(ch_reads_report)
@@ -292,10 +373,10 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.read_arg_prediction) {
 
-        ch_args_oap = ARGS_OAP(ch_host_clean_reads.reads)
-        ch_argv_prediction = KARGVA(ch_host_clean_reads.reads, params.kargva_db)
-        ch_arg_prediction = KARGA(ch_argv_prediction.kargva_reads, params.karga_db)
-        ARG_NORM_REPORT(ch_arg_prediction.concat(ch_argv_prediction.kargva_reports).concat(ch_args_oap).collect())
+          ch_args_oap = ARGS_OAP(ch_host_clean_reads.reads)
+          ch_argv_prediction = KARGVA(ch_host_clean_reads.reads.combine(ch_kargva_db))
+          ch_arg_prediction = KARGA(ch_argv_prediction.kargva_reads.combine(ch_karga_db))
+          ARG_NORM_REPORT(ch_arg_prediction.concat(ch_argv_prediction.kargva_reports).concat(ch_args_oap).collect())
 
     }
 
@@ -403,9 +484,9 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.contig_tax_and_arg ) {
 
-             ch_nt_blastn = NT_BLASTN(ch_contigs_blastn, params.nt_db)
+             ch_nt_blastn = NT_BLASTN(ch_contigs_blastn.combine(ch_blast_db_formated))
              ch_index_bam = SAMTOOLS_INDEX(ch_bam_index)
-             ch_blob_table = BLOBTOOLS(ch_nt_blastn.join(ch_index_bam), params.ncbi_nodes_dmp, params.ncbi_names_dmp)
+             ch_blob_table = BLOBTOOLS(ch_nt_blastn.join(ch_index_bam).combine(ch_taxdump_files_formated.collect()))
              BLOBPLOT(ch_blob_table.only_blob.collect())
 
              ch_contig_proteins = PRODIGAL_CONTIGS(ch_contigs_blastn)

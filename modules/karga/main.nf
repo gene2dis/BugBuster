@@ -4,8 +4,7 @@ process KARGA {
     label 'process_low'
 
     input:
-        tuple val(meta), path(report), path(reads)
-	path(params.karga_db)	    
+        tuple val(meta), path(report), path(reads), path(karga_db)
 
     output:
         path("*_all_reads_KARGA_mappedGenes.csv"), emit: kargva
@@ -20,7 +19,7 @@ process KARGA {
                 cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
         fi
 
-        java -cp /bin/ KARGA k:17 d:${params.karga_db} -XX:ActiveProcessorCount=${task.cpus} r:n -Xmx32GB ${prefix}_all_reads.fastq.gz
+        java -cp /bin/ KARGA k:17 d:${karga_db} -XX:ActiveProcessorCount=${task.cpus} r:n -Xmx32GB ${prefix}_all_reads.fastq.gz
         rm -f ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGA_mappedGenes.csv ]]; then

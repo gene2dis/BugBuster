@@ -1,11 +1,10 @@
 process KARGVA {
-    container 'quay.io/ffuentessantander/kargva:1.1'
+    container 'quay.io/ffuentessantander/kargva:1.0'
 
     label 'process_low'
 
     input:
-        tuple val(meta), path(reads)
-        path(params.kargva_db)
+        tuple val(meta), path(reads), path(kargva_db)
     
     output:
         tuple val(meta), path("*_all_reads_KARGVA_mappedGenes.csv"), path(reads), emit: kargva_reads
@@ -21,7 +20,7 @@ process KARGVA {
 		cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
 	fi
 
-	java -cp /bin/ KARGVA k:17 d:${params.kargva_db} -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB ${prefix}_all_reads.fastq.gz
+	java -cp /bin/ KARGVA k:17 d:${kargva_db} -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGVA_mappedGenes.csv ]]; then
                 echo "GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGVA_mappedGenes.csv

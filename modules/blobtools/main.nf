@@ -4,9 +4,7 @@ process BLOBTOOLS {
     label 'process_single'
 
     input:
-        tuple val(meta), path(contigs), path(blastn_hits), path(bam), path(bam_bai)
-        path(NCBI_NODES_DMP)
-        path(NCBI_NAMES_DMP)
+        tuple val(meta), path(contigs), path(blastn_hits), path(bam), path(bam_bai), path(tax_files)
 
     output:
         tuple val(meta), path("*_Blob_tabl*"), emit: blob_table
@@ -19,8 +17,8 @@ process BLOBTOOLS {
         blobtools create \\
                   --infile ${contigs} \\
                   --hitsfile ${blastn_hits} \\
-                  --nodes ${NCBI_NODES_DMP} \\
-                  --names ${NCBI_NAMES_DMP} \\
+                  --nodes ${tax_files}/nodes.dmp \\
+                  --names ${tax_files}/names.dmp \\
                   --bam ${bam} \\
                   --out ${prefix} 
 

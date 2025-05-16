@@ -5,8 +5,7 @@ process BRACKEN {
     label 'process_single'
 
     input:
-        tuple val(meta), path(kraken_report)
-        path db
+        tuple val(meta), path(kraken_report), path(db)
         val db_name
 
     output:

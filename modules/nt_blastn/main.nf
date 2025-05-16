@@ -4,8 +4,7 @@ process NT_BLASTN {
     label 'process_low'
 
     input:
-        tuple val(meta), path(contigs)
-        path(nt_db)
+        tuple val(meta), path(contigs), path(nt_db)
 
     output:
         tuple val(meta), path(contigs), path("*_megablast.out"), emit: megablast_to_blob

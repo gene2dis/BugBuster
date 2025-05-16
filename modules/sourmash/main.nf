@@ -7,9 +7,7 @@ process SOURMASH {
     publishDir "${params.output}/workflow/${meta.id}/sourmash_${db_name}", pattern: '*.with-lineages.csv'
 
     input:
-        tuple val(meta), path(reads)
-	path db
-        path tax_file
+        tuple val(meta), path(reads), path(db), path(tax_file)
 	val db_name
         val sourmash_rank
 
