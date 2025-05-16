@@ -81,6 +81,7 @@ sudo docker run hello-world
 ## Databases
 
 All database paths must be modified in the configuration file. 
+
 **🚧WIP🚧 Some databases can be automatically download. Variables with custom_ from below can be void (ej: custom_host_db = ''). You can choice one from config/databases.config for the same variable without custom_ extension, ej: host_db = "human". In this example, the workflow will download human index and prepare it required process** 
 
 **Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
