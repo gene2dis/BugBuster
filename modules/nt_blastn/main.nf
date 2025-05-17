@@ -13,10 +13,12 @@ process NT_BLASTN {
         def prefix = "${meta.id}"
 
         """
+	db_basename=`ls ${nt_db}/ | grep -P '\\.[0]+?\\.' | cut -f1 -d'.' | sort | uniq`
+
         blastn \\
             -task megablast \\
             -query ${contigs} \\
-            -db ${nt_db}/nt \\
+            -db ${nt_db}/\${db_basename} \\
             -outfmt '6 qseqid staxids bitscore std' \\
             -max_target_seqs 1 \\
             -max_hsps 1 \\

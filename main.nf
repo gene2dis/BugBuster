@@ -183,6 +183,8 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
    '''
     println(help_info)
+
+    exit0
 }
 
     switch ( params.taxonomic_profiler ) {
@@ -213,8 +215,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
        break;
 
        default:
-
-       exit 0
+       exit 1, "ERROR: Not valid taxonomic profiler, please check nextflow.config file"
     }
 
     if ( params.read_arg_prediction ) {
@@ -223,8 +224,9 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
        } else {
              ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["file"]).map { file(it) }
        }
-    }
-       if ( params.custom_kargva_db?.trim() ) {
+    
+
+    if ( params.custom_kargva_db?.trim() ) {
              ch_kargva_db = Channel.from(file(params.custom_kargva_db))
        } else {
              ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["file"]).map { file(it) }
@@ -240,7 +242,6 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
             ch_bowtie_host_index_formated = FORMAT_BOWTIE_HOST(ch_bowtie_host_index)
        }
        ch_bowtie_phiX_index_formated = Channel.from(file(params.phyX_db))
-
     }
 
     if ( params.contig_tax_and_arg ) {
