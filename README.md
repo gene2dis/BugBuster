@@ -82,7 +82,7 @@ sudo docker run hello-world
 
 All database paths must be modified in the configuration file. 
 
-**🚧WIP🚧 Some databases can be automatically download. Variables with custom_ from below can be void (ej: custom_host_db = ''). You can choice one from config/databases.config for the same variable without custom_ extension, ej: host_db = "human". In this example, the workflow will automatically download human index and prepare it required process** 
+All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config fie. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. 
 
 **Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
 
