@@ -154,7 +154,7 @@ Optional arguments:
    --quality_control              Include the reads filtering steps.
                                   (default: true)
 
-   --taxonomic_profiler           Software for taxonomic classification in reads, avaible options: "kraken2", "sourmash", "none
+   --taxonomic_profiler           Choice software for taxonomic classification in reads, avaible options: "kraken2", "sourmash", "none
                                   (default: kraken2)
 
    --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly", "none"
