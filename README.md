@@ -80,19 +80,17 @@ sudo docker run hello-world
 
 ## Databases
 
-All database paths must be modified in the configuration file. 
-
 All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config fie. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. 
 
-**Note: You don't need to download all databases if you don't want to use all the features of the pipeline**
+**Note: Only the required databases for the requested tasks will be automatically download**
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. custom_host_db = recommended download: [`Chm13plusY`](https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip)
-2. phyX_db = recommended download: [`phiX`](https://www.ncbi.nlm.nih.gov/nuccore/J02482.1?report=fasta) **Fasta file must be indexed with bowtie2**
+1. custom_host_db
+2. custom_phyX_index 
 
 **Kraken2:**
     
-3. custom_kraken2_db = recommended download: [`gtdb_release_207_for_kraken2`](http://ftp.tue.mpg.de/ebio/projects/struo2/GTDB_release207/)
+3. custom_kraken2_db 
 
 **BBlobTools:**
 
