@@ -85,37 +85,37 @@ All databases can be automatically download in the first use of the pipeline and
 **Note: Only the required databases for the requested tasks will be automatically download**
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. custom_host_db
-2. custom_phyX_index 
+1. phiX_index = Default download from [`phage phiX174 geonome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank) (4.1 GB).
+2. host_db = Default download from [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie) (8.1 MB).
 
 **Kraken2:**
     
-3. custom_kraken2_db 
+3. kraken2_db = User can choice between Standard-8 (7.5 GB) and GTDB v220 (497 GB) for automatic download. From [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2).
 
 **BBlobTools:**
 
-4. custom_taxdump_files = must be a dir with nodes.dmp and names.dmp files. recommended download: dir from taxdump.tar.gz: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+4. taxdump_files = Default download from [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz) (448 MB).
 
 **BlastDB for contig taxonomic annotation:**
 
-5. custom_blast_db = recommended download: [`ncbi_nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
-6. deeparg_db = Use the downloand command from deeparg software, for more info visit [`deeparg github`](https://github.com/gaarangoa/deeparg)
+5. blast_db = Default download from [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/) (434 GB).
+6. deeparg_db = Default download from [`deeparg`](https://github.com/gaarangoa/deeparg) (4.8 GB).
 
 **KARGA:**
 
-7. custom_karga_db = must be a fasta with ARG genes. recommended download: [`megares_db`](https://www.meglab.org/downloads/megares_v3.00/megares_database_v3.00.fasta)
+7. karga_db = Default download from [`megares`](https://www.meglab.org/megares/download/) (9.2 MB)
 
 **KARGVA:**
 
-8. custom_kargva_db = must be a fasta with ARGV genes, where the resistance mutations are specified in the header. recommended download: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/blob/main/kargva_db_v5.fasta)
+8. kargva_db = Default download from [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
 
 **CheckM2**
 
-9. checkm_db = follow the instructions from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+9. checkm2_db = Default download from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 
 **GTDB-TK**
 
-10. gtdbtk-db = recommended download release 220 from [`gtdbtk_db`](https://data.ace.uq.edu.au/public/gtdb/data/releases/latest/auxillary_files/gtdbtk_package/full_package/gtdbtk_data.tar.gz)
+10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 
 ## Running the pipeline
 
@@ -132,7 +132,7 @@ The file **always** has to include the header `sample,r1,r2,s` but also "s" colu
 
 # Pipeline parameters
 
-The file `nextflow.config` contains all the parameteres used by the pipeline, including path to database files. Currently the path work in our server (_Arrakis_), but if you are running elsewhere, these need to be updated. 
+The file `nextflow.config` contains all the parameteres used by the pipeline.
 
 #### Starting the pipeline
 
@@ -150,6 +150,12 @@ Mandatory arguments:
    --output                       Path to output dir
 
 Optional arguments:
+   --quality_control              Include the reads filtering steps.
+                                  (default: true)
+
+   --taxonomic_profiler           Software for taxonomic classification in reads, avaible options: "kraken2", "sourmash", "none
+                                  (default: kraken2)
+
    --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly", "none"
                                   (default: assembly)
                                   coassembly: all samples are processing in one only data set
@@ -164,7 +170,9 @@ Optional arguments:
    --contig_tax_and_arg           Contig taxonomy and ARG prediction
                                   (default: false)
 
-   --arg_clustering               ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
+   --include_binning              Include the binning and binning refining steps. (default: false)
+
+   --arg_bin_clustering           ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
                                   (default: false)
 
    --help                         Print this usage statement.
