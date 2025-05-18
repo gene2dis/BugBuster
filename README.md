@@ -80,7 +80,7 @@ sudo docker run hello-world
 
 ## Databases
 
-All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config fie. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. 
+All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config file. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. 
 
 **Note: Only the required databases for the requested tasks will be automatically download**
 
