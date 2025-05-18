@@ -104,19 +104,19 @@ All databases can be automatically download in the first use of the pipeline and
 
 **KARGA:**
 
-7. karga_db = Default download from [`megares`](https://www.meglab.org/megares/download/) (9.2 MB)
+7. karga_db = Default download from [`megares`](https://www.meglab.org/megares/download/) (9.2 MB).
 
 **KARGVA:**
 
-8. kargva_db = Default download from [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
+8. kargva_db = Default download from [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main) (1.5 MB).
 
 **CheckM2**
 
-9. checkm2_db = Default download from [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+9. checkm2_db = Default download from [`Checkm2_docs`](https://github.com/chklovski/CheckM2) (2.9 GB).
 
 **GTDB-TK**
 
-10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
+10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html) (109 GB).
 
 ## Running the pipeline
 
