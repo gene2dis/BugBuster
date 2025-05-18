@@ -85,8 +85,8 @@ All databases can be automatically download in the first use of the pipeline and
 **Note: Only the required databases for the requested tasks will be automatically download**
 
 **Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. phiX_index = Default download from [`phage phiX174 geonome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank) (4.1 GB).
-2. host_db = Default download from [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie) (8.1 MB).
+1. phiX_index = Default download from [`phage phiX174 geonome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank) (8.1 MB).
+2. host_db = Default download from [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie) (4.1 GB).
 
 **Taxonomic profiling:**
     
