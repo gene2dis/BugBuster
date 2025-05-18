@@ -76,7 +76,7 @@ sudo docker run hello-world
 
 3. Download the pipeline, either cloning the repository or downloading the zip file
 
-4. Download databases and modify their paths in 'nextflow.config' file or use one of the default download databases from config/databases.config and modify the variable in the nextflow.config file.
+4. Download databases and modify their paths in 'nextflow.config' file or use one of the default automatic download databases from config/databases.config and modify the variable in the nextflow.config file.
 
 ## Databases
 
