@@ -6,8 +6,7 @@ process DEEPARG_BINS {
     label 'process_low'
 
     input:
-        tuple val(meta), path(prodigal_bins)
-        path(deeparg_db)
+        tuple val(meta), path(prodigal_bins), path(deeparg_db)
 
     output:
         tuple val(meta), path("*_deeparg_results"), emit: deeparg_bins
@@ -47,8 +46,7 @@ process DEEPARG_CONTIGS {
     label 'process_low'
 
     input:
-        tuple val(meta), path(prodigal_contigs)
-        path(deeparg_db)
+        tuple val(meta), path(prodigal_contigs), path(deeparg_db)
 
     output:
         tuple val(meta), path("*.ARG"), emit: deeparg

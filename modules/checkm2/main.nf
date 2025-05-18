@@ -6,8 +6,7 @@ process CHECKM2_COASSEMBLY {
     publishDir "${params.output}/workflow/co_assembly/checkm2", pattern: '*quality_report.tsv'
 
     input:
-        path(bins)
-	path(checkm_db)
+        path(bins), path(checkm_db)
 
     output:
         path("*quality_report.tsv"), emit: all_reports
@@ -60,8 +59,7 @@ process CHECKM2 {
     publishDir "${params.output}/workflow/${meta.id}/checkm2", pattern: '*quality_report.tsv'
 
     input:
-        tuple val(meta), path(metabat2), path(semibin), path(comebin), path(metawrap)
-	path(checkm_db)
+        tuple val(meta), path(metabat2), path(semibin), path(comebin), path(metawrap), path(checkm_db)
 
     output:
         path("*quality_report.tsv"), emit: all_reports

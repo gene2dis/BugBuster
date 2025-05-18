@@ -7,8 +7,7 @@ process GTDB_TK {
     publishDir "${params.output}/workflow/${meta.id}/gtdb-tk", pattern: '*_gtdbtk_*'
 
     input:
-        tuple val(meta), path(metawrap)
-	path(gtdbtk_db)
+        tuple val(meta), path(metawrap), path(gtdbtk_db)
 
     output:
         tuple val(meta), path("*_gtdbtk_*"), emit: gtdb_tk
@@ -45,8 +44,7 @@ process GTDB_TK_COASSEMBLY {
     publishDir "${params.output}/workflow/co_assembly/gtdb-tk", pattern: '*_gtdbtk_*'
 
     input:
-        path(metawrap)
-	path(gtdbtk_db)
+        path(metawrap), path(gtdbtk_db)
 
     output:
         path("*_gtdbtk_*"), emit: gtdb_tk

@@ -22,13 +22,17 @@ logo='''
 
 println logo 
 
-	// FORMATEO DE BASES DE DATOS
+	// FORMATEO Y/O DESCARGA DE BASES DE DATOS
 
 include {FORMAT_SM_DB} from "./modules/format_db/main"
 include {FORMAT_KRAKEN_DB} from "./modules/format_db/main"
 include {FORMAT_BOWTIE_INDEX as FORMAT_BOWTIE_HOST} from "./modules/format_db/main"
 include {FORMAT_NT_BLAST_DB} from "./modules/format_db/main"
 include {FORMAT_TAXDUMP_FILES} from "./modules/format_db/main"
+include {DOWNLOAD_DEEPARG_DB} from "./modules/format_db/main"
+include {FORMAT_CHECKM2_DB} from "./modules/format_db/main"
+include {BUILD_PHIX_BOWTIE2_INDEX} from "./modules/format_db/main"
+include {DOWNLOAD_GTDBTK_DB} from "./modules/format_db/main"
 
 	// FILTRADO DE SECUENCIAS
 
@@ -235,29 +239,60 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.quality_control ) {
 
+       if ( params.custom_phiX_index?.trim() ) {
+            ch_bowtie_phiX_index_formated = Channel.fromPath(params.custom_phiX_index)
+       } else {
+            ch_bowtie_phiX_index = Channel.fromList(params.bowtie_ref_genomes_for_build[params.phiX_index]["file"]).map { file(it) }
+            ch_bowtie_phiX_index_formated = BUILD_PHIX_BOWTIE2_INDEX(ch_bowtie_phiX_index)
+       }
+
        if ( params.custom_bowtie_host_index?.trim() ) {
             ch_bowtie_host_index_formated = Channel.from(path(params.custom_bowtie_host_index))
        } else {
             ch_bowtie_host_index = Channel.fromList(params.bowtie_ref_host_index[params.host_db]["file"])
             ch_bowtie_host_index_formated = FORMAT_BOWTIE_HOST(ch_bowtie_host_index)
        }
-       ch_bowtie_phiX_index_formated = Channel.from(file(params.phyX_db))
     }
 
     if ( params.contig_tax_and_arg ) {
 
+       if ( params.custom_deeparg_db?.trim() ) {
+           ch_deeparg_db = Channel.fromPath(params.custom_deeparg_db)
+       } else {
+           ch_deeparg_db = DOWNLOAD_DEEPARG_DB()
+       }
+
        if ( params.custom_blast_db?.trim() ) {
-           ch_blast_db_formated = Channel.from(path(params.custom_blast_db))
+           ch_blast_db_formated = Channel.fromPath(params.custom_blast_db)
        } else {
            ch_blast_db =  Channel.fromList(params.blast_ref_db[params.blast_db]["url"])
            ch_blast_db_formated = FORMAT_NT_BLAST_DB(ch_blast_db)
        }
+
        if ( params.custom_taxdump_files?.trim() ) {
            ch_taxdump_files_formated = Channel.from(path(params.custom_taxdump_files))
        } else {
            ch_taxdump_files = Channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
            ch_taxdump_files_formated = FORMAT_TAXDUMP_FILES(ch_taxdump_files)
        }
+    }
+    
+    if ( params.include_binning ) {
+
+       if ( params.custom_gtdbtk_db?.trim() ) {
+           ch_gtdbtk_db_formated = Channel.fromPath(params.custom_gtdbtk_db)
+       } else {
+           ch_gtdbtk_db = Channel.fromList(params.gtdbtk_ref_db[params.gtdbtk_db]["url"])
+           ch_gtdbtk_db_formated = DOWNLOAD_GTDBTK_DB(ch_gtdbtk_db)
+       }
+
+       if ( params.custom_checkm2_db?.trim() ) {
+           ch_checkm2_db_formated = Channel.fromPath(params.custom_checkm2_db)
+       } else {
+           ch_checkm2_db = Channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
+           ch_checkm2_db_formated = FORMAT_CHECKM2_DB(ch_checkm2_db)
+       }
+
     }
 
 	// LEER EL ARCHIVO DE MUESTRAS Y GENERAR EL CANAL
@@ -422,8 +457,8 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
         // ESTIMACIÓN DE CALIDAD, ASIGNACIÓN TAXONOMICA Y GENERACIÓN DE REPORTES
 
-              ch_checkm = CHECKM2_COASSEMBLY(ch_all_bins.combine(ch_metawrap_co), params.checkm_db)
-              ch_gtdb_tk = GTDB_TK_COASSEMBLY(ch_metawrap_co, params.gtdbtk_db)
+              ch_checkm = CHECKM2_COASSEMBLY(ch_all_bins.combine(ch_metawrap_co).combine(ch_checkm2_db_formated))
+              ch_gtdb_tk = GTDB_TK_COASSEMBLY(ch_metawrap_co.combine(ch_gtdbtk_db_formated))
               ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(ch_host_clean_reads.reads.combine(ch_metawrap_co))
               ch_bin_cov = BEDTOOLS(ch_bin_depth)
 
@@ -461,8 +496,8 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
         // ESTIMACIÓN DE CALIDAD Y ASIGNACIÓN TAXONOMICA
 
-             ch_checkm = CHECKM2(ch_all_bins.join(ch_metawrap), params.checkm_db)
-             ch_gtdb_tk = GTDB_TK(ch_metawrap, params.gtdbtk_db)
+             ch_checkm = CHECKM2(ch_all_bins.join(ch_metawrap).combine(ch_checkm2_db_formated))
+             ch_gtdb_tk = GTDB_TK(ch_metawrap.combine(ch_gtdbtk_db_formated))
 
              BIN_QUALITY_REPORT(ch_checkm.all_reports.collect())
              BIN_TAX_REPORT(ch_gtdb_tk.report.collect())
@@ -491,7 +526,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
              BLOBPLOT(ch_blob_table.only_blob.collect())
 
              ch_contig_proteins = PRODIGAL_CONTIGS(ch_contigs_blastn)
-             ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins, params.deeparg_db)
+             ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(ch_deeparg_db))
              ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(ch_contig_args.only_deeparg.concat(ch_blob_table.only_blob).collect())
              ARG_BLOBPLOT(ch_arg_contig_data)
 
@@ -502,7 +537,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
     if ( params.arg_bin_clustering) {
 
         ch_raw_orfs = PRODIGAL_BINS(ch_metawrap)
-        ch_deeparg = DEEPARG_BINS(ch_raw_orfs, params.deeparg_db)     
+        ch_deeparg = DEEPARG_BINS(ch_raw_orfs.combine(ch_deeparg_db))     
         ch_arg_fasta = ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))        
         ch_clusters = CLUSTERING(ch_arg_fasta.collect())
     }

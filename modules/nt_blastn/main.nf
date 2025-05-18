@@ -13,7 +13,7 @@ process NT_BLASTN {
         def prefix = "${meta.id}"
 
         """
-	db_basename=`ls ${nt_db}/ | grep -P '\\.[0]+?\\.' | cut -f1 -d'.' | sort | uniq`
+	db_basename=`ls ${nt_db}/ | grep -E '\\.[0]+?\\.' | cut -f1 -d'.' | sort | uniq`
 
         blastn \\
             -task megablast \\
