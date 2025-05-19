@@ -91,6 +91,7 @@ All databases can be automatically download in the first use of the pipeline and
 **Taxonomic profiling:**
     
 3A. kraken2_db = User can choice between Standard-8 (7.5 GB) and GTDB release 220 (497 GB) for automatic download. From [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2).
+
 3B. sourmash_db = GTDB release 220 (17 GB) it's the only automatic default download in this instance (for now 👷). From [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/). 
 
 **BBlobTools:**
