@@ -175,7 +175,7 @@ Optional arguments:
    --include_binning              Include the binning and binning refining steps. (default: false)
 
    --arg_bin_clustering           ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
-                                  (default: false)
+                                  (default: false) 🚧 WIP Function 🚧
 
    --help                         Print this usage statement.
 ```
