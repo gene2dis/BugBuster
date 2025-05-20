@@ -247,7 +247,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
        }
 
        if ( params.custom_bowtie_host_index?.trim() ) {
-            ch_bowtie_host_index_formated = Channel.from(path(params.custom_bowtie_host_index))
+            ch_bowtie_host_index_formated = Channel.fromPath(params.custom_bowtie_host_index)
        } else {
             ch_bowtie_host_index = Channel.fromList(params.bowtie_ref_host_index[params.host_db]["file"])
             ch_bowtie_host_index_formated = FORMAT_BOWTIE_HOST(ch_bowtie_host_index)
