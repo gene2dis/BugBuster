@@ -80,7 +80,7 @@ sudo docker run hello-world
 
 ## Databases
 
-All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config file. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. 
+All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config file. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. You can use any host bowtie2 index for filtering steps but only human host it's in the automatic download (for now 👷). 
 
 **Note: Only the required databases for the requested tasks will be automatically download**
 
@@ -182,9 +182,11 @@ Optional arguments:
 Additionally, all options can be modified in nextflow.config file
 ## Credits
 
-gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes
+gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes 
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 
 - Francisco A. Fuentes
 - Juan A. Ugalde
+
+If you have any question of how to use the pipeline, you can contact the developer at the mail ffuentessantander@gmail.com. We will be happy to answer your questions!
