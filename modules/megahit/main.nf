@@ -12,9 +12,9 @@ process MEGAHIT_COASSEMBLY {
     script:
 
         """
-        R1_list=`ls | grep -E '.+?R1_map.+' | tr '\\n' ',' | sed 's/.\$//'`
-        R2_list=`ls | grep -E '.+?R2_map.+' | tr '\\n' ',' | sed 's/.\$//'`
-        Singleton_list=`ls | grep -E '.+?Singleton_map.+' | tr '\\n' ',' | sed 's/.\$//'`
+        R1_list=`ls | grep -E '.+?R1.+' | tr '\\n' ',' | sed 's/.\$//'`
+        R2_list=`ls | grep -E '.+?R2.+' | tr '\\n' ',' | sed 's/.\$//'`
+        Singleton_list=`ls | grep -E '.+?Singleton.+' | tr '\\n' ',' | sed 's/.\$//'`
 
 	if [[ `ls | grep 'Singleton_map'` != "" ]]; then	
 		megahit \\
