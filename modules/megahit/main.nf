@@ -16,7 +16,7 @@ process MEGAHIT_COASSEMBLY {
         R2_list=`ls | grep -E '.+?R2.+' | tr '\\n' ',' | sed 's/.\$//'`
         Singleton_list=`ls | grep -E '.+?Singleton.+' | tr '\\n' ',' | sed 's/.\$//'`
 
-	if [[ `ls | grep 'Singleton_map'` != "" ]]; then	
+	if [[ `ls | grep 'Singleton'` != "" ]]; then	
 		megahit \\
                    -1 \$R1_list \\
                    -2 \$R2_list \\
