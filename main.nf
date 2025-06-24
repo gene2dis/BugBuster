@@ -195,7 +195,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
        case "kraken2":
 
-       if ( params.custom_kraken_db?.trim() ) {
+       if ( params.custom_kraken_db ) {
              ch_kraken_ref_db_formated = Channel.from(path(params.custom_kraken_db))
        } else {
              ch_kraken_ref_db = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["file"])
@@ -206,8 +206,8 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
        case "sourmash":
 
-       if ( params.custom_sourmash_db?.trim() ) {
-             ch_sourmash_db = Channel.fromList(params.custom_sourmash_db).map { file(it) }
+       if ( params.custom_sourmash_db ) {
+             ch_sourmash_db = Channel.fromList(params.custom_sourmash_db).map { file(it) }.collect()
        } else {
              ch_sourmash_db = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["file"]).map { file(it) }
        }
@@ -223,14 +223,14 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
     }
 
     if ( params.read_arg_prediction ) {
-       if ( params.custom_karga_db?.trim() ) {
+       if ( params.custom_karga_db ) {
              ch_karga_db = Channel.from(file(params.custom_karga_db))
        } else {
              ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["file"]).map { file(it) }
        }
     
 
-    if ( params.custom_kargva_db?.trim() ) {
+    if ( params.custom_kargva_db ) {
              ch_kargva_db = Channel.from(file(params.custom_kargva_db))
        } else {
              ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["file"]).map { file(it) }
@@ -239,14 +239,14 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.quality_control ) {
 
-       if ( params.custom_phiX_index?.trim() ) {
+       if ( params.custom_phiX_index ) {
             ch_bowtie_phiX_index_formated = Channel.fromPath(params.custom_phiX_index)
        } else {
             ch_bowtie_phiX_index = Channel.fromList(params.bowtie_ref_genomes_for_build[params.phiX_index]["file"]).map { file(it) }
             ch_bowtie_phiX_index_formated = BUILD_PHIX_BOWTIE2_INDEX(ch_bowtie_phiX_index)
        }
 
-       if ( params.custom_bowtie_host_index?.trim() ) {
+       if ( params.custom_bowtie_host_index ) {
             ch_bowtie_host_index_formated = Channel.fromPath(params.custom_bowtie_host_index)
        } else {
             ch_bowtie_host_index = Channel.fromList(params.bowtie_ref_host_index[params.host_db]["file"])
@@ -256,20 +256,20 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     if ( params.contig_tax_and_arg ) {
 
-       if ( params.custom_deeparg_db?.trim() ) {
+       if ( params.custom_deeparg_db ) {
            ch_deeparg_db = Channel.fromPath(params.custom_deeparg_db)
        } else {
            ch_deeparg_db = DOWNLOAD_DEEPARG_DB()
        }
 
-       if ( params.custom_blast_db?.trim() ) {
+       if ( params.custom_blast_db ) {
            ch_blast_db_formated = Channel.fromPath(params.custom_blast_db)
        } else {
            ch_blast_db =  Channel.fromList(params.blast_ref_db[params.blast_db]["url"])
            ch_blast_db_formated = FORMAT_NT_BLAST_DB(ch_blast_db)
        }
 
-       if ( params.custom_taxdump_files?.trim() ) {
+       if ( params.custom_taxdump_files ) {
            ch_taxdump_files_formated = Channel.from(path(params.custom_taxdump_files))
        } else {
            ch_taxdump_files = Channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
@@ -279,14 +279,14 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
     
     if ( params.include_binning ) {
 
-       if ( params.custom_gtdbtk_db?.trim() ) {
+       if ( params.custom_gtdbtk_db ) {
            ch_gtdbtk_db_formated = Channel.fromPath(params.custom_gtdbtk_db)
        } else {
            ch_gtdbtk_db = Channel.fromList(params.gtdbtk_ref_db[params.gtdbtk_db]["url"])
            ch_gtdbtk_db_formated = DOWNLOAD_GTDBTK_DB(ch_gtdbtk_db)
        }
 
-       if ( params.custom_checkm2_db?.trim() ) {
+       if ( params.custom_checkm2_db ) {
            ch_checkm2_db_formated = Channel.fromPath(params.custom_checkm2_db)
        } else {
            ch_checkm2_db = Channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
