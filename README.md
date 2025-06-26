@@ -188,5 +188,6 @@ We thank the following people for their extensive assistance in the development 
 
 - Francisco A. Fuentes
 - Juan A. Ugalde
+- Carolina Curiqueo
 
 If you have any question of how to use the pipeline, you can contact the developer at the mail ffuentessantander@gmail.com. We will be happy to answer your questions!
