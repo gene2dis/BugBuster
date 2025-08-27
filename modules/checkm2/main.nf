@@ -6,7 +6,7 @@ process CHECKM2_COASSEMBLY {
     publishDir "${params.output}/workflow/co_assembly/checkm2", pattern: '*quality_report.tsv'
 
     input:
-        path(bins), path(checkm_db)
+        tuple path(bins), path(checkm_db)
 
     output:
         path("*quality_report.tsv"), emit: all_reports
