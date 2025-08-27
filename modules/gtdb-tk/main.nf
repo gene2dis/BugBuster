@@ -44,7 +44,7 @@ process GTDB_TK_COASSEMBLY {
     publishDir "${params.output}/workflow/co_assembly/gtdb-tk", pattern: '*_gtdbtk_*'
 
     input:
-        path(metawrap), path(gtdbtk_db)
+        tuple path(metawrap), path(gtdbtk_db)
 
     output:
         path("*_gtdbtk_*"), emit: gtdb_tk
