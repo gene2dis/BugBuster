@@ -6,7 +6,7 @@ process CHECKM2_COASSEMBLY {
     publishDir "${params.output}/workflow/co_assembly/checkm2", pattern: '*quality_report.tsv'
 
     input:
-        tuple path(bins), path(checkm_db)
+        tuple path(metabat), path(semibin), path(comebin), path(metawrap), path(checkm_db)
 
     output:
         path("*quality_report.tsv"), emit: all_reports
@@ -18,37 +18,37 @@ process CHECKM2_COASSEMBLY {
         """
         checkm2 predict \\
                 --threads $task.cpus \\
-                --input ${bins[0]} \\
+                --input ${metabat} \\
                 --output-directory ${prefix}_metabat_checkm2_report \\
                 --database_path ${checkm_db} \\
-                -x .fa 
+                -x .fa
 
         checkm2 predict \\
                 --threads $task.cpus \\
-                --input ${bins[1]} \\
+                --input ${semibin} \\
                 --output-directory ${prefix}_semibin_checkm2_report \\
                 --database_path ${checkm_db} \\
-                -x .fa 
+                -x .fa
 
         checkm2 predict \\
                 --threads $task.cpus \\
-                --input ${bins[2]} \\
-                --output-directory ${prefix}_autometa_checkm2_report \\
+                --input ${comebin} \\
+                --output-directory ${prefix}_comebin_checkm2_report \\
                 --database_path ${checkm_db} \\
-                -x .fa 
+                -x .fa
 
-	 checkm2 predict \\
+         checkm2 predict \\
                 --threads $task.cpus \\
-                --input ${bins[3]} \\
+                --input ${metawrap} \\
                 --output-directory ${prefix}_metawrap_checkm2_report \\
                 --database_path ${checkm_db} \\
                 -x .fa
 
-        mv ${prefix}_metabat_checkm2_report/quality_report.tsv ${prefix}_metabat_quality_report.tsv 
-        mv ${prefix}_semibin_checkm2_report/quality_report.tsv ${prefix}_semibin_quality_report.tsv 
-        mv ${prefix}_autometa_checkm2_report/quality_report.tsv ${prefix}_autometa_quality_report.tsv 
+        mv ${prefix}_metabat_checkm2_report/quality_report.tsv ${prefix}_metabat_quality_report.tsv
+        mv ${prefix}_semibin_checkm2_report/quality_report.tsv ${prefix}_semibin_quality_report.tsv
+        mv ${prefix}_comebin_checkm2_report/quality_report.tsv ${prefix}_comebin_quality_report.tsv
         mv ${prefix}_metawrap_checkm2_report/quality_report.tsv ${prefix}_metawrap_quality_report.tsv
-	"""
+	    """
 }
 
 process CHECKM2 {
