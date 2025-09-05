@@ -196,7 +196,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
        case "kraken2":
 
        if ( params.custom_kraken_db ) {
-             ch_kraken_ref_db_formated = Channel.from(path(params.custom_kraken_db))
+             ch_kraken_ref_db_formated = Channel.fromPath(params.custom_kraken_db)
        } else {
              ch_kraken_ref_db = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["file"])
              ch_kraken_ref_db_formated = FORMAT_KRAKEN_DB(ch_kraken_ref_db)
