@@ -3,7 +3,6 @@ process KRAKEN_TO_PHYLOSEQ {
     container 'quay.io/ffuentessantander/r_reports:1.1'
 
     publishDir "${params.output}/reports/read_level/taxonomy", mode: 'copy', pattern: '*.RDS'
-    publishDir "${params.output}/reports/read_level/taxonomy", mode: 'copy', pattern: '*.png'
 
     label 'process_single'
 
@@ -12,7 +11,6 @@ process KRAKEN_TO_PHYLOSEQ {
 
     output:
         path("*.RDS"), emit: kraken_to_phyloseq
-        path("*.png"), emit: png
 
     script:
 
