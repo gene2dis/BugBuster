@@ -1,6 +1,8 @@
 process BRACKEN {
     container 'quay.io/biocontainers/bracken:2.9--py39h1f90b4d_0'
 
+    publishDir "${params.output}/workflow/${meta.id}/bracken_${db_name}", mode: 'copy', pattern: '*.report'
+
     maxForks 4
     label 'process_single'
 
