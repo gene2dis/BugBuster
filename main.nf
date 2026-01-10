@@ -392,7 +392,7 @@ workflow {
         ch_fastp_reads = FASTP(ch_reads)
 
         // Extract and format QC reports
-        ch_fastp_reads_report = QFILTER(ch_fastp_reads)
+        ch_fastp_reads_report = QFILTER(ch_fastp_reads.fastq)
 
         // Filter samples by minimum read count
         ch_fastp_reads_num = ch_fastp_reads_report.qfilter.map { tuple ->

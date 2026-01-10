@@ -31,7 +31,7 @@ workflow QC {
         //
         // Extract and format QC reports
         //
-        ch_fastp_reads_report = QFILTER(ch_fastp_reads)
+        ch_fastp_reads_report = QFILTER(ch_fastp_reads.fastq)
 
         //
         // Filter samples by minimum read count
