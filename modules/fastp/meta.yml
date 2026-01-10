@@ -1,0 +1,48 @@
+name: fastp
+description: Perform adapter/quality trimming on sequencing reads
+keywords:
+  - trimming
+  - quality control
+  - fastq
+  - adapter removal
+tools:
+  - fastp:
+      description: A tool designed to provide fast all-in-one preprocessing for FastQ files
+      homepage: https://github.com/OpenGene/fastp
+      documentation: https://github.com/OpenGene/fastp
+      tool_dev_url: https://github.com/OpenGene/fastp
+      doi: "10.1093/bioinformatics/bty560"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files of size 2 or 3
+        e.g. [ file1_R1.fastq.gz, file1_R2.fastq.gz ] or [ file1_R1.fastq.gz, file1_R2.fastq.gz, singletons.fastq.gz ]
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - fastq:
+      type: tuple
+      description: Trimmed reads and JSON report
+      pattern: "*_fastp.fastq.gz"
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@ffuentessantander"
+maintainers:
+  - "@ffuentessantander"

@@ -1,0 +1,55 @@
+name: kraken2
+description: Taxonomic classification of sequencing reads using Kraken2
+keywords:
+  - taxonomy
+  - classification
+  - metagenomics
+  - profiling
+tools:
+  - kraken2:
+      description: Taxonomic sequence classification system
+      homepage: https://ccb.jhu.edu/software/kraken2/
+      documentation: https://github.com/DerrickWood/kraken2/wiki
+      tool_dev_url: https://github.com/DerrickWood/kraken2
+      doi: "10.1186/s13059-019-1891-0"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files
+        e.g. [ file1_R1.fastq.gz, file1_R2.fastq.gz ]
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+  - db:
+      type: directory
+      description: Kraken2 database directory
+      pattern: "*"
+  - db_name:
+      type: string
+      description: Database name for output naming
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - kraken:
+      type: file
+      description: Kraken2 report file
+      pattern: "*_kraken_report"
+  - report:
+      type: file
+      description: Summary report TSV
+      pattern: "*_report.tsv"
+
+authors:
+  - "@ffuentessantander"
+maintainers:
+  - "@ffuentessantander"

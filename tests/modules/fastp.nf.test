@@ -1,0 +1,66 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FASTP Module Test
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test FASTP Process"
+    script "../../modules/fastp/main.nf"
+    process "FASTP"
+
+    test("FASTP should filter reads") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test_sample' ],
+                    [
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_1.fastq.gz"),
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_2.fastq.gz")
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            // Check process completed
+            assert process.success
+            
+            // Check output files exist
+            assert process.out.fastq
+            assert process.out.versions
+            
+            // Check output structure
+            with(process.out.fastq) {
+                assert size() == 1
+                assert get(0).get(0).id == 'test_sample'
+            }
+        }
+    }
+
+    test("FASTP stub run") {
+        options "-stub"
+        
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test_sample' ],
+                    [
+                        file("test1_R1.fastq.gz"),
+                        file("test1_R2.fastq.gz")
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.versions
+        }
+    }
+}

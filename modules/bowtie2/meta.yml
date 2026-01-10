@@ -1,0 +1,63 @@
+name: bowtie2
+description: Align reads to a reference genome using Bowtie2 and extract unmapped reads
+keywords:
+  - alignment
+  - read mapping
+  - host decontamination
+  - filtering
+tools:
+  - bowtie2:
+      description: Fast and sensitive read alignment
+      homepage: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
+      documentation: http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
+      tool_dev_url: https://github.com/BenLangmead/bowtie2
+      doi: "10.1038/nmeth.1923"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files
+        e.g. [ file1_R1.fastq.gz, file1_R2.fastq.gz ]
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+  - index_db:
+      type: directory
+      description: Bowtie2 index directory
+      pattern: "*"
+  - db_alias:
+      type: string
+      description: Alias for the database used in output naming
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - reads:
+      type: file
+      description: Reads that did not align to the reference
+      pattern: "*map*fastq.gz"
+  - report:
+      type: file
+      description: Alignment statistics report
+      pattern: "*_bowtie_report.tsv"
+  - reads_coassembly:
+      type: file
+      description: Reads for coassembly (same as reads output)
+      pattern: "*map*fastq.gz"
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@ffuentessantander"
+maintainers:
+  - "@ffuentessantander"

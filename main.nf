@@ -1,16 +1,27 @@
-// DSL-2 enabled
+#!/usr/bin/env nextflow
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    gene2dis/BugBuster
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Github : https://github.com/gene2dis/BugBuster
+----------------------------------------------------------------------------------------
+*/
+
 nextflow.enable.dsl = 2
 
 /*
-IMPORT MODULES
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    PIPELINE LOGO AND INFO
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-logo='''
+def logo = '''
+\u001B[0m
      \u001B[31m╔███████████╗       \u001B[36m██████╗ ██╗   ██╗ ██████╗
    \u001B[31m╔██╝   \u001B[32m▄ ▄   \u001B[31m╚▀█╗\u001B[36m     ██╔══██╗██║   ██║██╔════╝
  \u001B[31m╔█▀▀╚▀█╗\u001B[32m▄▄█▄▄    \u001B[31m▀▀█╗\u001B[36m   ██████╔╝██║   ██║██║  ███╗
-\u001B[31m██╝ \u001B[32m▄  ▄\u001B[31m█╗\u001B[33mo  o\u001B[32m▀▄  ▄ \u001B[31m╚██\u001B[36m  ██╔══██╗██║   ██║██║   ██║     
-\u001B[31m██   \u001B[32m▀▀█\u001B[31m╚▀█╗\u001B[33mo  \u001B[32m█▀▀   \u001B[31m██\u001B[36m  ██████╔╝╚██████╔╝╚██████╔╝ 
+\u001B[31m██╝ \u001B[32m▄  ▄\u001B[31m█╗\u001B[33mo  o\u001B[32m▀▄  ▄ \u001B[31m╚██\u001B[36m  ██╔══██╗██║   ██║██║   ██║
+\u001B[31m██   \u001B[32m▀▀█\u001B[31m╚▀█╗\u001B[33mo  \u001B[32m█▀▀   \u001B[31m██\u001B[36m  ██████╔╝╚██████╔╝╚██████╔╝
 \u001B[31m██  \u001B[32m▄  █  \u001B[31m╚█▄╗ \u001B[32m█  ▄  \u001B[31m██\u001B[36m  ╚═════╝  ╚═════╝  ╚═════╝
 \u001B[31m██  \u001B[32m▄▀▀█\u001B[33m o  \u001B[31m╚█▄\u001B[32m█▀▀▄\u001B[31m  ██\u001B[36m  ██████╗ ██╗   ██╗███████╗████████╗███████╗██████╗
 \u001B[31m██     \u001B[32m█\u001B[33m   o  \u001B[31m╚█╗    ██\u001B[36m  ██╔══██╗██║   ██║██╔════╝╚══██╔══╝██╔════╝██╔══██╗
@@ -18,9 +29,118 @@ logo='''
  \u001B[31m╚█▄▄    \u001B[32m▀▀█▀▀\u001B[0m   \u001B[31m╚█▄█╝\u001B[36m   ██╔══██╗██║   ██║╚════██║   ██║   ██╔══╝  ██╔══██╗
    \u001B[31m╚█▄    \u001B[32m▀ ▀\u001B[0m    \u001B[31m▄█╝\u001B[36m     ██████╔╝╚██████╔╝███████║   ██║   ███████╗██║  ██║
      \u001B[31m╚███████████╝\u001B[36m       ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
+\u001B[0m
 '''
 
-println logo 
+def printVersion() {
+    log.info ""
+    log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
+    log.info "  ${workflow.manifest.description}"
+    log.info ""
+}
+
+def printHelp() {
+    log.info logo
+    log.info """
+    \u001B[1;33mUsage:\u001B[0m
+
+    The typical command for running the pipeline is as follows:
+
+      nextflow run main.nf --input samplesheet.csv --output ./results -profile docker
+
+    \u001B[1;33mMandatory arguments:\u001B[0m
+      --input                       Path to CSV samplesheet with columns: sample,r1,r2,s
+      --output                      Path to output directory
+
+    \u001B[1;33mPipeline options:\u001B[0m
+      --quality_control             Enable QC and host filtering (default: ${params.quality_control})
+      --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
+      --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'none' (default: ${params.taxonomic_profiler})
+      --include_binning             Enable binning and refinement (default: ${params.include_binning})
+      --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
+      --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
+      --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
+
+    \u001B[1;33mResource options:\u001B[0m
+      --max_cpus                    Maximum CPUs per process (default: ${params.max_cpus})
+      --max_memory                  Maximum memory per process (default: ${params.max_memory})
+      --max_time                    Maximum time per process (default: ${params.max_time})
+
+    \u001B[1;33mProfile options:\u001B[0m
+      -profile docker               Run with Docker containers
+      -profile singularity          Run with Singularity containers
+      -profile podman               Run with Podman containers
+      -profile conda                Run with Conda environments
+      -profile slurm_singularity    Run on SLURM with Singularity
+      -profile test                 Run with minimal test dataset
+
+    \u001B[1;33mOther options:\u001B[0m
+      --help                        Show this help message
+      --version                     Show pipeline version
+
+    For more information, visit: ${workflow.manifest.homePage}
+    """
+}
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    VALIDATE INPUTS AND PRINT INFO
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// Show help message
+if (params.help) {
+    printHelp()
+    exit 0
+}
+
+// Show version
+if (params.containsKey('version') && params.version) {
+    printVersion()
+    exit 0
+}
+
+// Print logo
+log.info logo
+log.info ""
+log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
+log.info "  ================================================"
+log.info ""
+
+// Validate required parameters
+if (!params.input) {
+    log.error "ERROR: --input parameter is required"
+    printHelp()
+    exit 1
+}
+
+if (!params.output) {
+    log.error "ERROR: --output parameter is required"
+    printHelp()
+    exit 1
+}
+
+// Print run configuration
+log.info "  Run configuration:"
+log.info "  -------------------"
+log.info "  Input samplesheet    : ${params.input}"
+log.info "  Output directory     : ${params.output}"
+log.info "  Quality control      : ${params.quality_control}"
+log.info "  Assembly mode        : ${params.assembly_mode}"
+log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
+log.info "  Include binning      : ${params.include_binning}"
+log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
+log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+log.info ""
+
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    IMPORT MODULES AND SUBWORKFLOWS
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+// Input validation
+include { INPUT_CHECK } from './subworkflows/local/input_check'
 
 	// FORMATEO Y/O DESCARGA DE BASES DE DATOS
 
@@ -34,7 +154,7 @@ include {FORMAT_CHECKM2_DB} from "./modules/format_db/main"
 include {BUILD_PHIX_BOWTIE2_INDEX} from "./modules/format_db/main"
 include {DOWNLOAD_GTDBTK_DB} from "./modules/format_db/main"
 
-	// FILTRADO DE SECUENCIAS
+	// SEQUENCE FILTERING
 
 include {FASTP} from "./modules/fastp/main"
 include {QFILTER} from "./modules/qfilter/main"
@@ -43,7 +163,7 @@ include {COUNT_READS} from "./modules/count_reads/main"
 include {BOWTIE2 as BOWTIE2_HOST} from "./modules/bowtie2/main"
 include {BOWTIE2 as BOWTIE2_PHYX} from "./modules/bowtie2/main"
 
-	// PREDICCION TAXONOMICA EN READS
+	// TAXONOMIC PREDICTION IN READS
 
 include {KRAKEN2 as KRAKEN2} from "./modules/kraken2/main"
 include {BRACKEN as BRACKEN} from "./modules/bracken/main"
@@ -54,7 +174,7 @@ include {KRAKEN_TO_PHYLOSEQ} from "./modules/kraken_to_phyloseq/main"
 include {SOURMASH} from "./modules/sourmash/main"
 include {SOURMASH_TO_PHYLOSEQ} from "./modules/sourmash_to_phyloseq/main"
 
-	// ENSAMBLE Y COENSAMBLE 
+	// ASSEMBLY AND CO-ASSEMBLY
 
 include {MEGAHIT} from "./modules/megahit/main"
 include {MEGAHIT_COASSEMBLY} from "./modules/megahit/main"
@@ -86,7 +206,7 @@ include {COMEBIN_COASSEMBLY} from "./modules/comebin/main"
 include {METAWRAP} from "./modules/metawrap/main"
 include {METAWRAP_COASSEMBLY} from "./modules/metawrap/main"
 
-	// PREDICCION DE CALIDAD EN BINS
+	// BIN QUALITY PREDICTION
 
 include {CHECKM2} from "./modules/checkm2/main"
 include {CHECKM2_COASSEMBLY} from "./modules/checkm2/main"
@@ -95,45 +215,45 @@ include {BIN_QUALITY_REPORT} from "./modules/bin_quality_report/main"
 include {BIN_TAX_REPORT} from "./modules/bin_tax_report/main"
 include {BIN_SUMMARY} from "./modules/bin_summary/main"
 
-	// ANOTACION FUNCIONAL
+	// FUNCTIONAL ANNOTATION
 
 include {METACERBERUS_CONTIGS} from "./modules/metacerberus/main"
 
-	// PREDICCION TAXONOMICA EN CONTIGS
+	// TAXONOMIC PREDICTION IN CONTIGS
 
 include {NT_BLASTN} from "./modules/nt_blastn/main"
 include {BLOBTOOLS} from "./modules/blobtools/main"
 include {SAMTOOLS_INDEX} from "./modules/samtools_index/main"
 include {BLOBPLOT} from "./modules/blobplot/main"
 
-	// REPORTES DE LECTURAS
+	// READ REPORTS
 
 include {READS_REPORT} from "./modules/reads_report/main"
 include {TAX_REPORT_KRAKEN2} from "./modules/tax_report_kraken2/main"
 include {TAX_REPORT_SOURMASH} from "./modules/tax_report_sourmash/main"
 
-	// PREDICCION TAXONOMICA DE BINS
+	// BIN TAXONOMIC PREDICTION
 
 include {GTDB_TK} from "./modules/gtdb-tk/main"
 include {GTDB_TK_COASSEMBLY} from "./modules/gtdb-tk/main"
 
-	// CALCULO DE COVERTURA POR BIN
+	// COVERAGE CALCULATION PER BIN
 
 include {BEDTOOLS} from "./modules/bedtools/main"
 
-	// PREDICCION DE ORFS EN CONTIGS Y BINS
+	// ORF PREDICTION IN CONTIGS AND BINS
 
 include {PRODIGAL_BINS} from "./modules/prodigal/main"
 include {PRODIGAL_CONTIGS} from "./modules/prodigal/main"
 
-        // PREDICCION DE ARGS EN READS
+	// ARG PREDICTION IN READS
 
 include {KARGVA} from "./modules/kargva/main"
 include {KARGA} from "./modules/karga/main"
 include {ARGS_OAP} from "./modules/args_oap/main"
 include {ARG_NORM_REPORT} from "./modules/arg_norm_report/main"
 
-	// PREDICCION DE ARGS EN CONTIGS Y BINS
+	// ARG PREDICTION IN CONTIGS AND BINS
 
 include {DEEPARG_BINS} from "./modules/deeparg/main"
 include {DEEPARG_CONTIGS} from "./modules/deeparg/main"
@@ -142,55 +262,23 @@ include {ARG_FASTA_FORMATTER} from "./modules/arg_fasta_formatter/main"
 include {CLUSTERING} from "./modules/clustering/main"
 include {ARG_BLOBPLOT} from "./modules/arg_blobplot/main"
 
-// Run the workflow
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RUN MAIN WORKFLOW
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
 
-workflow{
-    if ( params.help ) {
+workflow {
+    
+    //
+    // SUBWORKFLOW: Validate and parse input samplesheet
+    //
+    INPUT_CHECK(file(params.input, checkIfExists: true))
+    ch_reads = INPUT_CHECK.out.reads
 
-      help_info ='''
-\u001B[33mUsage:\u001B[0m
-
-\u001B[32mThe typical command for running the pipeline is as follows:\u001B[0m
-
-nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -resume (recomended)
-
-\u001B[33mMandatory arguments:\u001B[0m
-   \u001B[32m--input\u001B[0m                        Input csv file with: samples names, path of all fastq files, and optionaly singletons.
-                                  colnames required: "sample,r1,r2,s" if don't have singletons colname "s" can be empty
-
-   \u001B[32m--output\u001B[0m                       Path to output dir 
-
-\u001B[33mOptional arguments:\u001B[0m
-   \u001B[32m--assembly_mode\u001B[0m                Mode of assembly, avaible options: "coassembly", "assembly", "none" 
-                                  (default: assembly)
-                                  coassembly: all samples are processing in one only data set
-                                  assembly: all samples are processing individualy 
-
-   \u001B[32m--taxonomic_profiler\u001B[0m           Software for taxonomic profiling, avaible options: "kraken2", "sourmash", "none"
-                                  (default: sourmash)
-
-   \u001B[32m--arg_clustering\u001B[0m               ARG gene prediction and clustering for horizontal gene transfer inference 
-                                  (default: false)
-
-   \u001B[32m--read_arg_prediction\u001B[0m          ARG and ARGV gene prediction at read level using KARGA and KARGVA 
-                                  (default: false)
-
-   \u001B[32m--contig_tax_and_arg\u001B[0m           Tax and ARG gene prediction at contig level using Blobtools and Deeparg
-                                  (default: false)
-
-   \u001B[32m--contig_level_metacerberus\u001B[0m    Contig level functional annotation with metacebeus 
-                                  (default: false)
-
-   \u001B[32m--help\u001B[0m                         Print this usage statement.
-
-\u001B[33mAdditionally, all options can be modified in nextflow.config file\u001B[0m
-
-   '''
-    println(help_info)
-
-    exit0
-}
-
+    //
+    // DATABASE SETUP: Taxonomic profiler databases
+    //
     switch ( params.taxonomic_profiler ) {
 
        case "kraken2":
@@ -295,68 +383,49 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     }
 
-	// LEER EL ARCHIVO DE MUESTRAS Y GENERAR EL CANAL
-    
-    ch_reads = Channel
-                   .from(file(params.input))
-                   .splitCsv(header:true)
-                   .map { row ->
-                       def meta = [:]
-                           meta.id = row.sample
-                       def r1 = row.r1
-                       def r2 = row.r2
-                       if( row.s ) {
-                            def s = row.s
-                            return [meta, [r1, r2, s]]
-                       }
-                       else {
-                            return [meta, [r1, r2]]
-                       }
-                   }
+    //
+    // QUALITY CONTROL: Read filtering and host decontamination
+    //
+    if ( params.quality_control ) {
 
-      if ( params.quality_control ) {
+        // Read quality filtering with Fastp
+        ch_fastp_reads = FASTP(ch_reads)
 
-	        // LIMPIEZA DE LECTURAS POR CALIDAD
+        // Extract and format QC reports
+        ch_fastp_reads_report = QFILTER(ch_fastp_reads)
 
-	    ch_fastp_reads = FASTP(ch_reads)
+        // Filter samples by minimum read count
+        ch_fastp_reads_num = ch_fastp_reads_report.qfilter.map { tuple ->
+            def after_reads = tuple[2].text
+            if ( Integer.parseInt(after_reads) >= params.min_read_sample ) {
+                def meta = tuple[0]
+                def reads = tuple[1]
+                return [meta, reads]
+            } else {
+                return null
+            }
+        }.filter { it != null }
 
-	        // EXTRAIGO Y FORMATEO REPORTES
+        // Remove PhiX and host contamination
+        ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num.combine(ch_bowtie_phiX_index_formated), "phiX")
+        ch_host_clean_reads = BOWTIE2_HOST(ch_phyx_clean_reads.reads.combine(ch_bowtie_host_index_formated), "host")
 
-	    ch_fastp_reads_report = QFILTER(ch_fastp_reads)
+        // Collect read reports
+        ch_reads_report = READS_REPORT(
+            ch_phyx_clean_reads.report
+                .concat(ch_host_clean_reads.report)
+                .concat(ch_fastp_reads_report.reads_report)
+                .collect(),
+            "phiX host"
+        )
+    } else {
+        ch_host_clean_reads = COUNT_READS(ch_reads)
 
-		// EXTRAIGO EL NUMERO DE LECTURAS
-
-	    ch_fastp_reads_num = ch_fastp_reads_report.qfilter.map{ 
-				       def after_reads = it[2].text
-				       if( Integer.parseInt(after_reads) >= params.min_read_sample ) {
-						def reads = it[1]
-						def meta = it[0]
-						return [meta, reads]
-				       }
-				       else {
-						return 
-				       }
-				}
-
-	        // MAPEO DE LECTURAS CONTRA BASES DE DATOS
-		// SE INTRODUCE EL PATH DEL INDEX, EL INDEX BASENAME Y UN ALIAS DE LA BASE DE DATOS PARA LA SALIDA QUE NO CONTENGA PUNTOS
-
-	    ch_phyx_clean_reads = BOWTIE2_PHYX(ch_fastp_reads_num.combine(ch_bowtie_phiX_index_formated), "phiX")
-	    ch_host_clean_reads = BOWTIE2_HOST(ch_phyx_clean_reads.reads.combine(ch_bowtie_host_index_formated), "host")
-
-	        // UNIFICACIÓN DE REPORTES
-
-	    ch_reads_report = READS_REPORT(ch_phyx_clean_reads.report
-	                                .concat(ch_host_clean_reads.report)
-	                                .concat(ch_fastp_reads_report.reads_report)
-	                                .collect(),"phiX host")
-       } else {
-
-            ch_host_clean_reads = COUNT_READS(ch_reads)
-
-            ch_reads_report = READS_REPORT(ch_host_clean_reads.reads_report
-                                        .collect(), "none")
-       }
+        ch_reads_report = READS_REPORT(
+            ch_host_clean_reads.reads_report.collect(), 
+            "none"
+        )
+    }
 
     switch ( params.taxonomic_profiler ) {
        case "kraken2":
@@ -367,17 +436,17 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
                            .concat(ch_reads_report)
                            .collect())
 
-        // ESTIMACION DE ABUNDANCIA, SE DEBE ESPECIFICAR EL PATH DE LA BASE DE DATOS,
-        // UN ALIAS PARA LA SALIDA, EL TAMAÑO MINIMO DE READ Y EL NIVEL TAXONOMICO
-        // SI FALLA ESTA PARTE, SE DEBE CAMBIAR EL NIVEL TAXONOMICO
+        // ABUNDANCE ESTIMATION - requires specifying the database path,
+        // an output alias, minimum read size and taxonomic level.
+        // If this step fails, try changing the taxonomic level.
 
             ch_taxonomy_estimation = BRACKEN(ch_k2_taxonomy.kraken.combine(ch_kraken_ref_db_formated), params.kraken_db_used)
 
-        // GENERAR ARCHIVO .BIOM
+        // GENERATE .BIOM FILE
 
             ch_kraken_biom = KRAKEN_BIOM(ch_taxonomy_estimation.collect(), params.kraken_db_used)
 
-        // GENERAR OBJETO PHYLOSEQ Y GRAFICOS DE ABUNDANCIA
+        // GENERATE PHYLOSEQ OBJECT AND ABUNDANCE PLOTS
 
             KRAKEN_TO_PHYLOSEQ(ch_kraken_biom)
 
@@ -405,7 +474,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
        exit 1, "ERROR: Not valid taxonomic profiler, please check nextflow.config file"
     }
 
-	// PREDICCION DE ARGS EN READS
+	// ARG PREDICTION IN READS
 
     if ( params.read_arg_prediction) {
 
@@ -419,7 +488,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
     switch ( params.assembly_mode ) {
        case "coassembly": 
 
-        // ENSAMBLE DE LECTURAS, FILTRADO DE CONTIGS Y CALCULO DE PROFUNDIDAD
+        // READ ASSEMBLY, CONTIG FILTERING AND DEPTH CALCULATION
 
          ch_assembly_co = MEGAHIT_COASSEMBLY(ch_host_clean_reads.reads_coassembly.collect())
          ch_filtered_contigs_co = BBMAP_COASSEMBLY(ch_assembly_co)
@@ -446,7 +515,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
               ch_depth = CALCULATE_DEPTH_COASSEMBLY(ch_bowtie2_samtools.collect())
 
-        // BINNING Y REFINAMIENTO DE BINS
+        // BINNING AND BIN REFINEMENT
 
               ch_metabat2 = METABAT2_COASSEMBLY(ch_filtered_contigs_co.contigs.combine(ch_depth))
               ch_semibin = SEMIBIN_COASSEMBLY(ch_bowtie2_samtools.collect().combine(ch_filtered_contigs_co.contigs))
@@ -455,7 +524,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
               ch_all_bins = ch_metabat2.combine(ch_semibin).combine(ch_comebin)
               ch_metawrap_co = METAWRAP_COASSEMBLY(ch_all_bins)
 
-        // ESTIMACIÓN DE CALIDAD, ASIGNACIÓN TAXONOMICA Y GENERACIÓN DE REPORTES
+        // QUALITY ESTIMATION, TAXONOMIC ASSIGNMENT AND REPORT GENERATION
 
               ch_checkm = CHECKM2_COASSEMBLY(ch_all_bins.combine(ch_metawrap_co).combine(ch_checkm2_db_formated))
               ch_gtdb_tk = GTDB_TK_COASSEMBLY(ch_metawrap_co.combine(ch_gtdbtk_db_formated))
@@ -469,12 +538,12 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
          
          case "assembly":
 
-        // ENSAMBLE DE LECTURAS, FILTRADO DE CONTIGS Y CALCULO DE PROFUNDIDAD
+        // READ ASSEMBLY, CONTIG FILTERING AND DEPTH CALCULATION
 
          ch_assembly = MEGAHIT(ch_host_clean_reads.reads)
          ch_filtered_contigs = BBMAP(ch_assembly)
 
-        // BINNING Y REFINAMIENTO DE BINS
+        // BINNING AND BIN REFINEMENT
 
          if ( params.include_binning || params.contig_tax_and_arg ) {
  
@@ -494,7 +563,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
              ch_all_bins = ch_metabat2.join(ch_semibin).join(ch_comebin)
              ch_metawrap = METAWRAP(ch_all_bins)
 
-        // ESTIMACIÓN DE CALIDAD Y ASIGNACIÓN TAXONOMICA
+        // QUALITY ESTIMATION AND TAXONOMIC ASSIGNMENT
 
              ch_checkm = CHECKM2(ch_all_bins.join(ch_metawrap).combine(ch_checkm2_db_formated))
              ch_gtdb_tk = GTDB_TK(ch_metawrap.combine(ch_gtdbtk_db_formated))
@@ -532,7 +601,7 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
     }
 
-	// PREDICCION ARG EN BINS Y CLUSTERING
+	// ARG PREDICTION IN BINS AND CLUSTERING
 
     if ( params.arg_bin_clustering) {
 
@@ -544,6 +613,38 @@ nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -
 
 }
 
-workflow.onComplete = {
-    // any workflow property can be used here
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    COMPLETION HANDLER
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+workflow.onComplete {
+    def msg = """\
+        Pipeline execution summary
+        ---------------------------
+        Completed at : ${workflow.complete}
+        Duration     : ${workflow.duration}
+        Success      : ${workflow.success}
+        Exit status  : ${workflow.exitStatus}
+        Work dir     : ${workflow.workDir}
+        Output dir   : ${params.output}
+        """
+        .stripIndent()
+
+    log.info msg
+
+    if (workflow.success) {
+        log.info "\u001B[32m========================================\u001B[0m"
+        log.info "\u001B[32m  Pipeline completed successfully!\u001B[0m"
+        log.info "\u001B[32m========================================\u001B[0m"
+    } else {
+        log.error "\u001B[31m========================================\u001B[0m"
+        log.error "\u001B[31m  Pipeline completed with errors\u001B[0m"
+        log.error "\u001B[31m========================================\u001B[0m"
+    }
+}
+
+workflow.onError {
+    log.error "Pipeline failed. Check error message above or in ${params.output}/pipeline_info/"
 }

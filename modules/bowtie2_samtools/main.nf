@@ -66,7 +66,7 @@ process BOWTIE2_SAMTOOLS_COASSEMBLY {
     input:
         tuple val(meta), path(reads), path(contigs)
 
-    // Aqui creo los canales de salida de este proceso.
+    // Output channels for this process
 
     output:
         path("*_all_reads.bam"), emit: bam
@@ -129,7 +129,7 @@ process BOWTIE2_SAMTOOLS_DEPTH {
     input:
         tuple val(meta), path(reads), path(bins)
 
-    // Aqui creo los canales de salida de este proceso.
+    // Output channels for this process
 
     output:
         tuple val(meta), path("*_all_reads.bam"), emit: reads

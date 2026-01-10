@@ -1,68 +1,101 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BOWTIE2 Alignment Module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Read alignment and filtering using Bowtie2
+----------------------------------------------------------------------------------------
+*/
+
 process BOWTIE2 {
+    tag "${meta.id}_${db_alias}"
     container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('R1_map_host.fastq.gz') ? "${meta.id}_R1_clean_reads.fastq.gz" : null }
-    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('R2_map_host.fastq.gz') ? "${meta.id}_R2_clean_reads.fastq.gz" : null }
-    publishDir "${params.output}/workflow/${meta.id}/clean_reads", saveAs: { fn -> fn.endsWith('_Singleton_map_host.fastq.gz') ? "${meta.id}_Singleton_clean_reads.fastq.gz" : null }
+    publishDir "${params.output}/workflow/${meta.id}/clean_reads", 
+        mode: params.publish_dir_mode,
+        pattern: "*_clean_reads.fastq.gz"
 
     input:
-        tuple val(meta), path(reads), path(index_db)
-	val db_alias
+    tuple val(meta), path(reads), path(index_db)
+    val db_alias
 
     output:
-        tuple val(meta), path("*map*fastq.gz"), emit: reads
-	path("*_bowtie_report.tsv"), emit: report
-        path("*map*fastq.gz"), emit: reads_coassembly	
+    tuple val(meta), path("*map*fastq.gz"), emit: reads
+    path("*_bowtie_report.tsv")           , emit: report
+    path("*map*fastq.gz")                 , emit: reads_coassembly
+    path "versions.yml"                   , emit: versions
 
     when:
-        task.ext.when == null || task.ext.when
+    task.ext.when == null || task.ext.when
 
     script:
-        def args = task.ext.args ?: ''
-        def prefix = "${meta.id}"
+    def args = task.ext.args ?: ''
+    def prefix = meta.id
+    def r1 = reads[0]
+    def r2 = reads[1]
+    def singleton = reads.size() > 2 ? reads[2] : null
 
-        """
-        basename=`ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | uniq`
+    """
+    # Get bowtie2 index basename
+    basename=\$(ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | sort -u | head -1)
 
-        bowtie2 \\
-        $args \\
+    # Align paired-end reads and extract unmapped
+    bowtie2 \\
+        ${args} \\
         -x ${index_db}/\${basename} \\
-        -p $task.cpus \\
-        -1 ${reads[0]} \\
-        -2 ${reads[1]} \\
+        -p ${task.cpus} \\
+        -1 ${r1} \\
+        -2 ${r2} \\
         --un-conc-gz ${prefix}_${db_alias} > ${prefix}_bowtie_map_${db_alias}
 
-        mv ${prefix}_${db_alias}.1 ${prefix}_R1_map_${db_alias}.fastq.gz &&
-        mv ${prefix}_${db_alias}.2 ${prefix}_R2_map_${db_alias}.fastq.gz &&
+    mv ${prefix}_${db_alias}.1 ${prefix}_R1_map_${db_alias}.fastq.gz
+    mv ${prefix}_${db_alias}.2 ${prefix}_R2_map_${db_alias}.fastq.gz
 
-        R1_in_count=`zcat ${prefix}_R1_map_${db_alias}.fastq.gz | wc -l`
-        R1_r_count=`echo \$((\${R1_in_count}/4))`
-        final_reads_count=`echo \$((\${R1_r_count}*2))`
+    # Count reads
+    R1_lines=\$(zcat ${prefix}_R1_map_${db_alias}.fastq.gz | wc -l)
+    R1_count=\$(( R1_lines / 4 ))
+    final_reads=\$(( R1_count * 2 ))
 
-	if [[ ${reads[2]} != null ]]; then
-		bowtie2 \\
-                $args \\
-		-x ${index_db}/\${basename} \\
-		-p $task.cpus \\
-		-U ${reads[2]} \\
-		--un-gz ${prefix}_${db_alias} > ${prefix}_bowtie_singleton_map_${db_alias}
+    # Process singleton reads if present
+    ${singleton ? """
+    bowtie2 \\
+        ${args} \\
+        -x ${index_db}/\${basename} \\
+        -p ${task.cpus} \\
+        -U ${singleton} \\
+        --un-gz ${prefix}_singleton_unmapped > ${prefix}_bowtie_singleton_map_${db_alias}
 
-		mv ${prefix}_${db_alias} ${prefix}_Singleton_map_${db_alias}.fastq.gz
-		rm -f ${prefix}_bowtie_singleton_map_${db_alias}
-	
-	fi
+    mv ${prefix}_singleton_unmapped ${prefix}_Singleton_map_${db_alias}.fastq.gz
+    rm -f ${prefix}_bowtie_singleton_map_${db_alias}
 
-	if [[ ${reads[2]} != null ]]; then
-		Singleton_l_count=`zcat  ${prefix}_Singleton_map_${db_alias}.fastq.gz | wc -l`
-		Singleton_r_count=`echo \$((\${Singleton_l_count}/4))`
-		echo "Id\tBowtie ${db_alias}\tBowtie ${db_alias} singletons" > ${prefix}_${db_alias}_bowtie_report.tsv
-		echo "${prefix}\t\${final_reads_count}\t\${Singleton_r_count}" >> ${prefix}_${db_alias}_bowtie_report.tsv
-	else
-		echo "Id\tBowtie ${db_alias}" > ${prefix}_${db_alias}_bowtie_report.tsv
-                echo "${prefix}\t\${final_reads_count}" >> ${prefix}_${db_alias}_bowtie_report.tsv
-	fi
-	rm -f ${prefix}_bowtie_map_${db_alias}
-	""" 
+    Singleton_lines=\$(zcat ${prefix}_Singleton_map_${db_alias}.fastq.gz | wc -l)
+    Singleton_count=\$(( Singleton_lines / 4 ))
+    echo -e \"Id\\tBowtie ${db_alias}\\tBowtie ${db_alias} singletons\" > ${prefix}_${db_alias}_bowtie_report.tsv
+    echo -e \"${prefix}\\t\${final_reads}\\t\${Singleton_count}\" >> ${prefix}_${db_alias}_bowtie_report.tsv
+    """ : """
+    echo -e \"Id\\tBowtie ${db_alias}\" > ${prefix}_${db_alias}_bowtie_report.tsv
+    echo -e \"${prefix}\\t\${final_reads}\" >> ${prefix}_${db_alias}_bowtie_report.tsv
+    """}
+
+    rm -f ${prefix}_bowtie_map_${db_alias}
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bowtie2: \$(bowtie2 --version | head -1 | sed 's/.*version //')
+    END_VERSIONS
+    """
+
+    stub:
+    def prefix = meta.id
+    """
+    touch ${prefix}_R1_map_${db_alias}.fastq.gz
+    touch ${prefix}_R2_map_${db_alias}.fastq.gz
+    touch ${prefix}_${db_alias}_bowtie_report.tsv
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        bowtie2: 2.5.3
+    END_VERSIONS
+    """
 }

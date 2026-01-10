@@ -7,7 +7,7 @@ process QFILTER {
     input:
         tuple val(meta), path(reads), path(json)
 
-    // Aqui creo los canales de salida de este proceso.
+    // Output channels for this process
 
     output:
         tuple val(meta), path(reads), path("after_reads_fr.txt"), emit: qfilter

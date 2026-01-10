@@ -8,7 +8,7 @@ process BEDTOOLS {
     input:
         tuple val(meta), path(bam_files)
 
-    // Aqui creo los canales de salida de este proceso.
+    // Output channels for this process
 
     output:
         path("*_bin_depth.tsv"), emit: bin_depth

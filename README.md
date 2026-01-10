@@ -1,13 +1,24 @@
 ![image](https://github.com/user-attachments/assets/a10c01f6-ef6c-40c4-a4ac-26a0c4f87564)
+
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
+[![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?logo=docker)](https://www.docker.com/)
+[![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg)](https://sylabs.io/docs/)
+
 ## Introduction
 
 **Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible** 
 
-**BugBuster** is a bioinformatics best-practice analysis pipeline for microbial metagenomic and gene resistance.
+**BugBuster** is a bioinformatics best-practice analysis pipeline for microbial metagenomic analysis and antimicrobial resistance gene prediction.
 
-The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation of this pipeline uses one container per process which makes it much easier to maintain and update software dependencies. Where possible, these processes have been submitted to and installed from [nf-core/modules](https://github.com/nf-core/modules) in order to make them available to all nf-core pipelines, and to everyone within the Nextflow community!
+The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker/Singularity containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation uses one container per process which makes it easier to maintain and update software dependencies.
 
-On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources.
+### Key Features
+
+- **Multi-platform support**: Run locally, on HPC clusters (SLURM), or cloud (AWS, GCP, Azure)
+- **Flexible execution modes**: Per-sample assembly, co-assembly, or taxonomy-only
+- **Comprehensive analysis**: QC, taxonomy, assembly, binning, and ARG prediction
+- **Automatic database management**: Databases download automatically on first use
+- **Resource optimization**: Dynamic resource allocation with retry strategies
 
 ## Pipeline summary
 ![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/40d02c04-e84e-48b4-b517-c93dccd68abc)
@@ -40,43 +51,66 @@ On release, automated continuous integration tests run the pipeline on a full-si
 
 ## Quick Start
 
-Currently the pipeline has been tested with Docker.
+### Requirements
 
-1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=22.10.1`)
+- [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=23.04.0`)
+- Container runtime: [Docker](https://docs.docker.com/engine/installation/), [Singularity](https://sylabs.io/guides/), or [Podman](https://podman.io/)
 
-2. Install [`Docker`](https://docs.docker.com/engine/installation/) for full pipeline reproducibility.
+### Basic Usage
 
-For install docker in Ubuntu, follow the instructions:
 ```bash
-# Run the following command to uninstall all conflicting packages:
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+# Clone the repository
+git clone https://github.com/gene2dis/BugBuster.git
+cd BugBuster
 
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Run with Docker
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    -profile docker
 
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-
-# Install the docker packages
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Verify that the installation is successful by running the hello-world image:
-sudo docker run hello-world
+# Run with Singularity (HPC)
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    -profile singularity
 ```
 
-**Once docker is installed and the pipeline is used for the first time, it will automatically download all the containers required for the execution of the pipeline with the desired configuration.**
+### Available Profiles
 
-3. Download the pipeline, either cloning the repository or downloading the zip file
+| Profile | Description |
+|---------|-------------|
+| `docker` | Run with Docker containers |
+| `singularity` | Run with Singularity containers |
+| `podman` | Run with Podman containers |
+| `slurm` | Run on SLURM HPC cluster |
+| `aws` | Run on AWS Batch |
+| `gcp` | Run on Google Cloud |
+| `azure` | Run on Azure Batch |
+| `test` | Run with minimal test data |
 
-4. Download databases and modify their paths in 'nextflow.config' file or use one of the default automatic download databases from config/databases.config and modify the variable in the nextflow.config file.
+Combine profiles as needed: `-profile slurm,singularity` or `-profile aws,docker`
+
+### Cloud Execution Examples
+
+```bash
+# AWS Batch
+nextflow run main.nf \
+    --input s3://bucket/samplesheet.csv \
+    --output s3://bucket/results \
+    -profile aws,docker \
+    -work-dir s3://bucket/work
+
+# Google Cloud
+nextflow run main.nf \
+    --input gs://bucket/samplesheet.csv \
+    --output gs://bucket/results \
+    -profile gcp,docker \
+    --gcp_project my-project \
+    -work-dir gs://bucket/work
+```
+
+See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
 
 ## Databases
 
@@ -119,67 +153,58 @@ All databases can be automatically download in the first use of the pipeline and
 
 10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html) (109 GB).
 
-## Running the pipeline
+## Samplesheet Format
 
-### Sample sheet file
+Create a CSV file with your sample information:
 
-First you need to create a Samplesheet file, that contain the name of the samples and the location of the reads. This is an example of this file:
-
-```
+```csv
 sample,r1,r2,s
-SRR9040400,/home/ffuentes/Raw_data/SRR9040400_1.fastq.gz,/home/ffuentes/Raw_data/SRR9040400_2.fastq.gz,/home/ffuentes/Raw_data/SRR9040400.fastq.gz
+sample1,/path/to/sample1_R1.fastq.gz,/path/to/sample1_R2.fastq.gz,
+sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sample2_singletons.fastq.gz
 ```
 
-The file **always** has to include the header `sample,r1,r2,s` but also "s" column can be empty 
+| Column | Required | Description |
+|--------|----------|-------------|
+| `sample` | Yes | Unique sample identifier |
+| `r1` | Yes | Path to forward reads (R1) |
+| `r2` | Yes | Path to reverse reads (R2) |
+| `s` | No | Path to singleton reads (optional) |
 
-# Pipeline parameters
+## Pipeline Parameters
 
-The file `nextflow.config` contains all the parameteres used by the pipeline.
+### Core Options
 
-#### Starting the pipeline
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--input` | *required* | Path to samplesheet CSV |
+| `--output` | *required* | Output directory |
+| `--quality_control` | `true` | Enable QC and host filtering |
+| `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
+| `--include_binning` | `false` | Enable binning and refinement |
 
+### Feature Toggles
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
+| `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
+| `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
+
+### Resource Limits
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--max_cpus` | `16` | Maximum CPUs per process |
+| `--max_memory` | `128.GB` | Maximum memory per process |
+| `--max_time` | `240.h` | Maximum time per process |
+
+### Help
+
+```bash
+nextflow run main.nf --help
 ```
-Usage:
-
-The typical command for running the pipeline is as follows:
-
-nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -profile local_docker -resume (recomended)
-
-Mandatory arguments:
-   --input                        Input csv file with: samples names, path of all fastq files, and optionaly singletons.
-                                  colnames required: "sample,r1,r2,s" if don't have singletons colname "s" can be empty
-
-   --output                       Path to output dir
-
-Optional arguments:
-   --quality_control              Include the reads filtering steps.
-                                  (default: true)
-
-   --taxonomic_profiler           Choice software for taxonomic classification in reads, avaible options: "kraken2", "sourmash", "none
-                                  (default: kraken2)
-
-   --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly", "none"
-                                  (default: assembly)
-                                  coassembly: all samples are processing in one only data set
-                                  assembly: all samples are processing individualy
-
-   --read_arg_prediction          ARG and ARGV gene prediction at read level using KARGA and KARGVA
-                                  (default: false)
-
-   --contig_level_metacerberus    Contig level functional annotation with metacebeus
-                                  (default: false)
-
-   --contig_tax_and_arg           Contig taxonomy and ARG prediction
-                                  (default: false)
-
-   --include_binning              Include the binning and binning refining steps. (default: false)
-
-   --arg_bin_clustering           ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
-                                  (default: false) 🚧 WIP Function 🚧
-
-   --help                         Print this usage statement.
-```
-Additionally, all options can be modified in nextflow.config file
 ## Credits
 
 gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes 

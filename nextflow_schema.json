@@ -1,0 +1,410 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/gene2dis/BugBuster/main/nextflow_schema.json",
+    "title": "gene2dis/BugBuster pipeline parameters",
+    "description": "Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible",
+    "type": "object",
+    "definitions": {
+        "input_output_options": {
+            "title": "Input/output options",
+            "type": "object",
+            "fa_icon": "fas fa-terminal",
+            "description": "Define where the pipeline should find input data and save output data.",
+            "required": ["input", "output"],
+            "properties": {
+                "input": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "mimetype": "text/csv",
+                    "pattern": "^\\S+\\.csv$",
+                    "description": "Path to comma-separated file containing information about the samples in the experiment.",
+                    "help_text": "You will need to create a samplesheet with information about the samples you want to analyse before running the pipeline. Use this parameter to specify its location. It has to be a comma-separated file with 4 columns (sample, r1, r2, s), and a header row.",
+                    "fa_icon": "fas fa-file-csv"
+                },
+                "output": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "The output directory where the results will be saved. You have to use absolute paths to storage on Cloud infrastructure.",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "outdir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Alias for output directory (for nf-core compatibility).",
+                    "fa_icon": "fas fa-folder-open",
+                    "hidden": true
+                }
+            }
+        },
+        "pipeline_options": {
+            "title": "Pipeline execution options",
+            "type": "object",
+            "fa_icon": "fas fa-cogs",
+            "description": "Control which pipeline steps to run.",
+            "properties": {
+                "quality_control": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Enable quality control and host read filtering steps.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "assembly_mode": {
+                    "type": "string",
+                    "default": "assembly",
+                    "enum": ["assembly", "coassembly", "none"],
+                    "description": "Mode of genome assembly.",
+                    "help_text": "Choose 'assembly' for individual sample assembly, 'coassembly' to combine all samples, or 'none' to skip assembly.",
+                    "fa_icon": "fas fa-puzzle-piece"
+                },
+                "taxonomic_profiler": {
+                    "type": "string",
+                    "default": "sourmash",
+                    "enum": ["kraken2", "sourmash", "none"],
+                    "description": "Software for taxonomic profiling at read level.",
+                    "fa_icon": "fas fa-sitemap"
+                },
+                "include_binning": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable metagenomic binning and refinement steps.",
+                    "fa_icon": "fas fa-th"
+                },
+                "read_arg_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA.",
+                    "fa_icon": "fas fa-dna"
+                },
+                "contig_tax_and_arg": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
+                    "fa_icon": "fas fa-microscope"
+                },
+                "contig_level_metacerberus": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable contig-level functional annotation with MetaCerberus.",
+                    "fa_icon": "fas fa-tags"
+                },
+                "arg_bin_clustering": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable ARG gene prediction and clustering for horizontal gene transfer inference.",
+                    "fa_icon": "fas fa-project-diagram"
+                },
+                "min_read_sample": {
+                    "type": "integer",
+                    "default": 0,
+                    "minimum": 0,
+                    "description": "Minimum number of reads required per sample after QC filtering.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                }
+            }
+        },
+        "database_options": {
+            "title": "Database options",
+            "type": "object",
+            "fa_icon": "fas fa-database",
+            "description": "Options for reference databases. Use automatic downloads or provide custom paths.",
+            "properties": {
+                "phiX_index": {
+                    "type": "string",
+                    "default": "phiX174",
+                    "description": "PhiX genome index selection for automatic download.",
+                    "fa_icon": "fas fa-virus"
+                },
+                "host_db": {
+                    "type": "string",
+                    "default": "human",
+                    "description": "Host genome database for read filtering.",
+                    "fa_icon": "fas fa-user"
+                },
+                "kraken2_db": {
+                    "type": "string",
+                    "default": "standard-8",
+                    "enum": ["standard-8", "gtdb_220"],
+                    "description": "Kraken2 database selection.",
+                    "fa_icon": "fas fa-database"
+                },
+                "sourmash_db": {
+                    "type": "string",
+                    "default": "gtdb_220_k31",
+                    "description": "Sourmash database selection.",
+                    "fa_icon": "fas fa-database"
+                },
+                "checkm2_db": {
+                    "type": "string",
+                    "default": "v3",
+                    "description": "CheckM2 database version.",
+                    "fa_icon": "fas fa-database"
+                },
+                "gtdbtk_db": {
+                    "type": "string",
+                    "default": "release_220",
+                    "description": "GTDB-TK database release version.",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_phiX_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom PhiX Bowtie2 index directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_bowtie_host_index": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom host Bowtie2 index directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_kraken_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom Kraken2 database directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_sourmash_db": {
+                    "type": "array",
+                    "description": "Paths to custom Sourmash database files [kmer_file, lineages_file].",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_checkm2_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to custom CheckM2 database file.",
+                    "fa_icon": "fas fa-file"
+                },
+                "custom_gtdbtk_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom GTDB-TK database directory.",
+                    "fa_icon": "fas fa-folder"
+                }
+            }
+        },
+        "fastp_options": {
+            "title": "Fastp options",
+            "type": "object",
+            "fa_icon": "fas fa-cut",
+            "description": "Parameters for read quality filtering with Fastp.",
+            "properties": {
+                "fastp_n_base_limit": {
+                    "type": "integer",
+                    "default": 5,
+                    "description": "Maximum number of N bases allowed in a read.",
+                    "fa_icon": "fas fa-sliders-h"
+                },
+                "fastp_unqualified_percent_limit": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum percentage of unqualified bases allowed.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "fastp_qualified_quality_phred": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Phred quality score threshold for qualified bases.",
+                    "fa_icon": "fas fa-chart-line"
+                },
+                "fastp_cut_front_window_size": {
+                    "type": "integer",
+                    "default": 4,
+                    "description": "Window size for cutting from front of reads.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "fastp_cut_front_mean_quality": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Mean quality threshold for front cutting.",
+                    "fa_icon": "fas fa-chart-bar"
+                },
+                "fastp_cut_right_window_size": {
+                    "type": "integer",
+                    "default": 4,
+                    "description": "Window size for cutting from right of reads.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "fastp_cut_right_mean_quality": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Mean quality threshold for right cutting.",
+                    "fa_icon": "fas fa-chart-bar"
+                }
+            }
+        },
+        "taxonomy_options": {
+            "title": "Taxonomy profiling options",
+            "type": "object",
+            "fa_icon": "fas fa-sitemap",
+            "description": "Parameters for taxonomic classification.",
+            "properties": {
+                "kraken_confidence": {
+                    "type": "number",
+                    "default": 0.1,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Kraken2 confidence threshold.",
+                    "fa_icon": "fas fa-balance-scale"
+                },
+                "kraken_db_used": {
+                    "type": "string",
+                    "default": "gtdb_release207",
+                    "description": "Kraken2 database name for reports.",
+                    "fa_icon": "fas fa-tag"
+                },
+                "bracken_read_len": {
+                    "type": "integer",
+                    "default": 150,
+                    "description": "Read length for Bracken abundance estimation.",
+                    "fa_icon": "fas fa-ruler-horizontal"
+                },
+                "bracken_tax_level": {
+                    "type": "string",
+                    "default": "S",
+                    "enum": ["D", "P", "C", "O", "F", "G", "S"],
+                    "description": "Taxonomic level for Bracken (D=Domain, P=Phylum, C=Class, O=Order, F=Family, G=Genus, S=Species).",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "sourmash_db_name": {
+                    "type": "string",
+                    "default": "gtdb_release_220",
+                    "description": "Sourmash database name for reports.",
+                    "fa_icon": "fas fa-tag"
+                },
+                "sourmash_tax_rank": {
+                    "type": "string",
+                    "default": "species",
+                    "enum": ["genus", "species", "strain"],
+                    "description": "Taxonomic rank for Sourmash classification.",
+                    "fa_icon": "fas fa-layer-group"
+                }
+            }
+        },
+        "binning_options": {
+            "title": "Binning options",
+            "type": "object",
+            "fa_icon": "fas fa-th",
+            "description": "Parameters for metagenomic binning.",
+            "properties": {
+                "metabat_minContig": {
+                    "type": "integer",
+                    "default": 2500,
+                    "description": "Minimum contig length for MetaBAT2.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "metawrap_completeness": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum bin completeness threshold for MetaWRAP.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "metawrap_contamination": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum bin contamination threshold for MetaWRAP.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "semibin_env_model": {
+                    "type": "string",
+                    "default": "human_gut",
+                    "enum": ["human_gut", "dog_gut", "ocean", "soil", "cat_gut", "human_oral", "mouse_gut", "pig_gut", "built_environment", "wastewater", "chicken_caecum", "global"],
+                    "description": "SemiBin environment model for binning.",
+                    "fa_icon": "fas fa-globe"
+                }
+            }
+        },
+        "max_job_request_options": {
+            "title": "Max job request options",
+            "type": "object",
+            "fa_icon": "fab fa-acquisitions-incorporated",
+            "description": "Set the top limit for requested resources for any single job.",
+            "help_text": "If you are running on a smaller system, a pipeline step requesting more resources than are available may cause the Nextflow to stop the run with an error. These options allow you to cap the maximum resources requested by any single job so that the pipeline will run on your system.\n\nNote that you can not _increase_ the resources requested by any job using these options. For that you will need your own configuration file. See [the nf-core website](https://nf-co.re/usage/configuration) for details.",
+            "properties": {
+                "max_cpus": {
+                    "type": "integer",
+                    "description": "Maximum number of CPUs that can be requested for any single job.",
+                    "default": 16,
+                    "fa_icon": "fas fa-microchip",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the CPU requirement for each process. Should be an integer e.g. `--max_cpus 1`"
+                },
+                "max_memory": {
+                    "type": "string",
+                    "description": "Maximum amount of memory that can be requested for any single job.",
+                    "default": "128.GB",
+                    "fa_icon": "fas fa-memory",
+                    "pattern": "^\\d+(\\.\\d+)?\\.?\\s*(K|M|G|T)?B$",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the memory requirement for each process. Should be a string in the format integer-unit e.g. `--max_memory '8.GB'`"
+                },
+                "max_time": {
+                    "type": "string",
+                    "description": "Maximum amount of time that can be requested for any single job.",
+                    "default": "240.h",
+                    "fa_icon": "far fa-clock",
+                    "pattern": "^(\\d+\\.?\\s*(s|m|h|d|day)\\s*)+$",
+                    "hidden": true,
+                    "help_text": "Use to set an upper-limit for the time requirement for each process. Should be a string in the format integer-unit e.g. `--max_time '2.h'`"
+                }
+            }
+        },
+        "generic_options": {
+            "title": "Generic options",
+            "type": "object",
+            "fa_icon": "fas fa-file-import",
+            "description": "Less common options for the pipeline, typically set in a config file.",
+            "hidden": true,
+            "properties": {
+                "help": {
+                    "type": "boolean",
+                    "description": "Display help text.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "version": {
+                    "type": "boolean",
+                    "description": "Display version and exit.",
+                    "fa_icon": "fas fa-question-circle",
+                    "hidden": true
+                },
+                "publish_dir_mode": {
+                    "type": "string",
+                    "default": "copy",
+                    "description": "Method used to save pipeline results to output directory.",
+                    "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
+                    "fa_icon": "fas fa-copy",
+                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "hidden": true
+                },
+                "validationShowHiddenParams": {
+                    "type": "boolean",
+                    "fa_icon": "far fa-eye-slash",
+                    "description": "Show all params when using `--help`.",
+                    "hidden": true
+                },
+                "validationSchemaIgnoreParams": {
+                    "type": "string",
+                    "description": "Parameters to ignore during schema validation.",
+                    "hidden": true
+                }
+            }
+        }
+    },
+    "allOf": [
+        { "$ref": "#/definitions/input_output_options" },
+        { "$ref": "#/definitions/pipeline_options" },
+        { "$ref": "#/definitions/database_options" },
+        { "$ref": "#/definitions/fastp_options" },
+        { "$ref": "#/definitions/taxonomy_options" },
+        { "$ref": "#/definitions/binning_options" },
+        { "$ref": "#/definitions/max_job_request_options" },
+        { "$ref": "#/definitions/generic_options" }
+    ]
+}

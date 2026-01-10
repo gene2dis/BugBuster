@@ -1,0 +1,40 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema",
+    "$id": "https://raw.githubusercontent.com/gene2dis/BugBuster/main/assets/schema_input.json",
+    "title": "BugBuster pipeline - params.input schema",
+    "description": "Schema for the samplesheet used as input to the BugBuster pipeline",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Sample name must be provided and cannot contain spaces",
+                "meta": ["id"]
+            },
+            "r1": {
+                "type": "string",
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "R1 FastQ file path must be provided and have a valid extension (.fastq, .fq, .fastq.gz, .fq.gz)",
+                "format": "file-path",
+                "exists": true
+            },
+            "r2": {
+                "type": "string",
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "R2 FastQ file path must be provided and have a valid extension (.fastq, .fq, .fastq.gz, .fq.gz)",
+                "format": "file-path",
+                "exists": true
+            },
+            "s": {
+                "type": "string",
+                "pattern": "^\\S+\\.f(ast)?q(\\.gz)?$",
+                "errorMessage": "Singleton FastQ file path (optional) must have a valid extension (.fastq, .fq, .fastq.gz, .fq.gz)",
+                "format": "file-path",
+                "exists": true
+            }
+        },
+        "required": ["sample", "r1", "r2"]
+    }
+}
