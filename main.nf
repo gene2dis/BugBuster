@@ -356,14 +356,14 @@ workflow {
     }
     
     // Run MultiQC
-    NFCORE_MULTIQC(
-        ch_multiqc_files.collect().ifEmpty([]),
-        file("${projectDir}/assets/multiqc_config.yml", checkIfExists: true),
-        [],  // extra_multiqc_config
-        [],  // multiqc_logo
-        [],  // replace_names
-        []   // sample_names
-    )
+    //NFCORE_MULTIQC(
+    //    ch_multiqc_files.collect().ifEmpty([]),
+    //    file("${projectDir}/assets/multiqc_config.yml", checkIfExists: true),
+    //    [],  // extra_multiqc_config
+    //    [],  // multiqc_logo
+    //    [],  // replace_names
+    //    []   // sample_names
+    //)
 
 }
 

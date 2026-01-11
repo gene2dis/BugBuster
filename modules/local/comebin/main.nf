@@ -16,15 +16,25 @@ process COMEBIN {
         def prefix = "${meta.id}"
 
         """
-        mkdir ${prefix}_comebin_bins
+        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
 
+        contig_count=\$(grep -c "^>" ${contigs} || true)
+        
+        if [[ \$contig_count -lt 10 ]]; then
+            echo "Warning: Sample ${prefix} has only \$contig_count contigs. Skipping COMEBIN (requires at least 10 contigs)." >&2
+            echo "COMEBIN skipped due to insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
+            exit 0
+        fi
+
+        set +e
         if [[ $task.attempt == 1 ]]; then
                bash run_comebin.sh \\
                    -a ${contigs} \\
                    -p ./ \\
                    -o ${prefix}_comebin_bins \\
                    -n 8 \\
-                   -t $task.cpus 
+                   -t $task.cpus
+               exit_code=\$?
         elif [[ $task.attempt == 2 ]]; then 
                 bash run_comebin.sh \\
                    -a ${contigs} \\
@@ -35,6 +45,7 @@ process COMEBIN {
                    -b 896 \\
                    -e 1792 \\
                    -c 1792
+                exit_code=\$?
         elif [[ $task.attempt == 3 ]]; then
                 bash run_comebin.sh \\
                    -a ${contigs} \\
@@ -45,6 +56,15 @@ process COMEBIN {
                    -b 512 \\
                    -e 1024 \\
                    -c 1024
+                exit_code=\$?
+        fi
+        set -e
+
+        if [[ \$exit_code -ne 0 ]]; then
+            echo "Warning: COMEBIN failed for sample ${prefix}. Creating empty bin directory to allow pipeline to continue." >&2
+            mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
+            echo "COMEBIN failed - insufficient data or features for binning" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
+            exit 0
         fi
 
 	"""
@@ -70,8 +90,22 @@ process COMEBIN_COASSEMBLY {
         """
         contigs=`ls | grep -E '.+?filtered_contigs.+' | tr '\\n' ',' | sed 's/.\$//'`
 
-        mkdir ${prefix}_comebin_bins
+        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
 
+        contig_count=0
+        IFS=',' read -ra CONTIG_FILES <<< "\${contigs}"
+        for contig_file in "\${CONTIG_FILES[@]}"; do
+            count=\$(grep -c "^>" "\$contig_file" || true)
+            contig_count=\$((contig_count + count))
+        done
+        
+        if [[ \$contig_count -lt 10 ]]; then
+            echo "Warning: Coassembly has only \$contig_count contigs. Skipping COMEBIN (requires at least 10 contigs)." >&2
+            echo "COMEBIN skipped due to insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
+            exit 0
+        fi
+
+        set +e
         if [[ $task.attempt == 1 ]]; then
                bash run_comebin.sh \\
                    -a \${contigs} \\
@@ -79,6 +113,7 @@ process COMEBIN_COASSEMBLY {
                    -o ${prefix}_comebin_bins \\
                    -n 8 \\
                    -t $task.cpus
+               exit_code=\$?
         elif [[ $task.attempt == 2 ]]; then
                 bash run_comebin.sh \\
                    -a \${contigs} \\
@@ -89,6 +124,7 @@ process COMEBIN_COASSEMBLY {
                    -b 896 \\
                    -e 1792 \\
                    -c 1792
+                exit_code=\$?
         elif [[ $task.attempt == 3 ]]; then
                 bash run_comebin.sh \\
                    -a \${contigs} \\
@@ -99,6 +135,15 @@ process COMEBIN_COASSEMBLY {
                    -b 512 \\
                    -e 1024 \\
                    -c 1024
+                exit_code=\$?
+        fi
+        set -e
+
+        if [[ \$exit_code -ne 0 ]]; then
+            echo "Warning: COMEBIN failed for coassembly. Creating empty bin directory to allow pipeline to continue." >&2
+            mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
+            echo "COMEBIN failed - insufficient data or features for binning" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
+            exit 0
         fi
 
         """

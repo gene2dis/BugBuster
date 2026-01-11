@@ -43,7 +43,7 @@ workflow BINNING {
     //
     if ( params.assembly_mode == "assembly" ) {
         // Calculate depth
-        ch_depth = CALCULATE_DEPTH(contigs)
+        ch_depth = CALCULATE_DEPTH(bam)
         
         //
         // Run nf-core METABAT2
@@ -63,8 +63,10 @@ workflow BINNING {
         // nf-core outputs individual gzipped bins; collect them for downstream
         // Group bins by sample for compatibility with local binners
         ch_metabat2 = METABAT2.out.fasta
-        ch_semibin = SEMIBIN(contigs)
-        ch_comebin = COMEBIN(contigs)
+        
+        // bam channel already has the correct structure: [ meta, contigs, bam ]
+        ch_semibin = SEMIBIN(bam)
+        ch_comebin = COMEBIN(bam)
 
         // Combine bins for refinement
         ch_all_bins = ch_metabat2.join(ch_semibin).join(ch_comebin)
