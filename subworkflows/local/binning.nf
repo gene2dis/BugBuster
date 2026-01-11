@@ -6,25 +6,25 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { CALCULATE_DEPTH            } from '../../modules/calculate_depth/main'
-include { CALCULATE_DEPTH_COASSEMBLY } from '../../modules/calculate_depth/main'
-include { METABAT2                   } from '../../modules/metabat2/main'
-include { METABAT2_COASSEMBLY        } from '../../modules/metabat2/main'
-include { SEMIBIN                    } from '../../modules/semibin/main'
-include { SEMIBIN_COASSEMBLY         } from '../../modules/semibin/main'
-include { COMEBIN                    } from '../../modules/comebin/main'
-include { COMEBIN_COASSEMBLY         } from '../../modules/comebin/main'
-include { METAWRAP                   } from '../../modules/metawrap/main'
-include { METAWRAP_COASSEMBLY        } from '../../modules/metawrap/main'
-include { CHECKM2                    } from '../../modules/checkm2/main'
-include { CHECKM2_COASSEMBLY         } from '../../modules/checkm2/main'
-include { GTDB_TK                    } from '../../modules/gtdb-tk/main'
-include { GTDB_TK_COASSEMBLY         } from '../../modules/gtdb-tk/main'
-include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/bowtie2_samtools/main'
-include { BEDTOOLS                   } from '../../modules/bedtools/main'
-include { BIN_QUALITY_REPORT         } from '../../modules/bin_quality_report/main'
-include { BIN_TAX_REPORT             } from '../../modules/bin_tax_report/main'
-include { BIN_SUMMARY                } from '../../modules/bin_summary/main'
+include { CALCULATE_DEPTH            } from '../../modules/local/calculate_depth/main'
+include { CALCULATE_DEPTH_COASSEMBLY } from '../../modules/local/calculate_depth/main'
+include { METABAT2_METABAT2 as METABAT2 } from '../../modules/nf-core/metabat2/metabat2/main'
+include { METABAT2_COASSEMBLY        } from '../../modules/local/metabat2/main'
+include { SEMIBIN                    } from '../../modules/local/semibin/main'
+include { SEMIBIN_COASSEMBLY         } from '../../modules/local/semibin/main'
+include { COMEBIN                    } from '../../modules/local/comebin/main'
+include { COMEBIN_COASSEMBLY         } from '../../modules/local/comebin/main'
+include { METAWRAP                   } from '../../modules/local/metawrap/main'
+include { METAWRAP_COASSEMBLY        } from '../../modules/local/metawrap/main'
+include { CHECKM2                    } from '../../modules/local/checkm2/main'
+include { CHECKM2_COASSEMBLY         } from '../../modules/local/checkm2/main'
+include { GTDB_TK                    } from '../../modules/local/gtdb-tk/main'
+include { GTDB_TK_COASSEMBLY         } from '../../modules/local/gtdb-tk/main'
+include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
+include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
+include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
+include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
+include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
 
 workflow BINNING {
     take:
@@ -45,8 +45,24 @@ workflow BINNING {
         // Calculate depth
         ch_depth = CALCULATE_DEPTH(contigs)
         
-        // Run multiple binners
-        ch_metabat2 = METABAT2(ch_depth)
+        //
+        // Run nf-core METABAT2
+        // nf-core METABAT2_METABAT2 signature:
+        //   input:  tuple val(meta), path(fasta), path(depth)
+        //   output: tuple val(meta), path("*.fa.gz"), emit: fasta
+        //
+        ch_metabat2_input = ch_depth.map { meta, contigs_file, depth_file ->
+            [ meta, contigs_file, depth_file ]
+        }
+        
+        METABAT2(ch_metabat2_input)
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(METABAT2.out.versions.first())
+        
+        // nf-core outputs individual gzipped bins; collect them for downstream
+        // Group bins by sample for compatibility with local binners
+        ch_metabat2 = METABAT2.out.fasta
         ch_semibin = SEMIBIN(contigs)
         ch_comebin = COMEBIN(contigs)
 

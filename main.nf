@@ -153,31 +153,34 @@ include { BINNING            } from './subworkflows/local/binning'
 // Modules for functionality not covered by subworkflows
 
 	// FUNCTIONAL ANNOTATION
-include { METACERBERUS_CONTIGS } from './modules/metacerberus/main'
+include { METACERBERUS_CONTIGS } from './modules/local/metacerberus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
-include { NT_BLASTN        } from './modules/nt_blastn/main'
-include { BLOBTOOLS        } from './modules/blobtools/main'
-include { SAMTOOLS_INDEX   } from './modules/samtools_index/main'
-include { BLOBPLOT         } from './modules/blobplot/main'
+include { NT_BLASTN        } from './modules/local/nt_blastn/main'
+include { BLOBTOOLS        } from './modules/local/blobtools/main'
+include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
+include { BLOBPLOT         } from './modules/local/blobplot/main'
 
 	// ORF PREDICTION IN CONTIGS AND BINS
-include { PRODIGAL_BINS    } from './modules/prodigal/main'
-include { PRODIGAL_CONTIGS } from './modules/prodigal/main'
+include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
+include { PRODIGAL as PRODIGAL_CONTIGS } from './modules/nf-core/prodigal/main'
 
 	// ARG PREDICTION IN READS
-include { KARGVA           } from './modules/kargva/main'
-include { KARGA            } from './modules/karga/main'
-include { ARGS_OAP         } from './modules/args_oap/main'
-include { ARG_NORM_REPORT  } from './modules/arg_norm_report/main'
+include { KARGVA           } from './modules/local/kargva/main'
+include { KARGA            } from './modules/local/karga/main'
+include { ARGS_OAP         } from './modules/local/args_oap/main'
+include { ARG_NORM_REPORT  } from './modules/local/arg_norm_report/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
-include { DEEPARG_BINS             } from './modules/deeparg/main'
-include { DEEPARG_CONTIGS          } from './modules/deeparg/main'
-include { ARG_CONTIG_LEVEL_REPORT  } from './modules/arg_contig_level_report/main'
-include { ARG_FASTA_FORMATTER      } from './modules/arg_fasta_formatter/main'
-include { CLUSTERING               } from './modules/clustering/main'
-include { ARG_BLOBPLOT             } from './modules/arg_blobplot/main'
+include { DEEPARG_BINS             } from './modules/local/deeparg/main'
+include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
+include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
+include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
+include { CLUSTERING               } from './modules/local/clustering/main'
+include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
+
+	// MULTIQC REPORTING
+include { MULTIQC as NFCORE_MULTIQC } from './modules/nf-core/multiqc/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -281,7 +284,18 @@ workflow {
     //
     if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
         ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db))
-        ch_index_bam = SAMTOOLS_INDEX(ch_bam_meta)
+        //
+        // Run nf-core SAMTOOLS_INDEX for BAM indexing
+        // nf-core SAMTOOLS_INDEX signature:
+        //   input:  tuple val(meta), path(input)
+        //   output: tuple val(meta), path("*.bai"), emit: bai
+        //
+        NFCORE_SAMTOOLS_INDEX(ch_bam_meta)
+        
+        // Join BAM with its index for BLOBTOOLS compatibility
+        // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
+        ch_index_bam = ch_bam_meta
+            .join(NFCORE_SAMTOOLS_INDEX.out.bai)
         ch_blob_table = BLOBTOOLS(
             ch_nt_blastn
                 .join(ch_index_bam)
@@ -289,7 +303,17 @@ workflow {
         )
         BLOBPLOT(ch_blob_table.only_blob.collect())
 
-        ch_contig_proteins = PRODIGAL_CONTIGS(ch_contigs_meta)
+        //
+        // Run nf-core PRODIGAL for contig ORF prediction
+        // nf-core PRODIGAL signature:
+        //   input:  tuple val(meta), path(genome) + val(output_format)
+        //   output: tuple val(meta), path("*.faa.gz"), emit: amino_acid_fasta
+        //
+        PRODIGAL_CONTIGS(
+            ch_contigs_meta,
+            "gff"  // output_format
+        )
+        ch_contig_proteins = PRODIGAL_CONTIGS.out.amino_acid_fasta
         ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
             ch_contig_args.only_deeparg
@@ -308,6 +332,38 @@ workflow {
         ch_arg_fasta = ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
         ch_clusters = CLUSTERING(ch_arg_fasta.collect())
     }
+
+    //
+    // MULTIQC: Aggregate QC reports
+    // nf-core MULTIQC signature:
+    //   input: path(multiqc_files) + path(config) + path(extra_config) + path(logo) + path(replace_names) + path(sample_names)
+    //   output: path("*.html"), emit: report
+    //
+    ch_multiqc_files = Channel.empty()
+    
+    // Collect FASTP reports if QC was run
+    if ( params.quality_control ) {
+        ch_multiqc_files = ch_multiqc_files.mix(
+            QC.out.fastp_json.collect{ _meta, json -> json }.ifEmpty([])
+        )
+    }
+    
+    // Collect Kraken2 reports if taxonomy was run
+    if ( params.taxonomic_profiler == "kraken2" ) {
+        ch_multiqc_files = ch_multiqc_files.mix(
+            TAXONOMY.out.versions.ifEmpty([])
+        )
+    }
+    
+    // Run MultiQC
+    NFCORE_MULTIQC(
+        ch_multiqc_files.collect().ifEmpty([]),
+        file("${projectDir}/assets/multiqc_config.yml", checkIfExists: true),
+        [],  // extra_multiqc_config
+        [],  // multiqc_logo
+        [],  // replace_names
+        []   // sample_names
+    )
 
 }
 

@@ -19,9 +19,10 @@ process BBMAP {
         def contig_length = "${params.bbmap_lenght}"
 
         """
-	reformat.sh in=${contigs} out=${prefix}_filtered_contigs.fa minlength=${contig_length}	
-	stats.sh in=${contigs} out=${prefix}_contig.stats
-	"""
+        # Handle both gzipped and uncompressed contigs (nf-core outputs .fa.gz)
+        reformat.sh in=${contigs} out=${prefix}_filtered_contigs.fa minlength=${contig_length}	
+        stats.sh in=${contigs} out=${prefix}_contig.stats
+        """
 }
 
 process BBMAP_COASSEMBLY {

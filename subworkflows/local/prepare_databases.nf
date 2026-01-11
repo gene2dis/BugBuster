@@ -6,14 +6,14 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { FORMAT_KRAKEN_DB        } from '../../modules/format_db/main'
-include { FORMAT_BOWTIE_INDEX     } from '../../modules/format_db/main'
-include { FORMAT_NT_BLAST_DB      } from '../../modules/format_db/main'
-include { FORMAT_TAXDUMP_FILES    } from '../../modules/format_db/main'
-include { DOWNLOAD_DEEPARG_DB     } from '../../modules/format_db/main'
-include { FORMAT_CHECKM2_DB       } from '../../modules/format_db/main'
-include { BUILD_PHIX_BOWTIE2_INDEX } from '../../modules/format_db/main'
-include { DOWNLOAD_GTDBTK_DB      } from '../../modules/format_db/main'
+include { FORMAT_KRAKEN_DB        } from '../../modules/local/format_db/main'
+include { FORMAT_BOWTIE_INDEX     } from '../../modules/local/format_db/main'
+include { FORMAT_NT_BLAST_DB      } from '../../modules/local/format_db/main'
+include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
+include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
+include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
+include { BUILD_PHIX_BOWTIE2_INDEX } from '../../modules/local/format_db/main'
+include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 
 workflow PREPARE_DATABASES {
     

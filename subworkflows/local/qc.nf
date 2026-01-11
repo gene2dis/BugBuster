@@ -6,12 +6,12 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { FASTP                      } from '../../modules/fastp/main'
-include { QFILTER                    } from '../../modules/qfilter/main'
-include { COUNT_READS                } from '../../modules/count_reads/main'
-include { BOWTIE2 as BOWTIE2_PHIX    } from '../../modules/bowtie2/main'
-include { BOWTIE2 as BOWTIE2_HOST    } from '../../modules/bowtie2/main'
-include { READS_REPORT               } from '../../modules/reads_report/main'
+include { FASTP                      } from '../../modules/nf-core/fastp/main'
+include { QFILTER                    } from '../../modules/local/qfilter/main'
+include { COUNT_READS                } from '../../modules/local/count_reads/main'
+include { BOWTIE2 as BOWTIE2_PHIX    } from '../../modules/local/bowtie2/main'
+include { BOWTIE2 as BOWTIE2_HOST    } from '../../modules/local/bowtie2/main'
+include { READS_REPORT               } from '../../modules/local/reads_report/main'
 
 workflow QC {
     take:
@@ -21,17 +21,43 @@ workflow QC {
 
     main:
     ch_versions = Channel.empty()
+    ch_fastp_json = Channel.empty()
     
     if ( params.quality_control ) {
         //
-        // Read quality filtering with Fastp
+        // Read quality filtering with nf-core Fastp
+        // nf-core FASTP signature: tuple val(meta), path(reads), path(adapter_fasta)
+        //                          val discard_trimmed_pass, val save_trimmed_fail, val save_merged
         //
-        ch_fastp_reads = FASTP(reads)
+        ch_fastp_input = reads.map { meta, reads_files -> 
+            [ meta, reads_files, [] ]  // Empty adapter_fasta
+        }
+        
+        FASTP(
+            ch_fastp_input,
+            false,  // discard_trimmed_pass
+            false,  // save_trimmed_fail
+            false   // save_merged
+        )
+        
+        // Collect versions and FASTP json for MultiQC
+        ch_versions = ch_versions.mix(FASTP.out.versions.first())
+        ch_fastp_json = FASTP.out.json
+        
+        //
+        // Combine reads and json for QFILTER
+        // QFILTER expects: tuple val(meta), path(reads), path(json)
+        //
+        ch_fastp_combined = FASTP.out.reads
+            .join(FASTP.out.json)
+            .map { meta, reads_files, json_file ->
+                [ meta, reads_files, json_file ]
+            }
 
         //
         // Extract and format QC reports
         //
-        ch_fastp_reads_report = QFILTER(ch_fastp_reads.fastq)
+        ch_fastp_reads_report = QFILTER(ch_fastp_combined)
 
         //
         // Filter samples by minimum read count
@@ -46,7 +72,7 @@ workflow QC {
                     return null
                 }
             }
-            .filter { it != null }
+            .filter { item -> item != null }
 
         //
         // Remove PhiX contamination
@@ -97,5 +123,6 @@ workflow QC {
     reads              = ch_clean_reads            // channel: [ val(meta), [ reads ] ]
     reads_coassembly   = ch_clean_reads_coassembly // channel: path(reads)
     report             = ch_report                 // channel: path(report)
+    fastp_json         = ch_fastp_json             // channel: [ val(meta), path(json) ] for MultiQC
     versions           = ch_versions               // channel: path(versions.yml)
 }
