@@ -1,7 +1,11 @@
 process GTDB_TK {
-    container 'quay.io/ffuentessantander/gtdbtk:2.4.0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/gtdbtk:2.5.2--pyh1f0d9b5_0':
+        'quay.io/biocontainers/gtdbtk:2.5.2--pyh1f0d9b5_0' }"
+
 
     label 'process_high'
+    label 'process_high_memory'
     maxForks 2
 
     publishDir "${params.output}/workflow/${meta.id}/gtdb-tk", pattern: '*_gtdbtk_*'
@@ -25,7 +29,7 @@ process GTDB_TK {
                --cpus $task.cpus \\
                --skip_ani_screen \\
                --extension .fa \\
-               --pplacer_cpus $task.cpus
+               --pplacer_cpus 1
         
 	mv ${prefix}_gtdb/classify/gtdbtk.bac120.summary.tsv ${prefix}_gtdbtk_bac120.tsv
 
@@ -40,6 +44,7 @@ process GTDB_TK_COASSEMBLY {
     container 'quay.io/ffuentessantander/gtdbtk:2.4.0'
 
     label 'process_high'
+    label 'process_high_memory'
 
     publishDir "${params.output}/workflow/co_assembly/gtdb-tk", pattern: '*_gtdbtk_*'
 
@@ -62,7 +67,7 @@ process GTDB_TK_COASSEMBLY {
                --cpus $task.cpus \\
                --skip_ani_screen \\
                --extension .fa \\
-               --pplacer_cpus $task.cpus
+               --pplacer_cpus 1
         
 	mv ${prefix}_gtdb/classify/gtdbtk.bac120.summary.tsv ${prefix}_gtdbtk_bac120.tsv
 

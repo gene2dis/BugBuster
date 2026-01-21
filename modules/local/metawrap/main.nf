@@ -20,9 +20,18 @@ process METAWRAP {
         def contamination = "${params.metawrap_contamination}"
 
         """
-        cp -rL ${metabat2_bins} metabat_wp_bins
-	cp -rL ${semibin_bins} semibin_wp_bins
-        cp -rL ${comebin_bins} comebin_wp_bins
+        mkdir -p metabat_wp_bins semibin_wp_bins comebin_wp_bins
+        
+        for bin in ${metabat2_bins}; do
+            if [[ "\$bin" == *.fa.gz ]]; then
+                gunzip -c "\$bin" > "metabat_wp_bins/\$(basename "\$bin" .gz)"
+            elif [[ "\$bin" == *.fa ]]; then
+                cp "\$bin" metabat_wp_bins/
+            fi
+        done
+        
+        cp -rL ${semibin_bins}/* semibin_wp_bins/ 2>/dev/null || true
+        cp -rL ${comebin_bins}/* comebin_wp_bins/ 2>/dev/null || true
 	metawrap bin_refinement \\
 		-o Refined_bins \\
 		-t $task.cpus \\
@@ -61,9 +70,18 @@ process METAWRAP_COASSEMBLY {
         def contamination = "${params.metawrap_contamination}"
 
         """
-        cp -rL ${bins[0]} metabat_wp_bins
-	cp -rL ${bins[1]} semibin_wp_bins
-        cp -rL ${bins[2]} comebin_wp_bins
+        mkdir -p metabat_wp_bins semibin_wp_bins comebin_wp_bins
+        
+        for bin in ${bins[0]}; do
+            if [[ "\$bin" == *.fa.gz ]]; then
+                gunzip -c "\$bin" > "metabat_wp_bins/\$(basename "\$bin" .gz)"
+            elif [[ "\$bin" == *.fa ]]; then
+                cp "\$bin" metabat_wp_bins/
+            fi
+        done
+        
+        cp -rL ${bins[1]}/* semibin_wp_bins/ 2>/dev/null || true
+        cp -rL ${bins[2]}/* comebin_wp_bins/ 2>/dev/null || true
 	metawrap bin_refinement \\
 		-o Refined_bins \\
 		-t $task.cpus \\
