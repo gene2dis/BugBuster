@@ -1,0 +1,52 @@
+name: phyloseq_converter
+description: Convert phyloseq-compatible TSV tables to native R phyloseq S4 objects
+keywords:
+  - phyloseq
+  - conversion
+  - R
+  - taxonomy
+  - abundance
+tools:
+  - phyloseq:
+      description: Handling and analysis of high-throughput microbiome census data
+      homepage: https://joey711.github.io/phyloseq/
+      documentation: https://joey711.github.io/phyloseq/
+      tool_dev_url: https://github.com/joey711/phyloseq
+      doi: "10.1371/journal.pone.0061217"
+      licence: ["AGPL-3.0"]
+
+input:
+  - otu_table:
+      type: file
+      description: OTU/abundance table in TSV format (taxa × samples)
+      pattern: "*_otu_table.tsv"
+  - tax_table:
+      type: file
+      description: Taxonomy table in TSV format (taxa × taxonomic ranks)
+      pattern: "*_tax_table.tsv"
+  - sample_metadata:
+      type: file
+      description: Sample metadata table in TSV format
+      pattern: "*_sample_metadata.tsv"
+  - db_name:
+      type: value
+      description: Database name for output file naming
+
+output:
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - phyloseq_rds:
+      type: file
+      description: R phyloseq S4 object saved as RDS file
+      pattern: "*.RDS"
+
+notes:
+  - This module only runs when params.create_phyloseq_rds is set to true
+  - Provides backward compatibility for R-based downstream analysis
+  - Optional validation mode available via task.ext.validate
+
+authors:
+  - "@ffuentessantander"
+  - "@jugalde"
