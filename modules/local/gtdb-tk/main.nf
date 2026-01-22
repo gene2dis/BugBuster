@@ -8,8 +8,6 @@ process GTDB_TK {
     label 'process_high_memory'
     maxForks 2
 
-    publishDir "${params.output}/workflow/${meta.id}/gtdb-tk", pattern: '*_gtdbtk_*'
-
     input:
         tuple val(meta), path(metawrap), path(gtdbtk_db)
 
@@ -45,8 +43,6 @@ process GTDB_TK_COASSEMBLY {
 
     label 'process_high'
     label 'process_high_memory'
-
-    publishDir "${params.output}/workflow/co_assembly/gtdb-tk", pattern: '*_gtdbtk_*'
 
     input:
         tuple path(metawrap), path(gtdbtk_db)

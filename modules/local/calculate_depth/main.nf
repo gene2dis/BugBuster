@@ -3,7 +3,8 @@ process CALCULATE_DEPTH_COASSEMBLY {
 
     label 'process_single'
 
-    publishDir "${params.output}/workflow/co_assembly/depth_file", pattern: '*depth.txt'
+    // Depth files are intermediate - don't publish to final output
+    // publishDir "${params.output}/workflow/co_assembly/depth_file", pattern: '*depth.txt'
 
     input:
        path(bam)
@@ -25,7 +26,8 @@ process CALCULATE_DEPTH {
 
     label 'process_single'
 
-    publishDir "${params.output}/workflow/${meta.id}/depth_file", pattern: '*depth.txt'
+    // Depth files are intermediate - don't publish to final output
+    // publishDir "${params.output}/workflow/${meta.id}/depth_file", pattern: '*depth.txt'
 
     input:
        tuple val(meta), path(contigs), path(bam)

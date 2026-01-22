@@ -12,8 +12,6 @@ process FASTP {
 
     label 'process_low'
 
-    publishDir "${params.output}/workflow/${meta.id}/fastp", mode: params.publish_dir_mode, pattern: "*_report.json"
-
     input:
     tuple val(meta), path(reads)
 

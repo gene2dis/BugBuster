@@ -3,8 +3,6 @@ process BLOBPLOT {
 
     label 'process_single'
 
-    publishDir "${params.output}/reports/contig_level", mode: 'copy', pattern: '*.png'
-
     input:
         path(blob_table)
 

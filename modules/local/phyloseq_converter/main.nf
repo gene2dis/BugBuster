@@ -7,8 +7,6 @@ process PHYLOSEQ_CONVERTER {
         'https://depot.galaxyproject.org/singularity/bioconductor-phyloseq:1.46.0--r43hdfd78af_0' :
         'quay.io/biocontainers/bioconductor-phyloseq:1.46.0--r43hdfd78af_0' }"
     
-    publishDir "${params.output}/reports/read_level/taxonomy", mode: params.publish_dir_mode, pattern: '*.RDS'
-    
     input:
     path(otu_table)
     path(tax_table)

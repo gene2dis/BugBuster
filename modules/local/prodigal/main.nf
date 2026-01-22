@@ -3,8 +3,6 @@ process PRODIGAL_BINS {
 
     label 'process_medium'
 
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/refined_bins_proteins", mode: 'copy', pattern: '*_bins_proteins'
-
     input:
         tuple val(meta), path(metawrap)
 
@@ -53,8 +51,6 @@ process PRODIGAL_CONTIGS {
     container 'quay.io/biocontainers/prodigal:2.6.3--h031d066_8'
 
     label 'process_single'
-
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*contigs*'
 
     input:
         tuple val(meta), path(contigs)

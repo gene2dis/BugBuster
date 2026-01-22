@@ -7,8 +7,6 @@ process TAXONOMY_PHYLOSEQ {
         'docker://jupyter/scipy-notebook:python-3.11' :
         'jupyter/scipy-notebook:python-3.11' }"
     
-    publishDir "${params.output}/reports/read_level/taxonomy", mode: params.publish_dir_mode, pattern: '*.{tsv,h5,png}'
-    
     input:
     path(input_files)
     val(profiler)

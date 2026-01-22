@@ -1,8 +1,6 @@
 process BEDTOOLS {
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_1'
 
-    publishDir "${params.output}/workflow/${meta.id}/bins_depth", pattern: '*_bin_depth.tsv'
-
     label 'process_single'
 
     input:

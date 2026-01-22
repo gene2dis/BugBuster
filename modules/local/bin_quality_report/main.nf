@@ -3,9 +3,6 @@ process BIN_QUALITY_REPORT {
 
     label 'process_single'
 
-    publishDir "${params.output}/reports/bin_level/bins_quality", mode: 'copy', pattern: '*.png'
-    publishDir "${params.output}/reports/bin_level/bins_quality", mode: 'copy', pattern: '*.csv'
-
     input:
         path(reports)
 

@@ -3,16 +3,11 @@ process METAWRAP {
 
     label 'process_high'
 
-    publishDir "${params.output}/workflow/${meta.id}/metawrap", pattern: '*metawrap*bins'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/refined_bins", mode: 'copy', pattern: '*metawrap*bins'
-
     input:
         tuple val(meta), path(metabat2_bins), path(semibin_bins), path(comebin_bins)
 
     output:
         tuple val(meta), path("*metawrap*bins"), emit: metawrap
-
-    cache 'lenient'
 
     script:
         def prefix = "${meta.id}"
@@ -53,16 +48,11 @@ process METAWRAP_COASSEMBLY {
 
     label 'process_high'
 
-    publishDir "${params.output}/workflow/co_assembly/metawrap", pattern: '*metawrap*bins'
-    publishDir "${params.output}/contigs_and_bins/co_assembly/refined_bins", mode: 'copy', pattern: '*metawrap*bins'
-
     input:
         path(bins)
 
     output:
         path("*metawrap*bins"), emit: metawrap
-
-    cache 'lenient'
 
     script:
         def prefix = "co_assembly"

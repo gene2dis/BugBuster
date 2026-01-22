@@ -7,9 +7,6 @@ process TAXONOMY_REPORT {
         'docker://jupyter/scipy-notebook:python-3.11' :
         'jupyter/scipy-notebook:python-3.11' }"
     
-    publishDir "${params.output}/reports/read_level/", mode: params.publish_dir_mode, pattern: 'Reads_report.csv'
-    publishDir "${params.output}/reports/read_level/taxonomy", mode: params.publish_dir_mode, pattern: '*.png'
-    
     input:
     path(reports)
     path(reads_report)

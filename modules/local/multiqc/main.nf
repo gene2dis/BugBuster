@@ -12,8 +12,6 @@ process MULTIQC {
 
     label 'process_single'
 
-    publishDir "${params.output}/multiqc", mode: params.publish_dir_mode
-
     input:
     path(multiqc_files, stageAs: "?/*")
     path(multiqc_config)

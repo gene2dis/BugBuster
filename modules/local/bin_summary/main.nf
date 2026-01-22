@@ -2,8 +2,6 @@ process BIN_SUMMARY {
 
     container 'quay.io/ffuentessantander/r_reports:1.1'
 
-    publishDir "${params.output}/reports/bin_level", mode: 'copy', pattern: 'Bin_summary.csv'
-
     label 'process_single'
 
     input:

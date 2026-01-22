@@ -3,9 +3,6 @@ process SEMIBIN {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/semibin", pattern: '*semibin_bins'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/raw_bins", mode: 'copy', pattern: '*semibin_output_bins'
-
     input:
         tuple val(meta), path(contigs), path(bam)
     
@@ -45,9 +42,6 @@ process SEMIBIN_COASSEMBLY {
     container 'quay.io/biocontainers/semibin:2.1.0--pyhdfd78af_0'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/co_assembly/semibin", pattern: 'co_assembly_semibin_bins'
-    publishDir "${params.output}/contigs_and_bins/co_assembly/raw_bins", mode: 'copy', pattern: 'co_assembly_semibin_bins'
 
     input:
         path(bams_and_contigs)

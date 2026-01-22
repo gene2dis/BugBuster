@@ -3,9 +3,6 @@ process COMEBIN {
 
     label 'process_high'
 
-    publishDir "${params.output}/workflow/${meta.id}/comebin", pattern: '*_comebin_bins/comebin_res/comebin_res_bins'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/raw_bins", mode: 'copy', pattern: '*_comebin_bins/comebin_res/comebin_res_bins'
-
     input:
         tuple val(meta), path(contigs), path(bam)
     
@@ -74,9 +71,6 @@ process COMEBIN_COASSEMBLY {
     container 'quay.io/biocontainers/comebin:1.0.4--hdfd78af_0'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/co_assembly/comebin", pattern: 'coassembly_comebin_bins/comebin_res/comebin_res_bins'
-    publishDir "${params.output}/contigs_and_bins/co_assembly/raw_bins", mode: 'copy', pattern: 'coassembly_comebin_bins/comebin_res/comebin_res_bins'
 
     input:
         path(bams_and_contigs)

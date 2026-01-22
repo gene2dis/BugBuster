@@ -3,9 +3,6 @@ process VAMB {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/vamb", pattern: '*vamb_bins'
-    publishDir "${params.output}/Assembly/${meta.id}/Bins", mode: 'copy', pattern: '*vamb_bins'
-
     input:
         tuple val(meta), path(contigs), path(depth)
     
@@ -29,9 +26,6 @@ process VAMB_COASSEMBLY {
     container 'quay.io/biocontainers/vamb:3.0.2--py36h91eb985_2'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/co_assembly/vamb", pattern: 'co_assembly_vamb_bins'
-    publishDir "${params.output}/Co_assembly/Bins", mode: 'copy', pattern: 'co_assembly_vamb_bins'
 
     input:
         path(bams_and_contigs)

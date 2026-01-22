@@ -3,9 +3,6 @@ process METACERBERUS_CONTIGS {
 
     label 'process_high'
 
-    publishDir "${params.output}/workflow/${meta.id}/metacerberus_contigs", pattern: '*_annotation'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*_annotation_results'
-
     input:
         tuple val(meta), path(contigs)
 
@@ -36,9 +33,6 @@ process METACERBERUS_BINS {
     container 'quay.io/ffuentessantander/metacerberus:1.2.1'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/${meta.id}/metacerberus_bins", pattern: '*_annotation'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/bins", mode: 'copy', pattern: '*_annotation_results'
 
     input:
         tuple val(meta), path(bin_folder)
