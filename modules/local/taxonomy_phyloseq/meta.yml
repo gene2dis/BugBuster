@@ -1,0 +1,65 @@
+name: taxonomy_phyloseq
+description: Generate phyloseq-compatible tables and visualizations from Kraken2/Bracken or Sourmash taxonomy data
+keywords:
+  - taxonomy
+  - phyloseq
+  - kraken2
+  - bracken
+  - sourmash
+  - abundance
+  - visualization
+tools:
+  - custom:
+      description: Python-based phyloseq table generator
+      homepage: https://github.com/gene2dis/BugBuster
+      documentation: https://github.com/gene2dis/BugBuster/docs
+      tool_dev_url: https://github.com/gene2dis/BugBuster
+      licence: ["MIT"]
+
+input:
+  - input_files:
+      type: file
+      description: Input files - BIOM files for Kraken2/Bracken or gather CSV files for Sourmash
+      pattern: "*.{biom,csv,report}"
+  - profiler:
+      type: value
+      description: Taxonomic profiler used ('kraken2' or 'sourmash')
+  - db_name:
+      type: value
+      description: Database name for labeling outputs
+  - plot_levels:
+      type: value
+      description: Comma-separated taxonomic levels to plot (e.g., 'Phylum,Family,Genus,Species')
+  - top_n:
+      type: integer
+      description: Number of top taxa to show in plots
+
+output:
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - otu_table:
+      type: file
+      description: OTU/abundance table in TSV format (taxa × samples)
+      pattern: "*_otu_table.tsv"
+  - tax_table:
+      type: file
+      description: Taxonomy table in TSV format (taxa × taxonomic ranks)
+      pattern: "*_tax_table.tsv"
+  - sample_metadata:
+      type: file
+      description: Sample metadata table in TSV format
+      pattern: "*_sample_metadata.tsv"
+  - phyloseq_h5:
+      type: file
+      description: Phyloseq data in HDF5 format for Python analysis
+      pattern: "*_phyloseq_data.h5"
+  - plots:
+      type: file
+      description: Relative abundance plots at various taxonomic levels
+      pattern: "plots/*.png"
+
+authors:
+  - "@ffuentessantander"
+  - "@jugalde"

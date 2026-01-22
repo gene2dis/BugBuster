@@ -168,3 +168,22 @@ process DOWNLOAD_GTDBTK_DB {
         ${params.gtdbtk_ref_db[params.gtdbtk_db]["fmtscript"]} $db
         """
 }
+
+process SOURMASH_TAX_PREPARE {
+
+    container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'
+    publishDir "${params.output}/downloaded_db/sourmash", pattern: '*.sqldb'
+
+    label 'process_single'
+
+    input:
+        path(tax_file)
+
+    output:
+        path("*.sqldb"), emit: tax_db
+
+    script:
+        """
+        sourmash tax prepare -t ${tax_file} -o taxonomy.sqldb -F sql
+        """
+}
