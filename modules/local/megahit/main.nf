@@ -12,8 +12,6 @@ process MEGAHIT {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/assembly", mode: params.publish_dir_mode, pattern: "*_contigs.fa"
-
     input:
     tuple val(meta), path(reads)
 
@@ -64,8 +62,6 @@ process MEGAHIT_COASSEMBLY {
     container 'quay.io/biocontainers/megahit:1.2.9--h43eeafb_4'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/coassembly/assembly", mode: params.publish_dir_mode, pattern: "*_contigs.fa"
 
     input:
     path(reads)

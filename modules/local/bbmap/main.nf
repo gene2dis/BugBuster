@@ -3,9 +3,6 @@ process BBMAP {
 
     label 'process_single'
 
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*_filtered_contigs.fa'
-    publishDir "${params.output}/contigs_and_bins/${meta.id}/contigs", mode: 'copy', pattern: '*_contig.stats'
-
     input:
         tuple val(meta), path(reads), path(contigs)
 
@@ -29,9 +26,6 @@ process BBMAP_COASSEMBLY {
     container 'quay.io/biocontainers/bbmap:39.06--h92535d8_0'
 
     label 'process_single'
-
-    publishDir "${params.output}/contigs_and_bins/co_assembly/contigs", mode: 'copy', pattern: '*_contig.stats'
-    publishDir "${params.output}/contigs_and_bins/co_assembly/contigs", mode: 'copy', pattern: '*_filtered_contigs.fa'
 
     input:
         tuple path(reads), path(contigs)

@@ -3,8 +3,6 @@ process CHECKM2_COASSEMBLY {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/co_assembly/checkm2", pattern: '*quality_report.tsv'
-
     input:
         tuple path(metabat), path(semibin), path(comebin), path(metawrap), path(checkm_db)
 
@@ -55,8 +53,6 @@ process CHECKM2 {
     container 'quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1'
 
     label 'process_medium'
-
-    publishDir "${params.output}/workflow/${meta.id}/checkm2", pattern: '*quality_report.tsv'
 
     input:
         tuple val(meta), path(metabat2), path(semibin), path(comebin), path(metawrap), path(checkm_db)

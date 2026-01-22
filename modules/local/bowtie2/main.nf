@@ -12,9 +12,10 @@ process BOWTIE2 {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/clean_reads", 
-        mode: params.publish_dir_mode,
-        pattern: "*_clean_reads.fastq.gz"
+    // Clean reads are intermediate files - don't publish to final output
+    // publishDir "${params.output}/workflow/${meta.id}/clean_reads", 
+    //     mode: params.publish_dir_mode,
+    //     pattern: "*_clean_reads.fastq.gz"
 
     input:
     tuple val(meta), path(reads), path(index_db)

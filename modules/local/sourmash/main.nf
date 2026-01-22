@@ -4,8 +4,6 @@ process SOURMASH {
     maxForks 24
     label 'process_single'
 
-    publishDir "${params.output}/workflow/${meta.id}/sourmash_${db_name}", pattern: '*.with-lineages.csv'
-
     input:
         tuple val(meta), path(reads), path(db), path(tax_db)
 	val db_name

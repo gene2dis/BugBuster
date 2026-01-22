@@ -3,9 +3,6 @@ process AUTOMETA {
 
     label 'process_high'
 
-    publishDir "${params.output}/workflow/${meta.id}/autometa", pattern: 'autometa_bins'
-    publishDir "${params.output}/Assembly/${meta.id}/Bins", mode: 'copy', pattern: 'autometa_bins'
-
     input:
         tuple val(meta), path(contigs), path(bam)
 	path(ncbi_db)
@@ -131,9 +128,6 @@ process AUTOMETA_COASSEMBLY {
     container 'quay.io/biocontainers/autometa:2.2.0--pyh7cba7a3_0'
 
     label 'process_high'
-
-    publishDir "${params.output}/workflow/co_assembly/autometa", pattern: 'autometa_bins'
-    publishDir "${params.output}/Co_assembly/Bins", mode: 'copy', pattern: 'autometa_bins'
 
     input:
         path(bams_and_contigs)

@@ -1,8 +1,6 @@
 process CLUSTERING {
     container 'quay.io/biocontainers/mmseqs2:15.6f452--pl5321h6a68c12_1'
 
-    publishDir "${params.output}/reports/bin_level/arg_clustering", mode: 'copy', pattern: '*_cluster.tsv'
-
     label 'process_high'
 
     input:

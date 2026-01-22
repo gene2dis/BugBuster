@@ -3,9 +3,6 @@ process BIN_TAX_REPORT {
 
     label 'process_single'
 
-    publishDir "${params.output}/reports/bin_level/bins_taxonomy", mode: 'copy', pattern: '*.png'
-    publishDir "${params.output}/reports/bin_level/bins_taxonomy", mode: 'copy', pattern: '*.csv'
-
     input:
 	path(gtdbtk_tax)
 

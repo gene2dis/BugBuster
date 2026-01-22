@@ -64,8 +64,6 @@ class PhyloseqTableGenerator:
         self.top_n = top_n
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        self.plot_dir = self.output_dir / 'plots'
-        self.plot_dir.mkdir(exist_ok=True)
         
         if self.profiler not in ['kraken2', 'sourmash']:
             raise ValueError(f"Profiler must be 'kraken2' or 'sourmash', got '{profiler}'")
@@ -436,7 +434,7 @@ class PhyloseqTableGenerator:
             plt.tight_layout()
             
             # Save plot
-            plot_path = self.plot_dir / f"{self.profiler}_{self.db_name}_{tax_level.lower()}_bar.png"
+            plot_path = self.output_dir / f"{self.profiler}_{self.db_name}_{tax_level.lower()}_bar.png"
             plt.savefig(plot_path, dpi=300, bbox_inches='tight')
             plt.close()
             

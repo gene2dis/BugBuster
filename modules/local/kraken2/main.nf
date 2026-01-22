@@ -4,8 +4,6 @@ process KRAKEN2 {
     maxForks 3
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/kraken2_${db_name}", mode: 'copy', pattern: '*_kraken_report'
-
     input:
         tuple val(meta), path(reads), path(db)
 	val db_name

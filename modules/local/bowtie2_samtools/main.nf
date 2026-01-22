@@ -3,7 +3,8 @@ process BOWTIE2_SAMTOOLS {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/bowtie2_samtools", pattern: '*_all_reads.bam'
+    // BAM files are intermediate - don't publish to final output
+    // publishDir "${params.output}/workflow/${meta.id}/bowtie2_samtools", pattern: '*_all_reads.bam'
 
     input:
         tuple val(meta), path(reads), path(contigs)
@@ -61,7 +62,8 @@ process BOWTIE2_SAMTOOLS_COASSEMBLY {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/co_assembly/bowtie2_samtools", pattern: 'co_assembly_all_reads.bam'
+    // BAM files are intermediate - don't publish to final output
+    // publishDir "${params.output}/workflow/co_assembly/bowtie2_samtools", pattern: 'co_assembly_all_reads.bam'
 
     input:
         tuple val(meta), path(reads), path(contigs)
@@ -124,7 +126,8 @@ process BOWTIE2_SAMTOOLS_DEPTH {
 
     label 'process_medium'
 
-    publishDir "${params.output}/workflow/${meta.id}/bowtie2_samtools", pattern: '*_all_reads.bam'
+    // BAM files are intermediate - don't publish to final output  
+    // publishDir "${params.output}/workflow/${meta.id}/bowtie2_samtools", pattern: '*_all_reads.bam'
 
     input:
         tuple val(meta), path(reads), path(bins)
