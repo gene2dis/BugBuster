@@ -1,19 +1,25 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    TAXONOMY PROFILING SUBWORKFLOW
+    TAXONOMY PROFILING SUBWORKFLOW - OPTIMIZED
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Taxonomic classification at read level using Kraken2 or Sourmash
+    
+    Improvements:
+    - Unified Python-based reporting and phyloseq generation
+    - Phyloseq-compatible TSV tables for interoperability
+    - Optional R phyloseq object generation
+    - Removed R container dependencies
+    - Better parallelization and resource utilization
+    - Reduced from 6 modules to 2 core modules (+1 optional)
 ----------------------------------------------------------------------------------------
 */
 
 include { KRAKEN2_KRAKEN2 as KRAKEN2 } from '../../modules/nf-core/kraken2/kraken2/main'
 include { BRACKEN_BRACKEN as BRACKEN } from '../../modules/nf-core/bracken/bracken/main'
-include { KRAKEN_BIOM          } from '../../modules/local/kraken_biom/main'
-include { KRAKEN_TO_PHYLOSEQ   } from '../../modules/local/kraken_to_phyloseq/main'
-include { TAX_REPORT_KRAKEN2   } from '../../modules/local/tax_report_kraken2/main'
 include { SOURMASH             } from '../../modules/local/sourmash/main'
-include { SOURMASH_TO_PHYLOSEQ } from '../../modules/local/sourmash_to_phyloseq/main'
-include { TAX_REPORT_SOURMASH  } from '../../modules/local/tax_report_sourmash/main'
+include { TAXONOMY_REPORT      } from '../../modules/local/taxonomy_report/main'
+include { TAXONOMY_PHYLOSEQ    } from '../../modules/local/taxonomy_phyloseq/main'
+include { PHYLOSEQ_CONVERTER   } from '../../modules/local/phyloseq_converter/main'
 
 workflow TAXONOMY {
     take:
@@ -29,62 +35,51 @@ workflow TAXONOMY {
     // Kraken2 taxonomic profiling
     //
     if ( params.taxonomic_profiler == "kraken2" ) {
-        //
-        // Run nf-core Kraken2 classification
-        // nf-core KRAKEN2_KRAKEN2 signature:
-        //   input:  tuple val(meta), path(reads) + path(db) + val save_output_fastqs + val save_reads_assignment
-        //   output: tuple val(meta), path('*report.txt'), emit: report
-        //
+        // Run Kraken2 classification
         KRAKEN2(
             reads,
             kraken_db.first(),
             false,  // save_output_fastqs
             false   // save_reads_assignment
         )
-        
-        // Collect versions
         ch_versions = ch_versions.mix(KRAKEN2.out.versions.first())
         
-        //
-        // Generate Kraken2 summary report (replaces local module's TSV generation)
-        // Extract classification stats from kraken report for TAX_REPORT_KRAKEN2
-        //
-        ch_kraken_report = KRAKEN2.out.report
-        
-        // Generate taxonomy report
-        TAX_REPORT_KRAKEN2(
-            ch_kraken_report
-                .map { _meta, report -> report }
-                .concat(reads_report)
-                .collect()
-        )
-
-        //
-        // Bracken abundance estimation with nf-core module
-        // nf-core BRACKEN_BRACKEN signature:
-        //   input:  tuple val(meta), path(kraken_report) + path database
-        //   output: tuple val(meta), path(bracken_report), emit: reports
-        //
+        // Run Bracken abundance estimation
         BRACKEN(
-            ch_kraken_report,
+            KRAKEN2.out.report,
             kraken_db.first()
         )
-        
-        // Collect versions
         ch_versions = ch_versions.mix(BRACKEN.out.versions.first())
         
-        // Extract bracken reports for KRAKEN_BIOM (expects path only)
-        ch_bracken_reports = BRACKEN.out.txt
-            .map { _meta, report -> report }
-
-        // Generate BIOM file
-        ch_kraken_biom = KRAKEN_BIOM(
-            ch_bracken_reports.collect(),
+        // Generate unified taxonomy report
+        TAXONOMY_REPORT(
+            KRAKEN2.out.report.map { meta, report -> report }.collect(),
+            reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
+            'kraken2',
             params.kraken_db_used
         )
-
-        // Generate Phyloseq object and abundance plots
-        KRAKEN_TO_PHYLOSEQ(ch_kraken_biom)
+        ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
+        
+        // Generate phyloseq-compatible tables and plots
+        TAXONOMY_PHYLOSEQ(
+            BRACKEN.out.txt.map { meta, report -> report }.collect(),
+            'kraken2',
+            params.kraken_db_used,
+            params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
+            params.taxonomy_top_n_taxa ?: 10
+        )
+        ch_versions = ch_versions.mix(TAXONOMY_PHYLOSEQ.out.versions)
+        
+        // Optional: Convert to R phyloseq object
+        if (params.create_phyloseq_rds) {
+            PHYLOSEQ_CONVERTER(
+                TAXONOMY_PHYLOSEQ.out.otu_table,
+                TAXONOMY_PHYLOSEQ.out.tax_table,
+                TAXONOMY_PHYLOSEQ.out.sample_metadata,
+                params.kraken_db_used
+            )
+            ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
+        }
     }
 
     //
@@ -93,23 +88,40 @@ workflow TAXONOMY {
     if ( params.taxonomic_profiler == "sourmash" ) {
         // Run Sourmash classification
         ch_sm_taxonomy = SOURMASH(
-            reads.combine(sourmash_db.collect()),
+            reads.combine(sourmash_db),
             params.sourmash_db_name,
             params.sourmash_tax_rank
         )
-
-        // Generate taxonomy report
-        TAX_REPORT_SOURMASH(
-            ch_sm_taxonomy.report
-                .concat(reads_report)
-                .collect()
-        )
-
-        // Generate Phyloseq object
-        SOURMASH_TO_PHYLOSEQ(
-            ch_sm_taxonomy.sourmash_gather.collect(),
+        
+        // Generate unified taxonomy report
+        TAXONOMY_REPORT(
+            ch_sm_taxonomy.report.collect(),
+            reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
+            'sourmash',
             params.sourmash_db_name
         )
+        ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
+        
+        // Generate phyloseq-compatible tables and plots
+        TAXONOMY_PHYLOSEQ(
+            ch_sm_taxonomy.sourmash_gather.collect(),
+            'sourmash',
+            params.sourmash_db_name,
+            params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
+            params.taxonomy_top_n_taxa ?: 10
+        )
+        ch_versions = ch_versions.mix(TAXONOMY_PHYLOSEQ.out.versions)
+        
+        // Optional: Convert to R phyloseq object
+        if (params.create_phyloseq_rds) {
+            PHYLOSEQ_CONVERTER(
+                TAXONOMY_PHYLOSEQ.out.otu_table,
+                TAXONOMY_PHYLOSEQ.out.tax_table,
+                TAXONOMY_PHYLOSEQ.out.sample_metadata,
+                params.sourmash_db_name
+            )
+            ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
+        }
     }
 
     emit:

@@ -75,30 +75,30 @@ workflow QC {
             .filter { item -> item != null }
 
         //
-        // Remove PhiX contamination
-        //
-        ch_phix_clean = BOWTIE2_PHIX(
-            ch_fastp_reads_filtered.combine(phix_index),
-            "phiX"
-        )
-
-        //
         // Remove host contamination
         //
         ch_host_clean = BOWTIE2_HOST(
-            ch_phix_clean.reads.combine(host_index),
+            ch_fastp_reads_filtered.combine(host_index),
             "host"
+        )
+
+        //
+        // Remove PhiX contamination
+        //
+        ch_phix_clean = BOWTIE2_PHIX(
+            ch_host_clean.reads.combine(phix_index),
+            "phiX"
         )
 
         //
         // Collect read reports
         //
         ch_reads_report = READS_REPORT(
-            ch_phix_clean.report
-                .concat(ch_host_clean.report)
+            ch_host_clean.report
+                .concat(ch_phix_clean.report)
                 .concat(ch_fastp_reads_report.reads_report)
                 .collect(),
-            "phiX host"
+            "host phiX"
         )
 
         ch_clean_reads = ch_host_clean.reads

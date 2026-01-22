@@ -1,0 +1,50 @@
+name: taxonomy_report
+description: Generate unified taxonomy classification reports and plots for Kraken2 or Sourmash
+keywords:
+  - taxonomy
+  - classification
+  - kraken2
+  - sourmash
+  - report
+  - visualization
+tools:
+  - custom:
+      description: Python-based taxonomy report generator
+      homepage: https://github.com/gene2dis/BugBuster
+      documentation: https://github.com/gene2dis/BugBuster/docs
+      tool_dev_url: https://github.com/gene2dis/BugBuster
+      licence: ["MIT"]
+
+input:
+  - reports:
+      type: file
+      description: Taxonomy report TSV files from Kraken2 or Sourmash
+      pattern: "*.{tsv,txt}"
+  - reads_report:
+      type: file
+      description: Existing reads report CSV file to merge with taxonomy data
+      pattern: "*.csv"
+  - profiler:
+      type: value
+      description: Taxonomic profiler used ('kraken2' or 'sourmash')
+  - db_name:
+      type: value
+      description: Database name for labeling outputs
+
+output:
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - report:
+      type: file
+      description: Updated reads report with taxonomy statistics
+      pattern: "Reads_report.csv"
+  - plots:
+      type: file
+      description: Classification visualization plots
+      pattern: "*.png"
+
+authors:
+  - "@ffuentessantander"
+  - "@jugalde"
