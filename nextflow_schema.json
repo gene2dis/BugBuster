@@ -180,6 +180,36 @@
                     "format": "directory-path",
                     "description": "Path to custom GTDB-TK database directory.",
                     "fa_icon": "fas fa-folder"
+                },
+                "custom_deeparg_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom DeepARG database directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_blast_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom BLAST NT database directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_taxdump_files": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom NCBI taxdump directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "custom_karga_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to custom KARGA database FASTA file.",
+                    "fa_icon": "fas fa-file"
+                },
+                "custom_kargva_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to custom KARGVA database FASTA file.",
+                    "fa_icon": "fas fa-file"
                 }
             }
         },
@@ -283,6 +313,21 @@
                 }
             }
         },
+        "assembly_options": {
+            "title": "Assembly options",
+            "type": "object",
+            "fa_icon": "fas fa-puzzle-piece",
+            "description": "Parameters for genome assembly and contig filtering.",
+            "properties": {
+                "bbmap_lenght": {
+                    "type": "integer",
+                    "default": 1000,
+                    "minimum": 0,
+                    "description": "Minimum contig length after BBMap filtering.",
+                    "fa_icon": "fas fa-ruler"
+                }
+            }
+        },
         "binning_options": {
             "title": "Binning options",
             "type": "object",
@@ -294,6 +339,57 @@
                     "default": 2500,
                     "description": "Minimum contig length for MetaBAT2.",
                     "fa_icon": "fas fa-ruler"
+                },
+                "metabat_maxP": {
+                    "type": "integer",
+                    "default": 95,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum percentage of good contigs for MetaBAT2.",
+                    "fa_icon": "fas fa-percentage",
+                    "hidden": true
+                },
+                "metabat_minS": {
+                    "type": "integer",
+                    "default": 60,
+                    "description": "Minimum score for MetaBAT2.",
+                    "fa_icon": "fas fa-sort-numeric-up",
+                    "hidden": true
+                },
+                "metabat_maxEdges": {
+                    "type": "integer",
+                    "default": 200,
+                    "description": "Maximum edges for MetaBAT2.",
+                    "fa_icon": "fas fa-project-diagram",
+                    "hidden": true
+                },
+                "metabat_pTNF": {
+                    "type": "integer",
+                    "default": 0,
+                    "description": "TNF probability for MetaBAT2.",
+                    "fa_icon": "fas fa-calculator",
+                    "hidden": true
+                },
+                "metabat_minCV": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Minimum coefficient of variation for MetaBAT2.",
+                    "fa_icon": "fas fa-chart-line",
+                    "hidden": true
+                },
+                "metabat_minCVSum": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Minimum sum of coefficient of variation for MetaBAT2.",
+                    "fa_icon": "fas fa-chart-area",
+                    "hidden": true
+                },
+                "metabat_minClsSize": {
+                    "type": "integer",
+                    "default": 200000,
+                    "description": "Minimum cluster size for MetaBAT2.",
+                    "fa_icon": "fas fa-weight",
+                    "hidden": true
                 },
                 "metawrap_completeness": {
                     "type": "integer",
@@ -317,6 +413,236 @@
                     "enum": ["human_gut", "dog_gut", "ocean", "soil", "cat_gut", "human_oral", "mouse_gut", "pig_gut", "built_environment", "wastewater", "chicken_caecum", "global"],
                     "description": "SemiBin environment model for binning.",
                     "fa_icon": "fas fa-globe"
+                }
+            }
+        },
+        "deeparg_options": {
+            "title": "DeepARG options",
+            "type": "object",
+            "fa_icon": "fas fa-shield-virus",
+            "description": "Parameters for ARG prediction with DeepARG.",
+            "properties": {
+                "deeparg_min_prob": {
+                    "type": "number",
+                    "default": 0.8,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum probability threshold for DeepARG predictions.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "deeparg_arg_alignment_identity": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Minimum alignment identity percentage for DeepARG.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "deeparg_arg_alignment_evalue": {
+                    "type": "string",
+                    "default": "1e-10",
+                    "description": "Maximum E-value for DeepARG alignments.",
+                    "fa_icon": "fas fa-calculator"
+                },
+                "deeparg_arg_alignment_overlap": {
+                    "type": "number",
+                    "default": 0.8,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum alignment overlap for DeepARG.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "deeparg_arg_num_alignments_per_entry": {
+                    "type": "integer",
+                    "default": 1000,
+                    "description": "Number of alignments per entry for DeepARG.",
+                    "fa_icon": "fas fa-sort-numeric-up",
+                    "hidden": true
+                },
+                "deeparg_model_version": {
+                    "type": "string",
+                    "default": "v2",
+                    "enum": ["v1", "v2"],
+                    "description": "DeepARG model version.",
+                    "fa_icon": "fas fa-code-branch"
+                }
+            }
+        },
+        "bowtie2_options": {
+            "title": "Bowtie2 alignment options",
+            "type": "object",
+            "fa_icon": "fas fa-align-center",
+            "description": "Parameters for Bowtie2 read alignment and filtering.",
+            "hidden": true,
+            "properties": {
+                "bowtie_ma": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Match bonus for Bowtie2.",
+                    "fa_icon": "fas fa-plus"
+                },
+                "bowtie_mp": {
+                    "type": "string",
+                    "default": "6,2",
+                    "description": "Mismatch penalty for Bowtie2.",
+                    "fa_icon": "fas fa-minus"
+                },
+                "bowtie_score_min": {
+                    "type": "string",
+                    "default": "G,15,6",
+                    "description": "Minimum alignment score function for Bowtie2.",
+                    "fa_icon": "fas fa-calculator"
+                },
+                "bowtie_k": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Number of alignments to report for Bowtie2.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "bowtie_N": {
+                    "type": "integer",
+                    "default": 1,
+                    "description": "Number of mismatches allowed in seed for Bowtie2.",
+                    "fa_icon": "fas fa-hashtag"
+                },
+                "bowtie_L": {
+                    "type": "integer",
+                    "default": 20,
+                    "description": "Seed length for Bowtie2.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "bowtie_R": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Number of re-seeding attempts for Bowtie2.",
+                    "fa_icon": "fas fa-redo"
+                },
+                "bowtie_i": {
+                    "type": "string",
+                    "default": "S,1,0.75",
+                    "description": "Interval function for Bowtie2 seeding.",
+                    "fa_icon": "fas fa-function"
+                }
+            }
+        },
+        "mmseqs2_options": {
+            "title": "MMseqs2 clustering options",
+            "type": "object",
+            "fa_icon": "fas fa-project-diagram",
+            "description": "Parameters for ARG clustering with MMseqs2.",
+            "hidden": true,
+            "properties": {
+                "mmseqs_start_sens": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Starting sensitivity for MMseqs2.",
+                    "fa_icon": "fas fa-sliders-h"
+                },
+                "mmseqs_s": {
+                    "type": "integer",
+                    "default": 7,
+                    "description": "Sensitivity for MMseqs2.",
+                    "fa_icon": "fas fa-sliders-h"
+                },
+                "mmseqs_sens_steps": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Number of sensitivity steps for MMseqs2.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "mmseqs_min_seq_id": {
+                    "type": "number",
+                    "default": 0.8,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum sequence identity for MMseqs2.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "mmseqs_c": {
+                    "type": "number",
+                    "default": 0.7,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Coverage threshold for MMseqs2.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "mmseqs_cov_mode": {
+                    "type": "integer",
+                    "default": 2,
+                    "description": "Coverage mode for MMseqs2.",
+                    "fa_icon": "fas fa-cog"
+                },
+                "mmseqs_e": {
+                    "type": "string",
+                    "default": "1e-20",
+                    "description": "E-value threshold for MMseqs2.",
+                    "fa_icon": "fas fa-calculator"
+                },
+                "mmseqs_format_mode": {
+                    "type": "integer",
+                    "default": 4,
+                    "description": "Output format mode for MMseqs2.",
+                    "fa_icon": "fas fa-file-export"
+                },
+                "mmseqs_alignment_mode": {
+                    "type": "integer",
+                    "default": 3,
+                    "description": "Alignment mode for MMseqs2.",
+                    "fa_icon": "fas fa-align-center"
+                },
+                "mmseqs_max_seqs": {
+                    "type": "integer",
+                    "default": 10000,
+                    "description": "Maximum number of sequences for MMseqs2.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "mmseqs_format_output": {
+                    "type": "string",
+                    "default": "empty,query,target,evalue,pident,qcov,tcov,tseq",
+                    "description": "Output format fields for MMseqs2.",
+                    "fa_icon": "fas fa-list"
+                }
+            }
+        },
+        "taxonomy_visualization_options": {
+            "title": "Taxonomy visualization options",
+            "type": "object",
+            "fa_icon": "fas fa-chart-bar",
+            "description": "Parameters for taxonomic visualization and output formatting.",
+            "properties": {
+                "taxonomy_plot_levels": {
+                    "type": "string",
+                    "default": "Phylum,Family,Genus,Species",
+                    "description": "Comma-separated list of taxonomic levels to plot.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "taxonomy_top_n_taxa": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "Number of top taxa to display in plots.",
+                    "fa_icon": "fas fa-sort-numeric-down"
+                },
+                "create_phyloseq_rds": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Generate R phyloseq RDS files for downstream analysis.",
+                    "fa_icon": "fas fa-file-code"
+                }
+            }
+        },
+        "database_storage_options": {
+            "title": "Database storage options",
+            "type": "object",
+            "fa_icon": "fas fa-hdd",
+            "description": "Options for database storage location.",
+            "hidden": true,
+            "properties": {
+                "databases_dir": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Directory for storing downloaded databases (separate from results output).",
+                    "fa_icon": "fas fa-folder"
                 }
             }
         },
@@ -403,7 +729,13 @@
         { "$ref": "#/definitions/database_options" },
         { "$ref": "#/definitions/fastp_options" },
         { "$ref": "#/definitions/taxonomy_options" },
+        { "$ref": "#/definitions/assembly_options" },
         { "$ref": "#/definitions/binning_options" },
+        { "$ref": "#/definitions/deeparg_options" },
+        { "$ref": "#/definitions/bowtie2_options" },
+        { "$ref": "#/definitions/mmseqs2_options" },
+        { "$ref": "#/definitions/taxonomy_visualization_options" },
+        { "$ref": "#/definitions/database_storage_options" },
         { "$ref": "#/definitions/max_job_request_options" },
         { "$ref": "#/definitions/generic_options" }
     ]

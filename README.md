@@ -114,44 +114,40 @@ See [docs/deployment.md](docs/deployment.md) for detailed deployment instruction
 
 ## Databases
 
-All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config file. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. You can use any host bowtie2 index for filtering steps but only human host it's in the automatic download (for now 👷). 
+All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`). Symbolic links are created in `<output_dir>/downloaded_db/` for reference. Only databases required for your selected pipeline options will be downloaded.
 
-**Note: Only the required databases for the requested tasks will be automatically download**
+You can use custom databases by specifying paths with `--custom_*` parameters (see table below).
 
-**Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. phiX_index = Default download from [`phage phiX174 geonome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank) (8.1 MB).
-2. host_db = Default download from [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie) (4.1 GB).
+### Automatic Download Databases
 
-**Taxonomic profiling:**
-    
-3A. kraken2_db = User can choice between Standard-8 (7.5 GB) and GTDB release 220 (497 GB) for automatic download. From [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2).
+| Database | Size | Used For | Trigger Parameter | Custom Path Parameter |
+|----------|------|----------|-------------------|----------------------|
+| **phiX174 Index** | 8.1 MB | PhiX contamination removal | `quality_control=true` | `--custom_phiX_index` |
+| **Human Host Index** | 4.1 GB | Host read removal | `quality_control=true` | `--custom_bowtie_host_index` |
+| **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
+| **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
+| **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
+| **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
+| **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
+| **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
+| **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
+| **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
+| **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
+| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
 
-3B. sourmash_db = GTDB release 220 (17 GB) it's the only automatic default download in this instance (for now 👷). From [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/). 
+### Database Sources
 
-**BBlobTools:**
-
-4. taxdump_files = Default download from [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz) (448 MB).
-
-**BlastDB for contig taxonomic annotation:**
-
-5. blast_db = Default download from [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/) (434 GB).
-6. deeparg_db = Default download from [`deeparg`](https://github.com/gaarangoa/deeparg) (4.8 GB).
-
-**KARGA:**
-
-7. karga_db = Default download from [`megares`](https://www.meglab.org/megares/download/) (9.2 MB).
-
-**KARGVA:**
-
-8. kargva_db = Default download from [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main) (1.5 MB).
-
-**CheckM2**
-
-9. checkm2_db = Default download from [`Checkm2_docs`](https://github.com/chklovski/CheckM2) (2.9 GB).
-
-**GTDB-TK**
-
-10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html) (109 GB).
+- **phiX_index**: [`phage phiX174 genome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank)
+- **host_db**: [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie)
+- **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
+- **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
+- **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+- **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+- **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
+- **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
+- **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
+- **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+- **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 
 ## Samplesheet Format
 
@@ -182,6 +178,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
 | `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
 | `--include_binning` | `false` | Enable binning and refinement |
+| `--min_read_sample` | `0` | Minimum reads required after QC |
 
 ### Feature Toggles
 
@@ -191,6 +188,54 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
+
+### Database Selection
+
+| Parameter | Default | Options | Description |
+|-----------|---------|---------|-------------|
+| `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
+| `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--databases_dir` | `<output>/../databases` | Path | Database storage location |
+
+### Quality Control Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--fastp_qualified_quality_phred` | `20` | Phred quality threshold |
+| `--fastp_unqualified_percent_limit` | `10` | Max % unqualified bases |
+| `--fastp_n_base_limit` | `5` | Max N bases per read |
+
+### Taxonomy Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
+| `--bracken_tax_level` | `S` | Bracken level: D, P, C, O, F, G, S |
+| `--sourmash_tax_rank` | `species` | Sourmash rank: genus, species, strain |
+| `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Taxonomic levels to plot |
+| `--taxonomy_top_n_taxa` | `10` | Number of top taxa in plots |
+| `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files |
+
+### Assembly & Binning Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--bbmap_lenght` | `1000` | Minimum contig length after filtering |
+| `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
+| `--metawrap_completeness` | `50` | Minimum bin completeness (%) |
+| `--metawrap_contamination` | `10` | Maximum bin contamination (%) |
+| `--semibin_env_model` | `human_gut` | SemiBin environment model |
+
+**SemiBin Models**: `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`, `human_oral`, `chicken_caecum`, `ocean`, `soil`, `wastewater`, `built_environment`, `global`
+
+### ARG Prediction Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--deeparg_min_prob` | `0.8` | Minimum probability threshold |
+| `--deeparg_arg_alignment_identity` | `50` | Minimum alignment identity (%) |
+| `--deeparg_arg_alignment_evalue` | `1e-10` | Maximum E-value |
+| `--deeparg_model_version` | `v2` | DeepARG model version |
 
 ### Resource Limits
 
@@ -205,6 +250,45 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 ```bash
 nextflow run main.nf --help
 ```
+
+## Output Structure
+
+The pipeline generates organized output with numbered prefixes:
+
+```
+results/
+├── pipeline_info/              # Execution reports and logs
+├── 01_quality_control/         # QC results (if quality_control=true)
+│   ├── fastp/                  # Per-sample FastP reports
+│   └── summary/                # Aggregated statistics
+├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
+│   ├── kraken2/ or sourmash/   # Per-sample results
+│   ├── tables/                 # Abundance tables
+│   ├── phyloseq/               # Phyloseq objects (*.h5, *.RDS)
+│   └── figures/                # Taxonomy plots
+├── 03_assembly/                # Genome assembly (if assembly_mode != 'none')
+│   ├── per_sample/             # Per-sample assemblies
+│   └── coassembly/             # Co-assembly results
+├── 04_binning/                 # Metagenomic binning (if include_binning=true)
+│   ├── per_sample/ or coassembly/
+│   │   ├── raw_bins/           # MetaBAT2, SemiBin, COMEBin
+│   │   ├── refined_bins/       # MetaWRAP refined bins
+│   │   ├── quality/            # CheckM2 reports
+│   │   └── taxonomy/           # GTDB-TK classifications
+│   ├── quality/summary/        # Aggregated quality reports
+│   └── taxonomy/summary/       # Aggregated taxonomy reports
+├── 05_arg_prediction/          # ARG predictions
+│   ├── read_level/             # KARGA/KARGVA (if read_arg_prediction=true)
+│   ├── contig_level/           # DeepARG (if contig_tax_and_arg=true)
+│   └── bin_level/              # Bin ARG clustering (if arg_bin_clustering=true)
+├── 06_contig_taxonomy/         # BlobTools plots (if contig_tax_and_arg=true)
+└── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
+```
+
+**Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).
+
+For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output-structure).
+
 ## Credits
 
 gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes 

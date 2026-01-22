@@ -334,9 +334,11 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--bbmap_lenght` | `1000` | Minimum contig length after filtering |
+| `--bbmap_lenght` | `1000` | Minimum contig length after BBMap filtering |
 
 ### 6.8 Binning Options
+
+#### Basic Binning Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -351,17 +353,63 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 - `ocean`, `soil`, `wastewater`, `built_environment`
 - `global` (for mixed/unknown environments)
 
+#### Advanced MetaBAT2 Parameters
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--metabat_maxP` | `95` | Maximum percentage of good contigs |
+| `--metabat_minS` | `60` | Minimum score for binning |
+| `--metabat_maxEdges` | `200` | Maximum edges in the graph |
+| `--metabat_pTNF` | `0` | TNF probability threshold |
+| `--metabat_minCV` | `1` | Minimum coefficient of variation |
+| `--metabat_minCVSum` | `1` | Minimum sum of coefficient of variation |
+| `--metabat_minClsSize` | `200000` | Minimum cluster size (bp) |
+
 ### 6.9 DeepARG Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--deeparg_min_prob` | `0.8` | Minimum probability threshold |
+| `--deeparg_min_prob` | `0.8` | Minimum probability threshold (0-1) |
 | `--deeparg_arg_alignment_identity` | `50` | Minimum alignment identity (%) |
 | `--deeparg_arg_alignment_evalue` | `1e-10` | Maximum E-value |
-| `--deeparg_arg_alignment_overlap` | `0.8` | Minimum alignment overlap |
-| `--deeparg_model_version` | `v2` | DeepARG model version |
+| `--deeparg_arg_alignment_overlap` | `0.8` | Minimum alignment overlap (0-1) |
+| `--deeparg_arg_num_alignments_per_entry` | `1000` | Number of alignments per entry |
+| `--deeparg_model_version` | `v2` | DeepARG model version (`v1` or `v2`) |
 
-### 6.10 MetaCerberus Options
+### 6.10 Bowtie2 Alignment Options
+
+Advanced parameters for Bowtie2 read alignment during host filtering:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--bowtie_ma` | `2` | Match bonus |
+| `--bowtie_mp` | `6,2` | Mismatch penalty (max, min) |
+| `--bowtie_score_min` | `G,15,6` | Minimum alignment score function |
+| `--bowtie_k` | `1` | Number of alignments to report |
+| `--bowtie_N` | `1` | Number of mismatches allowed in seed |
+| `--bowtie_L` | `20` | Seed length |
+| `--bowtie_R` | `2` | Number of re-seeding attempts |
+| `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
+
+### 6.11 MMseqs2 Clustering Options
+
+Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--mmseqs_start_sens` | `2` | Starting sensitivity |
+| `--mmseqs_s` | `7` | Sensitivity level |
+| `--mmseqs_sens_steps` | `3` | Number of sensitivity steps |
+| `--mmseqs_min_seq_id` | `0.8` | Minimum sequence identity (0-1) |
+| `--mmseqs_c` | `0.7` | Coverage threshold (0-1) |
+| `--mmseqs_cov_mode` | `2` | Coverage mode |
+| `--mmseqs_e` | `1e-20` | E-value threshold |
+| `--mmseqs_format_mode` | `4` | Output format mode |
+| `--mmseqs_alignment_mode` | `3` | Alignment mode |
+| `--mmseqs_max_seqs` | `10000` | Maximum number of sequences |
+| `--mmseqs_format_output` | `empty,query,target,evalue,pident,qcov,tcov,tseq` | Output format fields |
+
+### 6.12 MetaCerberus Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -371,7 +419,27 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 **Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
 
-### 6.11 Resource Limit Options
+### 6.13 Taxonomy Visualization Options
+
+Control taxonomic output visualization and formatting:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Comma-separated taxonomic levels to plot |
+| `--taxonomy_top_n_taxa` | `10` | Number of top taxa to display in plots |
+| `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files for downstream analysis |
+
+**Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
+
+### 6.14 Database Storage Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
+
+By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs. Symbolic links are created in `<output>/downloaded_db/` for reference.
+
+### 6.15 Resource Limit Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -462,48 +530,150 @@ nextflow run main.nf --help
 
 ## 8. Output Structure
 
+### Main Output Directory
+
 ```
 results/
-├── pipeline_info/                    # Execution reports
-│   ├── execution_report_*.html       # Resource usage report
-│   ├── execution_timeline_*.html     # Timeline visualization
-│   ├── execution_trace_*.txt         # Task trace log
-│   └── pipeline_dag_*.svg            # Pipeline DAG
-├── downloaded_db/                    # Downloaded databases (symlinks)
-├── qc/                               # Quality control results
-│   ├── fastp/                        # FastP reports per sample
-│   └── reads_report.html             # Aggregated read statistics
-├── taxonomy/                         # Taxonomic profiling
-│   ├── kraken2/ or sourmash/         # Per-sample results
-│   ├── phyloseq_object.rds           # R Phyloseq object
-│   └── tax_report.html               # Taxonomy summary report
-├── assembly/                         # Genome assembly
-│   ├── {sample}/                     # Per-sample assemblies
-│   │   ├── contigs.fa                # Filtered contigs
-│   │   └── megahit/                  # MEGAHIT output
-│   └── coassembly/                   # Co-assembly (if enabled)
-├── binning/                          # Metagenomic bins
-│   ├── {sample}/
-│   │   ├── metabat2/                 # MetaBAT2 bins
-│   │   ├── semibin/                  # SemiBin bins
-│   │   ├── comebin/                  # COMEBin bins
-│   │   └── metawrap/                 # Refined bins
-│   └── reports/
-│       ├── bin_quality_report.html   # CheckM2 quality summary
-│       └── bin_taxonomy_report.html  # GTDB-TK taxonomy summary
-├── args/                             # ARG predictions
-│   ├── read_level/                   # KARGA/KARGVA results
-│   │   ├── arg_norm_report.html      # Normalized ARG counts
-│   │   └── args_oap/                 # ARGs-OAP results
-│   └── contig_level/                 # DeepARG results
-│       ├── deeparg/                  # Per-sample predictions
-│       └── arg_contig_report.html    # Summary report
-├── blobtools/                        # Contig taxonomy (BlobTools)
-│   ├── {sample}/                     # Per-sample blob tables
-│   └── blobplot.html                 # Aggregated visualization
-└── functional/                       # Functional annotation
-    └── metacerberus/                 # MetaCerberus results
+├── pipeline_info/                              # Execution reports
+│   ├── execution_report_*.html                 # Resource usage report
+│   ├── execution_timeline_*.html               # Timeline visualization
+│   ├── execution_trace_*.txt                   # Task trace log
+│   └── pipeline_dag_*.svg                      # Pipeline DAG
+├── 01_quality_control/                         # Quality control (if quality_control=true)
+│   ├── fastp/                                  # FastP reports per sample
+│   │   └── {sample}/                           # Per-sample QC results
+│   │       ├── {sample}.fastp.html             # HTML report
+│   │       ├── {sample}.fastp.json             # JSON report
+│   │       └── {sample}.fastp.log              # Log file
+│   └── summary/                                # Aggregated QC statistics
+│       ├── Reads_report.csv                    # Read count summary
+│       └── *.png                               # QC plots
+├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
+│   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
+│   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
+│   ├── bracken/                                # Bracken abundance estimates
+│   │   └── {sample}_*.bracken                  # Per-sample Bracken results
+│   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
+│   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
+│   ├── tables/                                 # Taxonomy tables
+│   │   └── *.tsv                               # Abundance tables
+│   ├── phyloseq/                               # Phyloseq objects
+│   │   ├── *.h5                                # HDF5 format
+│   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
+│   └── figures/                                # Taxonomy plots
+│       └── *.png                               # Visualization plots
+├── 03_assembly/                                # Genome assembly (if assembly_mode != 'none')
+│   ├── per_sample/                             # Per-sample assemblies (if assembly_mode='assembly')
+│   │   └── {sample}/
+│   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_lenght bp)
+│   │       ├── {sample}_contig.stats           # Assembly statistics
+│   │       └── {sample}_contigs.fa             # Raw MEGAHIT contigs
+│   └── coassembly/                             # Co-assembly (if assembly_mode='coassembly')
+│       ├── coassembly_filtered_contigs.fa      # Filtered contigs
+│       ├── coassembly_contig.stats             # Assembly statistics
+│       └── coassembly_contigs.fa               # Raw MEGAHIT contigs
+├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
+│   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
+│   │   └── {sample}/
+│   │       ├── raw_bins/                       # Raw bins from 3 binners
+│   │       │   ├── metabat2/                   # MetaBAT2 bins
+│   │       │   ├── semibin/                    # SemiBin bins
+│   │       │   └── comebin/                    # COMEBin bins
+│   │       ├── refined_bins/                   # MetaWRAP refined bins
+│   │       ├── quality/                        # CheckM2 quality reports
+│   │       │   └── checkm2/
+│   │       └── taxonomy/                       # GTDB-TK taxonomy
+│   │           └── gtdbtk/
+│   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
+│   │   ├── raw_bins/                           # Raw bins from 3 binners
+│   │   ├── refined_bins/                       # MetaWRAP refined bins
+│   │   ├── quality/                            # CheckM2 quality reports
+│   │   ├── taxonomy/                           # GTDB-TK taxonomy
+│   │   ├── coverage/                           # Bin coverage information
+│   │   └── summary/                            # Bin summary statistics
+│   ├── quality/                                # Aggregated quality reports
+│   │   └── summary/
+│   │       ├── *.csv                           # Quality summary tables
+│   │       └── *.png                           # Quality plots
+│   └── taxonomy/                               # Aggregated taxonomy reports
+│       └── summary/
+│           ├── *.csv                           # Taxonomy summary tables
+│           └── *.png                           # Taxonomy plots
+├── 05_arg_prediction/                          # ARG predictions
+│   ├── read_level/                             # Read-level ARG (if read_arg_prediction=true)
+│   │   ├── karga/                              # KARGA results per sample
+│   │   │   └── {sample}_KARGA_mappedGenes.csv
+│   │   ├── kargva/                             # KARGVA results per sample
+│   │   │   └── {sample}_KARGVA_mappedGenes.csv
+│   │   ├── args_oap/                           # ARGs-OAP normalization
+│   │   │   └── {sample}_args_oap_s1_out/
+│   │   └── summary/                            # Normalized ARG summary
+│   │       └── *.csv
+│   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
+│   │   ├── prodigal/                           # ORF predictions
+│   │   │   └── {sample}/
+│   │   ├── deeparg/                            # DeepARG predictions (not published by default)
+│   │   ├── summary/                            # ARG summary reports
+│   │   │   └── Contig_tax_and_arg_prediction.tsv
+│   │   └── figures/                            # ARG visualization
+│   │       └── *.png
+│   └── bin_level/                              # Bin-level ARG (if arg_bin_clustering=true)
+│       ├── proteins/                           # Prodigal ORF predictions
+│       │   └── {sample}/
+│       ├── deeparg/                            # DeepARG predictions per bin
+│       │   └── {sample}/
+│       └── clustering/                         # MMseqs2 clustering results
+│           └── *_cluster.tsv
+├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
+│   └── figures/                                # BlobTools plots
+│       └── *.png
+└── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
+    ├── contigs/                                # Contig-level annotation
+    │   └── {sample}/
+    │       └── {sample}_annotation_results/
+    └── bins/                                   # Bin-level annotation
+        └── {sample}/
+            └── {sample}_annotation_results/
 ```
+
+### Database Storage Directory
+
+By default, databases are stored separately from results at `<output_dir>/../databases/`:
+
+```
+databases/                            # Database storage (configurable via --databases_dir)
+├── phiX_index/                       # PhiX174 Bowtie2 index
+├── host_index/                       # Host genome Bowtie2 index
+├── kraken2_standard8/                # Kraken2 Standard-8 database
+├── kraken2_gtdb220/                  # Kraken2 GTDB r220 database (if selected)
+├── sourmash_gtdb220/                 # Sourmash GTDB r220 database
+├── taxdump/                          # NCBI taxonomy dump
+├── blast_nt/                         # NCBI NT BLAST database
+├── deeparg/                          # DeepARG database
+├── karga/                            # KARGA (MEGARes) database
+├── kargva/                           # KARGVA database
+├── checkm2/                          # CheckM2 database
+└── gtdbtk_r220/                      # GTDB-TK release 220 database
+```
+
+### Conditional Outputs
+
+The following outputs are only generated when specific parameters are enabled:
+
+| Output Directory | Required Parameter | Description |
+|------------------|-------------------|-------------|
+| `01_quality_control/` | `quality_control=true` | Quality control and filtering results |
+| `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
+| `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |
+| `03_assembly/` | `assembly_mode != 'none'` | Assembly results |
+| `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
+| `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
+| `04_binning/` | `include_binning=true` | Binning and bin refinement results |
+| `05_arg_prediction/read_level/` | `read_arg_prediction=true` | Read-level ARG predictions |
+| `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
+| `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
+| `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
+| `07_functional_annotation/` | `contig_level_metacerberus=true` | Functional annotation results |
 
 ---
 
@@ -661,6 +831,39 @@ nextflow run main.nf \
     --include_binning true \
     --semibin_env_model ocean \
     --custom_bowtie_host_index null \
+    -profile singularity
+```
+
+### Example 11: Custom Taxonomy Visualization
+
+Enhanced taxonomy profiling with custom visualization:
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --taxonomic_profiler kraken2 \
+    --kraken2_db gtdb_220 \
+    --taxonomy_plot_levels "Phylum,Class,Order,Family,Genus" \
+    --taxonomy_top_n_taxa 20 \
+    --create_phyloseq_rds true \
+    --assembly_mode none \
+    -profile docker
+```
+
+### Example 12: Shared Database Storage
+
+Using pre-downloaded databases in shared storage:
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --databases_dir /shared/databases/bugbuster \
+    --custom_kraken_db /shared/databases/bugbuster/kraken2_gtdb220 \
+    --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
+    --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --include_binning true \
     -profile singularity
 ```
 
