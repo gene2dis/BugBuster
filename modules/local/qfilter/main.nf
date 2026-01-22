@@ -2,7 +2,7 @@ process QFILTER {
 
     label 'process_single'
 
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    container 'ubuntu:22.04'
 
     input:
         tuple val(meta), path(reads), path(json)

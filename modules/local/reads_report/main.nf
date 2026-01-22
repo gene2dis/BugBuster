@@ -1,6 +1,6 @@
 process READS_REPORT {
 
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    container 'quay.io/biocontainers/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0'
 
     publishDir "${params.output}/reports/read_level", mode: 'copy', pattern: '*'
 
@@ -15,6 +15,6 @@ process READS_REPORT {
 
     script:
         """
-        Rscript /mnt/Report_unify.R ${args}
+        report_unify.py ${args}
 	""" 
 }

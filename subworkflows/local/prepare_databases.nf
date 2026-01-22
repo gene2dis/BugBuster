@@ -14,6 +14,7 @@ include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { BUILD_PHIX_BOWTIE2_INDEX } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
+include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 
 workflow PREPARE_DATABASES {
     
@@ -48,13 +49,30 @@ workflow PREPARE_DATABASES {
     //
     if ( params.taxonomic_profiler == "sourmash" ) {
         if ( params.custom_sourmash_db ) {
-            ch_sourmash_db = Channel.fromList(params.custom_sourmash_db)
+            // Custom database: expect list with [kmer_db, lineages_file]
+            ch_sourmash_files = Channel.fromList(params.custom_sourmash_db)
                 .map { filepath -> file(filepath, checkIfExists: true) }
                 .collect()
+            
+            ch_sourmash_kmer = ch_sourmash_files.map { files -> files[0] }
+            ch_sourmash_lineages = ch_sourmash_files.map { files -> files[1] }
         } else {
-            ch_sourmash_db = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["file"])
+            // Reference database: download both k-mer and lineages files
+            ch_sourmash_files = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["file"])
                 .map { filepath -> file(filepath) }
+                .collect()
+            
+            ch_sourmash_kmer = ch_sourmash_files.map { files -> files[0] }
+            ch_sourmash_lineages = ch_sourmash_files.map { files -> files[1] }
         }
+        
+        // Prepare taxonomy database ONCE (not per-sample)
+        ch_sourmash_tax_db = SOURMASH_TAX_PREPARE(ch_sourmash_lineages)
+        
+        // Combine k-mer DB and prepared taxonomy DB for downstream use
+        ch_sourmash_db = ch_sourmash_kmer
+            .combine(ch_sourmash_tax_db)
+            .collect()
     }
 
     //
