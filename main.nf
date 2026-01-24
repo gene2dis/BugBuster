@@ -261,11 +261,10 @@ workflow {
         //
         if ( params.include_binning ) {
             BINNING(
-                ch_clean_reads,
-                ASSEMBLY.out.contigs,
                 ASSEMBLY.out.bam,
                 PREPARE_DATABASES.out.checkm2_db,
-                PREPARE_DATABASES.out.gtdbtk_db
+                PREPARE_DATABASES.out.gtdbtk_db,
+                ch_clean_reads
             )
             ch_refined_bins = BINNING.out.refined_bins
         }
