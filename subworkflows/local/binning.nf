@@ -6,20 +6,14 @@
 ----------------------------------------------------------------------------------------
 */
 
+// Unified modules - handle both per-sample and co-assembly modes
 include { CALCULATE_DEPTH            } from '../../modules/local/calculate_depth/main'
-include { CALCULATE_DEPTH_COASSEMBLY } from '../../modules/local/calculate_depth/main'
-include { METABAT2_METABAT2 as METABAT2 } from '../../modules/nf-core/metabat2/metabat2/main'
-include { METABAT2_COASSEMBLY        } from '../../modules/local/metabat2/main'
+include { METABAT2                   } from '../../modules/local/metabat2/main'
 include { SEMIBIN                    } from '../../modules/local/semibin/main'
-include { SEMIBIN_COASSEMBLY         } from '../../modules/local/semibin/main'
 include { COMEBIN                    } from '../../modules/local/comebin/main'
-include { COMEBIN_COASSEMBLY         } from '../../modules/local/comebin/main'
 include { METAWRAP                   } from '../../modules/local/metawrap/main'
-include { METAWRAP_COASSEMBLY        } from '../../modules/local/metawrap/main'
 include { CHECKM2                    } from '../../modules/local/checkm2/main'
-include { CHECKM2_COASSEMBLY         } from '../../modules/local/checkm2/main'
 include { GTDB_TK                    } from '../../modules/local/gtdb-tk/main'
-include { GTDB_TK_COASSEMBLY         } from '../../modules/local/gtdb-tk/main'
 include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
 include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
@@ -45,89 +39,104 @@ workflow BINNING {
         // Calculate depth
         ch_depth = CALCULATE_DEPTH(bam)
         
-        //
-        // Run nf-core METABAT2
-        // nf-core METABAT2_METABAT2 signature:
-        //   input:  tuple val(meta), path(fasta), path(depth)
-        //   output: tuple val(meta), path("*.fa.gz"), emit: fasta
-        //
-        ch_metabat2_input = ch_depth.map { meta, contigs_file, depth_file ->
-            [ meta, contigs_file, depth_file ]
-        }
-        
-        METABAT2(ch_metabat2_input)
+        // Run binning tools
+        ch_metabat2 = METABAT2(ch_depth.depth)
+        ch_semibin = SEMIBIN(bam)
+        ch_comebin = COMEBIN(bam)
         
         // Collect versions
         ch_versions = ch_versions.mix(METABAT2.out.versions.first())
-        
-        // nf-core outputs individual gzipped bins; collect them for downstream
-        // Group bins by sample for compatibility with local binners
-        ch_metabat2 = METABAT2.out.fasta
-        
-        // bam channel already has the correct structure: [ meta, contigs, bam ]
-        ch_semibin = SEMIBIN(bam)
-        ch_comebin = COMEBIN(bam)
+        ch_versions = ch_versions.mix(SEMIBIN.out.versions.first())
+        ch_versions = ch_versions.mix(COMEBIN.out.versions.first())
 
         // Combine bins for refinement
-        ch_all_bins = ch_metabat2.join(ch_semibin).join(ch_comebin)
+        ch_all_bins = ch_metabat2.bins.join(ch_semibin.bins).join(ch_comebin.bins)
         
         // Refine bins with MetaWRAP
         ch_metawrap = METAWRAP(ch_all_bins)
-        ch_refined_bins = ch_metawrap
+        ch_refined_bins = ch_metawrap.bins
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
 
         // Quality assessment with CheckM2
         ch_checkm = CHECKM2(
-            ch_all_bins.join(ch_metawrap).combine(checkm2_db)
+            ch_all_bins.join(ch_metawrap.bins).combine(checkm2_db)
         )
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(CHECKM2.out.versions.first())
 
         // Taxonomic classification with GTDB-TK
-        ch_gtdb_tk = GTDB_TK(ch_metawrap.combine(gtdbtk_db))
+        ch_gtdb_tk = GTDB_TK(ch_metawrap.bins.combine(gtdbtk_db))
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(GTDB_TK.out.versions.first())
 
         // Generate reports
-        BIN_QUALITY_REPORT(ch_checkm.all_reports.collect())
-        BIN_TAX_REPORT(ch_gtdb_tk.report.collect())
+        BIN_QUALITY_REPORT(ch_checkm.all_reports.map { meta, reports -> reports }.collect())
+        BIN_TAX_REPORT(ch_gtdb_tk.report.map { meta, reports -> reports }.collect())
     }
 
     //
     // Co-assembly binning mode
     //
     if ( params.assembly_mode == "coassembly" ) {
-        // Calculate depth from all BAMs
-        ch_depth_co = CALCULATE_DEPTH_COASSEMBLY(bam.collect())
+        // Create coassembly meta
+        def coassembly_meta = [id: 'coassembly']
         
-        // Run multiple binners
-        ch_metabat2_co = METABAT2_COASSEMBLY(
-            contigs.combine(ch_depth_co)
-        )
-        ch_semibin_co = SEMIBIN_COASSEMBLY(
-            bam.collect().combine(contigs)
-        )
-        ch_comebin_co = COMEBIN_COASSEMBLY(
-            bam.collect().combine(contigs)
-        )
+        // Prepare inputs with coassembly meta
+        ch_bam_collected = bam.collect()
+        ch_contigs_with_meta = channel.of(coassembly_meta)
+            .combine(contigs)
+            .combine(ch_bam_collected)
+        
+        // Calculate depth
+        ch_depth_co = CALCULATE_DEPTH(ch_contigs_with_meta)
+        
+        // Run binning tools with coassembly meta
+        ch_metabat2_co = METABAT2(ch_depth_co.depth)
+        ch_semibin_co = SEMIBIN(ch_contigs_with_meta)
+        ch_comebin_co = COMEBIN(ch_contigs_with_meta)
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(METABAT2.out.versions.first())
+        ch_versions = ch_versions.mix(SEMIBIN.out.versions.first())
+        ch_versions = ch_versions.mix(COMEBIN.out.versions.first())
 
-        // Combine and refine bins
-        ch_all_bins_co = ch_metabat2_co.combine(ch_semibin_co).combine(ch_comebin_co)
-        ch_metawrap_co = METAWRAP_COASSEMBLY(ch_all_bins_co)
-        ch_refined_bins = ch_metawrap_co
+        // Combine bins for refinement
+        ch_all_bins_co = ch_metabat2_co.bins.join(ch_semibin_co.bins).join(ch_comebin_co.bins)
+        
+        // Refine bins with MetaWRAP
+        ch_metawrap_co = METAWRAP(ch_all_bins_co)
+        ch_refined_bins = ch_metawrap_co.bins
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
 
         // Quality assessment
-        ch_checkm_co = CHECKM2_COASSEMBLY(
-            ch_all_bins_co.combine(ch_metawrap_co).combine(checkm2_db)
+        ch_checkm_co = CHECKM2(
+            ch_all_bins_co.join(ch_metawrap_co.bins).combine(checkm2_db)
         )
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(CHECKM2.out.versions.first())
 
         // Taxonomic classification
-        ch_gtdb_tk_co = GTDB_TK_COASSEMBLY(ch_metawrap_co.combine(gtdbtk_db))
+        ch_gtdb_tk_co = GTDB_TK(ch_metawrap_co.bins.combine(gtdbtk_db))
+        
+        // Collect versions
+        ch_versions = ch_versions.mix(GTDB_TK.out.versions.first())
 
         // Calculate bin coverage
-        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(reads.combine(ch_metawrap_co))
+        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(reads.combine(ch_metawrap_co.bins.map { meta, bins -> bins }))
         ch_bin_cov = BEDTOOLS(ch_bin_depth)
 
         // Generate summary report
         BIN_SUMMARY(
             ch_bin_cov.collect()
-                .combine(ch_gtdb_tk_co.report.collect())
-                .combine(ch_checkm_co.metawrap_report.collect())
+                .combine(ch_gtdb_tk_co.report.map { meta, reports -> reports }.collect())
+                .combine(ch_checkm_co.metawrap_report.map { meta, reports -> reports }.collect())
         )
     }
 

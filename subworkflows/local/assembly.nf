@@ -3,15 +3,35 @@
     ASSEMBLY SUBWORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Genome assembly using MEGAHIT with per-sample or co-assembly mode
+    
+    DESCRIPTION:
+        This subworkflow handles metagenome assembly using MEGAHIT, followed by contig
+        filtering with BBMap, and optional read alignment with Bowtie2/SAMtools for
+        downstream binning and coverage analysis.
+    
+    INPUTS:
+        reads: Channel of [meta, reads] tuples for per-sample assembly
+        reads_coassembly: Channel of collected reads for co-assembly mode
+    
+    OUTPUTS:
+        contigs: [meta, reads, contigs] - Filtered contigs with reads for binning
+        contigs_meta: [meta, contigs] - Filtered contigs only for annotation
+        bam: [meta, contigs, bam] - BAM files with contigs for depth analysis
+        bam_meta: [meta, bam] - BAM files only for indexing
+        versions: Tool version information
+    
+    MODES:
+        assembly: Per-sample assembly (default)
+        coassembly: Pool all reads and assemble together
+        none: Skip assembly entirely
 ----------------------------------------------------------------------------------------
 */
 
 include { MEGAHIT as NFCORE_MEGAHIT } from '../../modules/nf-core/megahit/main'
-include { MEGAHIT_COASSEMBLY   } from '../../modules/local/megahit/main'
+include { MEGAHIT              } from '../../modules/local/megahit/main'
 include { BBMAP                } from '../../modules/local/bbmap/main'
-include { BBMAP_COASSEMBLY     } from '../../modules/local/bbmap/main'
 include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main'
-include { BOWTIE2_SAMTOOLS_COASSEMBLY } from '../../modules/local/bowtie2_samtools/main'
+include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
 
 workflow ASSEMBLY {
     take:
@@ -19,53 +39,45 @@ workflow ASSEMBLY {
     reads_coassembly   // channel: path(reads) - collected reads for coassembly
 
     main:
-    ch_versions = Channel.empty()
-    ch_contigs = Channel.empty()
-    ch_contigs_meta = Channel.empty()
-    ch_bam = Channel.empty()
-    ch_bam_meta = Channel.empty()
+    ch_versions = channel.empty()
+    ch_contigs_with_reads = channel.empty()
+    ch_contigs_only = channel.empty()
+    ch_bam_with_contigs = channel.empty()
+    ch_bam_only = channel.empty()
+    ch_filter_reports = channel.empty()
+    ch_empty_reports = channel.empty()
 
     //
     // Per-sample assembly mode
     //
     if ( params.assembly_mode == "assembly" ) {
-        //
-        // Assemble reads with nf-core MEGAHIT
-        // nf-core MEGAHIT signature:
-        //   input:  tuple val(meta), path(reads1), path(reads2)
-        //   output: tuple val(meta), path("*.contigs.fa.gz"), emit: contigs
-        //
-        ch_megahit_input = reads.map { meta, reads_files ->
-            [ meta, reads_files[0], reads_files[1] ]  // Split reads into R1 and R2
-        }
-        
-        NFCORE_MEGAHIT(ch_megahit_input)
+        // Assemble reads with local MEGAHIT (unified process)
+        MEGAHIT(reads)
         
         // Collect versions
-        ch_versions = ch_versions.mix(NFCORE_MEGAHIT.out.versions.first())
+        ch_versions = ch_versions.mix(MEGAHIT.out.versions.first())
         
-        //
-        // Re-join reads with contigs for BBMAP
-        // Decompress contigs (nf-core outputs .fa.gz, BBMAP expects .fa)
-        // Join original reads channel with contigs output
-        //
-        ch_assembly = reads
-            .join(NFCORE_MEGAHIT.out.contigs)
-            .map { meta, reads_files, contigs_gz ->
-                [ meta, reads_files, contigs_gz ]
-            }
+        // Filter contigs by length with BBMap
+        BBMAP(MEGAHIT.out.contigs_and_reads)
         
-        // Filter contigs by length with BBMap (handles gzipped input)
-        ch_filtered = BBMAP(ch_assembly)
+        // Collect BBMap versions
+        ch_versions = ch_versions.mix(BBMAP.out.versions.first())
         
-        ch_contigs = ch_filtered.bbmap
-        ch_contigs_meta = ch_filtered.bbmap_contigs
+        // Collect filter reports for tracking
+        ch_filter_reports = BBMAP.out.filter_report
+        
+        // Set output channels
+        ch_contigs_with_reads = BBMAP.out.contigs_with_reads
+        ch_contigs_only = BBMAP.out.contigs_only
 
-        // Generate BAM files for binning/contig analysis
+        // Generate BAM files for binning/contig analysis if needed
         if ( params.include_binning || params.contig_tax_and_arg ) {
-            ch_bowtie2_samtools = BOWTIE2_SAMTOOLS(ch_filtered.bbmap)
-            ch_bam = ch_bowtie2_samtools.contigs_and_bam
-            ch_bam_meta = ch_bowtie2_samtools.only_bam
+            BOWTIE2_SAMTOOLS(BBMAP.out.contigs_with_reads)
+            
+            ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+            ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
+            ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
+            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
         }
     }
 
@@ -73,37 +85,61 @@ workflow ASSEMBLY {
     // Co-assembly mode
     //
     if ( params.assembly_mode == "coassembly" ) {
-        // Co-assemble all reads with MEGAHIT
-        ch_assembly_co = MEGAHIT_COASSEMBLY(reads_coassembly.collect())
+        // Prepare coassembly input: create meta and combine with collected reads
+        ch_coassembly_input = channel.of([id: "coassembly"])
+            .combine(reads_coassembly.collect())
         
-        // Filter contigs by length
-        ch_filtered_co = BBMAP_COASSEMBLY(ch_assembly_co)
+        // Co-assemble all reads with unified MEGAHIT process
+        MEGAHIT(ch_coassembly_input)
         
-        // Add meta information for coassembly
-        ch_contigs_meta = ch_filtered_co.contigs.map { contigs ->
-            def meta = [id: "coassembly"]
-            return [meta, contigs]
-        }
+        // Collect versions
+        ch_versions = ch_versions.mix(MEGAHIT.out.versions.first())
+        
+        // Filter contigs by length with unified BBMAP process
+        BBMAP(MEGAHIT.out.contigs_and_reads)
+        
+        // Collect BBMap versions
+        ch_versions = ch_versions.mix(BBMAP.out.versions.first())
+        
+        // Collect filter reports for tracking
+        ch_filter_reports = BBMAP.out.filter_report
+        
+        // Set output channels
+        ch_contigs_only = BBMAP.out.contigs_only
 
-        // Generate BAM files for binning/contig analysis
+        // Generate BAM files for binning/contig analysis if needed
         if ( params.include_binning || params.contig_tax_and_arg ) {
-            ch_bowtie2_samtools_co = BOWTIE2_SAMTOOLS_COASSEMBLY(
-                reads.combine(ch_filtered_co.contigs)
-            )
+            // Prepare input: combine all original reads with filtered contigs
+            // More efficient: collect reads first, then combine with contigs
+            ch_alignment_input = reads
+                .map { _meta, reads_files -> reads_files }
+                .collect()
+                .map { all_reads -> [[id: "coassembly"], all_reads.flatten()] }
+                .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
+                .map { meta, reads_list, contigs -> [meta, reads_list, contigs] }
             
-            ch_bam_meta = ch_bowtie2_samtools_co.map { bam ->
-                def meta = [id: "coassembly"]
-                return [meta, bam]
-            }
+            BOWTIE2_SAMTOOLS(ch_alignment_input)
             
-            ch_bam = ch_bowtie2_samtools_co
+            ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
+            ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+            ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
+            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
         }
     }
 
+    // Generate contig filtering summary report
+    if ( params.assembly_mode != "none" ) {
+        CONTIG_FILTER_SUMMARY(
+            ch_filter_reports.collect().ifEmpty([]),
+            ch_empty_reports.collect().ifEmpty([])
+        )
+        ch_versions = ch_versions.mix(CONTIG_FILTER_SUMMARY.out.versions)
+    }
+
     emit:
-    contigs         = ch_contigs          // channel: [ val(meta), path(reads), path(contigs) ]
-    contigs_meta    = ch_contigs_meta     // channel: [ val(meta), path(contigs) ]
-    bam             = ch_bam              // channel: path(bam) or [ val(meta), path(bam) ]
-    bam_meta        = ch_bam_meta         // channel: [ val(meta), path(bam) ]
-    versions        = ch_versions         // channel: path(versions.yml)
+    contigs         = ch_contigs_with_reads  // channel: [ val(meta), path(reads), path(contigs) ] - for binning
+    contigs_meta    = ch_contigs_only        // channel: [ val(meta), path(contigs) ] - for annotation
+    bam             = ch_bam_with_contigs    // channel: [ val(meta), path(contigs), path(bam) ] - for depth analysis
+    bam_meta        = ch_bam_only            // channel: [ val(meta), path(bam) ] - for indexing
+    versions        = ch_versions            // channel: path(versions.yml)
 }
