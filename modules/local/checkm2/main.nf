@@ -66,14 +66,26 @@ process CHECKM2 {
                 ;;
         esac
         
-        checkm2 predict \\
-            --threads ${task.cpus} \\
-            --input \$bin_dir \\
-            --output-directory ${prefix}_\${binner}_checkm2_report \\
-            --database_path ${checkm_db} \\
-            -x .fa
+        # Check if bins directory contains actual genome files
+        bin_count=\$(find \$bin_dir -maxdepth 1 -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | wc -l)
         
-        mv ${prefix}_\${binner}_checkm2_report/quality_report.tsv ${prefix}_\${binner}_quality_report.tsv
+        if [ "\$bin_count" -eq 0 ]; then
+            echo "WARNING: No genome bins found in \$bin_dir for \$binner. Skipping CheckM2 assessment."
+            
+            # Create empty output file with header
+            echo -e "Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes" > ${prefix}_\${binner}_quality_report.tsv
+        else
+            echo "Found \$bin_count genome bins for \$binner. Running CheckM2 assessment..."
+            
+            checkm2 predict \\
+                --threads ${task.cpus} \\
+                --input \$bin_dir \\
+                --output-directory ${prefix}_\${binner}_checkm2_report \\
+                --database_path ${checkm_db} \\
+                -x .fa
+            
+            mv ${prefix}_\${binner}_checkm2_report/quality_report.tsv ${prefix}_\${binner}_quality_report.tsv
+        fi
     done
     
     cat <<-END_VERSIONS > versions.yml

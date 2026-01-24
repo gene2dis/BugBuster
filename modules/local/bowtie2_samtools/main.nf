@@ -20,7 +20,7 @@
 
 process BOWTIE2_SAMTOOLS {
     tag "${meta.id}"
-    label 'process_medium'
+    label 'process_high'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:a0ffedb52808e102887f6ce600d092675bf3528a-0' :
@@ -275,7 +275,7 @@ process BOWTIE2_SAMTOOLS {
 process BOWTIE2_SAMTOOLS_DEPTH {
     container 'quay.io/sangerpathogens/bowtie2-samtools:1.1-c1'
 
-    label 'process_medium'
+    label 'process_high'
 
     // BAM files are intermediate - don't publish to final output  
     // publishDir "${params.output}/workflow/${meta.id}/bowtie2_samtools", pattern: '*_all_reads.bam'

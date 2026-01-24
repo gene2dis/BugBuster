@@ -73,19 +73,31 @@ process METAWRAP {
     cp -rL ${semibin_bins}/* semibin_wp_bins/ 2>/dev/null || true
     cp -rL ${comebin_bins}/* comebin_wp_bins/ 2>/dev/null || true
     
-    # Run MetaWRAP bin refinement
-    metawrap bin_refinement \\
-        -o Refined_bins \\
-        -t ${task.cpus} \\
-        -A metabat_wp_bins \\
-        -B semibin_wp_bins \\
-        -C comebin_wp_bins \\
-        -c ${completeness} \\
-        -x ${contamination}
+    # Count total bins across all binners
+    total_bins=\$(find metabat_wp_bins semibin_wp_bins comebin_wp_bins -type f \\( -name "*.fa" -o -name "*.fasta" \\) 2>/dev/null | wc -l)
     
-    # Organize output
-    chmod 777 Refined_bins
-    mv Refined_bins/metawrap_${completeness}_${contamination}_bins ${prefix}_metawrap_${completeness}_${contamination}_bins
+    if [[ \$total_bins -eq 0 ]]; then
+        echo "WARNING: No bins found from any binner. Skipping MetaWRAP refinement."
+        echo "Creating empty output directory for ${prefix}"
+        mkdir -p ${prefix}_metawrap_${completeness}_${contamination}_bins
+        echo "No bins available for refinement" > ${prefix}_metawrap_${completeness}_${contamination}_bins/SKIPPED.txt
+    else
+        echo "Found \$total_bins bins total. Running MetaWRAP refinement..."
+        
+        # Run MetaWRAP bin refinement
+        metawrap bin_refinement \\
+            -o Refined_bins \\
+            -t ${task.cpus} \\
+            -A metabat_wp_bins \\
+            -B semibin_wp_bins \\
+            -C comebin_wp_bins \\
+            -c ${completeness} \\
+            -x ${contamination}
+        
+        # Organize output
+        chmod 777 Refined_bins
+        mv Refined_bins/metawrap_${completeness}_${contamination}_bins ${prefix}_metawrap_${completeness}_${contamination}_bins
+    fi
     
     # Cleanup
     rm -r metabat_wp_bins semibin_wp_bins comebin_wp_bins

@@ -29,8 +29,8 @@ workflow BINNING {
     gtdbtk_db       // channel: path(gtdbtk_db)
 
     main:
-    ch_versions = Channel.empty()
-    ch_refined_bins = Channel.empty()
+    ch_versions = channel.empty()
+    ch_refined_bins = channel.empty()
 
     //
     // Per-sample binning mode
@@ -74,8 +74,8 @@ workflow BINNING {
         ch_versions = ch_versions.mix(GTDB_TK.out.versions.first())
 
         // Generate reports
-        BIN_QUALITY_REPORT(ch_checkm.all_reports.map { meta, reports -> reports }.collect())
-        BIN_TAX_REPORT(ch_gtdb_tk.report.map { meta, reports -> reports }.collect())
+        BIN_QUALITY_REPORT(ch_checkm.all_reports.map { _meta, reports -> reports }.collect())
+        BIN_TAX_REPORT(ch_gtdb_tk.report.map { _meta, reports -> reports }.collect())
     }
 
     //
@@ -129,14 +129,14 @@ workflow BINNING {
         ch_versions = ch_versions.mix(GTDB_TK.out.versions.first())
 
         // Calculate bin coverage
-        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(reads.combine(ch_metawrap_co.bins.map { meta, bins -> bins }))
+        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(reads.combine(ch_metawrap_co.bins.map { _meta, bins -> bins }))
         ch_bin_cov = BEDTOOLS(ch_bin_depth)
 
         // Generate summary report
         BIN_SUMMARY(
             ch_bin_cov.collect()
-                .combine(ch_gtdb_tk_co.report.map { meta, reports -> reports }.collect())
-                .combine(ch_checkm_co.metawrap_report.map { meta, reports -> reports }.collect())
+                .combine(ch_gtdb_tk_co.report.map { _meta, reports -> reports }.collect())
+                .combine(ch_checkm_co.metawrap_report.map { _meta, reports -> reports }.collect())
         )
     }
 

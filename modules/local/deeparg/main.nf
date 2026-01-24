@@ -1,7 +1,7 @@
 process DEEPARG_BINS {
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
         
-    label 'process_low'
+    label 'process_medium'
 
     input:
         tuple val(meta), path(prodigal_bins), path(deeparg_db)
@@ -20,18 +20,33 @@ process DEEPARG_BINS {
         cp -rL ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
+        
+        # Parallel processing of bins using background jobs
+        bin_count=0
         for bin_prot in *.faa; do
-               bin_name=`echo \$bin_prot | sed -E 's/_proteins.faa//g'` 
-
-               deeparg predict \\
-                          -d ../${deeparg_db} \\
-                          --model LS \\
-                          --type prot \\
-                          $args \\
-                          --input \${bin_prot} \\
-                          --out \${bin_name}_deep_arg.out
-
+            bin_name=\$(echo \$bin_prot | sed -E 's/_proteins.faa//g')
+            
+            # Run deeparg in background
+            (
+                deeparg predict \\
+                    -d ../${deeparg_db} \\
+                    --model LS \\
+                    --type prot \\
+                    $args \\
+                    --input \${bin_prot} \\
+                    --out \${bin_name}_deep_arg.out
+            ) &
+            
+            # Limit concurrent jobs to number of CPUs
+            bin_count=\$((bin_count + 1))
+            if [ \$((bin_count % ${task.cpus})) -eq 0 ]; then
+                wait
+            fi
         done
+        
+        # Wait for all remaining jobs
+        wait
+        
         mv *.mapping.ARG ../${prefix}_deeparg_results/
         cd ..
         rm -rf tmp_bins
@@ -41,7 +56,7 @@ process DEEPARG_BINS {
 process DEEPARG_CONTIGS {
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
 
-    label 'process_low'
+    label 'process_medium'
 
     input:
         tuple val(meta), path(prodigal_contigs), path(deeparg_db)

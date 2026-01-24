@@ -48,10 +48,10 @@ process METABAT2_METABAT2 {
     """
 
     stub:
-    def args             = task.ext.args   ?: ''
+    def _args             = task.ext.args   ?: ''
     def prefix           = task.ext.prefix ?: "${meta.id}"
-    def decompress_depth = depth           ? "gzip -d -f $depth"    : ""
-    def depth_file       = depth           ? "-a ${depth.baseName}" : ""
+    def _decompress_depth = depth           ? "gzip -d -f $depth"    : ""
+    def _depth_file       = depth           ? "-a ${depth.baseName}" : ""
     """
     echo "" | gzip -c > ${prefix}.1.fa.gz
     echo "" | gzip -c > ${prefix}.1.tooShort.fa.gz

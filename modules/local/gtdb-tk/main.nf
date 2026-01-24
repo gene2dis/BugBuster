@@ -54,20 +54,33 @@ process GTDB_TK {
     """
     set -euo pipefail
     
-    export GTDBTK_DATA_PATH="${gtdbtk_db}"
+    # Check if bins directory contains actual genome files
+    bin_count=\$(find ${metawrap} -maxdepth 1 -name "*.fa" -o -name "*.fasta" -o -name "*.fna" | wc -l)
     
-    gtdbtk classify_wf \\
-        --genome_dir ${metawrap} \\
-        --out_dir ${prefix}_gtdb \\
-        --cpus ${task.cpus} \\
-        --skip_ani_screen \\
-        --extension .fa \\
-        --pplacer_cpus 1
-    
-    mv ${prefix}_gtdb/classify/gtdbtk.bac120.summary.tsv ${prefix}_gtdbtk_bac120.tsv
-    
-    if [ -f ${prefix}_gtdb/classify/gtdbtk.ar53.summary.tsv ]; then
-        mv ${prefix}_gtdb/classify/gtdbtk.ar53.summary.tsv ${prefix}_gtdbtk_ar53.tsv
+    if [ "\$bin_count" -eq 0 ]; then
+        echo "WARNING: No genome bins found in ${metawrap}. Skipping GTDB-Tk classification."
+        
+        # Create empty output files with headers
+        echo -e "user_genome\\tclassification\\tfastani_reference\\tfastani_reference_radius\\tfastani_taxonomy\\tfastani_ani\\tfastani_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > ${prefix}_gtdbtk_bac120.tsv
+        echo -e "user_genome\\tclassification\\tfastani_reference\\tfastani_reference_radius\\tfastani_taxonomy\\tfastani_ani\\tfastani_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > ${prefix}_gtdbtk_ar53.tsv
+    else
+        echo "Found \$bin_count genome bins. Running GTDB-Tk classification..."
+        
+        export GTDBTK_DATA_PATH="${gtdbtk_db}"
+        
+        gtdbtk classify_wf \\
+            --genome_dir ${metawrap} \\
+            --out_dir ${prefix}_gtdb \\
+            --cpus ${task.cpus} \\
+            --skip_ani_screen \\
+            --extension .fa \\
+            --pplacer_cpus 1
+        
+        mv ${prefix}_gtdb/classify/gtdbtk.bac120.summary.tsv ${prefix}_gtdbtk_bac120.tsv
+        
+        if [ -f ${prefix}_gtdb/classify/gtdbtk.ar53.summary.tsv ]; then
+            mv ${prefix}_gtdb/classify/gtdbtk.ar53.summary.tsv ${prefix}_gtdbtk_ar53.tsv
+        fi
     fi
     
     cat <<-END_VERSIONS > versions.yml

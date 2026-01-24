@@ -10,7 +10,7 @@ process BOWTIE2 {
     tag "${meta.id}_${db_alias}"
     container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
 
-    label 'process_medium'
+    label 'process_high'
 
     // Clean reads are intermediate files - don't publish to final output
     // publishDir "${params.output}/workflow/${meta.id}/clean_reads", 

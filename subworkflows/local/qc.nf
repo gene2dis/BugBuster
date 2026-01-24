@@ -101,8 +101,8 @@ workflow QC {
             "host phiX"
         )
 
-        ch_clean_reads = ch_host_clean.reads
-        ch_clean_reads_coassembly = ch_host_clean.reads_coassembly
+        ch_clean_reads = ch_phix_clean.reads
+        ch_clean_reads_coassembly = ch_phix_clean.reads_coassembly
         ch_report = ch_reads_report
 
     } else {

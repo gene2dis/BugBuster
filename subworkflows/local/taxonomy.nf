@@ -53,7 +53,7 @@ workflow TAXONOMY {
         
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
-            KRAKEN2.out.report.map { meta, report -> report }.collect(),
+            KRAKEN2.out.report.map { _meta, report -> report }.collect(),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'kraken2',
             params.kraken_db_used
@@ -62,7 +62,7 @@ workflow TAXONOMY {
         
         // Generate phyloseq-compatible tables and plots
         TAXONOMY_PHYLOSEQ(
-            BRACKEN.out.txt.map { meta, report -> report }.collect(),
+            BRACKEN.out.txt.map { _meta, report -> report }.collect(),
             'kraken2',
             params.kraken_db_used,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',

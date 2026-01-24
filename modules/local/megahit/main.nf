@@ -20,7 +20,7 @@
 
 process MEGAHIT {
     tag "${meta.id}"
-    label 'process_medium'
+    label 'process_high'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/megahit:1.2.9--h43eeafb_4' :
