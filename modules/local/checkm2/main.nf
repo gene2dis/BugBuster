@@ -67,7 +67,7 @@ process CHECKM2 {
         esac
         
         # Check if bins directory contains actual genome files
-        bin_count=\$(find \$bin_dir -maxdepth 1 -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | wc -l)
+        bin_count=\$(find -L \$bin_dir -maxdepth 1 -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
         
         if [ "\$bin_count" -eq 0 ]; then
             echo "WARNING: No genome bins found in \$bin_dir for \$binner. Skipping CheckM2 assessment."

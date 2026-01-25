@@ -195,45 +195,69 @@ flowchart TD
 
 ---
 
-### 6. BINNING Subworkflow
+### 6. BINNING Subworkflow (Unified - Mode-Agnostic)
 ```mermaid
 flowchart TD
-    Input[Contigs + BAM] --> Mode{Assembly<br/>Mode}
+    Input["Input: contigs_and_bam<br/>[meta, contigs, bam]"] --> CalcDepth[CALCULATE_DEPTH<br/>Calculate Contig Depth]
     
-    Mode -->|assembly| PerSampleBin[Per-Sample Binning]
-    PerSampleBin --> Depth1[CALCULATE_DEPTH]
-    Depth1 --> MetaBAT1[METABAT2]
-    Input --> SemiBin1[SEMIBIN]
-    Input --> COMEBin1[COMEBIN]
-    MetaBAT1 --> Combine1[Combine All Bins]
-    SemiBin1 --> Combine1
-    COMEBin1 --> Combine1
-    Combine1 --> MetaWRAP1[METAWRAP<br/>Bin Refinement]
-    MetaWRAP1 --> CheckM1[CHECKM2<br/>Quality Assessment]
-    MetaWRAP1 --> GTDBTK1[GTDB-TK<br/>Taxonomic Classification]
-    CheckM1 --> Report1[BIN_QUALITY_REPORT]
-    GTDBTK1 --> Report2[BIN_TAX_REPORT]
+    CalcDepth --> Depth["Depth Files<br/>[meta, contigs, depth]"]
+    Input --> BinInput["BAM Input for Binners<br/>[meta, contigs, bam]"]
     
-    Mode -->|coassembly| CoAssemblyBin[Co-Assembly Binning]
-    CoAssemblyBin --> Depth2[CALCULATE_DEPTH]
-    Depth2 --> MetaBAT2[METABAT2]
-    Input --> SemiBin2[SEMIBIN]
-    Input --> COMEBin2[COMEBIN]
-    MetaBAT2 --> Combine2[Combine All Bins]
-    SemiBin2 --> Combine2
-    COMEBin2 --> Combine2
-    Combine2 --> MetaWRAP2[METAWRAP<br/>Bin Refinement]
-    MetaWRAP2 --> CheckM2[CHECKM2<br/>Quality Assessment]
-    MetaWRAP2 --> GTDBTK2[GTDB-TK<br/>Taxonomic Classification]
-    MetaWRAP2 --> BinDepth[BOWTIE2_SAMTOOLS_DEPTH<br/>Calculate Bin Coverage]
-    BinDepth --> Bedtools[BEDTOOLS<br/>Coverage Statistics]
-    Bedtools --> Summary[BIN_SUMMARY]
-    CheckM2 --> Summary
-    GTDBTK2 --> Summary
+    %% Parallel binning
+    Depth --> MetaBAT[METABAT2<br/>Coverage-based Binning]
+    BinInput --> SemiBin[SEMIBIN<br/>Semi-supervised Binning]
+    BinInput --> COMEBin[COMEBIN<br/>Contrastive Learning Binning]
+    
+    %% Combine bins
+    MetaBAT --> Combine[Combine All Bins<br/>Join by meta]
+    SemiBin --> Combine
+    COMEBin --> Combine
+    
+    %% Refinement
+    Combine --> MetaWRAP[METAWRAP<br/>Bin Refinement & Consolidation]
+    
+    %% Quality and Taxonomy
+    MetaWRAP --> QualTax{Quality &<br/>Taxonomy}
+    Combine --> QualTax
+    QualTax --> CheckM[CHECKM2<br/>Completeness & Contamination]
+    QualTax --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
+    
+    %% Mode-specific reporting
+    CheckM --> ModeCheck{Assembly<br/>Mode?}
+    GTDBTK --> ModeCheck
+    
+    ModeCheck -->|assembly| AssemblyReports[Per-Sample Reports]
+    AssemblyReports --> QualReport[BIN_QUALITY_REPORT]
+    AssemblyReports --> TaxReport[BIN_TAX_REPORT]
+    
+    ModeCheck -->|coassembly| CoassemblyReports[Co-assembly Reports]
+    CoassemblyReports --> BinCov[BOWTIE2_SAMTOOLS_DEPTH<br/>Calculate Bin Coverage]
+    BinCov --> Bedtools[BEDTOOLS<br/>Coverage Statistics]
+    Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
+    CheckM --> Summary
+    GTDBTK --> Summary
+    
+    %% Output
+    MetaWRAP --> Output["Output: refined_bins<br/>[meta, bins]"]
 ```
 
+**Key Features:**
+- **Unified workflow**: Single implementation handles both assembly and co-assembly modes
+- **Parallel binning**: Three binners run simultaneously for better bin recovery
+- **Mode-agnostic processing**: Same binning pipeline regardless of assembly mode
+- **Mode-specific reporting**: 
+  - Assembly mode: Simple quality and taxonomy reports
+  - Co-assembly mode: Additional bin coverage analysis and comprehensive summary
+
+**Inputs:**
+- `contigs_and_bam`: `[meta, contigs, bam]` - Contigs with aligned reads
+- `checkm2_db`: CheckM2 database path
+- `gtdbtk_db`: GTDB-Tk database path
+- `reads`: `[meta, reads]` - Original reads (for co-assembly bin coverage only)
+
 **Outputs:**
-- `refined_bins`: High-quality refined bins with quality and taxonomy annotations
+- `refined_bins`: `[meta, bins]` - High-quality refined bins with quality and taxonomy annotations
+- `versions`: Tool version information
 
 ---
 

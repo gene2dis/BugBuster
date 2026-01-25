@@ -55,7 +55,7 @@ process GTDB_TK {
     set -euo pipefail
     
     # Check if bins directory contains actual genome files
-    bin_count=\$(find ${metawrap} -maxdepth 1 -name "*.fa" -o -name "*.fasta" -o -name "*.fna" | wc -l)
+    bin_count=\$(find -L ${metawrap} -maxdepth 1 -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
     
     if [ "\$bin_count" -eq 0 ]; then
         echo "WARNING: No genome bins found in ${metawrap}. Skipping GTDB-Tk classification."

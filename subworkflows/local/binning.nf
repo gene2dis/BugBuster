@@ -83,9 +83,14 @@ workflow BINNING {
     ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
 
     // Quality assessment with CheckM2
-    ch_checkm = CHECKM2(
-        ch_all_bins.join(ch_metawrap.bins).combine(checkm2_db)
-    )
+    // CheckM2 expects: tuple val(meta), path(metabat2), path(semibin), path(comebin), path(metawrap), path(checkm_db)
+    ch_checkm_input = ch_metabat2.bins
+        .join(ch_semibin.bins)
+        .join(ch_comebin.bins)
+        .join(ch_metawrap.bins)
+        .combine(checkm2_db)
+    
+    ch_checkm = CHECKM2(ch_checkm_input)
     ch_versions = ch_versions.mix(CHECKM2.out.versions.first())
 
     // Taxonomic classification with GTDB-TK
