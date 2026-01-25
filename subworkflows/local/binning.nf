@@ -36,8 +36,8 @@ include { METABAT2                   } from '../../modules/local/metabat2/main'
 include { SEMIBIN                    } from '../../modules/local/semibin/main'
 include { COMEBIN                    } from '../../modules/local/comebin/main'
 include { METAWRAP                   } from '../../modules/local/metawrap/main'
-include { CHECKM2                    } from '../../modules/local/checkm2/main'
-include { GTDB_TK                    } from '../../modules/local/gtdb-tk/main'
+include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/main'
+include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
 include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
 include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
@@ -82,28 +82,129 @@ workflow BINNING {
     ch_refined_bins = ch_metawrap.bins
     ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
 
-    // Quality assessment with CheckM2
-    // CheckM2 expects: tuple val(meta), path(metabat2), path(semibin), path(comebin), path(metawrap), path(checkm_db)
-    ch_checkm_input = ch_metabat2.bins
+    // Collect all bins for batched processing
+    // Combine bins from all binners for each sample
+    ch_all_sample_bins = ch_metabat2.bins
         .join(ch_semibin.bins)
         .join(ch_comebin.bins)
         .join(ch_metawrap.bins)
-        .combine(checkm2_db)
+        .map { meta, metabat, semibin, comebin, metawrap ->
+            // Stage bins with sample-specific directories
+            [
+                meta,
+                metabat, semibin, comebin, metawrap
+            ]
+        }
+        .collect()
+        .map { items ->
+            // Extract metadata list and organize bins by sample and binner
+            def meta_list = items.collect { item -> item[0] }
+            def all_bins = []
+            
+            items.each { item ->
+                def meta = item[0]
+                def metabat = item[1]
+                def semibin = item[2]
+                def comebin = item[3]
+                def metawrap = item[4]
+                
+                // Add bins with sample-specific staging paths
+                all_bins.add(["${meta.id}_metabat", metabat])
+                all_bins.add(["${meta.id}_semibin", semibin])
+                all_bins.add(["${meta.id}_comebin", comebin])
+                all_bins.add(["${meta.id}_metawrap", metawrap])
+            }
+            
+            [meta_list, all_bins.collect { bin_tuple -> bin_tuple[1] }]
+        }
     
-    ch_checkm = CHECKM2(ch_checkm_input)
-    ch_versions = ch_versions.mix(CHECKM2.out.versions.first())
+    // Batched quality assessment with CheckM2
+    ch_checkm_batch = CHECKM2_BATCH(ch_all_sample_bins.combine(checkm2_db))
+    ch_versions = ch_versions.mix(CHECKM2_BATCH.out.versions.first())
+    
+    // Transform batched output back to per-sample format
+    ch_checkm_all_reports = ch_checkm_batch.all_reports
+        .flatMap { meta_list, reports ->
+            // Group reports by sample
+            def sample_reports = [:]
+            reports.each { report ->
+                def sample_id = report.name.split('_')[0]
+                if (!sample_reports.containsKey(sample_id)) {
+                    sample_reports[sample_id] = []
+                }
+                sample_reports[sample_id].add(report)
+            }
+            // Emit per-sample tuples
+            sample_reports.collect { sample_id, report_list ->
+                def meta = meta_list.find { m -> m.id == sample_id }
+                [meta, report_list]
+            }
+        }
+    
+    ch_checkm_metawrap = ch_checkm_batch.metawrap_report
+        .flatMap { meta_list, reports ->
+            // Group reports by sample
+            def sample_reports = [:]
+            reports.each { report ->
+                def sample_id = report.name.split('_')[0]
+                if (!sample_reports.containsKey(sample_id)) {
+                    sample_reports[sample_id] = []
+                }
+                sample_reports[sample_id].add(report)
+            }
+            // Emit per-sample tuples
+            sample_reports.collect { sample_id, report_list ->
+                def meta = meta_list.find { m -> m.id == sample_id }
+                [meta, report_list]
+            }
+        }
 
-    // Taxonomic classification with GTDB-TK
-    ch_gtdb_tk = GTDB_TK(ch_metawrap.bins.combine(gtdbtk_db))
-    ch_versions = ch_versions.mix(GTDB_TK.out.versions.first())
+    // Collect metawrap bins for batched GTDB-Tk
+    ch_all_metawrap_bins = ch_metawrap.bins
+        .collect()
+        .map { items ->
+            def meta_list = items.collect { item -> item[0] }
+            def all_bins = []
+            
+            items.each { item ->
+                def meta = item[0]
+                def bins = item[1]
+                all_bins.add(["${meta.id}", bins])
+            }
+            
+            [meta_list, all_bins.collect { bin_tuple -> bin_tuple[1] }]
+        }
+    
+    // Batched taxonomic classification with GTDB-TK
+    ch_gtdb_tk_batch = GTDB_TK_BATCH(ch_all_metawrap_bins.combine(gtdbtk_db))
+    ch_versions = ch_versions.mix(GTDB_TK_BATCH.out.versions.first())
+    
+    // Transform batched output back to per-sample format
+    ch_gtdb_tk = ch_gtdb_tk_batch.report
+        .flatMap { meta_list, reports ->
+            // Group reports by sample
+            def sample_reports = [:]
+            reports.each { report ->
+                def sample_id = report.name.split('_')[0]
+                if (!sample_reports.containsKey(sample_id)) {
+                    sample_reports[sample_id] = []
+                }
+                sample_reports[sample_id].add(report)
+            }
+            // Emit per-sample tuples
+            sample_reports.collect { sample_id, report_list ->
+                def meta = meta_list.find { m -> m.id == sample_id }
+                [meta, report_list]
+            }
+        }
 
     //
     // Generate reports - mode-specific handling
     //
     if ( params.assembly_mode == "assembly" ) {
         // Per-sample mode: simple quality and taxonomy reports
-        BIN_QUALITY_REPORT(ch_checkm.all_reports.map { _meta, reports -> reports }.collect())
-        BIN_TAX_REPORT(ch_gtdb_tk.report.map { _meta, reports -> reports }.collect())
+        BIN_QUALITY_REPORT(ch_checkm_all_reports.map { _meta, reports -> reports }.collect())
+        BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
         ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(
@@ -113,8 +214,8 @@ workflow BINNING {
 
         BIN_SUMMARY(
             ch_bin_cov.collect()
-                .combine(ch_gtdb_tk.report.map { _meta, reports -> reports }.collect())
-                .combine(ch_checkm.metawrap_report.map { _meta, reports -> reports }.collect())
+                .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
+                .combine(ch_checkm_metawrap.map { _meta, reports -> reports }.collect())
         )
     }
 
