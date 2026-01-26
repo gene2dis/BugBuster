@@ -28,26 +28,27 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 2. Remove all samples that not have at least 10.000.000 reads after quality filter. **Can be modified by the user**
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
-5. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
-6. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
-7. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
-8. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
-9. Read traceback and taxonomic reports.
-10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
-11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
-13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-14. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
-15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
-16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-17. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`COMEBin`](https://github.com/ziyewang/COMEBin)
-18. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
-19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
-20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-21. Bin reports.
-22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-23. If requested ARG clustering **(work in progress)** [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Assembly modes: "coassembly", "assembly", "none"
+5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
+6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+7. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
+8. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
+9. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
+10. Read traceback and taxonomic reports.
+11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+12. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+13. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+14. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+15. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
+16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+18. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`COMEBin`](https://github.com/ziyewang/COMEBin)
+19. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+22. Bin reports.
+23. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+24. If requested ARG clustering **(work in progress)** [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -132,6 +133,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
+| **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
 | **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
 
@@ -146,6 +148,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
 - **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
 - **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
+- **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 
@@ -185,6 +188,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
@@ -236,6 +240,11 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--deeparg_arg_alignment_identity` | `50` | Minimum alignment identity (%) |
 | `--deeparg_arg_alignment_evalue` | `1e-10` | Maximum E-value |
 | `--deeparg_model_version` | `v2` | DeepARG model version |
+| `--rgi_card_version` | `latest` | CARD database version |
+| `--rgi_include_wildcard` | `true` | Include WildCARD variants |
+| `--rgi_aligner` | `kma` | RGI aligner: kma, bowtie2, bwa |
+| `--rgi_kmer_size` | `61` | K-mer size for pathogen prediction |
+| `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage |
 
 ### Resource Limits
 
@@ -278,7 +287,12 @@ results/
 │   ├── quality/summary/        # Aggregated quality reports
 │   └── taxonomy/summary/       # Aggregated taxonomy reports
 ├── 05_arg_prediction/          # ARG predictions
-│   ├── read_level/             # KARGA/KARGVA (if read_arg_prediction=true)
+│   ├── read_level/             # Read-level predictions
+│   │   ├── karga/              # KARGA results (if read_arg_prediction=true)
+│   │   ├── kargva/             # KARGVA results (if read_arg_prediction=true)
+│   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
+│   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
+│   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
 │   ├── contig_level/           # DeepARG (if contig_tax_and_arg=true)
 │   └── bin_level/              # Bin ARG clustering (if arg_bin_clustering=true)
 ├── 06_contig_taxonomy/         # BlobTools plots (if contig_tax_and_arg=true)

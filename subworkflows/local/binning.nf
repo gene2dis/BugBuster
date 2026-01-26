@@ -95,27 +95,27 @@ workflow BINNING {
                 metabat, semibin, comebin, metawrap
             ]
         }
-        .collect()
+        .toList()
         .map { items ->
-            // Extract metadata list and organize bins by sample and binner
-            def meta_list = items.collect { item -> item[0] }
-            def all_bins = []
+            // items is a list of [meta, metabat, semibin, comebin, metawrap] tuples
+            // Simplified: just collect meta_list and all non-null bin paths
+            def meta_list = []
+            def all_paths = []
             
             items.each { item ->
-                def meta = item[0]
-                def metabat = item[1]
-                def semibin = item[2]
-                def comebin = item[3]
-                def metawrap = item[4]
-                
-                // Add bins with sample-specific staging paths
-                all_bins.add(["${meta.id}_metabat", metabat])
-                all_bins.add(["${meta.id}_semibin", semibin])
-                all_bins.add(["${meta.id}_comebin", comebin])
-                all_bins.add(["${meta.id}_metawrap", metawrap])
+                if (item != null && item[0] != null) {
+                    def meta = item[0]
+                    meta_list.add(meta)
+                    
+                    // Add all non-null bin paths - directory names contain sample_id and binner info
+                    if (item[1] != null) all_paths.add(item[1])  // metabat
+                    if (item[2] != null) all_paths.add(item[2])  // semibin
+                    if (item[3] != null) all_paths.add(item[3])  // comebin
+                    if (item[4] != null) all_paths.add(item[4])  // metawrap
+                }
             }
             
-            [meta_list, all_bins.collect { bin_tuple -> bin_tuple[1] }]
+            [meta_list.unique(), all_paths]
         }
     
     // Batched quality assessment with CheckM2
@@ -128,7 +128,12 @@ workflow BINNING {
             // Group reports by sample
             def sample_reports = [:]
             reports.each { report ->
-                def sample_id = report.name.split('_')[0]
+                // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                def filename = report.name
+                def parts = filename.tokenize('_')
+                def binnerIdx = parts.findIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
+                
                 if (!sample_reports.containsKey(sample_id)) {
                     sample_reports[sample_id] = []
                 }
@@ -136,9 +141,16 @@ workflow BINNING {
             }
             // Emit per-sample tuples
             sample_reports.collect { sample_id, report_list ->
-                def meta = meta_list.find { m -> m.id == sample_id }
+                def meta = meta_list.find { m -> 
+                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                    mid == sample_id
+                }
+                if (meta == null) {
+                    log.warn "CheckM2: Could not find meta for sample_id: ${sample_id}"
+                    return null
+                }
                 [meta, report_list]
-            }
+            }.findAll { it -> it != null }
         }
     
     ch_checkm_metawrap = ch_checkm_batch.metawrap_report
@@ -146,7 +158,12 @@ workflow BINNING {
             // Group reports by sample
             def sample_reports = [:]
             reports.each { report ->
-                def sample_id = report.name.split('_')[0]
+                // Extract sample_id from filename: S10_Ago2021_metawrap_quality_report.tsv -> S10_Ago2021
+                def filename = report.name
+                def parts = filename.tokenize('_')
+                def binnerIdx = parts.findIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
+                
                 if (!sample_reports.containsKey(sample_id)) {
                     sample_reports[sample_id] = []
                 }
@@ -154,25 +171,29 @@ workflow BINNING {
             }
             // Emit per-sample tuples
             sample_reports.collect { sample_id, report_list ->
-                def meta = meta_list.find { m -> m.id == sample_id }
+                def meta = meta_list.find { m -> 
+                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                    mid == sample_id
+                }
+                if (meta == null) {
+                    log.warn "CheckM2 metawrap: Could not find meta for sample_id: ${sample_id}"
+                    return null
+                }
                 [meta, report_list]
-            }
+            }.findAll { it -> it != null }
         }
-
+    
     // Collect metawrap bins for batched GTDB-Tk
     ch_all_metawrap_bins = ch_metawrap.bins
-        .collect()
+        .filter { _meta, bins -> bins != null }  // Filter out null bins
+        .toList()
         .map { items ->
+            // items is a list of [meta, bins] tuples
+            // Simplified: just collect meta_list and all bin paths
             def meta_list = items.collect { item -> item[0] }
-            def all_bins = []
+            def all_paths = items.collect { item -> item[1] }
             
-            items.each { item ->
-                def meta = item[0]
-                def bins = item[1]
-                all_bins.add(["${meta.id}", bins])
-            }
-            
-            [meta_list, all_bins.collect { bin_tuple -> bin_tuple[1] }]
+            [meta_list, all_paths]
         }
     
     // Batched taxonomic classification with GTDB-TK
@@ -185,7 +206,12 @@ workflow BINNING {
             // Group reports by sample
             def sample_reports = [:]
             reports.each { report ->
-                def sample_id = report.name.split('_')[0]
+                // Extract sample_id from filename: S10_Ago2021_gtdbtk_bac120.tsv -> S10_Ago2021
+                def filename = report.name
+                def parts = filename.tokenize('_')
+                def gtdbIdx = parts.findIndexOf { part -> part == 'gtdbtk' }
+                def sample_id = gtdbIdx > 0 ? parts[0..<gtdbIdx].join('_') : parts[0]
+                
                 if (!sample_reports.containsKey(sample_id)) {
                     sample_reports[sample_id] = []
                 }
@@ -193,9 +219,16 @@ workflow BINNING {
             }
             // Emit per-sample tuples
             sample_reports.collect { sample_id, report_list ->
-                def meta = meta_list.find { m -> m.id == sample_id }
+                def meta = meta_list.find { m -> 
+                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                    mid == sample_id
+                }
+                if (meta == null) {
+                    log.warn "GTDB-Tk: Could not find meta for sample_id: ${sample_id}"
+                    return null
+                }
                 [meta, report_list]
-            }
+            }.findAll { it -> it != null }
         }
 
     //

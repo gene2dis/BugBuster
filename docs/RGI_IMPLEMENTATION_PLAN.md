@@ -48,11 +48,12 @@ modules/local/
 
 **Module**: `modules/local/rgi_load/main.nf`
 
-**Purpose**: Download and prepare CARD databases for RGI analysis
+**Purpose**: Download and prepare CARD databases for RGI analysis, or use existing pre-prepared databases
 
 **Inputs**:
 - Database version parameters (from config)
 - Include WildCARD flag
+- Optional: Path to existing CARD database directory
 
 **Process Steps**:
 1. Download CARD JSON database
@@ -76,9 +77,275 @@ params {
     rgi_kmer_size          = 61        // K-mer size for pathogen prediction
     
     // Custom database paths (override auto-download)
-    custom_rgi_card_json   = null
-    custom_rgi_wildcard    = null
+    custom_rgi_card_db     = null      // Path to pre-prepared CARD database directory
+    custom_rgi_card_json   = null      // Path to CARD JSON file (for manual preparation)
+    custom_rgi_wildcard    = null      // Path to WildCARD directory
 }
+```
+
+#### Using an Existing CARD Database
+
+If you have already prepared a CARD database (e.g., from a previous RGI installation or shared resource), you can skip the automatic download and preparation by specifying the database path:
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --rgi_prediction true \
+    --custom_rgi_card_db /path/to/existing/card_database \
+    -profile docker
+```
+
+**Requirements for existing database**:
+- Must contain RGI-loaded CARD data (created with `rgi load`)
+- Must have KMA indices built (files: `*.comp.b`, `*.length.b`, `*.name`, `*.seq.b`, `*.index.b`)
+- Should be located in a persistent directory (not temporary storage)
+- If using WildCARD, must include wildcard annotations
+
+**Database directory structure**:
+```
+card_database/
+├── card.json                           # CARD JSON database
+├── card_database_v*.fasta              # Annotated CARD sequences
+├── card_database_v*.fasta.comp.b       # KMA index files
+├── card_database_v*.fasta.length.b
+├── card_database_v*.fasta.name
+├── card_database_v*.fasta.seq.b
+├── card_database_v*.fasta.index.b
+├── wildcard_database_v*.fasta          # WildCARD sequences (optional)
+├── wildcard_database_v*.fasta.comp.b   # WildCARD KMA indices (optional)
+└── ...
+```
+
+#### Manual CARD Database Download and Preparation
+
+If you prefer to manually download and prepare the CARD database (e.g., for use across multiple projects or on systems without internet access during pipeline execution), follow these detailed instructions:
+
+##### Step 1: Install RGI
+
+First, ensure RGI is installed. Using conda/mamba (recommended):
+
+```bash
+# Create RGI environment
+mamba create -n rgi -c conda-forge -c bioconda -c defaults rgi
+
+# Activate environment
+conda activate rgi
+
+# Verify installation
+rgi --version
+```
+
+Or using Docker:
+
+```bash
+# Pull RGI container
+docker pull quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0
+
+# Test RGI
+docker run quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0 rgi --version
+```
+
+##### Step 2: Download CARD Database
+
+Create a directory for CARD databases and download the latest data:
+
+```bash
+# Create database directory
+mkdir -p /path/to/databases/rgi
+cd /path/to/databases/rgi
+
+# Download CARD JSON database (latest version)
+wget https://card.mcmaster.ca/latest/data
+tar -xvf data ./card.json
+
+# Check CARD version
+grep '"version"' card.json | head -1
+```
+
+**Alternative**: Download specific CARD version:
+
+```bash
+# For a specific version (e.g., 3.2.9)
+wget https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2
+tar -xjf broadstreet-v3.2.9.tar.bz2
+```
+
+##### Step 3: Prepare CARD for Protein Homolog Models Only
+
+This is the recommended approach for most metagenomic analyses (excludes variant/mutation models):
+
+```bash
+# Clean any previous RGI data
+rgi clean --local
+
+# Load CARD JSON
+rgi load --card_json card.json --local
+
+# Create annotated reference sequences
+rgi card_annotation -i card.json > card_annotation.log 2>&1
+
+# Load annotated sequences (note: filename depends on CARD version)
+# Check the actual filename created:
+ls -lh card_database_v*.fasta
+
+# Load with correct filename (example for v3.2.9)
+rgi load -i card.json \
+    --card_annotation card_database_v3.2.9.fasta \
+    --local
+
+# Verify database is loaded
+rgi database --version --local
+```
+
+##### Step 4: Download and Prepare WildCARD (Optional but Recommended)
+
+WildCARD provides extended allelic diversity from hundreds of pathogens:
+
+```bash
+# Download WildCARD variants
+wget -O wildcard_data.tar.bz2 https://card.mcmaster.ca/latest/variants
+
+# Extract to wildcard directory
+mkdir -p wildcard
+tar -xjf wildcard_data.tar.bz2 -C wildcard
+
+# Decompress all files
+gunzip wildcard/*.gz
+
+# Check WildCARD version
+ls wildcard/index-for-model-sequences.txt
+```
+
+**Prepare WildCARD annotations**:
+
+```bash
+# Get CARD version number from card.json
+CARD_VERSION=$(grep '"version"' card.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+
+# Run wildcard annotation (this may take 30-60 minutes)
+rgi wildcard_annotation \
+    -i wildcard \
+    --card_json card.json \
+    -v ${CARD_VERSION} \
+    > wildcard_annotation.log 2>&1
+
+# Check created files
+ls -lh wildcard_database_v*.fasta
+
+# Load WildCARD data (example for v3.2.9)
+rgi load \
+    --card_json card.json \
+    --wildcard_annotation wildcard_database_v3.2.9.fasta \
+    --wildcard_index wildcard/index-for-model-sequences.txt \
+    --card_annotation card_database_v3.2.9.fasta \
+    --local
+
+# Verify both databases are loaded
+rgi database --version --local
+```
+
+##### Step 5: Build KMA Indices
+
+RGI bwt requires KMA indices for read alignment:
+
+```bash
+# KMA indices are automatically built by RGI when you run rgi bwt
+# However, you can verify they exist after first use:
+ls -lh localDB/*.{comp.b,length.b,name,seq.b,index.b}
+```
+
+##### Step 6: Verify Database Preparation
+
+Test the database with a small dataset:
+
+```bash
+# Test RGI bwt (requires test FASTQ files)
+rgi bwt \
+    --read_one test_R1.fastq.gz \
+    --read_two test_R2.fastq.gz \
+    --output_file test_output \
+    --local \
+    --threads 4
+
+# Check output files
+ls -lh test_output*
+
+# If using WildCARD, test with wildcard flag
+rgi bwt \
+    --read_one test_R1.fastq.gz \
+    --read_two test_R2.fastq.gz \
+    --output_file test_wildcard_output \
+    --local \
+    --include_wildcard \
+    --threads 4
+```
+
+##### Step 7: Use Prepared Database in BugBuster
+
+Once prepared, specify the database directory in your pipeline run:
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --rgi_prediction true \
+    --custom_rgi_card_db /path/to/databases/rgi \
+    -profile docker
+```
+
+##### Database Size and Storage Requirements
+
+- **CARD only**: ~500 MB
+- **CARD + WildCARD**: ~20-50 GB (depends on version)
+- **Temporary space during preparation**: ~100 GB
+- **Recommended**: Use persistent storage, not temporary directories
+
+##### Troubleshooting Database Preparation
+
+**Issue**: `rgi load` fails with "database already loaded"
+```bash
+# Solution: Clean and reload
+rgi clean --local
+rgi load --card_json card.json --local
+```
+
+**Issue**: KMA indices not found
+```bash
+# Solution: Indices are built on first rgi bwt run
+# Ensure RGI has write permissions to the database directory
+chmod -R u+w /path/to/databases/rgi
+```
+
+**Issue**: WildCARD annotation takes too long
+```bash
+# Solution: Use multiple cores if available
+# WildCARD processing is CPU-intensive but single-threaded
+# Consider running on a compute node with good CPU
+```
+
+**Issue**: Version mismatch between CARD and WildCARD
+```bash
+# Solution: Ensure both are from the same CARD release
+# Check versions:
+grep '"version"' card.json
+grep "version" wildcard/index-for-model-sequences.txt
+```
+
+##### Updating CARD Database
+
+To update to a newer CARD version:
+
+```bash
+# Clean old database
+rgi clean --local
+
+# Download new version
+wget https://card.mcmaster.ca/latest/data
+tar -xvf data ./card.json
+
+# Repeat preparation steps 3-5
+# Update --custom_rgi_card_db path if needed
 ```
 
 ### RGI BWT Module (Read Alignment)
