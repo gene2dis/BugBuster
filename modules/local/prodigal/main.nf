@@ -16,7 +16,7 @@ process PRODIGAL_BINS {
         #!/bin/bash
         set -euo pipefail
 
-        cp -rL ${metawrap} tmp_bins
+        cp -r ${metawrap} tmp_bins
         cd tmp_bins
 
         mkdir ${prefix}_bins_genes

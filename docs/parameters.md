@@ -85,6 +85,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA
 - **Example**: `--read_arg_prediction true`
 
+### `--rgi_prediction`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Enable AMR gene prediction with pathogen-of-origin analysis using RGI and CARD database
+- **Example**: `--rgi_prediction true`
+- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for manual database preparation
+
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
@@ -223,6 +230,19 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (file path)
 - **Description**: Path to custom KARGVA database FASTA file
 - **Example**: `--custom_kargva_db /path/to/kargva.fasta`
+
+### `--custom_rgi_card_db`
+- **Type**: String (directory path)
+- **Description**: Path to pre-prepared CARD database directory for RGI (must contain RGI-loaded data and KMA indices)
+- **Example**: `--custom_rgi_card_db /path/to/card_database`
+- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for database preparation instructions
+
+### `--custom_rgi_wildcard`
+- **Type**: String (directory path)
+- **Description**: Path to WildCARD directory containing variant files. Use together with `--custom_rgi_card_db` to combine separate databases
+- **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
+- **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
+- **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
 
 ---
 
@@ -469,6 +489,37 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `v1`, `v2`
 - **Description**: DeepARG model version
 - **Example**: `--deeparg_model_version v2`
+
+### `--rgi_card_version`
+- **Type**: String
+- **Default**: `latest`
+- **Description**: CARD database version for RGI. Use 'latest' or specify a version number
+- **Example**: `--rgi_card_version latest` or `--rgi_card_version 3.2.9`
+
+### `--rgi_include_wildcard`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Include WildCARD variants for extended allelic diversity (recommended for environmental samples)
+- **Example**: `--rgi_include_wildcard true`
+
+### `--rgi_aligner`
+- **Type**: String
+- **Default**: `kma`
+- **Options**: `kma`, `bowtie2`, `bwa`
+- **Description**: Read aligner for RGI bwt. KMA is recommended for optimal performance with CARD
+- **Example**: `--rgi_aligner kma`
+
+### `--rgi_kmer_size`
+- **Type**: Integer
+- **Default**: `61`
+- **Description**: K-mer size for pathogen-of-origin prediction
+- **Example**: `--rgi_kmer_size 61`
+
+### `--rgi_min_kmer_coverage`
+- **Type**: Integer
+- **Default**: `10`
+- **Description**: Minimum k-mer coverage threshold for pathogen prediction
+- **Example**: `--rgi_min_kmer_coverage 10`
 
 ---
 

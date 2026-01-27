@@ -60,6 +60,7 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
+      --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
@@ -132,6 +133,7 @@ log.info "  Assembly mode        : ${params.assembly_mode}"
 log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
 log.info "  Include binning      : ${params.include_binning}"
 log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
+log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
 log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
 log.info ""
 
@@ -169,6 +171,11 @@ include { KARGVA           } from './modules/local/kargva/main'
 include { KARGA            } from './modules/local/karga/main'
 include { ARGS_OAP         } from './modules/local/args_oap/main'
 include { ARG_NORM_REPORT  } from './modules/local/arg_norm_report/main'
+
+	// RGI AMR PREDICTION
+include { RGI_BWT          } from './modules/local/rgi_bwt/main'
+include { RGI_KMER         } from './modules/local/rgi_kmer/main'
+include { RGI_REPORT       } from './modules/local/rgi_report/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
 include { DEEPARG_BINS             } from './modules/local/deeparg/main'
@@ -209,6 +216,8 @@ workflow {
         PREPARE_DATABASES.out.host_index
     )
     
+    // In DSL2, process outputs can be referenced multiple times
+    // No need to split channels - just use QC.out.reads directly in each consumer
     ch_clean_reads           = QC.out.reads
     ch_clean_reads_coassembly = QC.out.reads_coassembly
     ch_reads_report          = QC.out.report
@@ -237,6 +246,33 @@ workflow {
                 .concat(ch_argv_prediction.kargva_reports)
                 .concat(ch_args_oap)
                 .collect()
+        )
+    }
+
+    //
+    // RGI AMR PREDICTION IN READS
+    //
+    if ( params.rgi_prediction ) {
+        // Store rgi_card_db to allow reuse
+        ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
+        
+        // RGI bwt: Align reads to CARD AMR alleles
+        ch_rgi_bwt = RGI_BWT(
+            ch_clean_reads,
+            ch_rgi_db.collect()
+        )
+        
+        // RGI kmer: Pathogen-of-origin prediction
+        ch_rgi_kmer = RGI_KMER(
+            ch_rgi_bwt.bam,
+            ch_rgi_db.collect()
+        )
+        
+        // Generate summary report
+        RGI_REPORT(
+            ch_rgi_bwt.allele_mapping.map { meta, file -> file }.collect(),
+            ch_rgi_bwt.gene_mapping.map { meta, file -> file }.collect(),
+            ch_rgi_kmer.kmer_json.map { meta, file -> file }.collect()
         )
     }
 

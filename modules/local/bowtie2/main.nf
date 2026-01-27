@@ -22,9 +22,9 @@ process BOWTIE2 {
     val db_alias
 
     output:
-    tuple val(meta), path("*map*fastq.gz"), emit: reads
+    tuple val(meta), path("${meta.id}_R*_map_*.fastq.gz"), emit: reads
     path("*_bowtie_report.tsv")           , emit: report
-    path("*map*fastq.gz")                 , emit: reads_coassembly
+    path("${meta.id}_*_map_*.fastq.gz")   , emit: reads_coassembly
     path "versions.yml"                   , emit: versions
 
     when:

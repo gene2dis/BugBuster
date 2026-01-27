@@ -69,9 +69,9 @@ process METAWRAP {
         fi
     fi
     
-    # Copy SemiBin and COMEBin bins
-    cp -rL ${semibin_bins}/* semibin_wp_bins/ 2>/dev/null || true
-    cp -rL ${comebin_bins}/* comebin_wp_bins/ 2>/dev/null || true
+    # Copy SemiBin and COMEBin bins (avoid dereferencing to prevent infinite loops)
+    cp -r ${semibin_bins}/* semibin_wp_bins/ 2>/dev/null || true
+    cp -r ${comebin_bins}/* comebin_wp_bins/ 2>/dev/null || true
     
     # Count total bins across all binners
     total_bins=\$(find metabat_wp_bins semibin_wp_bins comebin_wp_bins -type f \\( -name "*.fa" -o -name "*.fasta" \\) 2>/dev/null | wc -l)
