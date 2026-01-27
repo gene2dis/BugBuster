@@ -17,7 +17,7 @@ process DEEPARG_BINS {
         def prefix = "${meta.id}"
 
         """
-        cp -rL ${prodigal_bins} tmp_bins
+        cp -r ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
         

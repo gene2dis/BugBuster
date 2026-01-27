@@ -17,9 +17,9 @@ process METAWRAP {
 
         """
 	echo ${metawrap_db} | checkm data setRoot ${metawrap_db}
-        cp -rL ${metabat2_bins} metabat_wp_bins
-	cp -rL ${semibin_bins} semibin_wp_bins
-        cp -rL ${comebin_bins} comebin_wp_bins
+        cp -r ${metabat2_bins} metabat_wp_bins
+	cp -r ${semibin_bins} semibin_wp_bins
+        cp -r ${comebin_bins} comebin_wp_bins
 	metawrap bin_refinement \\
 		-o Refined_bins \\
 		-t $task.cpus \\
@@ -55,9 +55,9 @@ process METAWRAP_COASSEMBLY {
 
         """
 	echo ${metawrap_db} | checkm data setRoot ${metawrap_db}
-        cp -rL ${bins[0]} metabat_wp_bins
-	cp -rL ${bins[1]} semibin_wp_bins
-        cp -rL ${bins[2]} autometa_wp_bins
+        cp -r ${bins[0]} metabat_wp_bins
+	cp -r ${bins[1]} semibin_wp_bins
+        cp -r ${bins[2]} autometa_wp_bins
 	metawrap bin_refinement \\
 		-o Refined_bins \\
 		-t $task.cpus \\

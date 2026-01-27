@@ -216,6 +216,8 @@ workflow {
         PREPARE_DATABASES.out.host_index
     )
     
+    // In DSL2, process outputs can be referenced multiple times
+    // No need to split channels - just use QC.out.reads directly in each consumer
     ch_clean_reads           = QC.out.reads
     ch_clean_reads_coassembly = QC.out.reads_coassembly
     ch_reads_report          = QC.out.report
@@ -251,16 +253,19 @@ workflow {
     // RGI AMR PREDICTION IN READS
     //
     if ( params.rgi_prediction ) {
+        // Store rgi_card_db to allow reuse
+        ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
+        
         // RGI bwt: Align reads to CARD AMR alleles
         ch_rgi_bwt = RGI_BWT(
             ch_clean_reads,
-            PREPARE_DATABASES.out.rgi_card_db
+            ch_rgi_db.collect()
         )
         
         // RGI kmer: Pathogen-of-origin prediction
         ch_rgi_kmer = RGI_KMER(
             ch_rgi_bwt.bam,
-            PREPARE_DATABASES.out.rgi_card_db
+            ch_rgi_db.collect()
         )
         
         // Generate summary report

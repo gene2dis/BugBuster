@@ -16,6 +16,12 @@ process RGI_LOAD {
 
     script:
         """
+        set +u
+        if [ -f /usr/local/env-execute ]; then
+            source /usr/local/env-execute
+        fi
+        set -u
+
         mkdir -p card_db
         cd card_db
 

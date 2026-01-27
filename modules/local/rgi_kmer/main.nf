@@ -26,18 +26,26 @@ process RGI_KMER {
         def minimum = params.rgi_min_kmer_coverage ?: 10
         
         """
+        set +u
+        if [ -f /usr/local/env-execute ]; then
+            source /usr/local/env-execute
+        fi
+        set -u
+
         # Copy database to local directory for RGI access
         cp -r ${card_db} rgi_db
-        export RGI_DATA=\$(pwd)/rgi_db
+        
+        # RGI --local flag looks for localDB/ in current directory
+        ln -s rgi_db/localDB localDB
         
         # Run RGI kmer_query for pathogen-of-origin prediction
         rgi kmer_query \\
             --bwt \\
-            --rgi_bwt_bam ${bam} \\
-            --kmer_size ${kmer_size} \\
-            --threads ${task.cpus} \\
-            --minimum ${minimum} \\
-            --output ${prefix}_rgi_kmer \\
+            -i ${bam} \\
+            -k ${kmer_size} \\
+            -n ${task.cpus} \\
+            -m ${minimum} \\
+            -o ${prefix}_rgi_kmer \\
             --local \\
             ${args}
 
@@ -52,7 +60,7 @@ process RGI_KMER {
         # Create versions file
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | grep -oP 'rgi \\K[0-9.]+' || echo "unknown")
+            rgi: \$(rgi --version 2>&1 | sed -n 's/.*rgi \\([0-9.]*\\).*/\\1/p' || echo "unknown")
         END_VERSIONS
         """
 

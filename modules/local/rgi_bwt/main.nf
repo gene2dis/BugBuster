@@ -32,9 +32,17 @@ process RGI_BWT {
         def read_two = reads.size() > 1 ? reads[1] : ''
         
         """
+        set +u
+        if [ -f /usr/local/env-execute ]; then
+            source /usr/local/env-execute
+        fi
+        set -u
+
         # Copy database to local directory for RGI access
         cp -r ${card_db} rgi_db
-        export RGI_DATA=\$(pwd)/rgi_db
+        
+        # RGI --local flag looks for localDB/ in current directory
+        ln -s rgi_db/localDB localDB
         
         # Run RGI bwt
         rgi bwt \\
@@ -56,7 +64,7 @@ process RGI_BWT {
         # Create versions file
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | grep -oP 'rgi \\K[0-9.]+' || echo "unknown")
+            rgi: \$(rgi --version 2>&1 | sed -n 's/.*rgi \\([0-9.]*\\).*/\\1/p' || echo "unknown")
             ${aligner}: \$(${aligner} --version 2>&1 | head -1 || echo "unknown")
         END_VERSIONS
         """

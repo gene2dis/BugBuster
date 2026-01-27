@@ -169,7 +169,7 @@ workflow PREPARE_DATABASES {
             // Use existing CARD database and add custom WildCARD
             ch_card_base = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
             ch_wildcard = Channel.fromPath(params.custom_rgi_wildcard, checkIfExists: true)
-            ch_rgi_card_db = RGI_LOAD_WILDCARD(ch_card_base, ch_wildcard)
+            ch_rgi_card_db = RGI_LOAD_WILDCARD(ch_card_base, ch_wildcard).card_db
         } else if ( params.custom_rgi_card_db ) {
             // Use existing pre-prepared CARD database (may or may not include WildCARD)
             ch_rgi_card_db = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
@@ -178,7 +178,7 @@ workflow PREPARE_DATABASES {
             ch_rgi_card_db = RGI_LOAD(
                 params.rgi_card_version,
                 params.rgi_include_wildcard
-            )
+            ).card_db
         }
     }
 
