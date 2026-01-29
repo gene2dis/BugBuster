@@ -15,6 +15,8 @@ include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { BUILD_PHIX_BOWTIE2_INDEX } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
+include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
+include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 
 workflow PREPARE_DATABASES {
     
@@ -31,6 +33,7 @@ workflow PREPARE_DATABASES {
     ch_taxdump          = Channel.empty()
     ch_gtdbtk_db        = Channel.empty()
     ch_checkm2_db       = Channel.empty()
+    ch_rgi_card_db      = Channel.empty()
 
     //
     // Kraken2 database
@@ -158,6 +161,27 @@ workflow PREPARE_DATABASES {
         }
     }
 
+    //
+    // RGI CARD database for AMR prediction
+    //
+    if ( params.rgi_prediction ) {
+        if ( params.custom_rgi_card_db && params.custom_rgi_wildcard ) {
+            // Use existing CARD database and add custom WildCARD
+            ch_card_base = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
+            ch_wildcard = Channel.fromPath(params.custom_rgi_wildcard, checkIfExists: true)
+            ch_rgi_card_db = RGI_LOAD_WILDCARD(ch_card_base, ch_wildcard).card_db
+        } else if ( params.custom_rgi_card_db ) {
+            // Use existing pre-prepared CARD database (may or may not include WildCARD)
+            ch_rgi_card_db = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
+        } else {
+            // Download and prepare CARD database (with optional WildCARD)
+            ch_rgi_card_db = RGI_LOAD(
+                params.rgi_card_version,
+                params.rgi_include_wildcard
+            ).card_db
+        }
+    }
+
     emit:
     kraken_db   = ch_kraken_db
     sourmash_db = ch_sourmash_db
@@ -170,4 +194,5 @@ workflow PREPARE_DATABASES {
     taxdump     = ch_taxdump
     gtdbtk_db   = ch_gtdbtk_db
     checkm2_db  = ch_checkm2_db
+    rgi_card_db = ch_rgi_card_db
 }

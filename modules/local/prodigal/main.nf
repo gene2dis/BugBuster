@@ -14,32 +14,40 @@ process PRODIGAL_BINS {
 
         """
         #!/bin/bash
+        set -euo pipefail
 
-        cp -rL ${metawrap} tmp_bins
-	cd tmp_bins
+        cp -r ${metawrap} tmp_bins
+        cd tmp_bins
 
         mkdir ${prefix}_bins_genes
         mkdir ${prefix}_bins_proteins
 
-        N=$task.cpus
-        i=1
-        
-	for file in *.fa; do 
-             if (( \$i % \$N == 0 )); then
+        # Improved parallelization: run up to task.cpus jobs concurrently
+        job_count=0
+        for file in *.fa; do
+            file_name=\$(echo \$file | sed 's/.fa//g')
+            
+            # Run prodigal in background
+            (
+                prodigal -i \$file \\
+                    -o ${prefix}_\${file_name}_genes.gff \\
+                    -a ${prefix}_\${file_name}_proteins.faa \\
+                    -p single
+            ) &
+            
+            # Increment counter and wait if we've reached max concurrent jobs
+            job_count=\$((job_count + 1))
+            if [ \$((job_count % ${task.cpus})) -eq 0 ]; then
                 wait
-             fi
-             ((i++))
-
-             file_name=`echo \$file | sed 's/.fa//g'`
-             prodigal -i \$file \\
-                      -o ${prefix}_\${file_name}_genes.gff \\
-                      -a ${prefix}_\${file_name}_proteins.faa \\
-                      -p single &
-        done; wait
+            fi
+        done
+        
+        # Wait for all remaining jobs to complete
+        wait
         
         mv *_genes.gff ${prefix}_bins_genes
         mv *_proteins.faa ${prefix}_bins_proteins
-	cd ..
+        cd ..
         mv tmp_bins/${prefix}_bins_genes/ .
         mv tmp_bins/${prefix}_bins_proteins/ .
 

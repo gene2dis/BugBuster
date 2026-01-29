@@ -142,6 +142,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
+| **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
 | **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` |
 
@@ -274,7 +275,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
 | `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `none` | Taxonomic profiling tool |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
-| `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction |
+| `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
@@ -306,6 +308,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
 | `--custom_karga_db` | Path to KARGA database FASTA file |
 | `--custom_kargva_db` | Path to KARGVA database FASTA file |
+| `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
+| `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -376,7 +380,21 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | `--deeparg_arg_num_alignments_per_entry` | `1000` | Number of alignments per entry |
 | `--deeparg_model_version` | `v2` | DeepARG model version (`v1` or `v2`) |
 
-### 6.10 Bowtie2 Alignment Options
+### 6.10 RGI Options
+
+Parameters for RGI AMR gene prediction with pathogen-of-origin analysis:
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--rgi_card_version` | `latest` | CARD database version (`latest` or specific version) |
+| `--rgi_include_wildcard` | `true` | Include WildCARD variants for extended allelic diversity |
+| `--rgi_aligner` | `kma` | Read aligner: `kma`, `bowtie2`, or `bwa` |
+| `--rgi_kmer_size` | `61` | K-mer size for pathogen-of-origin prediction |
+| `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage threshold |
+
+**Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md).
+
+### 6.11 Bowtie2 Alignment Options
 
 Advanced parameters for Bowtie2 read alignment during host filtering:
 
@@ -391,7 +409,7 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.11 MMseqs2 Clustering Options
+### 6.12 MMseqs2 Clustering Options
 
 Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
 
@@ -600,14 +618,29 @@ results/
 │           ├── *.csv                           # Taxonomy summary tables
 │           └── *.png                           # Taxonomy plots
 ├── 05_arg_prediction/                          # ARG predictions
-│   ├── read_level/                             # Read-level ARG (if read_arg_prediction=true)
-│   │   ├── karga/                              # KARGA results per sample
+│   ├── read_level/                             # Read-level ARG
+│   │   ├── karga/                              # KARGA results (if read_arg_prediction=true)
 │   │   │   └── {sample}_KARGA_mappedGenes.csv
-│   │   ├── kargva/                             # KARGVA results per sample
+│   │   ├── kargva/                             # KARGVA results (if read_arg_prediction=true)
 │   │   │   └── {sample}_KARGVA_mappedGenes.csv
-│   │   ├── args_oap/                           # ARGs-OAP normalization
+│   │   ├── args_oap/                           # ARGs-OAP normalization (if read_arg_prediction=true)
 │   │   │   └── {sample}_args_oap_s1_out/
-│   │   └── summary/                            # Normalized ARG summary
+│   │   ├── rgi/                                # RGI per-sample results (if rgi_prediction=true)
+│   │   │   └── {sample}/
+│   │   │       ├── *_allele_mapping_data.txt
+│   │   │       ├── *_gene_mapping_data.txt
+│   │   │       └── *_sorted.length_100.bam
+│   │   ├── rgi_kmer/                           # RGI pathogen-of-origin (if rgi_prediction=true)
+│   │   │   └── {sample}/
+│   │   │       ├── *_61mer_analysis.json
+│   │   │       └── *_61mer_analysis.txt
+│   │   ├── rgi_summary/                        # RGI aggregated reports (if rgi_prediction=true)
+│   │   │   ├── RGI_summary_report.csv
+│   │   │   ├── RGI_amr_gene_family_distribution.png
+│   │   │   ├── RGI_drug_class_profile.png
+│   │   │   ├── RGI_resistance_mechanisms.png
+│   │   │   └── RGI_sample_amr_counts.png
+│   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
 │   │       └── *.csv
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── prodigal/                           # ORF predictions
@@ -652,6 +685,7 @@ databases/                            # Database storage (configurable via --dat
 ├── deeparg/                          # DeepARG database
 ├── karga/                            # KARGA (MEGARes) database
 ├── kargva/                           # KARGVA database
+├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
 └── gtdbtk_r220/                      # GTDB-TK release 220 database
 ```
@@ -669,7 +703,8 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
-| `05_arg_prediction/read_level/` | `read_arg_prediction=true` | Read-level ARG predictions |
+| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA/KARGVA ARG predictions |
+| `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
@@ -737,6 +772,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler sourmash \
     --read_arg_prediction true \
+    --rgi_prediction true \
     --contig_tax_and_arg true \
     --include_binning true \
     --arg_bin_clustering true \

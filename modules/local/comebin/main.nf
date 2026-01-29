@@ -1,144 +1,139 @@
-process COMEBIN {
-    container 'quay.io/biocontainers/comebin:1.0.4--hdfd78af_0'
-
-    label 'process_high'
-
-    input:
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    COMEBIN Binning Module
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Metagenomic binning using COMEBin
+    
+    Supports both per-sample and co-assembly modes
+    Includes retry logic with adjusted parameters on failure
+    
+    Input:
         tuple val(meta), path(contigs), path(bam)
     
-    output:
-        tuple val(meta), path("*_comebin_bins/comebin_res/comebin_res_bins"), emit: comebin
+    Output:
+        bins: tuple val(meta), path(comebin_bins/comebin_res/comebin_res_bins)
+        versions: path(versions.yml)
+----------------------------------------------------------------------------------------
+*/
 
-    script:
-        def prefix = "${meta.id}"
-
-        """
-        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-
-        contig_count=\$(grep -c "^>" ${contigs} || true)
-        
-        if [[ \$contig_count -lt 10 ]]; then
-            echo "Warning: Sample ${prefix} has only \$contig_count contigs. Skipping COMEBIN (requires at least 10 contigs)." >&2
-            echo "COMEBIN skipped due to insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
-            exit 0
-        fi
-
-        set +e
-        if [[ $task.attempt == 1 ]]; then
-               bash run_comebin.sh \\
-                   -a ${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus
-               exit_code=\$?
-        elif [[ $task.attempt == 2 ]]; then 
-                bash run_comebin.sh \\
-                   -a ${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus \\
-                   -b 896 \\
-                   -e 1792 \\
-                   -c 1792
-                exit_code=\$?
-        elif [[ $task.attempt == 3 ]]; then
-                bash run_comebin.sh \\
-                   -a ${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus \\
-                   -b 512 \\
-                   -e 1024 \\
-                   -c 1024
-                exit_code=\$?
-        fi
-        set -e
-
-        if [[ \$exit_code -ne 0 ]]; then
-            echo "Warning: COMEBIN failed for sample ${prefix}. Creating empty bin directory to allow pipeline to continue." >&2
-            mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-            echo "COMEBIN failed - insufficient data or features for binning" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
-            exit 0
-        fi
-
-	"""
-}
-
-process COMEBIN_COASSEMBLY {
-    container 'quay.io/biocontainers/comebin:1.0.4--hdfd78af_0'
-
+process COMEBIN {
+    tag "${meta.id}"
     label 'process_high'
+    
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/comebin:1.0.4--hdfd78af_0' :
+        'quay.io/biocontainers/comebin:1.0.4--hdfd78af_0' }"
 
     input:
-        path(bams_and_contigs)
+    tuple val(meta), path(contigs), path(bam)
 
     output:
-        path("coassembly_comebin_bins/comebin_res/comebin_res_bins"), emit: comebin
+    tuple val(meta), path("${meta.id}_comebin_bins/comebin_res/comebin_res_bins"), emit: bins
+    path "versions.yml", emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
 
     script:
-        def prefix = "coassembly"
-
-        """
-        contigs=`ls | grep -E '.+?filtered_contigs.+' | tr '\\n' ',' | sed 's/.\$//'`
-
-        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-
-        contig_count=0
-        IFS=',' read -ra CONTIG_FILES <<< "\${contigs}"
-        for contig_file in "\${CONTIG_FILES[@]}"; do
-            count=\$(grep -c "^>" "\$contig_file" || true)
-            contig_count=\$((contig_count + count))
-        done
+    prefix = meta.id
+    
+    // Input validation
+    if (!meta || !meta.id) {
+        error "COMEBIN: meta.id is required"
+    }
+    if (!contigs) {
+        error "COMEBIN: No contig file provided for sample ${meta.id}"
+    }
+    
+    """
+    set -euo pipefail
+    
+    mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
+    
+    # Validate minimum contig count
+    contig_count=\$(grep -c "^>" ${contigs} || true)
+    
+    if [[ \$contig_count -lt 10 ]]; then
+        echo "WARNING: Only \$contig_count contigs. Skipping COMEBIN (requires ≥10)." >&2
+        echo "COMEBIN skipped: insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
         
-        if [[ \$contig_count -lt 10 ]]; then
-            echo "Warning: Coassembly has only \$contig_count contigs. Skipping COMEBIN (requires at least 10 contigs)." >&2
-            echo "COMEBIN skipped due to insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
-            exit 0
-        fi
-
-        set +e
-        if [[ $task.attempt == 1 ]]; then
-               bash run_comebin.sh \\
-                   -a \${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus
-               exit_code=\$?
-        elif [[ $task.attempt == 2 ]]; then
-                bash run_comebin.sh \\
-                   -a \${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus \\
-                   -b 896 \\
-                   -e 1792 \\
-                   -c 1792
-                exit_code=\$?
-        elif [[ $task.attempt == 3 ]]; then
-                bash run_comebin.sh \\
-                   -a \${contigs} \\
-                   -p ./ \\
-                   -o ${prefix}_comebin_bins \\
-                   -n 8 \\
-                   -t $task.cpus \\
-                   -b 512 \\
-                   -e 1024 \\
-                   -c 1024
-                exit_code=\$?
-        fi
-        set -e
-
-        if [[ \$exit_code -ne 0 ]]; then
-            echo "Warning: COMEBIN failed for coassembly. Creating empty bin directory to allow pipeline to continue." >&2
-            mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-            echo "COMEBIN failed - insufficient data or features for binning" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
-            exit 0
-        fi
-
-        """
+        cat <<-END_VERSIONS > versions.yml
+	"${task.process}":
+	    comebin: 1.0.4
+	END_VERSIONS
+        exit 0
+    fi
+    
+    # Run COMEBIN with retry logic and adjusted parameters
+    set +e
+    exit_code=0
+    if [[ ${task.attempt} == 1 ]]; then
+        bash run_comebin.sh \\
+            -a ${contigs} \\
+            -p ./ \\
+            -o ${prefix}_comebin_bins \\
+            -n 8 \\
+            -t ${task.cpus}
+        exit_code=\$?
+    elif [[ ${task.attempt} == 2 ]]; then
+        bash run_comebin.sh \\
+            -a ${contigs} \\
+            -p ./ \\
+            -o ${prefix}_comebin_bins \\
+            -n 8 \\
+            -t ${task.cpus} \\
+            -b 896 \\
+            -e 1792 \\
+            -c 1792
+        exit_code=\$?
+    elif [[ ${task.attempt} == 3 ]]; then
+        bash run_comebin.sh \\
+            -a ${contigs} \\
+            -p ./ \\
+            -o ${prefix}_comebin_bins \\
+            -n 8 \\
+            -t ${task.cpus} \\
+            -b 512 \\
+            -e 1024 \\
+            -c 1024
+        exit_code=\$?
+    fi
+    set -e
+    
+    # Handle failure gracefully
+    if [[ \$exit_code -ne 0 ]]; then
+        echo "WARNING: COMEBIN failed for ${prefix}. Creating empty directory." >&2
+        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
+        echo "COMEBIN failed - insufficient data or features" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
+    fi
+    
+    cat <<-END_VERSIONS > versions.yml
+	"${task.process}":
+	    comebin: \$(run_comebin.sh --version 2>&1 | head -n1 || echo "1.0.4")
+	END_VERSIONS
+    """
+    
+    stub:
+    prefix = meta.id
+    """
+    mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
+    
+    # Create stub bin files
+    cat > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/bin.1.fa << 'EOF'
+>contig_1
+ACGTACGTACGTACGTACGTACGTACGTACGT
+>contig_2
+TGCATGCATGCATGCATGCATGCATGCATGCA
+EOF
+    
+    cat > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/bin.2.fa << 'EOF'
+>contig_3
+GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
+EOF
+    
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        comebin: 1.0.4
+    END_VERSIONS
+    """
 }

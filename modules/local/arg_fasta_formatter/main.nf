@@ -13,8 +13,8 @@ process ARG_FASTA_FORMATTER {
     script: 
 
     """
-    cp -rL ${proteins}/* . 
-    cp -rL ${deeparg}/* .
+    cp -r ${proteins}/* . 
+    cp -r ${deeparg}/* .
     for file in *_deep_arg.out.mapping.ARG; do \\
              file_name=`echo \$file | sed 's/_deep_arg.out.mapping.ARG//g'`
              protein_file=`echo \$file | sed 's/_deep_arg.out.mapping.ARG/_proteins.faa/g'`

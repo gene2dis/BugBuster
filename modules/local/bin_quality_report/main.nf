@@ -1,16 +1,31 @@
 process BIN_QUALITY_REPORT {
-    container 'quay.io/ffuentessantander/r_reports:1.1'
-
+    tag "bin_quality"
     label 'process_single'
+    
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0' :
+        'quay.io/biocontainers/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0' }"
 
     input:
-        path(reports)
+    path(reports)
 
     output:
-        tuple path("*.png"), path("*.csv")
+    path("*.png")      , emit: plots
+    path("*.csv")      , emit: tables
+    path "versions.yml", emit: versions
+
+    when:
+    task.ext.when == null || task.ext.when
 
     script:
-        """
-        Rscript /mnt/Bin_checkm_general_plot.R
-	"""
+    """
+    bin_quality_report.py
+    
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: \$(python --version 2>&1 | sed 's/Python //')
+        pandas: \$(python -c "import pandas; print(pandas.__version__)")
+        matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
+    END_VERSIONS
+    """
 }

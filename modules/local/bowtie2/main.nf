@@ -10,7 +10,7 @@ process BOWTIE2 {
     tag "${meta.id}_${db_alias}"
     container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
 
-    label 'process_medium'
+    label 'process_high'
 
     // Clean reads are intermediate files - don't publish to final output
     // publishDir "${params.output}/workflow/${meta.id}/clean_reads", 
@@ -22,9 +22,9 @@ process BOWTIE2 {
     val db_alias
 
     output:
-    tuple val(meta), path("*map*fastq.gz"), emit: reads
+    tuple val(meta), path("${meta.id}_R*_map_*.fastq.gz"), emit: reads
     path("*_bowtie_report.tsv")           , emit: report
-    path("*map*fastq.gz")                 , emit: reads_coassembly
+    path("${meta.id}_*_map_*.fastq.gz")   , emit: reads_coassembly
     path "versions.yml"                   , emit: versions
 
     when:

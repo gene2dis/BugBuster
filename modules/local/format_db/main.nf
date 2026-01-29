@@ -1,6 +1,6 @@
 process FORMAT_SM_DB {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_sourmash_db"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 
@@ -17,8 +17,8 @@ process FORMAT_SM_DB {
 }
 
 process FORMAT_KRAKEN_DB {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_kraken_db"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 
@@ -35,8 +35,8 @@ process FORMAT_KRAKEN_DB {
 }
 
 process FORMAT_BOWTIE_INDEX {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_bowtie_index"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 
@@ -53,8 +53,8 @@ process FORMAT_BOWTIE_INDEX {
 }
 
 process FORMAT_NT_BLAST_DB {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_blast_db"
+    container 'ubuntu:22.04'
 
     label 'process_download_extensive'
 
@@ -71,8 +71,8 @@ process FORMAT_NT_BLAST_DB {
 }
 
 process FORMAT_TAXDUMP_FILES {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_taxdump"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 
@@ -106,8 +106,8 @@ process DOWNLOAD_DEEPARG_DB {
 }
 
 process FORMAT_CHECKM2_DB {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "format_checkm2_db"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 
@@ -143,8 +143,8 @@ process BUILD_PHIX_BOWTIE2_INDEX {
 }
 
 process DOWNLOAD_GTDBTK_DB {
-
-    container 'quay.io/ffuentessantander/r_reports:1.1'
+    tag "download_gtdbtk_db"
+    container 'ubuntu:22.04'
 
     label 'process_download_single'
 

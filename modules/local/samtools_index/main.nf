@@ -10,8 +10,6 @@ process SAMTOOLS_INDEX {
         tuple val(meta), path(sorted_bam), path("*.bam.bai")
 
     script:
-        def prefix = "${meta.id}"
-
         """
 	samtools index ${sorted_bam} -@ $task.cpus
 	""" 
