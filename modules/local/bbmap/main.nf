@@ -25,6 +25,10 @@ process BBMAP {
         'https://depot.galaxyproject.org/singularity/bbmap:39.06--h92535d8_0' :
         'quay.io/biocontainers/bbmap:39.06--h92535d8_0' }"
 
+    // Use storeDir for filtered contigs to enable immediate work dir cleanup
+    // This stores outputs permanently and cleans work directory automatically
+    storeDir params.store_filtered_contigs ? "${params.output}/assembly/${meta.id}" : null
+
     input:
     tuple val(meta), path(reads), path(contigs)
 

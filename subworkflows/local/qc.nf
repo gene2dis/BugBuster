@@ -9,15 +9,13 @@
 include { FASTP                      } from '../../modules/nf-core/fastp/main'
 include { QFILTER                    } from '../../modules/local/qfilter/main'
 include { COUNT_READS                } from '../../modules/local/count_reads/main'
-include { BOWTIE2 as BOWTIE2_PHIX    } from '../../modules/local/bowtie2/main'
-include { BOWTIE2 as BOWTIE2_HOST    } from '../../modules/local/bowtie2/main'
+include { BOWTIE2_DECONTAMINATE      } from '../../modules/local/bowtie2_decontaminate/main'
 include { READS_REPORT               } from '../../modules/local/reads_report/main'
 
 workflow QC {
     take:
-    reads           // channel: [ val(meta), [ reads ] ]
-    phix_index      // channel: path(phix_index)
-    host_index      // channel: path(host_index)
+    reads                   // channel: [ val(meta), [ reads ] ]
+    decontamination_index   // channel: path(decontamination_index) - combined phiX + host index
 
     main:
     ch_versions = Channel.empty()
@@ -75,34 +73,25 @@ workflow QC {
             .filter { item -> item != null }
 
         //
-        // Remove host contamination
+        // Single-pass decontamination (removes phiX + host in one step)
         //
-        ch_host_clean = BOWTIE2_HOST(
-            ch_fastp_reads_filtered.combine(host_index),
-            "host"
-        )
-
-        //
-        // Remove PhiX contamination
-        //
-        ch_phix_clean = BOWTIE2_PHIX(
-            ch_host_clean.reads.combine(phix_index),
-            "phiX"
+        ch_decontaminated = BOWTIE2_DECONTAMINATE(
+            ch_fastp_reads_filtered.combine(decontamination_index),
+            "contaminants"
         )
 
         //
         // Collect read reports
         //
         ch_reads_report = READS_REPORT(
-            ch_host_clean.report
-                .concat(ch_phix_clean.report)
+            ch_decontaminated.report
                 .concat(ch_fastp_reads_report.reads_report)
                 .collect(),
-            "host phiX"
+            "contaminants"
         )
 
-        ch_clean_reads = ch_phix_clean.reads
-        ch_clean_reads_coassembly = ch_phix_clean.reads_coassembly
+        ch_clean_reads = ch_decontaminated.reads
+        ch_clean_reads_coassembly = ch_decontaminated.reads_coassembly
         ch_report = ch_reads_report
 
     } else {

@@ -3,6 +3,7 @@
     PREPARE DATABASES SUBWORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Handles database downloads and formatting for all pipeline components
+    Updated: 2026-01-29 - Single-pass decontamination optimization
 ----------------------------------------------------------------------------------------
 */
 
@@ -17,6 +18,7 @@ include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
+include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
 
 workflow PREPARE_DATABASES {
     
@@ -26,8 +28,6 @@ workflow PREPARE_DATABASES {
     ch_sourmash_db      = Channel.empty()
     ch_karga_db         = Channel.empty()
     ch_kargva_db        = Channel.empty()
-    ch_phix_index       = Channel.empty()
-    ch_host_index       = Channel.empty()
     ch_deeparg_db       = Channel.empty()
     ch_blast_db         = Channel.empty()
     ch_taxdump          = Channel.empty()
@@ -98,23 +98,44 @@ workflow PREPARE_DATABASES {
     }
 
     //
-    // PhiX and host Bowtie2 indexes for QC
+    // Combined decontamination index (PhiX + host) for QC
     //
     if ( params.quality_control ) {
-        if ( params.custom_phiX_index ) {
-            ch_phix_index = Channel.fromPath(params.custom_phiX_index, checkIfExists: true)
+        if ( params.custom_decontamination_index ) {
+            // Use pre-built combined index
+            ch_decontamination_index = Channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
+            ch_phix_index = ch_decontamination_index
+            ch_host_index = ch_decontamination_index
         } else {
-            ch_phix_ref = Channel.fromList(params.bowtie_ref_genomes_for_build[params.phiX_index]["file"])
-                .map { filepath -> file(filepath) }
-            ch_phix_index = BUILD_PHIX_BOWTIE2_INDEX(ch_phix_ref)
+            // Collect FASTA file paths into lists
+            def phix_files = params.custom_phiX_fasta ? 
+                [params.custom_phiX_fasta] : 
+                params.bowtie_ref_genomes_for_build[params.phiX_index]["file"]
+            
+            def host_files = params.custom_host_fasta ? 
+                [params.custom_host_fasta] : 
+                params.bowtie_ref_host_index[params.host_db]["file"]
+            
+            // Combine lists and create single channel
+            def all_fasta_files = phix_files + host_files
+            
+            // Build combined index from all FASTA files
+            BOWTIE2_BUILD_COMBINED(
+                Channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect(),
+                "contaminants"
+            )
+            
+            // Extract only the index output (not versions)
+            ch_decontamination_index = BOWTIE2_BUILD_COMBINED.out.index
+            
+            // Keep legacy outputs for backward compatibility (deprecated)
+            ch_phix_index = ch_decontamination_index
+            ch_host_index = ch_decontamination_index
         }
-
-        if ( params.custom_bowtie_host_index ) {
-            ch_host_index = Channel.fromPath(params.custom_bowtie_host_index, checkIfExists: true)
-        } else {
-            ch_host_ref = Channel.fromList(params.bowtie_ref_host_index[params.host_db]["file"])
-            ch_host_index = FORMAT_BOWTIE_INDEX(ch_host_ref)
-        }
+    } else {
+        ch_decontamination_index = Channel.empty()
+        ch_phix_index = Channel.empty()
+        ch_host_index = Channel.empty()
     }
 
     //
@@ -183,16 +204,17 @@ workflow PREPARE_DATABASES {
     }
 
     emit:
-    kraken_db   = ch_kraken_db
-    sourmash_db = ch_sourmash_db
-    karga_db    = ch_karga_db
-    kargva_db   = ch_kargva_db
-    phix_index  = ch_phix_index
-    host_index  = ch_host_index
-    deeparg_db  = ch_deeparg_db
-    blast_db    = ch_blast_db
-    taxdump     = ch_taxdump
-    gtdbtk_db   = ch_gtdbtk_db
-    checkm2_db  = ch_checkm2_db
-    rgi_card_db = ch_rgi_card_db
+    kraken_db              = ch_kraken_db
+    sourmash_db            = ch_sourmash_db
+    karga_db               = ch_karga_db
+    kargva_db              = ch_kargva_db
+    decontamination_index  = ch_decontamination_index  // Combined phiX + host index
+    phix_index             = ch_phix_index             // Deprecated: use decontamination_index
+    host_index             = ch_host_index             // Deprecated: use decontamination_index
+    deeparg_db             = ch_deeparg_db
+    blast_db               = ch_blast_db
+    taxdump                = ch_taxdump
+    gtdbtk_db              = ch_gtdbtk_db
+    checkm2_db             = ch_checkm2_db
+    rgi_card_db            = ch_rgi_card_db
 }

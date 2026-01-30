@@ -208,12 +208,11 @@ workflow {
     PREPARE_DATABASES()
     
     //
-    // SUBWORKFLOW: Quality control and host decontamination
+    // SUBWORKFLOW: Quality control and decontamination (single-pass phiX + host removal)
     //
     QC(
         ch_reads,
-        PREPARE_DATABASES.out.phix_index,
-        PREPARE_DATABASES.out.host_index
+        PREPARE_DATABASES.out.decontamination_index
     )
     
     // In DSL2, process outputs can be referenced multiple times

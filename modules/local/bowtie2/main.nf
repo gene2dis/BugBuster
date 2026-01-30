@@ -12,10 +12,9 @@ process BOWTIE2 {
 
     label 'process_high'
 
-    // Clean reads are intermediate files - don't publish to final output
-    // publishDir "${params.output}/workflow/${meta.id}/clean_reads", 
-    //     mode: params.publish_dir_mode,
-    //     pattern: "*_clean_reads.fastq.gz"
+    // Use storeDir for clean reads (phiX removal) to enable immediate work dir cleanup
+    // This stores outputs permanently and cleans work directory automatically
+    storeDir params.store_clean_reads && db_alias == "phiX" ? "${params.output}/clean_reads/${meta.id}" : null
 
     input:
     tuple val(meta), path(reads), path(index_db)

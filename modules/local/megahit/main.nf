@@ -102,7 +102,15 @@ process MEGAHIT {
                 -o ${prefix}_assembly
         fi
         
+        # Move final contigs
         mv ${prefix}_assembly/final.contigs.fa ${prefix}_contigs.fa
+        
+        # CLEANUP: Remove large intermediate assembly files to free disk space
+        # Keep only final contigs and essential log files
+        rm -rf ${prefix}_assembly/intermediate_contigs/ 2>/dev/null || true
+        rm -rf ${prefix}_assembly/kmer_k*/ 2>/dev/null || true
+        rm -f ${prefix}_assembly/*.tmp 2>/dev/null || true
+        rm -f ${prefix}_assembly/checkpoints.txt 2>/dev/null || true
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
@@ -144,7 +152,15 @@ process MEGAHIT {
                 -o ${prefix}_assembly
         fi
         
+        # Move final contigs
         mv ${prefix}_assembly/final.contigs.fa ${prefix}_contigs.fa
+        
+        # CLEANUP: Remove large intermediate assembly files to free disk space
+        # Keep only final contigs and essential log files
+        rm -rf ${prefix}_assembly/intermediate_contigs/ 2>/dev/null || true
+        rm -rf ${prefix}_assembly/kmer_k*/ 2>/dev/null || true
+        rm -f ${prefix}_assembly/*.tmp 2>/dev/null || true
+        rm -f ${prefix}_assembly/checkpoints.txt 2>/dev/null || true
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

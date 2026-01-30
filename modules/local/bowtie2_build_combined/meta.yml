@@ -1,0 +1,38 @@
+name: bowtie2_build_combined
+description: Build a single Bowtie2 index from multiple FASTA files for efficient decontamination
+keywords:
+  - alignment
+  - index
+  - bowtie2
+  - decontamination
+  - reference genome
+tools:
+  - bowtie2:
+      description: |
+        Bowtie 2 is an ultrafast and memory-efficient tool for aligning sequencing reads to long reference sequences.
+      homepage: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
+      documentation: http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
+      doi: 10.1038/nmeth.1923
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - fasta_files:
+      type: file
+      description: List of FASTA files to combine into a single index (e.g., phiX, host genomes)
+      pattern: "*.{fasta,fa,fna,fasta.gz,fa.gz,fna.gz}"
+  - index_name:
+      type: string
+      description: Name for the combined index (e.g., "contaminants")
+
+output:
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - index:
+      type: directory
+      description: Directory containing Bowtie2 index files
+      pattern: "*_index"
+
+authors:
+  - "@gene2dis"
