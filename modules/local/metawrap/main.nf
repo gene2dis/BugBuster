@@ -24,9 +24,13 @@ process METAWRAP {
         'https://depot.galaxyproject.org/singularity/metawrap:1.2--hdfd78af_2' :
         'quay.io/ffuentessantander/metawrap:1.2' }"
 
-    // Use storeDir for refined bins to enable immediate work dir cleanup
-    // This stores final bins permanently and cleans work directory automatically
-    storeDir params.store_refined_bins ? "${params.output}/bins/${meta.id}" : null
+    // Publish refined bins using 'move' mode to free disk space immediately
+    publishDir(
+        path: "${params.output}/bins/${meta.id}",
+        mode: 'move',
+        enabled: params.store_refined_bins,
+        saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+    )
 
     input:
     tuple val(meta), path(metabat2_bins), path(semibin_bins), path(comebin_bins)

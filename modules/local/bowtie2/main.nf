@@ -12,9 +12,14 @@ process BOWTIE2 {
 
     label 'process_high'
 
-    // Use storeDir for clean reads (phiX removal) to enable immediate work dir cleanup
-    // This stores outputs permanently and cleans work directory automatically
-    storeDir params.store_clean_reads && db_alias == "phiX" ? "${params.output}/clean_reads/${meta.id}" : null
+    // Publish clean reads (phiX removal) using 'move' mode to free disk space immediately
+    // Only publish phiX-filtered reads when cleanup is enabled
+    publishDir(
+        path: "${params.output}/clean_reads/${meta.id}",
+        mode: 'move',
+        enabled: params.store_clean_reads && db_alias == "phiX",
+        saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
+    )
 
     input:
     tuple val(meta), path(reads), path(index_db)

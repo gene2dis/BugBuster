@@ -6,36 +6,39 @@ This document describes the disk space optimization features implemented in BugB
 
 The pipeline implements a **progressive cleanup strategy** that frees disk space **during execution**, not after. This is achieved through three complementary mechanisms:
 
-1. **storeDir directives** - Automatically move outputs to permanent storage and clean work directories
+1. **publishDir with mode 'move'** - Move (not copy) large outputs to final location, immediately freeing work directory space
 2. **Internal process cleanup** - Remove temporary files within processes as soon as they're no longer needed
 3. **Nextflow cleanup configuration** - Enable automatic work directory cleanup with resume support
 
 ## Implementation Details
 
-### Phase 1: storeDir for Large Intermediates
+### Phase 1: publishDir with mode 'move' for Large Intermediates
 
-The following processes use `storeDir` to automatically clean their work directories after storing outputs:
+The following processes use `publishDir` with `mode: 'move'` to immediately free disk space by moving (not copying) outputs:
 
 #### BOWTIE2 (Clean Reads)
 - **Location**: `modules/local/bowtie2/main.nf`
-- **Stores to**: `output/clean_reads/{sample_id}/`
+- **Moves to**: `output/clean_reads/{sample_id}/`
 - **When**: After phiX removal (final QC step)
+- **Mode**: `move` - files are moved from work directory, not copied
 - **Disk savings**: ~8-10 GB per sample
-- **Files stored**: `*_R1_map_phiX.fastq.gz`, `*_R2_map_phiX.fastq.gz`, `*_bowtie_report.tsv`
+- **Files moved**: `*_R1_map_phiX.fastq.gz`, `*_R2_map_phiX.fastq.gz`, `*_bowtie_report.tsv`
 
 #### BBMAP (Filtered Contigs)
 - **Location**: `modules/local/bbmap/main.nf`
-- **Stores to**: `output/assembly/{sample_id}/`
+- **Moves to**: `output/assembly/{sample_id}/`
 - **When**: After contig length filtering
+- **Mode**: `move` - files are moved from work directory, not copied
 - **Disk savings**: ~2-5 GB per sample
-- **Files stored**: `*_filtered_contigs.fa`, `*_contig.stats`, `*_filter_report.txt`
+- **Files moved**: `*_filtered_contigs.fa`, `*_contig.stats`, `*_filter_report.txt`
 
 #### METAWRAP (Refined Bins)
 - **Location**: `modules/local/metawrap/main.nf`
-- **Stores to**: `output/bins/{sample_id}/`
+- **Moves to**: `output/bins/{sample_id}/`
 - **When**: After bin refinement
+- **Mode**: `move` - files are moved from work directory, not copied
 - **Disk savings**: ~1-3 GB per sample
-- **Files stored**: `*_metawrap_*_bins/` directory with all refined bins
+- **Files moved**: `*_metawrap_*_bins/` directory with all refined bins
 
 ### Phase 2: Internal Process Cleanup
 
@@ -338,14 +341,21 @@ grep "Cached" .nextflow.log | wc -l
 
 ## Technical Details
 
-### storeDir vs publishDir
+### publishDir Modes
 
-| Feature | storeDir | publishDir |
-|---------|----------|------------|
-| **Purpose** | Permanent cache | Final results |
-| **Work dir cleanup** | Automatic | Manual |
-| **Resume support** | Built-in | Requires lenient cache |
-| **When to use** | Large intermediates | Final outputs |
+| Mode | Behavior | Disk Impact | Use Case |
+|------|----------|-------------|----------|
+| **copy** | Copy files to output | No space freed | Default, safe for all outputs |
+| **move** | Move files to output | Immediate space freed | Large intermediates, cleanup enabled |
+| **symlink** | Create symbolic links | Minimal space | Read-only access |
+| **rellink** | Create relative links | Minimal space | Portable links |
+
+### Why mode 'move' Works for Cleanup
+
+- **Immediate**: Files are moved as soon as the process completes
+- **No duplication**: Files exist only in output directory, not in work directory
+- **Resume compatible**: Nextflow finds outputs in publishDir location with lenient cache
+- **Selective**: Only enabled when cleanup parameters are true
 
 ### Cache Strategies
 
