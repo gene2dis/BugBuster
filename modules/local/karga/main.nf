@@ -19,7 +19,7 @@ process KARGA {
                 cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
         fi
 
-        java -cp /bin/ KARGA k:17 d:${karga_db} -XX:ActiveProcessorCount=${task.cpus} r:n -Xmx32GB ${prefix}_all_reads.fastq.gz
+        java -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB -cp /bin/ KARGA k:17 d:${karga_db} r:n ${prefix}_all_reads.fastq.gz
         rm -f ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGA_mappedGenes.csv ]]; then
