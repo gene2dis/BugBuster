@@ -334,6 +334,12 @@
             "fa_icon": "fas fa-th",
             "description": "Parameters for metagenomic binning.",
             "properties": {
+                "binners": {
+                    "type": "string",
+                    "default": "semibin",
+                    "description": "Comma-separated list of binners to use. Options: comebin, semibin, metabat2. At least one required. If >=2 selected, MetaWRAP refinement is used.",
+                    "fa_icon": "fas fa-cubes"
+                },
                 "metabat_minContig": {
                     "type": "integer",
                     "default": 2500,

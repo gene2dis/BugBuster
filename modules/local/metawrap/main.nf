@@ -4,11 +4,11 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Bin refinement using MetaWRAP
     
-    Consolidates bins from multiple binners (MetaBAT2, SemiBin, COMEBin)
+    Consolidates bins from multiple binners (2 or 3 of: MetaBAT2, SemiBin, COMEBin)
     and refines them based on completeness and contamination thresholds
     
     Input:
-        tuple val(meta), path(metabat2_bins), path(semibin_bins), path(comebin_bins)
+        tuple val(meta), path(bin_dirs) - bin_dirs is a list of 2-3 bin directories
     
     Output:
         bins: tuple val(meta), path(metawrap_bins)
@@ -33,7 +33,7 @@ process METAWRAP {
     )
 
     input:
-    tuple val(meta), path(metabat2_bins), path(semibin_bins), path(comebin_bins)
+    tuple val(meta), path(bin_dirs)
 
     output:
     tuple val(meta), path("${meta.id}_metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"), emit: bins
@@ -55,34 +55,41 @@ process METAWRAP {
     """
     set -euo pipefail
     
-    # Prepare bin directories
-    mkdir -p metabat_wp_bins semibin_wp_bins comebin_wp_bins
+    # Prepare bin directories from each binner and build MetaWRAP flags
+    flags=(A B C)
+    flag_idx=0
+    bin_flags=""
+    prep_dirs=""
     
-    # Handle MetaBAT2 bins (may be gzipped)
-    if [[ -d "${metabat2_bins}" ]]; then
-        for bin in ${metabat2_bins}/*.fa* ${metabat2_bins}/*.fasta*; do
-            [[ -e "\$bin" ]] || continue
-            if [[ "\$bin" == *.fa.gz ]] || [[ "\$bin" == *.fasta.gz ]]; then
-                gunzip -c "\$bin" > "metabat_wp_bins/\$(basename "\$bin" .gz)"
-            elif [[ "\$bin" == *.fa ]] || [[ "\$bin" == *.fasta ]]; then
-                cp "\$bin" metabat_wp_bins/
+    for bin_dir in ${bin_dirs}; do
+        dir_name=\$(basename "\$bin_dir")
+        prep_dir="prep_\${flags[\$flag_idx]}"
+        mkdir -p "\$prep_dir"
+        
+        if [[ "\$dir_name" == *metabat* ]]; then
+            # Handle MetaBAT2 bins (may be gzipped)
+            if [[ -d "\$bin_dir" ]]; then
+                for bin in "\$bin_dir"/*.fa* "\$bin_dir"/*.fasta*; do
+                    [[ -e "\$bin" ]] || continue
+                    if [[ "\$bin" == *.fa.gz ]] || [[ "\$bin" == *.fasta.gz ]]; then
+                        gunzip -c "\$bin" > "\$prep_dir/\$(basename "\$bin" .gz)"
+                    elif [[ "\$bin" == *.fa ]] || [[ "\$bin" == *.fasta ]]; then
+                        cp "\$bin" "\$prep_dir/"
+                    fi
+                done
             fi
-        done
-    else
-        # Handle single file input
-        if [[ "${metabat2_bins}" == *.fa.gz ]] || [[ "${metabat2_bins}" == *.fasta.gz ]]; then
-            gunzip -c "${metabat2_bins}" > "metabat_wp_bins/\$(basename "${metabat2_bins}" .gz)"
-        elif [[ "${metabat2_bins}" == *.fa ]] || [[ "${metabat2_bins}" == *.fasta ]]; then
-            cp "${metabat2_bins}" metabat_wp_bins/
+        else
+            # SemiBin or COMEBin bins - simple copy
+            cp -r "\$bin_dir"/* "\$prep_dir/" 2>/dev/null || true
         fi
-    fi
+        
+        bin_flags="\$bin_flags -\${flags[\$flag_idx]} \$prep_dir"
+        prep_dirs="\$prep_dirs \$prep_dir"
+        flag_idx=\$((flag_idx + 1))
+    done
     
-    # Copy SemiBin and COMEBin bins (avoid dereferencing to prevent infinite loops)
-    cp -r ${semibin_bins}/* semibin_wp_bins/ 2>/dev/null || true
-    cp -r ${comebin_bins}/* comebin_wp_bins/ 2>/dev/null || true
-    
-    # Count total bins across all binners
-    total_bins=\$(find metabat_wp_bins semibin_wp_bins comebin_wp_bins -type f \\( -name "*.fa" -o -name "*.fasta" \\) 2>/dev/null | wc -l)
+    # Count total bins across all prepared directories
+    total_bins=\$(find \$prep_dirs -type f \\( -name "*.fa" -o -name "*.fasta" \\) 2>/dev/null | wc -l)
     
     if [[ \$total_bins -eq 0 ]]; then
         echo "WARNING: No bins found from any binner. Skipping MetaWRAP refinement."
@@ -96,9 +103,7 @@ process METAWRAP {
         metawrap bin_refinement \\
             -o Refined_bins \\
             -t ${task.cpus} \\
-            -A metabat_wp_bins \\
-            -B semibin_wp_bins \\
-            -C comebin_wp_bins \\
+            \$bin_flags \\
             -c ${completeness} \\
             -x ${contamination}
         
@@ -108,7 +113,7 @@ process METAWRAP {
     fi
     
     # Cleanup
-    rm -r metabat_wp_bins semibin_wp_bins comebin_wp_bins
+    rm -rf \$prep_dirs
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -118,6 +123,8 @@ process METAWRAP {
     
     stub:
     prefix = meta.id
+    completeness = params.metawrap_completeness
+    contamination = params.metawrap_contamination
     """
     mkdir -p ${prefix}_metawrap_${completeness}_${contamination}_bins
     

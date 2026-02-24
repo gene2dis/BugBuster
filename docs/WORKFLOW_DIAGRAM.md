@@ -30,8 +30,8 @@ flowchart TD
     Assembly --> Contigs{Contigs & BAM}
     
     %% Binning Branch
-    Contigs -->|if include_binning| Binning[BINNING SUBWORKFLOW<br/>MetaBAT2, SemiBin, COMEBin]
-    Binning --> RefinedBins[Refined Bins<br/>MetaWRAP + CheckM2 + GTDB-TK]
+    Contigs -->|if include_binning| Binning[BINNING SUBWORKFLOW<br/>Selected binners from:<br/>MetaBAT2, SemiBin, COMEBin]
+    Binning --> RefinedBins[Refined Bins<br/>MetaWRAP (if ≥2 binners) + CheckM2 + GTDB-TK]
     
     %% Contig-level Analysis Branch
     Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy & ARG<br/>NT_BLASTN + BLOBTOOLS]
@@ -198,54 +198,55 @@ flowchart TD
 ### 6. BINNING Subworkflow (Unified - Mode-Agnostic)
 ```mermaid
 flowchart TD
-    Input["Input: contigs_and_bam<br/>[meta, contigs, bam]"] --> CalcDepth[CALCULATE_DEPTH<br/>Calculate Contig Depth]
-    
-    CalcDepth --> Depth["Depth Files<br/>[meta, contigs, depth]"]
-    Input --> BinInput["BAM Input for Binners<br/>[meta, contigs, bam]"]
-    
-    %% Parallel binning
-    Depth --> MetaBAT[METABAT2<br/>Coverage-based Binning]
-    BinInput --> SemiBin[SEMIBIN<br/>Semi-supervised Binning]
-    BinInput --> COMEBin[COMEBIN<br/>Contrastive Learning Binning]
-    
-    %% Combine bins
-    MetaBAT --> Combine[Combine All Bins<br/>Join by meta]
-    SemiBin --> Combine
-    COMEBin --> Combine
-    
-    %% Refinement
-    Combine --> MetaWRAP[METAWRAP<br/>Bin Refinement & Consolidation]
-    
+    Input["Input: contigs_and_bam<br/>[meta, contigs, bam]"] --> BinnerSelect{Selected Binners<br/>params.binners}
+
+    BinnerSelect -->|if metabat2 selected| CalcDepth[CALCULATE_DEPTH<br/>Calculate Contig Depth]
+    CalcDepth --> MetaBAT[METABAT2<br/>Coverage-based Binning]
+
+    BinnerSelect -->|if semibin selected| SemiBin[SEMIBIN<br/>Semi-supervised Binning]
+    BinnerSelect -->|if comebin selected| COMEBin[COMEBIN<br/>Contrastive Learning Binning]
+
+    %% Conditional MetaWRAP
+    MetaBAT --> BinCount{Number of<br/>binners selected}
+    SemiBin --> BinCount
+    COMEBin --> BinCount
+
+    BinCount -->|≥2 binners| MetaWRAP[METAWRAP<br/>Bin Refinement & Consolidation]
+    BinCount -->|1 binner| DirectOut[Use binner output directly]
+
     %% Quality and Taxonomy
-    MetaWRAP --> QualTax{Quality &<br/>Taxonomy}
-    Combine --> QualTax
-    QualTax --> CheckM[CHECKM2<br/>Completeness & Contamination]
-    QualTax --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
-    
+    MetaWRAP --> AllBins[All bins:<br/>individual + refined]
+    DirectOut --> AllBins
+    AllBins --> CheckM[CHECKM2<br/>Completeness & Contamination]
+    MetaWRAP --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
+    DirectOut --> GTDBTK
+
     %% Mode-specific reporting
     CheckM --> ModeCheck{Assembly<br/>Mode?}
     GTDBTK --> ModeCheck
-    
+
     ModeCheck -->|assembly| AssemblyReports[Per-Sample Reports]
     AssemblyReports --> QualReport[BIN_QUALITY_REPORT]
     AssemblyReports --> TaxReport[BIN_TAX_REPORT]
-    
+
     ModeCheck -->|coassembly| CoassemblyReports[Co-assembly Reports]
     CoassemblyReports --> BinCov[BOWTIE2_SAMTOOLS_DEPTH<br/>Calculate Bin Coverage]
     BinCov --> Bedtools[BEDTOOLS<br/>Coverage Statistics]
     Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
     CheckM --> Summary
     GTDBTK --> Summary
-    
+
     %% Output
     MetaWRAP --> Output["Output: refined_bins<br/>[meta, bins]"]
+    DirectOut --> Output
 ```
 
 **Key Features:**
 - **Unified workflow**: Single implementation handles both assembly and co-assembly modes
-- **Parallel binning**: Three binners run simultaneously for better bin recovery
-- **Mode-agnostic processing**: Same binning pipeline regardless of assembly mode
-- **Mode-specific reporting**: 
+- **Selectable binners**: Run any combination of MetaBAT2, SemiBin, and COMEBin via `--binners`
+- **Conditional MetaWRAP**: Bin refinement only runs when ≥2 binners are selected
+- **Single-binner mode**: When only one binner is selected, its output is used directly (no MetaWRAP overhead)
+- **Mode-specific reporting**:
   - Assembly mode: Simple quality and taxonomy reports
   - Co-assembly mode: Additional bin coverage analysis and comprehensive summary
 
@@ -270,7 +271,8 @@ flowchart TD
 | `quality_control` | `true` | Enable QC and host filtering |
 | `assembly_mode` | `'assembly'` | Assembly mode: 'assembly', 'coassembly', 'none' |
 | `taxonomic_profiler` | `'kraken2'` | Profiler: 'kraken2', 'sourmash', 'none' |
-| `include_binning` | `true` | Enable binning and refinement |
+| `include_binning` | `false` | Enable binning and refinement |
+| `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
 | `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
@@ -359,6 +361,18 @@ results/
 ### Mode 3: Assembly + Binning Only
 ```bash
 --taxonomic_profiler none --read_arg_prediction false
+```
+
+### Mode 5: Binning with Single Fast Binner (Default)
+```bash
+--include_binning true --binners semibin
+```
+
+### Mode 6: Binning with MetaWRAP Refinement (Multiple Binners)
+```bash
+--include_binning true --binners semibin,metabat2
+# or all three:
+--include_binning true --binners semibin,metabat2,comebin
 ```
 
 ### Mode 4: Co-assembly Mode

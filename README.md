@@ -41,8 +41,8 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 15. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
 16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
 17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-18. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`COMEBin`](https://github.com/ziyewang/COMEBin)
-19. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
+18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+19. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
 20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
 21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 22. Bin reports.
@@ -181,6 +181,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
 | `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
 | `--include_binning` | `false` | Enable binning and refinement |
+| `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
 | `--min_read_sample` | `0` | Minimum reads required after QC |
 
 ### Feature Toggles
@@ -225,12 +226,25 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--bbmap_lenght` | `1000` | Minimum contig length after filtering |
+| `--binners` | `semibin` | Binners to run (comma-separated). `≥2` selected → MetaWRAP refinement enabled |
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
-| `--metawrap_completeness` | `50` | Minimum bin completeness (%) |
-| `--metawrap_contamination` | `10` | Maximum bin contamination (%) |
+| `--metawrap_completeness` | `50` | Minimum bin completeness (%) — used only when ≥2 binners |
+| `--metawrap_contamination` | `10` | Maximum bin contamination (%) — used only when ≥2 binners |
 | `--semibin_env_model` | `human_gut` | SemiBin environment model |
 
 **SemiBin Models**: `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`, `human_oral`, `chicken_caecum`, `ocean`, `soil`, `wastewater`, `built_environment`, `global`
+
+**Binner selection examples:**
+```bash
+# Default: single fast binner, no MetaWRAP
+--include_binning true --binners semibin
+
+# Two binners + MetaWRAP refinement
+--include_binning true --binners semibin,metabat2
+
+# All three binners + MetaWRAP
+--include_binning true --binners semibin,metabat2,comebin
+```
 
 ### ARG Prediction Options
 

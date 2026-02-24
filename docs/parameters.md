@@ -79,6 +79,17 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable metagenomic binning and refinement steps
 - **Example**: `--include_binning true`
 
+### `--binners`
+- **Type**: String (comma-separated)
+- **Default**: `semibin`
+- **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
+- **Description**: Selects which binning tools to run. When ≥2 binners are specified, MetaWRAP bin refinement is automatically enabled. When only one binner is selected, MetaWRAP is skipped and the binner's output is used directly.
+- **Examples**:
+  - `--binners semibin` — single fast binner, no MetaWRAP (default)
+  - `--binners semibin,metabat2` — two binners + MetaWRAP refinement
+  - `--binners semibin,metabat2,comebin` — all three binners + MetaWRAP refinement
+- **Note**: Only takes effect when `--include_binning true` is set
+
 ### `--read_arg_prediction`
 - **Type**: Boolean
 - **Default**: `false`
@@ -373,6 +384,23 @@ Override automatic downloads by providing custom database paths:
 ## Binning Parameters
 
 ### Basic Binning Parameters
+
+#### `--binners`
+- **Type**: String (comma-separated list)
+- **Default**: `semibin`
+- **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
+- **Description**: Controls which binning tools are run. When ≥2 binners are selected, MetaWRAP bin refinement is automatically enabled. When only one binner is selected, its output is used directly (no MetaWRAP). Only takes effect when `--include_binning true`.
+- **CLI examples**:
+  ```bash
+  --binners semibin                    # single binner, no MetaWRAP (default)
+  --binners semibin,metabat2           # two binners + MetaWRAP refinement
+  --binners semibin,metabat2,comebin   # all three binners + MetaWRAP refinement
+  ```
+- **YAML example**:
+  ```yaml
+  include_binning: true
+  binners: "semibin,metabat2"
+  ```
 
 #### `--metabat_minContig`
 - **Type**: Integer

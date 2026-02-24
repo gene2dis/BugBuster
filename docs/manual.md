@@ -275,6 +275,7 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
 | `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `none` | Taxonomic profiling tool |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
+| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables MetaWRAP |
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
@@ -342,13 +343,23 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 ### 6.8 Binning Options
 
+#### Binner Selection
+
+| Parameter | Default | Options | Description |
+|-----------|---------|---------|-------------|
+| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated list of binners to run. At least one required. MetaWRAP is automatically used when ≥2 binners are selected. |
+
+**Selection logic:**
+- **1 binner selected** → runs that binner only, MetaWRAP skipped, binner output used directly
+- **≥2 binners selected** → runs selected binners + MetaWRAP bin refinement
+
 #### Basic Binning Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
-| `--metawrap_completeness` | `50` | Minimum bin completeness (%) |
-| `--metawrap_contamination` | `10` | Maximum bin contamination (%) |
+| `--metawrap_completeness` | `50` | Minimum bin completeness (%) for MetaWRAP (used when ≥2 binners) |
+| `--metawrap_contamination` | `10` | Maximum bin contamination (%) for MetaWRAP (used when ≥2 binners) |
 | `--semibin_env_model` | `human_gut` | SemiBin environment model |
 
 **SemiBin Environment Models:**
@@ -742,9 +753,9 @@ nextflow run main.nf \
     -profile docker
 ```
 
-### Example 3: Full Pipeline with Binning
+### Example 3: Full Pipeline with Binning (Single Binner - Fast)
 
-Complete analysis including MAG recovery:
+Complete analysis using the default single binner (no MetaWRAP overhead):
 
 ```bash
 nextflow run main.nf \
@@ -754,10 +765,45 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler sourmash \
     --include_binning true \
+    --binners semibin \
+    --semibin_env_model human_gut \
+    -profile singularity
+```
+
+### Example 3b: Full Pipeline with Binning + MetaWRAP Refinement
+
+Run multiple binners and combine results with MetaWRAP for higher quality MAGs:
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --quality_control true \
+    --assembly_mode assembly \
+    --taxonomic_profiler sourmash \
+    --include_binning true \
+    --binners semibin,metabat2 \
     --semibin_env_model human_gut \
     --metawrap_completeness 50 \
     --metawrap_contamination 10 \
     -profile singularity
+```
+
+**YAML equivalent (`params.yaml`):**
+```yaml
+input: "samplesheet.csv"
+output: "./results"
+quality_control: true
+assembly_mode: "assembly"
+taxonomic_profiler: "sourmash"
+include_binning: true
+binners: "semibin,metabat2"
+semibin_env_model: "human_gut"
+metawrap_completeness: 50
+metawrap_contamination: 10
+```
+```bash
+nextflow run main.nf -params-file params.yaml -profile singularity
 ```
 
 ### Example 4: ARG-Focused Analysis

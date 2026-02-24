@@ -48,6 +48,7 @@ process COMEBIN {
     """
     set -euo pipefail
     
+    rm -rf ${prefix}_comebin_bins
     mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
     
     # Validate minimum contig count
@@ -64,6 +65,18 @@ process COMEBIN {
         exit 0
     fi
     
+    # Compute N50 and set contrastive loss temperature accordingly
+    n50=\$(awk '/^>/{if(seq) print length(seq); seq=""} !/^>/{seq=seq\$0} END{if(seq) print length(seq)}' ${contigs} \\
+        | sort -rn \\
+        | awk 'BEGIN{s=0} {a[NR]=\$1; s+=\$1} END{t=s/2; c=0; for(i=1;i<=NR;i++){c+=a[i]; if(c>=t){print a[i]; exit}}}')
+    temp_flag=""
+    if [[ \$n50 -lt 10000 ]]; then
+        echo "INFO: N50=\$n50 < 10000, setting temperature -l 0.15" >&2
+        temp_flag="-l 0.15"
+    else
+        echo "INFO: N50=\$n50 >= 10000, using default temperature" >&2
+    fi
+    
     # Run COMEBIN with retry logic and adjusted parameters
     set +e
     exit_code=0
@@ -72,30 +85,36 @@ process COMEBIN {
             -a ${contigs} \\
             -p ./ \\
             -o ${prefix}_comebin_bins \\
-            -n 8 \\
-            -t ${task.cpus}
+            -n 6 \\
+            -t ${task.cpus} \\
+            -b 512 \\
+            -e 1024 \\
+            -c 1024 \\
+            \$temp_flag
         exit_code=\$?
     elif [[ ${task.attempt} == 2 ]]; then
         bash run_comebin.sh \\
             -a ${contigs} \\
             -p ./ \\
             -o ${prefix}_comebin_bins \\
-            -n 8 \\
+            -n 4 \\
             -t ${task.cpus} \\
-            -b 896 \\
-            -e 1792 \\
-            -c 1792
+            -b 256 \\
+            -e 512 \\
+            -c 512 \\
+            \$temp_flag
         exit_code=\$?
     elif [[ ${task.attempt} == 3 ]]; then
         bash run_comebin.sh \\
             -a ${contigs} \\
             -p ./ \\
             -o ${prefix}_comebin_bins \\
-            -n 8 \\
+            -n 4 \\
             -t ${task.cpus} \\
-            -b 512 \\
-            -e 1024 \\
-            -c 1024
+            -b 128 \\
+            -e 256 \\
+            -c 256 \\
+            \$temp_flag
         exit_code=\$?
     fi
     set -e

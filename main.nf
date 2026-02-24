@@ -59,6 +59,7 @@ def printHelp() {
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
+      --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
@@ -123,6 +124,19 @@ if (!params.output) {
     exit 1
 }
 
+// Parse and validate binners parameter
+def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
+def valid_binners = ['comebin', 'semibin', 'metabat2']
+def invalid_binners = binners_list.findAll { !(it in valid_binners) }
+if (binners_list.isEmpty()) {
+    log.error "ERROR: --binners must specify at least one binner. Valid options: ${valid_binners.join(', ')}"
+    exit 1
+}
+if (invalid_binners) {
+    log.error "ERROR: Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}"
+    exit 1
+}
+
 // Print run configuration
 log.info "  Run configuration:"
 log.info "  -------------------"
@@ -132,6 +146,7 @@ log.info "  Quality control      : ${params.quality_control}"
 log.info "  Assembly mode        : ${params.assembly_mode}"
 log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
 log.info "  Include binning      : ${params.include_binning}"
+log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
 log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
 log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
 log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"

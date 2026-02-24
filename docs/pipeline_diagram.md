@@ -60,23 +60,20 @@
         └───────┬───────┘   └───────┬───────┘   └───────────────┘
                 │                   │
                 ▼                   ▼
-        ┌───────────────┐   ┌───────────────┐
-        │ CALCULATE_    │   │  NT_BLASTN    │
-        │   DEPTH       │   │  SAMTOOLS_IDX │
-        └───────┬───────┘   │  BLOBTOOLS    │
-                │           │  BLOBPLOT     │
-                ▼           └───────┬───────┘
-        ┌───────────────┐           │
-        │  METABAT2     │           ▼
-        │  SEMIBIN      │   ┌───────────────┐
-        │  COMEBIN      │   │  PRODIGAL     │
-        └───────┬───────┘   │  DEEPARG      │
-                │           │  ARG_CONTIG   │
-                ▼           │  ARG_BLOBPLOT │
-        ┌───────────────┐   └───────────────┘
-        │   METAWRAP    │
-        │ (Refinement)  │
-        └───────┬───────┘
+        ┌───────────────┐        ┌───────────────┐
+        │ Selected      │   │  NT_BLASTN    │
+        │ Binners:      │   │  SAMTOOLS_IDX │
+        │ METABAT2 *    │   │  BLOBTOOLS    │
+        │ SEMIBIN  *    │   │  BLOBPLOT     │
+        │ COMEBIN  *    │   └───────┬───────┘
+        │ (* if chosen) │           │
+        └───────┬───────┘           ▼
+                │           ┌───────────────┐
+                ▼           │  PRODIGAL     │
+        ┌───────────────┐   │  DEEPARG      │
+        │   METAWRAP    │   │  ARG_CONTIG   │
+        │(if ≥2 binners)│   │  ARG_BLOBPLOT │
+        └───────┬───────┘   └───────────────┘
                 │
         ┌───────┴───────┐
         │               │
@@ -137,15 +134,15 @@
 | `BBMAP` | Contig length filtering |
 
 ### Binning (BINNING Subworkflow - Mode-Agnostic)
-| Module | Description |
-|--------|-------------|
-| `CALCULATE_DEPTH` | Calculate contig depth from BAM files |
-| `METABAT2` | Binning by coverage and composition |
-| `SEMIBIN` | Semi-supervised binning |
-| `COMEBIN` | Contrastive learning binning |
-| `METAWRAP` | Bin refinement and consolidation |
-| `BOWTIE2_SAMTOOLS_DEPTH` | Calculate bin coverage (co-assembly only) |
-| `BEDTOOLS` | Coverage statistics (co-assembly only) |
+| Module | Condition | Description |
+|--------|-----------|-------------|
+| `CALCULATE_DEPTH` | if `metabat2` selected | Calculate contig depth from BAM files |
+| `METABAT2` | if `metabat2` in `--binners` | Binning by coverage and composition |
+| `SEMIBIN` | if `semibin` in `--binners` | Semi-supervised binning |
+| `COMEBIN` | if `comebin` in `--binners` | Contrastive learning binning |
+| `METAWRAP` | if ≥2 binners selected | Bin refinement and consolidation |
+| `BOWTIE2_SAMTOOLS_DEPTH` | co-assembly only | Calculate bin coverage |
+| `BEDTOOLS` | co-assembly only | Coverage statistics |
 
 ### Quality Assessment & Reporting
 | Module | Description |
@@ -208,12 +205,24 @@
 ### Unified Binning Workflow
 The BINNING subworkflow is **mode-agnostic**, handling both per-sample assembly and co-assembly modes with a single unified workflow:
 - Takes `contigs_and_bam` input directly
-- Runs three binning tools in parallel (MetaBAT2, SemiBin, COMEBin)
-- Refines bins with MetaWRAP
-- Assesses quality with CheckM2 and classifies with GTDB-Tk
+- Runs only the binners specified in `--binners` (default: `semibin`)
+- **MetaWRAP is only invoked when ≥2 binners are selected** — when a single binner is used, its output passes directly downstream
+- Assesses quality with CheckM2 and classifies with GTDB-Tk (always runs)
 - Generates mode-specific reports:
   - **Assembly mode**: Simple quality and taxonomy reports
   - **Co-assembly mode**: Additional bin coverage analysis and comprehensive summary
+
+**Binner selection examples:**
+```bash
+# Default - single fast binner, no MetaWRAP
+--include_binning true --binners semibin
+
+# Two binners - triggers MetaWRAP refinement
+--include_binning true --binners semibin,metabat2
+
+# All three binners
+--include_binning true --binners semibin,metabat2,comebin
+```
 
 ### Database Preparation
 The PREPARE_DATABASES subworkflow handles all database downloads and formatting:

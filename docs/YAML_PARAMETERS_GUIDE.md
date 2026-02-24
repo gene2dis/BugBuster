@@ -350,6 +350,105 @@ See the `examples/` directory for complete YAML examples:
 - `params_human_mouse.yaml` - Human + mouse specific example
 - `params_production.yaml` - Full production configuration
 
+## Binning Configuration
+
+### Selecting Binners
+
+Use the `binners` parameter to choose which binning tools to run. Accepts a comma-separated string with any combination of `semibin`, `metabat2`, and `comebin`. At least one is required when `include_binning: true`.
+
+**Key rule:** MetaWRAP bin refinement is **only invoked when ≥2 binners are selected**.
+
+#### Single Binner (Fast, Default)
+
+```yaml
+include_binning: true
+binners: "semibin"
+semibin_env_model: "human_gut"
+```
+
+```bash
+nextflow run main.nf --input samplesheet.csv --output results \
+    --include_binning true --binners semibin --semibin_env_model human_gut \
+    -profile docker
+```
+
+#### Two Binners + MetaWRAP Refinement
+
+```yaml
+include_binning: true
+binners: "semibin,metabat2"
+semibin_env_model: "human_gut"
+metawrap_completeness: 50
+metawrap_contamination: 10
+```
+
+```bash
+nextflow run main.nf --input samplesheet.csv --output results \
+    --include_binning true --binners semibin,metabat2 \
+    --semibin_env_model human_gut \
+    --metawrap_completeness 50 --metawrap_contamination 10 \
+    -profile docker
+```
+
+#### All Three Binners + MetaWRAP Refinement
+
+```yaml
+include_binning: true
+binners: "semibin,metabat2,comebin"
+semibin_env_model: "human_gut"
+metawrap_completeness: 50
+metawrap_contamination: 10
+```
+
+```bash
+nextflow run main.nf --input samplesheet.csv --output results \
+    --include_binning true --binners semibin,metabat2,comebin \
+    --metawrap_completeness 50 --metawrap_contamination 10 \
+    -profile docker
+```
+
+#### Complete Binning Configuration in YAML
+
+```yaml
+# Input/Output
+input: "samplesheet.csv"
+output: "results"
+
+# Pipeline
+assembly_mode: "assembly"
+taxonomic_profiler: "sourmash"
+include_binning: true
+
+# Binner selection — ≥2 enables MetaWRAP refinement automatically
+binners: "semibin,metabat2"
+
+# SemiBin
+semibin_env_model: "human_gut"
+
+# MetaWRAP thresholds (only used when ≥2 binners selected)
+metawrap_completeness: 50
+metawrap_contamination: 10
+
+# MetaBAT2 contig filter (only used when metabat2 selected)
+metabat_minContig: 2500
+```
+
+### Valid Binner Values
+
+| Value | Tool | Notes |
+|-------|------|-------|
+| `semibin` | SemiBin2 | Fast; requires `--semibin_env_model` |
+| `metabat2` | MetaBAT2 | Requires contig depth calculation |
+| `comebin` | COMEBin | Slow on CPU; best with GPU |
+
+### Important Notes
+
+- `binners` accepts a **comma-separated string without spaces**: `"semibin,metabat2"` ✅, `"semibin, metabat2"` ❌
+- `metawrap_completeness` and `metawrap_contamination` are **ignored** when only one binner is selected
+- CheckM2 and GTDB-Tk **always run** regardless of binner selection
+
+---
+
 ## References
 
 - **Nextflow Parameters**: https://www.nextflow.io/docs/latest/config.html#scope-params
