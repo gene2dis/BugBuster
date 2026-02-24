@@ -1,5 +1,6 @@
 process KARGA {
     container 'quay.io/ffuentessantander/karga:1.1'
+    containerOptions '-v /bin/ps:/usr/bin/ps:ro -v /bin/ps:/bin/ps:ro -v /lib/x86_64-linux-gnu/libprocps.so.8:/lib64/libprocps.so.8:ro'
 
     label 'process_low'
 
@@ -19,7 +20,7 @@ process KARGA {
                 cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
         fi
 
-        java -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB -cp /bin/ KARGA k:17 d:${karga_db} r:n ${prefix}_all_reads.fastq.gz
+        java -XX:ActiveProcessorCount=${task.cpus} -Xmx${task.memory.toGiga()}g -cp /bin/ KARGA k:17 d:${karga_db} r:n ${prefix}_all_reads.fastq.gz
         rm -f ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGA_mappedGenes.csv ]]; then
