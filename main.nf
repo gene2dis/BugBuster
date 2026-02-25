@@ -269,6 +269,7 @@ workflow {
     if ( params.rgi_prediction ) {
         // Store rgi_card_db to allow reuse
         ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
+            .ifEmpty { error "ERROR: RGI database is empty. Ensure params.rgi_prediction is enabled and a valid CARD database is configured." }
         
         // RGI bwt: Align reads to CARD AMR alleles
         ch_rgi_bwt = RGI_BWT(
@@ -312,8 +313,10 @@ workflow {
         if ( params.include_binning ) {
             BINNING(
                 ASSEMBLY.out.bam,
-                PREPARE_DATABASES.out.checkm2_db,
-                PREPARE_DATABASES.out.gtdbtk_db,
+                PREPARE_DATABASES.out.checkm2_db
+                    .ifEmpty { error "ERROR: CheckM2 database is empty. Ensure params.include_binning is enabled and a valid CheckM2 database is configured." },
+                PREPARE_DATABASES.out.gtdbtk_db
+                    .ifEmpty { error "ERROR: GTDB-Tk database is empty. Ensure params.include_binning is enabled and a valid GTDB-Tk database is configured." },
                 ch_clean_reads
             )
             ch_refined_bins = BINNING.out.refined_bins
@@ -331,7 +334,8 @@ workflow {
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
-        ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db))
+        ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
+            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }))
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -362,7 +366,8 @@ workflow {
             "gff"  // output_format
         )
         ch_contig_proteins = PRODIGAL_CONTIGS.out.amino_acid_fasta
-        ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db))
+        ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
+            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
             ch_contig_args.only_deeparg
                 .concat(ch_blob_table.only_blob)
@@ -381,37 +386,8 @@ workflow {
         ch_clusters = CLUSTERING(ch_arg_fasta.collect())
     }
 
-    //
-    // MULTIQC: Aggregate QC reports
-    // nf-core MULTIQC signature:
-    //   input: path(multiqc_files) + path(config) + path(extra_config) + path(logo) + path(replace_names) + path(sample_names)
-    //   output: path("*.html"), emit: report
-    //
-    ch_multiqc_files = Channel.empty()
-    
-    // Collect FASTP reports if QC was run
-    if ( params.quality_control ) {
-        ch_multiqc_files = ch_multiqc_files.mix(
-            QC.out.fastp_json.collect{ _meta, json -> json }.ifEmpty([])
-        )
-    }
-    
-    // Collect Kraken2 reports if taxonomy was run
-    if ( params.taxonomic_profiler == "kraken2" ) {
-        ch_multiqc_files = ch_multiqc_files.mix(
-            TAXONOMY.out.versions.ifEmpty([])
-        )
-    }
-    
-    // Run MultiQC
-    //NFCORE_MULTIQC(
-    //    ch_multiqc_files.collect().ifEmpty([]),
-    //    file("${projectDir}/assets/multiqc_config.yml", checkIfExists: true),
-    //    [],  // extra_multiqc_config
-    //    [],  // multiqc_logo
-    //    [],  // replace_names
-    //    []   // sample_names
-    //)
+    // TODO: Re-enable MultiQC aggregate reporting once module wiring is stabilized
+    // NFCORE_MULTIQC(ch_multiqc_files, config, [], [], [], [])
 
 }
 

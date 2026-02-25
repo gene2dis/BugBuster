@@ -56,7 +56,7 @@ workflow TAXONOMY {
             KRAKEN2.out.report.map { _meta, report -> report }.collect(),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'kraken2',
-            params.kraken_db_used
+            params.kraken2_db
         )
         ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
         
@@ -64,7 +64,7 @@ workflow TAXONOMY {
         TAXONOMY_PHYLOSEQ(
             BRACKEN.out.txt.map { _meta, report -> report }.collect(),
             'kraken2',
-            params.kraken_db_used,
+            params.kraken2_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
             params.taxonomy_top_n_taxa ?: 10
         )
@@ -76,7 +76,7 @@ workflow TAXONOMY {
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
                 TAXONOMY_PHYLOSEQ.out.sample_metadata,
-                params.kraken_db_used
+                params.kraken2_db
             )
             ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
         }
@@ -89,7 +89,7 @@ workflow TAXONOMY {
         // Run Sourmash classification
         ch_sm_taxonomy = SOURMASH(
             reads.combine(sourmash_db),
-            params.sourmash_db_name,
+            params.sourmash_db,
             params.sourmash_tax_rank
         )
         
@@ -98,7 +98,7 @@ workflow TAXONOMY {
             ch_sm_taxonomy.report.collect(),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'sourmash',
-            params.sourmash_db_name
+            params.sourmash_db
         )
         ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
         
@@ -106,7 +106,7 @@ workflow TAXONOMY {
         TAXONOMY_PHYLOSEQ(
             ch_sm_taxonomy.sourmash_gather.collect(),
             'sourmash',
-            params.sourmash_db_name,
+            params.sourmash_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
             params.taxonomy_top_n_taxa ?: 10
         )
@@ -118,7 +118,7 @@ workflow TAXONOMY {
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
                 TAXONOMY_PHYLOSEQ.out.sample_metadata,
-                params.sourmash_db_name
+                params.sourmash_db
             )
             ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
         }

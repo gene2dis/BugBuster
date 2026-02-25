@@ -104,8 +104,6 @@ workflow PREPARE_DATABASES {
         if ( params.custom_decontamination_index ) {
             // Use pre-built combined index
             ch_decontamination_index = Channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
-            ch_phix_index = ch_decontamination_index
-            ch_host_index = ch_decontamination_index
         } else {
             // Collect FASTA file paths into lists
             def phix_files = params.custom_phiX_fasta ? 
@@ -127,15 +125,9 @@ workflow PREPARE_DATABASES {
             
             // Extract only the index output (not versions)
             ch_decontamination_index = BOWTIE2_BUILD_COMBINED.out.index
-            
-            // Keep legacy outputs for backward compatibility (deprecated)
-            ch_phix_index = ch_decontamination_index
-            ch_host_index = ch_decontamination_index
         }
     } else {
         ch_decontamination_index = Channel.empty()
-        ch_phix_index = Channel.empty()
-        ch_host_index = Channel.empty()
     }
 
     //
@@ -209,8 +201,6 @@ workflow PREPARE_DATABASES {
     karga_db               = ch_karga_db
     kargva_db              = ch_kargva_db
     decontamination_index  = ch_decontamination_index  // Combined phiX + host index
-    phix_index             = ch_phix_index             // Deprecated: use decontamination_index
-    host_index             = ch_host_index             // Deprecated: use decontamination_index
     deeparg_db             = ch_deeparg_db
     blast_db               = ch_blast_db
     taxdump                = ch_taxdump

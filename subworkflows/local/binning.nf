@@ -52,7 +52,7 @@ workflow BINNING {
     reads           // channel: [ val(meta), [ reads ] ] - optional, only for co-assembly bin coverage
 
     main:
-    ch_versions = channel.empty()
+    ch_versions = Channel.empty()
 
     // Parse selected binners
     def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
@@ -129,11 +129,13 @@ workflow BINNING {
         .flatMap { meta_list, reports ->
             // Group reports by sample
             def sample_reports = [:]
-            reports.each { report ->
+            def report_files = reports instanceof List ? reports : [reports]
+            report_files.each { report ->
                 // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                // Use findLastIndexOf to correctly handle sample names that contain binner keywords
                 def filename = report.name
                 def parts = filename.tokenize('_')
-                def binnerIdx = parts.findIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
                 def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
                 
                 if (!sample_reports.containsKey(sample_id)) {
@@ -161,10 +163,11 @@ workflow BINNING {
             .flatMap { meta_list, reports ->
                 // Group reports by sample
                 def sample_reports = [:]
-                reports.each { report ->
+                def report_files = reports instanceof List ? reports : [reports]
+                report_files.each { report ->
                     def filename = report.name
                     def parts = filename.tokenize('_')
-                    def binnerIdx = parts.findIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
                     def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
                     
                     if (!sample_reports.containsKey(sample_id)) {
@@ -208,11 +211,13 @@ workflow BINNING {
         .flatMap { meta_list, reports ->
             // Group reports by sample
             def sample_reports = [:]
-            reports.each { report ->
+            def report_files = reports instanceof List ? reports : [reports]
+            report_files.each { report ->
                 // Extract sample_id from filename: S10_Ago2021_gtdbtk_bac120.tsv -> S10_Ago2021
+                // Use findLastIndexOf to correctly handle sample names that contain 'gtdbtk'
                 def filename = report.name
                 def parts = filename.tokenize('_')
-                def gtdbIdx = parts.findIndexOf { part -> part == 'gtdbtk' }
+                def gtdbIdx = parts.findLastIndexOf { part -> part == 'gtdbtk' }
                 def sample_id = gtdbIdx > 0 ? parts[0..<gtdbIdx].join('_') : parts[0]
                 
                 if (!sample_reports.containsKey(sample_id)) {

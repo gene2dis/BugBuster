@@ -39,13 +39,13 @@ workflow ASSEMBLY {
     reads_coassembly   // channel: path(reads) - collected reads for coassembly
 
     main:
-    ch_versions = channel.empty()
-    ch_contigs_with_reads = channel.empty()
-    ch_contigs_only = channel.empty()
-    ch_bam_with_contigs = channel.empty()
-    ch_bam_only = channel.empty()
-    ch_filter_reports = channel.empty()
-    ch_empty_reports = channel.empty()
+    ch_versions = Channel.empty()
+    ch_contigs_with_reads = Channel.empty()
+    ch_contigs_only = Channel.empty()
+    ch_bam_with_contigs = Channel.empty()
+    ch_bam_only = Channel.empty()
+    ch_filter_reports = Channel.empty()
+    ch_empty_reports = Channel.empty()
 
     //
     // Per-sample assembly mode
@@ -85,9 +85,11 @@ workflow ASSEMBLY {
     // Co-assembly mode
     //
     if ( params.assembly_mode == "coassembly" ) {
-        // Prepare coassembly input: create meta and combine with collected reads
-        ch_coassembly_input = channel.of([id: "coassembly"])
-            .combine(reads_coassembly.collect())
+        // Prepare coassembly input: collect all reads from per-sample channel and pool them
+        ch_coassembly_input = reads
+            .map { _meta, reads_files -> reads_files }
+            .collect()
+            .map { all_reads -> [[id: "coassembly"], all_reads.flatten()] }
         
         // Co-assemble all reads with unified MEGAHIT process
         MEGAHIT(ch_coassembly_input)

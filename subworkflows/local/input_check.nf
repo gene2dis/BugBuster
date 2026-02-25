@@ -13,6 +13,8 @@ workflow INPUT_CHECK {
     samplesheet // file: /path/to/samplesheet.csv
 
     main:
+    check_duplicates(samplesheet)
+
     channel
         .fromPath(samplesheet)
         .ifEmpty { error "Cannot find samplesheet file: ${samplesheet}" }
