@@ -130,9 +130,6 @@ process BOWTIE2_SAMTOOLS {
                 -@ ${task.cpus} \\
                 -o ${prefix}_paired.bam -
         
-        # CLEANUP: Remove Bowtie2 index files immediately after alignment
-        rm -f ${prefix}_index*.bt2 2>/dev/null || true
-        
         # Handle singleton reads if present
         if [ -n "\$Singleton_list" ]; then
             bowtie2 \\
@@ -146,6 +143,9 @@ process BOWTIE2_SAMTOOLS {
                     -@ ${task.cpus} \\
                     -o ${prefix}_singleton.bam -
             
+            # CLEANUP: Remove Bowtie2 index files after singleton alignment
+            rm -f ${prefix}_index*.bt2 2>/dev/null || true
+            
             # Merge paired and singleton BAMs
             samtools merge \\
                 -@ ${task.cpus} \\
@@ -158,6 +158,8 @@ process BOWTIE2_SAMTOOLS {
         else
             # No singletons - rename paired BAM
             mv ${prefix}_paired.bam ${prefix}_all_reads.bam
+            # CLEANUP: Remove Bowtie2 index files
+            rm -f ${prefix}_index*.bt2 2>/dev/null || true
         fi
         
         # CLEANUP: Remove log files
@@ -229,9 +231,6 @@ process BOWTIE2_SAMTOOLS {
                 -@ ${task.cpus} \\
                 -o ${prefix}_paired.bam -
         
-        # CLEANUP: Remove Bowtie2 index files immediately after alignment
-        rm -f ${prefix}_index*.bt2 2>/dev/null || true
-        
         # Handle singleton reads if present
         if [ ${reads.size()} -gt 2 ]; then
             bowtie2 \\
@@ -245,6 +244,9 @@ process BOWTIE2_SAMTOOLS {
                     -@ ${task.cpus} \\
                     -o ${prefix}_singleton.bam -
             
+            # CLEANUP: Remove Bowtie2 index files after singleton alignment
+            rm -f ${prefix}_index*.bt2 2>/dev/null || true
+            
             # Merge paired and singleton BAMs
             samtools merge \\
                 -@ ${task.cpus} \\
@@ -257,6 +259,8 @@ process BOWTIE2_SAMTOOLS {
         else
             # No singletons - rename paired BAM
             mv ${prefix}_paired.bam ${prefix}_all_reads.bam
+            # CLEANUP: Remove Bowtie2 index files
+            rm -f ${prefix}_index*.bt2 2>/dev/null || true
         fi
         
         # CLEANUP: Remove log files

@@ -22,7 +22,7 @@ process DEEPARG_BINS {
         cd tmp_bins
         
         # Parallel processing of bins using background jobs
-        bin_count=0
+        pids=()
         for bin_prot in *.faa; do
             bin_name=\$(echo \$bin_prot | sed -E 's/_proteins.faa//g')
             
@@ -36,16 +36,17 @@ process DEEPARG_BINS {
                     --input \${bin_prot} \\
                     --out \${bin_name}_deep_arg.out
             ) &
+            pids+=(\$!)
             
-            # Limit concurrent jobs to number of CPUs
-            bin_count=\$((bin_count + 1))
-            if [ \$((bin_count % ${task.cpus})) -eq 0 ]; then
-                wait
+            # When we reach max concurrent jobs, wait for each to finish
+            if [ \${#pids[@]} -ge ${task.cpus} ]; then
+                for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
+                pids=()
             fi
         done
         
         # Wait for all remaining jobs
-        wait
+        for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
         
         mv *.mapping.ARG ../${prefix}_deeparg_results/
         cd ..

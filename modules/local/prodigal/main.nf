@@ -23,7 +23,7 @@ process PRODIGAL_BINS {
         mkdir ${prefix}_bins_proteins
 
         # Improved parallelization: run up to task.cpus jobs concurrently
-        job_count=0
+        pids=()
         for file in *.fa; do
             file_name=\$(echo \$file | sed 's/.fa//g')
             
@@ -34,16 +34,17 @@ process PRODIGAL_BINS {
                     -a ${prefix}_\${file_name}_proteins.faa \\
                     -p single
             ) &
+            pids+=(\$!)
             
-            # Increment counter and wait if we've reached max concurrent jobs
-            job_count=\$((job_count + 1))
-            if [ \$((job_count % ${task.cpus})) -eq 0 ]; then
-                wait
+            # When we reach max concurrent jobs, wait for each to finish
+            if [ \${#pids[@]} -ge ${task.cpus} ]; then
+                for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
+                pids=()
             fi
         done
         
         # Wait for all remaining jobs to complete
-        wait
+        for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
         
         mv *_genes.gff ${prefix}_bins_genes
         mv *_proteins.faa ${prefix}_bins_proteins
