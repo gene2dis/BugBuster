@@ -40,7 +40,9 @@ flowchart TD
     ARGContigReport --> ARGBlobplot[ARG_BLOBPLOT]
     
     %% MetaCerberus Branch
-    Contigs -->|if assembly_mode==assembly<br/>& contig_level_metacerberus| MetaCerberus[METACERBERUS_CONTIGS<br/>Functional Annotation]
+    CleanReads -->|if metacerberus_levels includes reads| MetaCerberusReads[METACERBERUS_READS<br/>Read-level Functional Annotation]
+    Contigs -->|if metacerberus_levels includes contigs| MetaCerberus[METACERBERUS_CONTIGS<br/>Contig-level Functional Annotation]
+    RefinedBins -->|if metacerberus_levels includes bins| MetaCerberusBins[METACERBERUS_BINS_BATCH<br/>Bin-level Functional Annotation]
     
     %% Bin ARG Clustering Branch
     RefinedBins -->|if arg_bin_clustering| BinARG[PRODIGAL_BINS → DEEPARG_BINS]
@@ -275,7 +277,8 @@ flowchart TD
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
-| `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
+| `metacerberus_levels` | `'none'` | MetaCerberus levels: comma-separated reads, contigs, bins, or none |
+| `metacerberus_hmm` | `'KOFam_all,COG,VOG,PHROG,CAZy'` | Comma-separated HMM databases for MetaCerberus |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
 
 ---

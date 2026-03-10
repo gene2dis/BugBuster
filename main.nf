@@ -63,7 +63,9 @@ def printHelp() {
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
-      --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
+      --metacerberus_levels         MetaCerberus levels: comma-separated reads,contigs,bins or none (default: ${params.metacerberus_levels})
+      --metacerberus_hmm            Comma-separated HMM databases: KOFam_all,COG,VOG,PHROG,CAZy (default: ${params.metacerberus_hmm})
+      --metacerberus_db             Path to MetaCerberus HMM database directory (default: ${params.metacerberus_db})
 
     \u001B[1;33mResource options:\u001B[0m
       --max_cpus                    Maximum CPUs per process (default: ${params.max_cpus})
@@ -137,6 +139,16 @@ if (invalid_binners) {
     exit 1
 }
 
+// Parse and validate metacerberus_levels parameter
+def metacerberus_levels = (params.metacerberus_levels == null || params.metacerberus_levels.toString().toLowerCase() == 'none') ? [] :
+    params.metacerberus_levels.toString().tokenize(',').collect { it.trim().toLowerCase() }
+def valid_mc_levels = ['reads', 'contigs', 'bins']
+def invalid_mc_levels = metacerberus_levels.findAll { !(it in valid_mc_levels) }
+if (invalid_mc_levels) {
+    log.error "ERROR: Invalid MetaCerberus level(s): ${invalid_mc_levels.join(', ')}. Valid options: ${valid_mc_levels.join(', ')}"
+    exit 1
+}
+
 // Print run configuration
 log.info "  Run configuration:"
 log.info "  -------------------"
@@ -150,6 +162,7 @@ log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size
 log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
 log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
 log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+log.info "  MetaCerberus levels  : ${metacerberus_levels ? metacerberus_levels.join(', ') : 'none'}"
 log.info ""
 
 /*
@@ -169,7 +182,9 @@ include { BINNING            } from './subworkflows/local/binning'
 // Modules for functionality not covered by subworkflows
 
 	// FUNCTIONAL ANNOTATION
-include { METACERBERUS_CONTIGS } from './modules/local/metacerberus/main'
+include { METACERBERUS_READS      } from './modules/local/metacerberus/main'
+include { METACERBERUS_CONTIGS    } from './modules/local/metacerberus/main'
+include { METACERBERUS_BINS_BATCH } from './modules/local/metacerberus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { NT_BLASTN        } from './modules/local/nt_blastn/main'
@@ -322,12 +337,27 @@ workflow {
             ch_refined_bins = BINNING.out.refined_bins
         }
 
-        //
-        // MetaCerberus annotation (per-sample assembly only)
-        //
-        if ( params.assembly_mode == "assembly" && params.contig_level_metacerberus ) {
+        if ( 'contigs' in metacerberus_levels ) {
             METACERBERUS_CONTIGS(ch_contigs_meta)
         }
+        if ( 'bins' in metacerberus_levels && params.include_binning ) {
+            ch_all_refined_for_mc = ch_refined_bins
+                .filter { _meta, bins -> bins != null }
+                .toList()
+                .map { items ->
+                    def meta_list = items.collect { item -> item[0] }
+                    def all_paths = items.collect { item -> item[1] }
+                    [meta_list, all_paths]
+                }
+            METACERBERUS_BINS_BATCH(ch_all_refined_for_mc)
+        }
+    }
+
+    //
+    // MetaCerberus reads-level annotation (runs independently of assembly mode)
+    //
+    if ( 'reads' in metacerberus_levels ) {
+        METACERBERUS_READS(ch_clean_reads)
     }
 
     //

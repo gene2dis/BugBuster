@@ -191,7 +191,8 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
+| `--metacerberus_levels` | `none` | MetaCerberus functional annotation: comma-separated `reads`, `contigs`, `bins`, or `none` |
+| `--metacerberus_hmm` | `KOFam_all,COG,VOG,PHROG,CAZy` | Comma-separated HMM databases for MetaCerberus |
 | `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
 
 ### Database Selection
@@ -310,7 +311,7 @@ results/
 │   ├── contig_level/           # DeepARG (if contig_tax_and_arg=true)
 │   └── bin_level/              # Bin ARG clustering (if arg_bin_clustering=true)
 ├── 06_contig_taxonomy/         # BlobTools plots (if contig_tax_and_arg=true)
-└── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
+└── 07_functional_annotation/   # MetaCerberus (if metacerberus_levels!=none)
 ```
 
 **Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).

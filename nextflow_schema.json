@@ -82,11 +82,22 @@
                     "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
                     "fa_icon": "fas fa-microscope"
                 },
-                "contig_level_metacerberus": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable contig-level functional annotation with MetaCerberus.",
+                "metacerberus_levels": {
+                    "type": "string",
+                    "default": "none",
+                    "description": "Comma-separated levels to run MetaCerberus functional annotation: reads, contigs, bins, or none.",
                     "fa_icon": "fas fa-tags"
+                },
+                "metacerberus_hmm": {
+                    "type": "string",
+                    "default": "KOFam_all,KOFam_prokaryote,COG,VOG,PHROG,CAZy,MetHMMDB,Pfam",
+                    "description": "Comma-separated list of HMM databases for MetaCerberus: KOFam_all, KOFam_eukaryote, KOFam_prokaryote, COG, VOG, PHROG, CAZy, MetHMMDB, Pfam.",
+                    "fa_icon": "fas fa-database"
+                },
+                "metacerberus_db": {
+                    "type": "string",
+                    "description": "Path to directory where MetaCerberus HMM databases are stored. Defaults to <databases_dir>/metacerberus.",
+                    "fa_icon": "fas fa-folder-open"
                 },
                 "arg_bin_clustering": {
                     "type": "boolean",

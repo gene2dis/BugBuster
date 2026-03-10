@@ -279,7 +279,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
+| `--metacerberus_levels` | `none` | `reads`, `contigs`, `bins`, `none` | Comma-separated levels to run MetaCerberus functional annotation |
+| `--metacerberus_hmm` | `KOFam_all,COG,VOG,PHROG,CAZy` | Any valid HMM database names | Comma-separated HMM databases for MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
 
@@ -440,13 +441,17 @@ Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
 
 ### 6.12 MetaCerberus Options
 
+MetaCerberus is **disabled by default** (`--metacerberus_levels none`). Activate it by specifying one or more levels.
+
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--metacerberus_hmm` | `"KOFam_all, COG, VOG, PHROG, CAZy"` | HMM databases to use |
+| `--metacerberus_levels` | `none` | Comma-separated levels to run: `reads`, `contigs`, `bins`, or `none` |
+| `--metacerberus_hmm` | `KOFam_all,KOFam_prokaryote,COG,VOG,PHROG,CAZy,MetHMMDB,Pfam` | Comma-separated HMM databases to use |
+| `--metacerberus_db` | `<databases_dir>/metacerberus` | Path to directory where HMM databases are stored |
 | `--metacerberus_minscore` | `25` | Minimum HMM score |
 | `--metacerberus_evalue` | `1e-09` | Maximum E-value |
 
-**Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
+**Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`, `MetHMMDB`, `Pfam`
 
 ### 6.13 Taxonomy Visualization Options
 
@@ -671,13 +676,15 @@ results/
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                                # BlobTools plots
 │       └── *.png
-└── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
+└── 07_functional_annotation/                   # Functional annotation (if metacerberus_levels!=none)
+    ├── reads/                                  # Read-level annotation
+    │   └── {sample}/
+    │       └── {sample}_annotation_results/
     ├── contigs/                                # Contig-level annotation
     │   └── {sample}/
     │       └── {sample}_annotation_results/
     └── bins/                                   # Bin-level annotation
-        └── {sample}/
-            └── {sample}_annotation_results/
+        └── {sample}_{bin}_annotation_results/
 ```
 
 ### Database Storage Directory
@@ -719,7 +726,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
-| `07_functional_annotation/` | `contig_level_metacerberus=true` | Functional annotation results |
+| `07_functional_annotation/` | `metacerberus_levels!=none` | Functional annotation results (reads/contigs/bins) |
 
 ---
 

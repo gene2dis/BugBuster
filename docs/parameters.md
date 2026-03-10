@@ -109,11 +109,23 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG
 - **Example**: `--contig_tax_and_arg true`
 
-### `--contig_level_metacerberus`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Enable contig-level functional annotation with MetaCerberus
-- **Example**: `--contig_level_metacerberus true`
+### `--metacerberus_levels`
+- **Type**: String
+- **Default**: `none`
+- **Description**: Comma-separated levels to run MetaCerberus functional annotation: `reads`, `contigs`, `bins`, or `none`
+- **Example**: `--metacerberus_levels "reads,contigs,bins"`
+
+### `--metacerberus_hmm`
+- **Type**: String
+- **Default**: `KOFam_all,KOFam_prokaryote,COG,VOG,PHROG,CAZy,MetHMMDB,Pfam`
+- **Description**: Comma-separated list of HMM databases for MetaCerberus (options: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`, `MetHMMDB`, `Pfam`)
+- **Example**: `--metacerberus_hmm "KOFam_all,COG"`
+
+### `--metacerberus_db`
+- **Type**: String
+- **Default**: `<databases_dir>/metacerberus`
+- **Description**: Path to the directory where MetaCerberus HMM databases are stored. MetaCerberus will download databases here on first run (via `--db-path`). Override to point to a pre-populated directory.
+- **Example**: `--metacerberus_db /data/databases/metacerberus`
 
 ### `--arg_bin_clustering`
 - **Type**: Boolean
@@ -553,12 +565,24 @@ Override automatic downloads by providing custom database paths:
 
 ## Functional Annotation Parameters
 
+### `--metacerberus_levels`
+- **Type**: String
+- **Default**: `none`
+- **Description**: Comma-separated levels to run MetaCerberus functional annotation: `reads`, `contigs`, `bins`, or `none`. MetaCerberus is disabled by default.
+- **Example**: `--metacerberus_levels "reads,contigs,bins"`
+
 ### `--metacerberus_hmm`
 - **Type**: String
-- **Default**: `"KOFam_all, COG, VOG, PHROG, CAZy"`
-- **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
+- **Default**: `KOFam_all,KOFam_prokaryote,COG,VOG,PHROG,CAZy,MetHMMDB,Pfam`
+- **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`, `MetHMMDB`, `Pfam`
 - **Description**: Comma-separated list of HMM databases to use for MetaCerberus
-- **Example**: `--metacerberus_hmm "KOFam_prokaryote, COG, CAZy"`
+- **Example**: `--metacerberus_hmm "KOFam_prokaryote,COG,CAZy"`
+
+### `--metacerberus_db`
+- **Type**: String
+- **Default**: `<databases_dir>/metacerberus`
+- **Description**: Path to the directory where MetaCerberus HMM databases are stored. MetaCerberus will download databases here on first run. Override to point to a pre-populated directory.
+- **Example**: `--metacerberus_db /data/databases/metacerberus`
 
 ### `--metacerberus_minscore`
 - **Type**: Integer
