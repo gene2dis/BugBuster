@@ -99,14 +99,14 @@ Combine profiles as needed: `-profile slurm,singularity` or `-profile aws,docker
 nextflow run main.nf \
     --input s3://bucket/samplesheet.csv \
     --output s3://bucket/results \
-    -profile aws,docker \
+    -profile aws \
     -work-dir s3://bucket/work
 
 # Google Cloud
 nextflow run main.nf \
     --input gs://bucket/samplesheet.csv \
     --output gs://bucket/results \
-    -profile gcp,docker \
+    -profile gcp \
     --gcp_project my-project \
     -work-dir gs://bucket/work
 ```
