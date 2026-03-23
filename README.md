@@ -1,13 +1,24 @@
 ![image](https://github.com/user-attachments/assets/a10c01f6-ef6c-40c4-a4ac-26a0c4f87564)
+
+[![Nextflow](https://img.shields.io/badge/nextflow%20DSL2-%E2%89%A523.04.0-23aa62.svg)](https://www.nextflow.io/)
+[![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?logo=docker)](https://www.docker.com/)
+[![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg)](https://sylabs.io/docs/)
+
 ## Introduction
 
 **Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible** 
 
-**BugBuster** is a bioinformatics best-practice analysis pipeline for microbial metagenomic and gene resistance.
+**BugBuster** is a bioinformatics best-practice analysis pipeline for microbial metagenomic analysis and antimicrobial resistance gene prediction.
 
-The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation of this pipeline uses one container per process which makes it much easier to maintain and update software dependencies. Where possible, these processes have been submitted to and installed from [nf-core/modules](https://github.com/nf-core/modules) in order to make them available to all nf-core pipelines, and to everyone within the Nextflow community!
+The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool to run tasks across multiple compute infrastructures in a very portable manner. It uses Docker/Singularity containers making installation trivial and results highly reproducible. The [Nextflow DSL2](https://www.nextflow.io/docs/latest/dsl2.html) implementation uses one container per process which makes it easier to maintain and update software dependencies.
 
-On release, automated continuous integration tests run the pipeline on a full-sized dataset on the AWS cloud infrastructure. This ensures that the pipeline runs on AWS, has sensible resource allocation defaults set to run on real-world datasets, and permits the persistent storage of results to benchmark between pipeline releases and other analysis sources.
+### Key Features
+
+- **Multi-platform support**: Run locally, on HPC clusters (SLURM), or cloud (AWS, GCP, Azure)
+- **Flexible execution modes**: Per-sample assembly, co-assembly, or taxonomy-only
+- **Comprehensive analysis**: QC, taxonomy, assembly, binning, and ARG prediction
+- **Automatic database management**: Databases download automatically on first use
+- **Resource optimization**: Dynamic resource allocation with retry strategies
 
 ## Pipeline summary
 ![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/40d02c04-e84e-48b4-b517-c93dccd68abc)
@@ -17,169 +28,295 @@ On release, automated continuous integration tests run the pipeline on a full-si
 2. Remove all samples that not have at least 10.000.000 reads after quality filter. **Can be modified by the user**
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
-5. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
-6. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
-7. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
-8. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
-9. Read traceback and taxonomic reports.
-10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
-11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
-13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-14. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
-15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
-16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-17. Binning [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin) and [`COMEBin`](https://github.com/ziyewang/COMEBin)
-18. Binning refinement [`MetaWrap`](https://github.com/bxlab/metaWRAP)
-19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
-20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-21. Bin reports.
-22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-23. If requested ARG clustering **(work in progress)** [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Assembly modes: "coassembly", "assembly", "none"
+5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
+6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+7. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
+8. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
+9. Unification of the results with Kraken-Biom and change of format to a Phyloseq object. [`Kraken-Biom`](https://github.com/smdabdoub/kraken-biom)
+10. Read traceback and taxonomic reports.
+11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+12. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+13. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+14. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+15. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
+16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+19. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+22. Bin reports.
+23. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+24. If requested ARG clustering **(work in progress)** [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
-Currently the pipeline has been tested with Docker.
+### Requirements
 
-1. Install [`Nextflow`](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=22.10.1`)
+- [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=23.04.0`)
+- Container runtime: [Docker](https://docs.docker.com/engine/installation/), [Singularity](https://sylabs.io/guides/), or [Podman](https://podman.io/)
 
-2. Install [`Docker`](https://docs.docker.com/engine/installation/) for full pipeline reproducibility.
+### Basic Usage
 
-For install docker in Ubuntu, follow the instructions:
 ```bash
-# Run the following command to uninstall all conflicting packages:
-for pkg in docker.io docker-doc docker-compose docker-compose-v2 podman-docker containerd runc; do sudo apt-get remove $pkg; done
+# Clone the repository
+git clone https://github.com/gene2dis/BugBuster.git
+cd BugBuster
 
-# Add Docker's official GPG key:
-sudo apt-get update
-sudo apt-get install ca-certificates curl
-sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
+# Run with Docker
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    -profile docker
 
-# Add the repository to Apt sources:
-echo \
-  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu \
-  $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | \
-  sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-sudo apt-get update
-
-# Install the docker packages
-sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
-
-# Verify that the installation is successful by running the hello-world image:
-sudo docker run hello-world
+# Run with Singularity (HPC)
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    -profile singularity
 ```
 
-**Once docker is installed and the pipeline is used for the first time, it will automatically download all the containers required for the execution of the pipeline with the desired configuration.**
+### Available Profiles
 
-3. Download the pipeline, either cloning the repository or downloading the zip file
+| Profile | Description |
+|---------|-------------|
+| `docker` | Run with Docker containers |
+| `singularity` | Run with Singularity containers |
+| `podman` | Run with Podman containers |
+| `slurm` | Run on SLURM HPC cluster |
+| `aws` | Run on AWS Batch |
+| `gcp` | Run on Google Cloud |
+| `azure` | Run on Azure Batch |
+| `test` | Run with minimal test data |
 
-4. Download databases and modify their paths in 'nextflow.config' file or use one of the default automatic download databases from config/databases.config and modify the variable in the nextflow.config file.
+Combine profiles as needed: `-profile slurm,singularity` or `-profile aws,docker`
+
+### Cloud Execution Examples
+
+```bash
+# AWS Batch
+nextflow run main.nf \
+    --input s3://bucket/samplesheet.csv \
+    --output s3://bucket/results \
+    -profile aws,docker \
+    -work-dir s3://bucket/work
+
+# Google Cloud
+nextflow run main.nf \
+    --input gs://bucket/samplesheet.csv \
+    --output gs://bucket/results \
+    -profile gcp,docker \
+    --gcp_project my-project \
+    -work-dir gs://bucket/work
+```
+
+See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
 
 ## Databases
 
-All databases can be automatically download in the first use of the pipeline and their paths will be stored as symbolic links in output_path/downloaded_db folder. The descriptions of the automatic download databases are in the config/databases.config file. However, you can use your own databases by writing the absolute paths in variables prefixed with custom_ in the nextflow.config file. You can use any host bowtie2 index for filtering steps but only human host it's in the automatic download (for now 👷). 
+All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`). Symbolic links are created in `<output_dir>/downloaded_db/` for reference. Only databases required for your selected pipeline options will be downloaded.
 
-**Note: Only the required databases for the requested tasks will be automatically download**
+You can use custom databases by specifying paths with `--custom_*` parameters (see table below).
 
-**Bowtie2:** must be directories with the genomes indexed with bowtie2 format
-1. phiX_index = Default download from [`phage phiX174 geonome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank) (8.1 MB).
-2. host_db = Default download from [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie) (4.1 GB).
+### Automatic Download Databases
 
-**Taxonomic profiling:**
-    
-3A. kraken2_db = User can choice between Standard-8 (7.5 GB) and GTDB release 220 (497 GB) for automatic download. From [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2).
+| Database | Size | Used For | Trigger Parameter | Custom Path Parameter |
+|----------|------|----------|-------------------|----------------------|
+| **phiX174 Index** | 8.1 MB | PhiX contamination removal | `quality_control=true` | `--custom_phiX_index` |
+| **Human Host Index** | 4.1 GB | Host read removal | `quality_control=true` | `--custom_bowtie_host_index` |
+| **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
+| **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
+| **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
+| **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
+| **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
+| **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
+| **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
+| **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
+| **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
+| **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
+| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
 
-3B. sourmash_db = GTDB release 220 (17 GB) it's the only automatic default download in this instance (for now 👷). From [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/). 
+### Database Sources
 
-**BBlobTools:**
+- **phiX_index**: [`phage phiX174 genome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank)
+- **host_db**: [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie)
+- **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
+- **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
+- **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
+- **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+- **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
+- **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
+- **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
+- **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
+- **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+- **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 
-4. taxdump_files = Default download from [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz) (448 MB).
+## Samplesheet Format
 
-**BlastDB for contig taxonomic annotation:**
+Create a CSV file with your sample information:
 
-5. blast_db = Default download from [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/) (434 GB).
-6. deeparg_db = Default download from [`deeparg`](https://github.com/gaarangoa/deeparg) (4.8 GB).
-
-**KARGA:**
-
-7. karga_db = Default download from [`megares`](https://www.meglab.org/megares/download/) (9.2 MB).
-
-**KARGVA:**
-
-8. kargva_db = Default download from [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main) (1.5 MB).
-
-**CheckM2**
-
-9. checkm2_db = Default download from [`Checkm2_docs`](https://github.com/chklovski/CheckM2) (2.9 GB).
-
-**GTDB-TK**
-
-10. gtdbtk_db = Default download release 220 from [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html) (109 GB).
-
-## Running the pipeline
-
-### Sample sheet file
-
-First you need to create a Samplesheet file, that contain the name of the samples and the location of the reads. This is an example of this file:
-
-```
+```csv
 sample,r1,r2,s
-SRR9040400,/home/ffuentes/Raw_data/SRR9040400_1.fastq.gz,/home/ffuentes/Raw_data/SRR9040400_2.fastq.gz,/home/ffuentes/Raw_data/SRR9040400.fastq.gz
+sample1,/path/to/sample1_R1.fastq.gz,/path/to/sample1_R2.fastq.gz,
+sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sample2_singletons.fastq.gz
 ```
 
-The file **always** has to include the header `sample,r1,r2,s` but also "s" column can be empty 
+| Column | Required | Description |
+|--------|----------|-------------|
+| `sample` | Yes | Unique sample identifier |
+| `r1` | Yes | Path to forward reads (R1) |
+| `r2` | Yes | Path to reverse reads (R2) |
+| `s` | No | Path to singleton reads (optional) |
 
-# Pipeline parameters
+## Pipeline Parameters
 
-The file `nextflow.config` contains all the parameteres used by the pipeline.
+### Core Options
 
-#### Starting the pipeline
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--input` | *required* | Path to samplesheet CSV |
+| `--output` | *required* | Output directory |
+| `--quality_control` | `true` | Enable QC and host filtering |
+| `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
+| `--include_binning` | `false` | Enable binning and refinement |
+| `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
+| `--min_read_sample` | `0` | Minimum reads required after QC |
+
+### Feature Toggles
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
+| `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
+| `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
+| `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
+
+### Database Selection
+
+| Parameter | Default | Options | Description |
+|-----------|---------|---------|-------------|
+| `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
+| `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--databases_dir` | `<output>/../databases` | Path | Database storage location |
+
+### Quality Control Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--fastp_qualified_quality_phred` | `20` | Phred quality threshold |
+| `--fastp_unqualified_percent_limit` | `10` | Max % unqualified bases |
+| `--fastp_n_base_limit` | `5` | Max N bases per read |
+
+### Taxonomy Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
+| `--bracken_tax_level` | `S` | Bracken level: D, P, C, O, F, G, S |
+| `--sourmash_tax_rank` | `species` | Sourmash rank: genus, species, strain |
+| `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Taxonomic levels to plot |
+| `--taxonomy_top_n_taxa` | `10` | Number of top taxa in plots |
+| `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files |
+
+### Assembly & Binning Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--bbmap_lenght` | `1000` | Minimum contig length after filtering |
+| `--binners` | `semibin` | Binners to run (comma-separated). `≥2` selected → MetaWRAP refinement enabled |
+| `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
+| `--metawrap_completeness` | `50` | Minimum bin completeness (%) — used only when ≥2 binners |
+| `--metawrap_contamination` | `10` | Maximum bin contamination (%) — used only when ≥2 binners |
+| `--semibin_env_model` | `human_gut` | SemiBin environment model |
+
+**SemiBin Models**: `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`, `human_oral`, `chicken_caecum`, `ocean`, `soil`, `wastewater`, `built_environment`, `global`
+
+**Binner selection examples:**
+```bash
+# Default: single fast binner, no MetaWRAP
+--include_binning true --binners semibin
+
+# Two binners + MetaWRAP refinement
+--include_binning true --binners semibin,metabat2
+
+# All three binners + MetaWRAP
+--include_binning true --binners semibin,metabat2,comebin
+```
+
+### ARG Prediction Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--deeparg_min_prob` | `0.8` | Minimum probability threshold |
+| `--deeparg_arg_alignment_identity` | `50` | Minimum alignment identity (%) |
+| `--deeparg_arg_alignment_evalue` | `1e-10` | Maximum E-value |
+| `--deeparg_model_version` | `v2` | DeepARG model version |
+| `--rgi_card_version` | `latest` | CARD database version |
+| `--rgi_include_wildcard` | `true` | Include WildCARD variants |
+| `--rgi_aligner` | `kma` | RGI aligner: kma, bowtie2, bwa |
+| `--rgi_kmer_size` | `61` | K-mer size for pathogen prediction |
+| `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage |
+
+### Resource Limits
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--max_cpus` | `16` | Maximum CPUs per process |
+| `--max_memory` | `128.GB` | Maximum memory per process |
+| `--max_time` | `240.h` | Maximum time per process |
+
+### Help
+
+```bash
+nextflow run main.nf --help
+```
+
+## Output Structure
+
+The pipeline generates organized output with numbered prefixes:
 
 ```
-Usage:
-
-The typical command for running the pipeline is as follows:
-
-nextflow run main.nf --input "path/to/samples_sheet" --output "path/to/output" -profile local_docker -resume (recomended)
-
-Mandatory arguments:
-   --input                        Input csv file with: samples names, path of all fastq files, and optionaly singletons.
-                                  colnames required: "sample,r1,r2,s" if don't have singletons colname "s" can be empty
-
-   --output                       Path to output dir
-
-Optional arguments:
-   --quality_control              Include the reads filtering steps.
-                                  (default: true)
-
-   --taxonomic_profiler           Choice software for taxonomic classification in reads, avaible options: "kraken2", "sourmash", "none
-                                  (default: kraken2)
-
-   --assembly_mode                Mode of assembly, avaible options: "coassembly", "assembly", "none"
-                                  (default: assembly)
-                                  coassembly: all samples are processing in one only data set
-                                  assembly: all samples are processing individualy
-
-   --read_arg_prediction          ARG and ARGV gene prediction at read level using KARGA and KARGVA
-                                  (default: false)
-
-   --contig_level_metacerberus    Contig level functional annotation with metacebeus
-                                  (default: false)
-
-   --contig_tax_and_arg           Contig taxonomy and ARG prediction
-                                  (default: false)
-
-   --include_binning              Include the binning and binning refining steps. (default: false)
-
-   --arg_bin_clustering           ARG gene prediction and clustering for horizontal gene transfer inference (WIP)
-                                  (default: false) 🚧 WIP Function 🚧
-
-   --help                         Print this usage statement.
+results/
+├── pipeline_info/              # Execution reports and logs
+├── 01_quality_control/         # QC results (if quality_control=true)
+│   ├── fastp/                  # Per-sample FastP reports
+│   └── summary/                # Aggregated statistics
+├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
+│   ├── kraken2/ or sourmash/   # Per-sample results
+│   ├── tables/                 # Abundance tables
+│   ├── phyloseq/               # Phyloseq objects (*.h5, *.RDS)
+│   └── figures/                # Taxonomy plots
+├── 03_assembly/                # Genome assembly (if assembly_mode != 'none')
+│   ├── per_sample/             # Per-sample assemblies
+│   └── coassembly/             # Co-assembly results
+├── 04_binning/                 # Metagenomic binning (if include_binning=true)
+│   ├── per_sample/ or coassembly/
+│   │   ├── raw_bins/           # MetaBAT2, SemiBin, COMEBin
+│   │   ├── refined_bins/       # MetaWRAP refined bins
+│   │   ├── quality/            # CheckM2 reports
+│   │   └── taxonomy/           # GTDB-TK classifications
+│   ├── quality/summary/        # Aggregated quality reports
+│   └── taxonomy/summary/       # Aggregated taxonomy reports
+├── 05_arg_prediction/          # ARG predictions
+│   ├── read_level/             # Read-level predictions
+│   │   ├── karga/              # KARGA results (if read_arg_prediction=true)
+│   │   ├── kargva/             # KARGVA results (if read_arg_prediction=true)
+│   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
+│   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
+│   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
+│   ├── contig_level/           # DeepARG (if contig_tax_and_arg=true)
+│   └── bin_level/              # Bin ARG clustering (if arg_bin_clustering=true)
+├── 06_contig_taxonomy/         # BlobTools plots (if contig_tax_and_arg=true)
+└── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
 ```
-Additionally, all options can be modified in nextflow.config file
+
+**Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).
+
+For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output-structure).
+
 ## Credits
 
 gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes 

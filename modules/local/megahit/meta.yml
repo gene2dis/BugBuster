@@ -1,0 +1,48 @@
+name: megahit
+description: Assemble metagenomic reads using MEGAHIT
+keywords:
+  - assembly
+  - metagenomics
+  - contigs
+  - de novo assembly
+tools:
+  - megahit:
+      description: An ultra-fast and memory-efficient NGS assembler optimized for metagenomes
+      homepage: https://github.com/voutcn/megahit
+      documentation: https://github.com/voutcn/megahit/wiki
+      tool_dev_url: https://github.com/voutcn/megahit
+      doi: "10.1093/bioinformatics/btv033"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files
+        e.g. [ file1_R1.fastq.gz, file1_R2.fastq.gz ]
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'sample1' ]
+  - contigs_and_reads:
+      type: tuple
+      description: Tuple containing meta, reads, and assembled contigs
+      pattern: "*_contigs.fa"
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@ffuentessantander"
+maintainers:
+  - "@ffuentessantander"

@@ -1,0 +1,125 @@
+# BugBuster Parameters: Multiple Contaminant Genomes Example
+# This file demonstrates how to specify multiple genomes for decontamination
+
+# ==============================================================================
+# Example 1: Multiple Host Genomes (Human + Mouse)
+# ==============================================================================
+# Use this when you have samples that may contain multiple host organisms
+
+input: "samplesheet.csv"
+output: "results"
+quality_control: true
+
+# Provide multiple FASTA files as a comma-separated string
+custom_host_fasta: "/data/genomes/human_GRCh38.fasta,/data/genomes/mouse_GRCm39.fasta"
+custom_phiX_fasta: "/data/genomes/phix174.fasta"
+
+# ==============================================================================
+# Example 2: Multiple Contaminants (Host + Vector + Adapter)
+# ==============================================================================
+# Use this to remove various types of contamination
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# custom_host_fasta: "/data/genomes/human.fasta,/data/genomes/ecoli.fasta,/data/vectors/pUC19.fasta"
+# custom_phiX_fasta: "/data/genomes/phix174.fasta"
+
+# ==============================================================================
+# Example 3: Pre-built Combined Index
+# ==============================================================================
+# Use this if you've already built a combined index from multiple genomes
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# # This index was built from: phiX + human + mouse + E. coli
+# custom_decontamination_index: "/data/databases/contaminants_index"
+
+# ==============================================================================
+# Example 4: Multiple Genomes with Quoted Paths (Spaces in Filenames)
+# ==============================================================================
+# Use quotes if your file paths contain spaces
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# custom_host_fasta: '"/data/genomes/human genome.fasta","/data/genomes/mouse genome.fasta"'
+# custom_phiX_fasta: "/data/genomes/phix174.fasta"
+
+# ==============================================================================
+# Example 5: YAML List Format (Alternative Syntax)
+# ==============================================================================
+# Note: This format requires the pipeline to support list parameters
+# Currently, the pipeline expects comma-separated strings, but this shows
+# the YAML list syntax for reference
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# # List format (would need pipeline modification to support)
+# custom_host_fasta:
+#   - "/data/genomes/human_GRCh38.fasta"
+#   - "/data/genomes/mouse_GRCm39.fasta"
+#   - "/data/genomes/ecoli_K12.fasta"
+
+# ==============================================================================
+# Example 6: Complete Configuration with Multiple Genomes
+# ==============================================================================
+# Full parameter set for production use
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# # Multiple host genomes (human, mouse, rat)
+# custom_host_fasta: "/data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/rat.fasta"
+# custom_phiX_fasta: "/data/genomes/phix.fasta"
+# 
+# # Other QC parameters
+# min_read_sample: 10000
+# store_clean_reads: true
+# 
+# # Bowtie2 parameters
+# bowtie_k: 1
+# bowtie_score_min: "G,15,6"
+# 
+# # Resource limits
+# max_memory: "128.GB"
+# max_cpus: 32
+# 
+# # Database storage
+# databases_dir: "/shared/databases"
+
+# ==============================================================================
+# Example 7: Compressed FASTA Files
+# ==============================================================================
+# The pipeline handles both compressed and uncompressed FASTA files
+
+# input: "samplesheet.csv"
+# output: "results"
+# quality_control: true
+# 
+# # Mix of compressed and uncompressed files
+# custom_host_fasta: "/data/genomes/human.fasta.gz,/data/genomes/mouse.fasta,/data/genomes/ecoli.fasta.gz"
+# custom_phiX_fasta: "/data/genomes/phix174.fasta.gz"
+
+# ==============================================================================
+# Additional Parameters
+# ==============================================================================
+
+# Assembly mode
+assembly_mode: "assembly"  # Options: "assembly", "coassembly", "none"
+
+# Taxonomic profiling
+taxonomic_profiler: "sourmash"  # Options: "kraken2", "sourmash", "none"
+
+# Feature toggles
+read_arg_prediction: false
+rgi_prediction: false
+contig_tax_and_arg: false
+include_binning: false

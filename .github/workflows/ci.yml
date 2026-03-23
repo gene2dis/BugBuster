@@ -1,0 +1,111 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  pull_request:
+    branches:
+      - main
+      - dev
+  release:
+    types: [published]
+
+env:
+  NXF_ANSI_LOG: false
+
+concurrency:
+  group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Run pipeline tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        NXF_VER:
+          - "23.04.0"
+          - "latest-everything"
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "${{ matrix.NXF_VER }}"
+
+      - name: Run pipeline with test profile (stub)
+        run: |
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub
+
+      - name: Run pipeline with test profile
+        run: |
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker
+
+  lint:
+    name: Nextflow config lint
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "latest-everything"
+
+      - name: Validate nextflow.config
+        run: |
+          nextflow config -flat ${GITHUB_WORKSPACE} > /dev/null
+
+      - name: Check schema validation
+        run: |
+          if [ -f "nextflow_schema.json" ]; then
+            echo "Schema file exists"
+            python3 -c "import json; json.load(open('nextflow_schema.json'))"
+          fi
+
+  containers:
+    name: Check container availability
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Check Docker containers
+        run: |
+          # Extract container images from modules
+          grep -r "container " modules/ --include="*.nf" | \
+            grep -oP "container\s+['\"]?\K[^'\"]+(?=['\"]?)" | \
+            sort -u | \
+            while read container; do
+              echo "Checking: $container"
+              docker pull $container || echo "Warning: Could not pull $container"
+            done
+
+  changes:
+    name: Check for changes
+    runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.filter.outputs.modules }}
+      subworkflows: ${{ steps.filter.outputs.subworkflows }}
+      configs: ${{ steps.filter.outputs.configs }}
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            modules:
+              - 'modules/**'
+            subworkflows:
+              - 'subworkflows/**'
+            configs:
+              - 'conf/**'
+              - 'nextflow.config'
+              - 'nextflow_schema.json'

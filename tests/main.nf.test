@@ -1,0 +1,46 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Pipeline-level tests
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Test BugBuster Pipeline"
+    script "../main.nf"
+
+    test("Run with test profile - QC only") {
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            // Check pipeline completed successfully
+            assert workflow.success
+            
+            // Check output directory exists
+            assert path("${params.output}").exists()
+        }
+    }
+
+    test("Run with stub mode") {
+        options "-stub"
+        
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.success
+        }
+    }
+}

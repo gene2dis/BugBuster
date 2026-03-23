@@ -1,0 +1,61 @@
+name: bowtie2_decontaminate
+description: Single-pass read decontamination using combined Bowtie2 index to remove contaminants (phiX, host, etc.)
+keywords:
+  - alignment
+  - decontamination
+  - bowtie2
+  - quality control
+  - host removal
+  - phix removal
+tools:
+  - bowtie2:
+      description: |
+        Bowtie 2 is an ultrafast and memory-efficient tool for aligning sequencing reads to long reference sequences.
+      homepage: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
+      documentation: http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
+      doi: 10.1038/nmeth.1923
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'test', single_end:false ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files of size 2 (paired-end) or 3 (paired-end with singletons)
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+  - index_db:
+      type: directory
+      description: Bowtie2 index directory containing combined contaminant sequences
+  - db_alias:
+      type: string
+      description: Alias for reporting purposes (e.g., "contaminants", "phiX_host")
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'test', single_end:false ]
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - reads:
+      type: file
+      description: Clean reads (unmapped to any contaminant)
+      pattern: "*_R*_clean.fastq.gz"
+  - reads_coassembly:
+      type: file
+      description: Clean reads for coassembly (without meta)
+      pattern: "*_clean.fastq.gz"
+  - report:
+      type: file
+      description: TSV report with decontamination statistics
+      pattern: "*_decontamination_report.tsv"
+
+authors:
+  - "@gene2dis"

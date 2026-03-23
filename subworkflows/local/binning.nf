@@ -1,0 +1,266 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BINNING SUBWORKFLOW
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Metagenomic binning using multiple tools and refinement with MetaWRAP
+    
+    DESCRIPTION:
+        This subworkflow performs mode-agnostic metagenomic binning. It accepts
+        contigs and BAM files (regardless of assembly or co-assembly origin) and
+        runs a unified binning pipeline.
+    
+    INPUTS:
+        contigs_and_bam: [meta, contigs, bam] - Contigs with aligned reads (BAM)
+        checkm2_db: CheckM2 database for quality assessment
+        gtdbtk_db: GTDB-Tk database for taxonomic classification
+        reads: [meta, reads] - Original reads (optional, only for co-assembly bin coverage)
+    
+    OUTPUTS:
+        refined_bins: [meta, bins] - MetaWRAP-refined bins
+        versions: Tool version information
+    
+    WORKFLOW:
+        1. Calculate contig depth from BAM files (if MetaBAT2 selected)
+        2. Run selected binning tools in parallel (from: MetaBAT2, SemiBin, COMEBin)
+        3. If >=2 binners selected, refine bins with MetaWRAP
+        4. Assess quality with CheckM2
+        5. Classify taxonomy with GTDB-Tk
+        6. Generate reports (mode-specific: simple reports for assembly, 
+           coverage analysis for co-assembly)
+----------------------------------------------------------------------------------------
+*/
+
+// Modules - unified for both per-sample and co-assembly modes
+include { CALCULATE_DEPTH            } from '../../modules/local/calculate_depth/main'
+include { METABAT2                   } from '../../modules/local/metabat2/main'
+include { SEMIBIN                    } from '../../modules/local/semibin/main'
+include { COMEBIN                    } from '../../modules/local/comebin/main'
+include { METAWRAP                   } from '../../modules/local/metawrap/main'
+include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/main'
+include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
+include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
+include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
+include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
+include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
+include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
+
+workflow BINNING {
+    take:
+    contigs_and_bam // channel: [ val(meta), path(contigs), path(bam) ]
+    checkm2_db      // channel: path(checkm2_db)
+    gtdbtk_db       // channel: path(gtdbtk_db)
+    reads           // channel: [ val(meta), [ reads ] ] - optional, only for co-assembly bin coverage
+
+    main:
+    ch_versions = Channel.empty()
+
+    // Parse selected binners
+    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
+    def use_metabat2 = 'metabat2' in binners_list
+    def use_semibin  = 'semibin' in binners_list
+    def use_comebin  = 'comebin' in binners_list
+    def num_binners  = binners_list.size()
+    def use_metawrap = num_binners >= 2
+
+    //
+    // Unified binning workflow - mode-agnostic
+    //
+    
+    // Calculate depth from BAM files (required for MetaBAT2)
+    if (use_metabat2) {
+        CALCULATE_DEPTH(contigs_and_bam)
+        ch_versions = ch_versions.mix(CALCULATE_DEPTH.out.versions.first())
+        METABAT2(CALCULATE_DEPTH.out.depth)
+        ch_versions = ch_versions.mix(METABAT2.out.versions.first())
+    }
+
+    // Run selected binning tools
+    if (use_semibin) {
+        SEMIBIN(contigs_and_bam)
+        ch_versions = ch_versions.mix(SEMIBIN.out.versions.first())
+    }
+
+    if (use_comebin) {
+        COMEBIN(contigs_and_bam)
+        ch_versions = ch_versions.mix(COMEBIN.out.versions.first())
+    }
+
+    // Collect all selected binner outputs into a single channel
+    ch_binner_bins = Channel.empty()
+    if (use_metabat2) ch_binner_bins = ch_binner_bins.mix(METABAT2.out.bins)
+    if (use_semibin)  ch_binner_bins = ch_binner_bins.mix(SEMIBIN.out.bins)
+    if (use_comebin)  ch_binner_bins = ch_binner_bins.mix(COMEBIN.out.bins)
+
+    // Refine bins with MetaWRAP when >=2 binners are selected
+    if (use_metawrap) {
+        // Group binner outputs by sample for MetaWRAP
+        ch_bins_grouped = ch_binner_bins
+            .map { meta, bins -> [meta.id, meta, bins] }
+            .groupTuple(by: 0, size: num_binners)
+            .map { id, metas, bins_list -> [metas[0], bins_list] }
+
+        METAWRAP(ch_bins_grouped)
+        ch_refined_bins = METAWRAP.out.bins
+        ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
+
+        // All bins for CHECKM2: individual binners + metawrap refined
+        ch_all_bins_for_checkm = ch_binner_bins.mix(ch_refined_bins)
+    } else {
+        // Single binner: use output directly, no MetaWRAP
+        ch_refined_bins = ch_binner_bins
+        ch_all_bins_for_checkm = ch_binner_bins
+    }
+
+    // Collect all bins for batched CHECKM2 processing
+    ch_all_sample_bins = ch_all_bins_for_checkm
+        .toList()
+        .map { items ->
+            def meta_list = items.collect { it[0] }.unique { it.id }
+            def all_paths = items.collect { it[1] }
+            [meta_list, all_paths]
+        }
+    
+    // Batched quality assessment with CheckM2
+    ch_checkm_batch = CHECKM2_BATCH(ch_all_sample_bins.combine(checkm2_db))
+    ch_versions = ch_versions.mix(CHECKM2_BATCH.out.versions.first())
+    
+    // Transform batched output back to per-sample format
+    ch_checkm_all_reports = ch_checkm_batch.all_reports
+        .flatMap { meta_list, reports ->
+            // Group reports by sample
+            def sample_reports = [:]
+            def report_files = reports instanceof List ? reports : [reports]
+            report_files.each { report ->
+                // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                // Use findLastIndexOf to correctly handle sample names that contain binner keywords
+                def filename = report.name
+                def parts = filename.tokenize('_')
+                def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
+                
+                if (!sample_reports.containsKey(sample_id)) {
+                    sample_reports[sample_id] = []
+                }
+                sample_reports[sample_id].add(report)
+            }
+            // Emit per-sample tuples
+            sample_reports.collect { sample_id, report_list ->
+                def meta = meta_list.find { m -> 
+                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                    mid == sample_id
+                }
+                if (meta == null) {
+                    log.warn "CheckM2: Could not find meta for sample_id: ${sample_id}"
+                    return null
+                }
+                [meta, report_list]
+            }.findAll { it -> it != null }
+        }
+    
+    // CheckM2 reports for refined bins (metawrap when available, all reports otherwise)
+    if (use_metawrap) {
+        ch_checkm_refined = ch_checkm_batch.metawrap_report
+            .flatMap { meta_list, reports ->
+                // Group reports by sample
+                def sample_reports = [:]
+                def report_files = reports instanceof List ? reports : [reports]
+                report_files.each { report ->
+                    def filename = report.name
+                    def parts = filename.tokenize('_')
+                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                    def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
+                    
+                    if (!sample_reports.containsKey(sample_id)) {
+                        sample_reports[sample_id] = []
+                    }
+                    sample_reports[sample_id].add(report)
+                }
+                // Emit per-sample tuples
+                sample_reports.collect { sample_id, report_list ->
+                    def meta = meta_list.find { m -> 
+                        def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                        mid == sample_id
+                    }
+                    if (meta == null) {
+                        log.warn "CheckM2 metawrap: Could not find meta for sample_id: ${sample_id}"
+                        return null
+                    }
+                    [meta, report_list]
+                }.findAll { it -> it != null }
+            }
+    } else {
+        ch_checkm_refined = ch_checkm_all_reports
+    }
+    
+    // Collect refined bins for batched GTDB-Tk
+    ch_all_refined_bins = ch_refined_bins
+        .filter { _meta, bins -> bins != null }
+        .toList()
+        .map { items ->
+            def meta_list = items.collect { item -> item[0] }
+            def all_paths = items.collect { item -> item[1] }
+            [meta_list, all_paths]
+        }
+    
+    // Batched taxonomic classification with GTDB-TK
+    ch_gtdb_tk_batch = GTDB_TK_BATCH(ch_all_refined_bins.combine(gtdbtk_db))
+    ch_versions = ch_versions.mix(GTDB_TK_BATCH.out.versions.first())
+    
+    // Transform batched output back to per-sample format
+    ch_gtdb_tk = ch_gtdb_tk_batch.report
+        .flatMap { meta_list, reports ->
+            // Group reports by sample
+            def sample_reports = [:]
+            def report_files = reports instanceof List ? reports : [reports]
+            report_files.each { report ->
+                // Extract sample_id from filename: S10_Ago2021_gtdbtk_bac120.tsv -> S10_Ago2021
+                // Use findLastIndexOf to correctly handle sample names that contain 'gtdbtk'
+                def filename = report.name
+                def parts = filename.tokenize('_')
+                def gtdbIdx = parts.findLastIndexOf { part -> part == 'gtdbtk' }
+                def sample_id = gtdbIdx > 0 ? parts[0..<gtdbIdx].join('_') : parts[0]
+                
+                if (!sample_reports.containsKey(sample_id)) {
+                    sample_reports[sample_id] = []
+                }
+                sample_reports[sample_id].add(report)
+            }
+            // Emit per-sample tuples
+            sample_reports.collect { sample_id, report_list ->
+                def meta = meta_list.find { m -> 
+                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
+                    mid == sample_id
+                }
+                if (meta == null) {
+                    log.warn "GTDB-Tk: Could not find meta for sample_id: ${sample_id}"
+                    return null
+                }
+                [meta, report_list]
+            }.findAll { it -> it != null }
+        }
+
+    //
+    // Generate reports - mode-specific handling
+    //
+    if ( params.assembly_mode == "assembly" ) {
+        // Per-sample mode: simple quality and taxonomy reports
+        BIN_QUALITY_REPORT(ch_checkm_all_reports.map { _meta, reports -> reports }.collect())
+        BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
+    } else if ( params.assembly_mode == "coassembly" ) {
+        // Co-assembly mode: additional bin coverage analysis and summary report
+        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(
+            reads.combine(ch_refined_bins.map { _meta, bins -> bins })
+        )
+        ch_bin_cov = BEDTOOLS(ch_bin_depth)
+
+        BIN_SUMMARY(
+            ch_bin_cov.collect()
+                .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
+                .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect())
+        )
+    }
+
+    emit:
+    refined_bins = ch_refined_bins    // channel: [ val(meta), path(bins) ]
+    versions     = ch_versions        // channel: path(versions.yml)
+}
