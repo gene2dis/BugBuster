@@ -1,0 +1,91 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    TAXONOMY_PHYLOSEQ Module Test
+
+    Regression test for audit items #4 and #12: the kraken2 branch used to
+    json.load() (BIOM) the plain kraken-style bracken reports fed to it and
+    crashed on every run, and the multi-sample merge left NaN and kept the
+    taxonomy of only the first sample. Also guards the plots emit (previously
+    a dead plots/*.png glob — the script writes PNGs to the output root) and
+    the stub filename prefix (previously ${db_name} instead of the real
+    ${profiler}_${db_name}).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test TAXONOMY_PHYLOSEQ Process"
+    script "../../modules/local/taxonomy_phyloseq/main.nf"
+    process "TAXONOMY_PHYLOSEQ"
+
+    test("builds phyloseq tables from kraken-style bracken reports") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1.kraken2.report_bracken.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sample2.kraken2.report_bracken.txt", checkIfExists: true)
+                ]
+                input[1] = 'kraken2'
+                input[2] = 'standard-8'
+                input[3] = 'Phylum,Family,Genus,Species'
+                input[4] = 10
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def otu = path(process.out.otu_table.get(0)).readLines()
+            assert otu[0] == "\tsample1\tsample2"
+            // shared species has both counts; sample-unique species are 0.0, not NaN
+            assert otu.contains("562\t610.0\t380.0")
+            assert otu.contains("1423\t265.0\t0.0")
+            assert otu.contains("1280\t0.0\t420.0")
+
+            // taxonomy table covers the union of taxa, not just the first sample
+            def tax = path(process.out.tax_table.get(0)).readLines()
+            assert tax[0] == "\tKingdom\tPhylum\tClass\tOrder\tFamily\tGenus\tSpecies"
+            assert tax.contains("1423\tBacteria\tBacillota\tBacilli\tBacillales\tBacillaceae\tBacillus\tBacillus subtilis")
+            assert tax.contains("1280\tBacteria\tBacillota\tBacilli\tBacillales\tStaphylococcaceae\tStaphylococcus\tStaphylococcus aureus")
+
+            assert process.out.sample_metadata.size() == 1
+            assert process.out.phyloseq_h5.size() == 1
+
+            // abundance plots land in the output root and are emitted
+            assert process.out.plots.get(0).size() == 4
+        }
+    }
+
+    test("stub emits tables with the real filename prefix") {
+        options "-stub"
+
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1.kraken2.report_bracken.txt", checkIfExists: true)
+                ]
+                input[1] = 'kraken2'
+                input[2] = 'standard-8'
+                input[3] = 'Phylum,Family,Genus,Species'
+                input[4] = 10
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.otu_table.get(0)).name == "kraken2_standard-8_otu_table.tsv"
+            assert file(process.out.tax_table.get(0)).name == "kraken2_standard-8_tax_table.tsv"
+            assert file(process.out.sample_metadata.get(0)).name == "kraken2_standard-8_sample_metadata.tsv"
+        }
+    }
+}

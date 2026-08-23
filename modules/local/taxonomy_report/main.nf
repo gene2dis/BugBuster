@@ -9,7 +9,10 @@ process TAXONOMY_REPORT {
     
     input:
     path(reports)
-    path(reads_report)
+    // staged under a distinct name: the script's output is Reads_report.csv,
+    // and writing through a same-named input symlink would corrupt the
+    // upstream READS_REPORT work directory
+    path(reads_report, stageAs: 'input_reads_report.csv')
     val(profiler)
     val(db_name)
     

@@ -18,12 +18,9 @@ License: MIT
 
 import argparse
 import sys
-import json
-import re
 from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
-import numpy as np
 import h5py
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -70,103 +67,100 @@ class PhyloseqTableGenerator:
         
         self.tax_ranks = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
     
-    def parse_biom_file(self, biom_path: Path) -> Tuple[pd.DataFrame, pd.DataFrame]:
+    # Rank codes in kraken-style reports mapped to phyloseq ranks. Kraken2
+    # emits 'D' (domain) at the top level for NCBI taxonomies while other DB
+    # builds use 'K'; both fill the Kingdom slot. Sub-ranks (S1, G1, ...) and
+    # unranked rows stay on the indent-walk stack but fill no rank column.
+    KRAKEN_RANK_MAP = {
+        'D': 'Kingdom', 'K': 'Kingdom', 'P': 'Phylum', 'C': 'Class',
+        'O': 'Order', 'F': 'Family', 'G': 'Genus', 'S': 'Species',
+    }
+
+    def parse_kraken_reports(
+        self,
+        report_files: List[Path]
+    ) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Parse BIOM format file (Kraken2/Bracken output).
-        
+        Parse kraken-style reports (bracken's re-estimated ``-w`` output).
+
+        Each report is a headerless 6-column TSV (percent, clade reads, taxon
+        reads, rank code, taxid, name) where the lineage is encoded by rank
+        codes plus 2-space name indentation. Species rows become OTUs keyed
+        by taxid; their lineage is rebuilt by walking the indentation.
+
         Args:
-            biom_path: Path to BIOM file
-            
+            report_files: List of per-sample kraken-style report files
+
         Returns:
             Tuple of (otu_table, taxonomy_table)
         """
-        try:
-            with open(biom_path, 'r') as f:
-                biom_data = json.load(f)
-        except Exception as e:
-            raise ValueError(f"Failed to parse BIOM file {biom_path}: {e}")
-        
-        # Extract matrix data
-        matrix_type = biom_data.get('matrix_type', 'sparse')
-        shape = biom_data.get('shape', [0, 0])
-        
-        # Initialize abundance matrix
-        n_taxa = shape[0]
-        n_samples = shape[1]
-        abundance_matrix = np.zeros((n_taxa, n_samples))
-        
-        # Fill matrix based on type
-        if matrix_type == 'sparse':
-            for entry in biom_data.get('data', []):
-                row_idx, col_idx, value = entry
-                abundance_matrix[row_idx, col_idx] = value
-        else:
-            abundance_matrix = np.array(biom_data.get('data', []))
-        
-        # Extract row (taxa) information
-        taxa_ids = []
-        taxa_metadata = []
-        
-        for row in biom_data.get('rows', []):
-            taxa_ids.append(row['id'])
-            metadata = row.get('metadata', {})
-            taxonomy = metadata.get('taxonomy', [])
-            taxa_metadata.append(taxonomy)
-        
-        # Extract column (sample) information
-        sample_ids = []
-        for col in biom_data.get('columns', []):
-            sample_ids.append(col['id'])
-        
-        # Create OTU table
-        otu_table = pd.DataFrame(
-            abundance_matrix,
-            index=taxa_ids,
-            columns=sample_ids
-        )
-        
-        # Create taxonomy table
-        tax_table = self._parse_taxonomy_list(taxa_ids, taxa_metadata)
-        
+        per_sample_counts = {}
+        tax_rows = {}
+
+        for report_file in report_files:
+            sample_name = report_file.name
+            for suffix in ('.txt', '_bracken', '.report', '.kraken2'):
+                if sample_name.endswith(suffix):
+                    sample_name = sample_name[: -len(suffix)]
+
+            counts = {}
+            stack = []  # (depth, rank_code, name)
+            with open(report_file) as fh:
+                for line_no, line in enumerate(fh, 1):
+                    if not line.strip():
+                        continue
+                    fields = line.rstrip('\n').split('\t')
+                    if len(fields) != 6:
+                        raise ValueError(
+                            f"{report_file}:{line_no}: expected 6 tab-separated "
+                            f"kraken-report columns, got {len(fields)}"
+                        )
+                    _percent, clade_reads, _taxon_reads, rank, taxid, name = fields
+                    if rank == 'U':
+                        continue
+                    depth = (len(name) - len(name.lstrip(' '))) // 2
+                    while stack and stack[-1][0] >= depth:
+                        stack.pop()
+                    stack.append((depth, rank, name.strip()))
+                    if rank == 'S':
+                        try:
+                            clade_count = int(clade_reads)
+                        except ValueError:
+                            raise ValueError(
+                                f"{report_file}:{line_no}: non-integer clade "
+                                f"read count '{clade_reads}'"
+                            )
+                        lineage = {r: '' for r in self.tax_ranks}
+                        for _depth, rank_code, taxon_name in stack:
+                            rank_name = self.KRAKEN_RANK_MAP.get(rank_code)
+                            if rank_name:
+                                lineage[rank_name] = taxon_name
+                        counts[taxid] = counts.get(taxid, 0) + clade_count
+                        tax_rows.setdefault(taxid, {'taxon_id': taxid, **lineage})
+
+            per_sample_counts[sample_name] = counts
+
+        if not any(per_sample_counts.values()):
+            raise ValueError(
+                "No species-level rows found in any kraken/bracken report; "
+                "phyloseq tables cannot be built. Check the kraken2 database "
+                "and bracken settings."
+            )
+
+        # Outer-join samples on taxid; taxa absent from a sample get 0, and the
+        # taxonomy table covers the union of taxa across all samples.
+        otu_table = pd.concat(
+            [
+                pd.Series(counts, name=sample, dtype=float)
+                for sample, counts in per_sample_counts.items()
+            ],
+            axis=1
+        ).fillna(0)
+
+        tax_table = pd.DataFrame(list(tax_rows.values())).set_index('taxon_id')
+        tax_table = tax_table.reindex(otu_table.index).fillna('')
+
         return otu_table, tax_table
-    
-    def _parse_taxonomy_list(
-        self,
-        taxa_ids: List[str],
-        taxa_metadata: List[List[str]]
-    ) -> pd.DataFrame:
-        """
-        Parse taxonomy metadata into structured table.
-        
-        Args:
-            taxa_ids: List of taxon IDs
-            taxa_metadata: List of taxonomy lineages
-            
-        Returns:
-            DataFrame with taxonomic ranks as columns
-        """
-        tax_data = []
-        
-        for taxon_id, lineage in zip(taxa_ids, taxa_metadata):
-            tax_dict = {'taxon_id': taxon_id}
-            
-            # Parse lineage (format: "d__Bacteria; p__Proteobacteria; ...")
-            for i, rank in enumerate(self.tax_ranks):
-                if i < len(lineage):
-                    # Remove rank prefix (e.g., "d__", "p__", etc.)
-                    tax_value = lineage[i]
-                    if '__' in tax_value:
-                        tax_value = tax_value.split('__', 1)[1]
-                    tax_dict[rank] = tax_value
-                else:
-                    tax_dict[rank] = ''
-            
-            tax_data.append(tax_dict)
-        
-        tax_table = pd.DataFrame(tax_data)
-        tax_table.set_index('taxon_id', inplace=True)
-        
-        return tax_table
     
     def parse_sourmash_gather(
         self,
@@ -478,7 +472,7 @@ class PhyloseqTableGenerator:
         Main processing pipeline.
         
         Args:
-            input_files: List of input files (BIOM or Sourmash gather)
+            input_files: List of input files (kraken-style bracken reports or Sourmash gather)
             output_format: 'tables', 'hdf5', or 'both'
             
         Returns:
@@ -488,22 +482,8 @@ class PhyloseqTableGenerator:
         
         # Parse input files based on profiler
         if self.profiler == 'kraken2':
-            # For Kraken2, we expect BIOM files (from Bracken)
-            if len(input_files) == 1:
-                otu_table, tax_table = self.parse_biom_file(input_files[0])
-            else:
-                # Merge multiple BIOM files
-                all_otu = []
-                all_tax = []
-                for biom_file in input_files:
-                    otu, tax = self.parse_biom_file(biom_file)
-                    all_otu.append(otu)
-                    all_tax.append(tax)
-                
-                # Combine OTU tables
-                otu_table = pd.concat(all_otu, axis=1)
-                # Use first taxonomy table (should be consistent)
-                tax_table = all_tax[0]
+            # For Kraken2, we expect per-sample kraken-style bracken reports
+            otu_table, tax_table = self.parse_kraken_reports(input_files)
         else:
             # For Sourmash, parse gather CSV files
             otu_table, tax_table = self.parse_sourmash_gather(input_files)
@@ -541,8 +521,8 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Kraken2/Bracken BIOM files
-  taxonomy_phyloseq.py --profiler kraken2 --input-files *.report \\
+  # Kraken2/Bracken kraken-style reports
+  taxonomy_phyloseq.py --profiler kraken2 --input-files *_bracken.txt \\
       --db-name silva --output-dir . --format both \\
       --plot-levels Phylum,Family,Genus,Species
 
@@ -565,7 +545,7 @@ Examples:
         required=True,
         nargs='+',
         type=Path,
-        help='Input files (BIOM for kraken2, gather CSV for sourmash)'
+        help='Input files (kraken-style bracken reports for kraken2, gather CSV for sourmash)'
     )
     
     parser.add_argument(

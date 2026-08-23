@@ -19,7 +19,7 @@ process TAXONOMY_PHYLOSEQ {
     path("*_tax_table.tsv"), emit: tax_table
     path("*_sample_metadata.tsv"), emit: sample_metadata
     path("*_phyloseq_data.h5"), emit: phyloseq_h5, optional: true
-    path("plots/*.png"), emit: plots, optional: true
+    path("*.png"), emit: plots, optional: true
     path("versions.yml"), emit: versions
     
     when:
@@ -53,9 +53,10 @@ process TAXONOMY_PHYLOSEQ {
 
     stub:
     """
-    touch ${db_name}_otu_table.tsv
-    touch ${db_name}_tax_table.tsv
-    touch ${db_name}_sample_metadata.tsv
+    touch ${profiler}_${db_name}_otu_table.tsv
+    touch ${profiler}_${db_name}_tax_table.tsv
+    touch ${profiler}_${db_name}_sample_metadata.tsv
+    touch ${profiler}_${db_name}_phyloseq_data.h5
     touch versions.yml
     """
 }

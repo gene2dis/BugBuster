@@ -1,0 +1,84 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    TAXONOMY_REPORT Module Test
+
+    Regression test for audit item #4: the parser used to expect a legacy
+    headered TSV (Id / Kraken DB / Unclassified / Classified) while the
+    pipeline feeds it raw headerless 6-column nf-core kraken2 reports, so the
+    kraken2 reporting path crashed on every run. Also guards the staged-input
+    fix: the module output Reads_report.csv previously shared its name with
+    the staged input symlink, so the script wrote through the symlink into
+    the upstream READS_REPORT work directory (here: the committed fixture).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test TAXONOMY_REPORT Process"
+    script "../../modules/local/taxonomy_report/main.nf"
+    process "TAXONOMY_REPORT"
+
+    test("merges raw kraken2 reports into the reads report") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1.kraken2.report.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sample2.kraken2.report.txt", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/taxonomy/Reads_report_fixture.csv", checkIfExists: true)
+                input[2] = 'kraken2'
+                input[3] = 'standard-8'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.report.get(0)).readLines()
+            assert lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed),Kraken DB,Unclassified,Classified"
+            assert lines.contains("sample1,120000,110000,100000,standard-8,12.5,87.5")
+            assert lines.contains("sample2,90000,85000,80000,standard-8,0.0,100.0")
+
+            // classification plot emitted
+            assert process.out.plots.size() == 1
+
+            // staged-input regression: the committed fixture must be untouched
+            def fixture = path("${projectDir}/tests/data/taxonomy/Reads_report_fixture.csv").readLines()
+            assert fixture == [
+                "Id,Raw reads,Fastp,Clean reads (contaminants removed)",
+                "sample1,120000,110000,100000",
+                "sample2,90000,85000,80000"
+            ]
+        }
+    }
+
+    test("stub emits the reads report") {
+        options "-stub"
+
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1.kraken2.report.txt", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/taxonomy/Reads_report_fixture.csv", checkIfExists: true)
+                input[2] = 'kraken2'
+                input[3] = 'standard-8'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.report.size() == 1
+        }
+    }
+}

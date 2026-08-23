@@ -1,0 +1,3 @@
+Id,Raw reads,Fastp,Clean reads (contaminants removed)
+sample1,120000,110000,100000
+sample2,90000,85000,80000

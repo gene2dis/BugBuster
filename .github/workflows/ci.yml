@@ -109,6 +109,17 @@ jobs:
         run: |
           tests/bin/test_db_reformat_scripts.sh
 
+  report-scripts:
+    name: Test taxonomy/report scripts and pinned container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Run taxonomy script regression tests (audit #4, #12)
+        run: |
+          tests/bin/test_taxonomy_scripts.sh
+
   changes:
     name: Check for changes
     runs-on: ubuntu-latest
