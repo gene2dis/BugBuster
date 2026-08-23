@@ -94,26 +94,19 @@ def main():
     
     # Check if we have any data
     if not all_tax_reports:
-        print("WARNING: No bins were classified by GTDB-Tk. Creating empty output files.")
-        # Create empty output files
-        empty_df = pd.DataFrame(columns=[
-            'sample', 'bin_name', 'closest_genome_reference',
-            'Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species'
-        ])
-        empty_df.to_csv('MAGs_tax_summary.csv', index=False)
-        
-        # Create empty plot
-        fig, ax = plt.subplots(figsize=(16, 8))
-        ax.text(0.5, 0.5, 'No MAGs classified', 
-                ha='center', va='center', fontsize=20, transform=ax.transAxes)
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
-        ax.axis('off')
-        plt.savefig('MAGs_tax_plot.png', dpi=300, bbox_inches='tight', facecolor='white')
-        plt.close()
-        
-        print("Created empty output files (no bins to classify)")
-        return
+        # Fail loudly instead of publishing a "successful" empty taxonomy
+        # report: header-only GTDB-Tk summaries usually mean the batch step
+        # found no bin directories, not that no bins were classifiable.
+        print(
+            "ERROR: all GTDB-Tk summaries are empty (header-only) - no bins "
+            "were classified. With a single-binner setup (e.g. the default "
+            "'--binners semibin') or non-default MetaWRAP thresholds this "
+            "usually indicates the hardcoded bin-directory pattern bug in "
+            "gtdb_tk_batch (audit #6). Failing instead of writing an empty "
+            "taxonomy summary.",
+            file=sys.stderr
+        )
+        sys.exit(1)
     
     # Combine all reports
     all_tax_bin_reports_full = pd.concat(all_tax_reports, ignore_index=True)
@@ -132,49 +125,46 @@ def main():
     all_tax_bin_reports_csv.to_csv('MAGs_tax_summary.csv', index=False)
     
     # Create the plot
-    try:
-        fig, ax = plt.subplots(figsize=(16, 8))
-        
-        # Generate colors
-        n_phyla = len(phylum_counts)
-        colors = generate_colors(n_phyla)
-        color_map = dict(zip(phylum_counts['Phylum'], colors))
-        
-        # Create bar plot
-        bars = ax.bar(range(len(phylum_counts)), phylum_counts['Bin count'],
-                      color=[color_map[p] for p in phylum_counts['Phylum']],
-                      edgecolor='black', linewidth=1)
-        
-        # Add value labels on top of bars
-        for i, (idx, row) in enumerate(phylum_counts.iterrows()):
-            ax.text(i, row['Bin count'], str(row['Bin count']),
-                   ha='center', va='bottom', fontsize=20)
-        
-        # Set labels and formatting
-        ax.set_xticks(range(len(phylum_counts)))
-        ax.set_xticklabels(phylum_counts['Phylum'], rotation=40, ha='right', fontsize=20)
-        ax.set_ylabel('MAGs Count', fontsize=25)
-        ax.set_xlabel(None)
-        
-        # Style the plot
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.grid(axis='y', linestyle='--', alpha=0.7, color='gray')
-        ax.set_axisbelow(True)
-        ax.tick_params(axis='y', labelsize=18)
-        
-        # Set background
-        ax.set_facecolor('white')
-        fig.patch.set_facecolor('white')
-        
-        plt.tight_layout()
-        plt.savefig('MAGs_tax_plot.png', dpi=300, bbox_inches='tight', facecolor='white')
-        plt.close()
-        
-        print("Successfully generated MAGs_tax_plot.png")
-        
-    except Exception as e:
-        print(f"ERROR generating plot: {e}", file=sys.stderr)
+    fig, ax = plt.subplots(figsize=(16, 8))
+    
+    # Generate colors
+    n_phyla = len(phylum_counts)
+    colors = generate_colors(n_phyla)
+    color_map = dict(zip(phylum_counts['Phylum'], colors))
+    
+    # Create bar plot
+    bars = ax.bar(range(len(phylum_counts)), phylum_counts['Bin count'],
+                  color=[color_map[p] for p in phylum_counts['Phylum']],
+                  edgecolor='black', linewidth=1)
+    
+    # Add value labels on top of bars
+    for i, (idx, row) in enumerate(phylum_counts.iterrows()):
+        ax.text(i, row['Bin count'], str(row['Bin count']),
+               ha='center', va='bottom', fontsize=20)
+    
+    # Set labels and formatting
+    ax.set_xticks(range(len(phylum_counts)))
+    ax.set_xticklabels(phylum_counts['Phylum'], rotation=40, ha='right', fontsize=20)
+    ax.set_ylabel('MAGs Count', fontsize=25)
+    ax.set_xlabel(None)
+    
+    # Style the plot
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
+    ax.grid(axis='y', linestyle='--', alpha=0.7, color='gray')
+    ax.set_axisbelow(True)
+    ax.tick_params(axis='y', labelsize=18)
+    
+    # Set background
+    ax.set_facecolor('white')
+    fig.patch.set_facecolor('white')
+    
+    plt.tight_layout()
+    plt.savefig('MAGs_tax_plot.png', dpi=300, bbox_inches='tight', facecolor='white')
+    plt.close()
+    
+    print("Successfully generated MAGs_tax_plot.png")
+    
     
     print(f"Successfully generated MAGs_tax_summary.csv with {len(all_tax_bin_reports_csv)} MAGs")
     print(f"  - Unique phyla: {n_phyla}")

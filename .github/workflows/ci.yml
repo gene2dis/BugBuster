@@ -120,6 +120,10 @@ jobs:
         run: |
           tests/bin/test_taxonomy_scripts.sh
 
+      - name: Run report script regression tests (audit #13)
+        run: |
+          tests/bin/test_report_scripts.sh
+
   changes:
     name: Check for changes
     runs-on: ubuntu-latest

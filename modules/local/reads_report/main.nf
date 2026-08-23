@@ -9,7 +9,8 @@ process READS_REPORT {
         val(args)
 
     output:
-	path("*")
+        path("Reads_report.csv"), emit: report
+        path("Box_plot_reads.png"), emit: plot, optional: true
 
     script:
         """
@@ -19,6 +20,6 @@ process READS_REPORT {
     stub:
         """
         touch Reads_report.csv
-        touch Reads_report.png
+        touch Box_plot_reads.png
         """
 }

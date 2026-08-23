@@ -156,12 +156,11 @@ class TaxonomyReportGenerator:
         """
         try:
             reads_report = pd.read_csv(reads_report_path)
-        except FileNotFoundError:
-            print(f"Warning: Reads report not found at {reads_report_path}", file=sys.stderr)
-            return taxonomy_data
         except Exception as e:
-            print(f"Warning: Failed to read reads report: {e}", file=sys.stderr)
-            return taxonomy_data
+            raise ValueError(
+                f"Required reads report {reads_report_path} is missing or "
+                f"unreadable: {e}"
+            )
         
         # Merge on 'Id' column
         # Use suffixes to handle any overlapping columns

@@ -126,7 +126,7 @@ workflow QC {
                 .concat(ch_fastp_reads_report.reads_report)
                 .collect(),
             "contaminants"
-        )
+        ).report
 
         ch_clean_reads = ch_decontaminated.reads
         ch_clean_reads_coassembly = ch_decontaminated.reads_coassembly
@@ -143,7 +143,7 @@ workflow QC {
         ch_report = READS_REPORT(
             ch_count.reads_report.collect(),
             "none"
-        )
+        ).report
     }
 
     emit:
