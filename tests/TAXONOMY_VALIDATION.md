@@ -15,11 +15,11 @@ The refactored taxonomy workflow replaces 5 R-based modules with 2 Python-based 
 # Test help
 python3 bin/taxonomy_report.py --help
 
-# Test with sample Kraken2 data
+# Test with sample Kraken2 data (use reports from a previous pipeline run)
 python3 bin/taxonomy_report.py \
     --profiler kraken2 \
-    --reports tests/data/taxonomy/sample1_kraken_report.tsv \
-    --reads-report tests/data/taxonomy/Reads_report.csv \
+    --reports path/to/sample1_kraken_report.tsv \
+    --reads-report path/to/Reads_report.csv \
     --db-name silva \
     --output-dir test_output/
 
@@ -33,10 +33,10 @@ python3 bin/taxonomy_report.py \
 # Test help
 python3 bin/taxonomy_phyloseq.py --help
 
-# Test with Kraken2 BIOM data
+# Test with Kraken2 BIOM data (use output from a previous pipeline run)
 python3 bin/taxonomy_phyloseq.py \
     --profiler kraken2 \
-    --input-files tests/data/taxonomy/sample1.biom \
+    --input-files path/to/sample1.biom \
     --db-name silva \
     --output-dir test_output/ \
     --format both \
@@ -68,24 +68,18 @@ Rscript bin/tables_to_phyloseq.R \
 # - test_output/kraken2_silva_phyloseq.RDS
 ```
 
-### 2. Module Integration Tests
+### 2. Script and Module Tests
 
-#### Test TAXONOMY_REPORT module
+#### Smoke-test the taxonomy scripts
 ```bash
-# Run basic module test
-nextflow run tests/modules/taxonomy/taxonomy_report.nf.test
+# Checks script availability, Python dependencies, and --help of all three scripts
+tests/bin/test_taxonomy_scripts.sh
 ```
 
-#### Test TAXONOMY_PHYLOSEQ module
+#### Run the nf-test suite
 ```bash
-# Run basic module test
-nextflow run tests/modules/taxonomy/taxonomy_phyloseq.nf.test
-```
-
-#### Test PHYLOSEQ_CONVERTER module
-```bash
-# Run basic module test
-nextflow run tests/modules/taxonomy/phyloseq_converter.nf.test
+# Runs all tests under tests/ (configured in nf-test.config)
+nf-test test
 ```
 
 ### 3. Subworkflow Integration Tests

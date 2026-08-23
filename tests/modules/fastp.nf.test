@@ -1,65 +1,79 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    FASTP Module Test
+    FASTP Module Test (nf-core module used by the QC subworkflow)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
 nextflow_process {
 
     name "Test FASTP Process"
-    script "../../modules/fastp/main.nf"
+    script "../../modules/nf-core/fastp/main.nf"
     process "FASTP"
 
-    test("FASTP should filter reads") {
+    test("FASTP should filter paired-end reads") {
         when {
             process {
                 """
                 input[0] = [
-                    [ id: 'test_sample' ],
+                    [ id: 'test_sample', single_end: false ],
                     [
-                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_1.fastq.gz"),
-                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_2.fastq.gz")
-                    ]
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_1.fastq.gz", checkIfExists: true),
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_2.fastq.gz", checkIfExists: true)
+                    ],
+                    []
                 ]
+                input[1] = false // discard_trimmed_pass
+                input[2] = false // save_trimmed_fail
+                input[3] = false // save_merged
                 """
             }
         }
 
         then {
-            // Check process completed
             assert process.success
-            
-            // Check output files exist
-            assert process.out.fastq
-            assert process.out.versions
-            
-            // Check output structure
-            with(process.out.fastq) {
+
+            // Trimmed reads emitted with meta preserved (R1 + R2)
+            with(process.out.reads) {
                 assert size() == 1
                 assert get(0).get(0).id == 'test_sample'
+                assert get(0).get(1).size() == 2
             }
+
+            // The JSON report must be real fastp output, not an empty file
+            def json_text = path(process.out.json.get(0).get(1)).text
+            assert json_text.contains('"before_filtering"')
+            assert json_text.contains('"after_filtering"')
+
+            assert process.out.html
+            assert process.out.log
+            assert process.out.versions
         }
     }
 
     test("FASTP stub run") {
         options "-stub"
-        
+
         when {
             process {
                 """
                 input[0] = [
-                    [ id: 'test_sample' ],
+                    [ id: 'test_sample', single_end: false ],
                     [
-                        file("test1_R1.fastq.gz"),
-                        file("test1_R2.fastq.gz")
-                    ]
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_1.fastq.gz", checkIfExists: true),
+                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_2.fastq.gz", checkIfExists: true)
+                    ],
+                    []
                 ]
+                input[1] = false // discard_trimmed_pass
+                input[2] = false // save_trimmed_fail
+                input[3] = false // save_merged
                 """
             }
         }
 
         then {
             assert process.success
+            assert process.out.reads
             assert process.out.versions
         }
     }
