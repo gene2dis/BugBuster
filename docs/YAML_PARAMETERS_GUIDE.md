@@ -148,7 +148,7 @@ output: "results"
 
 # Quality Control
 quality_control: true
-min_read_sample: 10000
+min_read_sample: 10000000  # optional; default 0 disables the sample filter
 store_clean_reads: true
 
 # Multiple contaminant genomes

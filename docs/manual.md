@@ -126,7 +126,7 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/downloaded_db/` with symbolic links for reuse.
+BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, so they can be reused across pipeline runs.
 
 ### Automatic Download Databases
 
@@ -456,7 +456,7 @@ Control taxonomic output visualization and formatting:
 |-----------|---------|-------------|
 | `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
 
-By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs. Symbolic links are created in `<output>/downloaded_db/` for reference.
+By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
 
 ### 6.15 Resource Limit Options
 
@@ -559,6 +559,8 @@ results/
 │   ├── execution_trace_*.txt                   # Task trace log
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
+├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
+│   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control (if quality_control=true)
 │   ├── fastp/                                  # FastP reports per sample
 │   │   └── {sample}/                           # Per-sample QC results

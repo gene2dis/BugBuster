@@ -74,8 +74,13 @@ def printHelp() {
       -profile docker               Run with Docker containers
       -profile singularity          Run with Singularity containers
       -profile podman               Run with Podman containers
-      -profile conda                Run with Conda environments
-      -profile slurm_singularity    Run on SLURM with Singularity
+      -profile apptainer            Run with Apptainer containers
+      -profile conda                Run with Conda environments (containers recommended)
+      -profile slurm                Run on a SLURM HPC cluster (combine: slurm,singularity)
+      -profile aws                  Run on AWS Batch (combine: aws,docker)
+      -profile gcp                  Run on Google Cloud Batch (combine: gcp,docker)
+      -profile azure                Run on Azure Batch (combine: azure,docker)
+      -profile low_disk             Progressive work-dir cleanup (runs not resumable)
       -profile test                 Run with minimal test dataset
 
     \u001B[1;33mOther options:\u001B[0m
@@ -229,9 +234,6 @@ include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_repo
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
-
-	// MULTIQC REPORTING
-include { MULTIQC as NFCORE_MULTIQC } from './modules/nf-core/multiqc/main'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -424,8 +426,9 @@ workflow {
         ch_clusters = CLUSTERING(ch_arg_fasta.collect())
     }
 
-    // TODO: Re-enable MultiQC aggregate reporting once module wiring is stabilized
-    // NFCORE_MULTIQC(ch_multiqc_files, config, [], [], [], [])
+    // TODO: MultiQC aggregation is not wired. To re-enable: include the
+    // nf-core module (modules/nf-core/multiqc), collect the per-tool reports
+    // into a channel, and add a publishDir block in config/modules.config.
 
 }
 

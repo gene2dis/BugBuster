@@ -90,12 +90,6 @@
         │ (Quality/Tax/ │
         │   Summary)    │
         └───────────────┘
-                │
-                ▼
-        ┌───────────────┐
-        │   MULTIQC     │
-        │  (Aggregate)  │
-        └───────────────┘
 ```
 
 ## Subworkflow & Module Descriptions

@@ -40,7 +40,7 @@ workflow PREPARE_DATABASES {
         if ( params.custom_kraken_db ) {
             ch_kraken_db = Channel.fromPath(params.custom_kraken_db, checkIfExists: true)
         } else {
-            ch_kraken_ref = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["file"])
+            ch_kraken_ref = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["url"])
             ch_kraken_db = FORMAT_KRAKEN_DB(ch_kraken_ref)
         }
     }
@@ -59,7 +59,7 @@ workflow PREPARE_DATABASES {
             ch_sourmash_lineages = ch_sourmash_files.map { files -> files[1] }
         } else {
             // Reference database: download both k-mer and lineages files
-            ch_sourmash_files = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["file"])
+            ch_sourmash_files = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["url"])
                 .map { filepath -> file(filepath) }
                 .collect()
             
@@ -83,14 +83,14 @@ workflow PREPARE_DATABASES {
         if ( params.custom_karga_db ) {
             ch_karga_db = Channel.of(file(params.custom_karga_db, checkIfExists: true))
         } else {
-            ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["file"])
+            ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["url"])
                 .map { filepath -> file(filepath) }
         }
 
         if ( params.custom_kargva_db ) {
             ch_kargva_db = Channel.of(file(params.custom_kargva_db, checkIfExists: true))
         } else {
-            ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["file"])
+            ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["url"])
                 .map { filepath -> file(filepath) }
         }
     }
@@ -106,11 +106,11 @@ workflow PREPARE_DATABASES {
             // Collect FASTA file paths into lists
             def phix_files = params.custom_phiX_fasta ? 
                 [params.custom_phiX_fasta] : 
-                params.bowtie_ref_genomes_for_build[params.phiX_index]["file"]
+                params.bowtie_ref_genomes_for_build[params.phiX_index]["url"]
             
             def host_files = params.custom_host_fasta ? 
                 [params.custom_host_fasta] : 
-                params.bowtie_ref_host_index[params.host_db]["file"]
+                params.bowtie_ref_host_index[params.host_db]["url"]
             
             // Combine lists and create single channel
             def all_fasta_files = phix_files + host_files

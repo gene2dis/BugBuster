@@ -47,12 +47,9 @@ flowchart TD
     BinARG --> ARGFormat[ARG_FASTA_FORMATTER]
     ARGFormat --> Clustering[CLUSTERING]
     
-    %% MultiQC Reporting
-    QC --> MultiQC[MULTIQC<br/>Aggregate QC Reports]
-    Taxonomy --> MultiQC
-    
     %% End
-    MultiQC --> End([Results Output])
+    QC --> End([Results Output])
+    Taxonomy --> End
     ARGNorm --> End
     ARGBlobplot --> End
     Clustering --> End
@@ -66,7 +63,7 @@ flowchart TD
     classDef database fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     
     class InputCheck,QC,Taxonomy,Assembly,Binning subworkflow
-    class ReadARG,ContigTax,ContigARG,BinARG,MetaCerberus,MultiQC module
+    class ReadARG,ContigTax,ContigARG,BinARG,MetaCerberus module
     class CleanReads,Contigs decision
     class PrepDB database
 ```
@@ -138,7 +135,7 @@ flowchart TD
 - `reads`: Clean reads `[meta, reads]`
 - `reads_coassembly`: Collected reads for coassembly
 - `report`: QC summary report
-- `fastp_json`: FASTP JSON for MultiQC
+- `fastp_json`: FASTP JSON reports
 
 ---
 
@@ -319,7 +316,7 @@ flowchart LR
 ### Annotation & Reporting Modules
 - **Functional**: METACERBERUS, PRODIGAL
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
-- **Reporting**: MultiQC, custom report generators
+- **Reporting**: custom report generators
 
 ---
 
@@ -327,22 +324,15 @@ flowchart LR
 
 ```
 results/
-├── qc/                          # Quality control reports
-├── taxonomy/                    # Taxonomic profiles
-├── assembly/                    # Assembled contigs
-├── binning/                     # Refined bins
-│   ├── metabat2/
-│   ├── semibin/
-│   ├── comebin/
-│   ├── metawrap/
-│   ├── checkm2/
-│   └── gtdbtk/
-├── arg_prediction/              # ARG analysis results
-│   ├── reads/
-│   ├── contigs/
-│   └── bins/
-├── annotation/                  # Functional annotations
-└── multiqc/                     # Aggregated QC report
+├── pipeline_info/               # Execution reports and logs
+├── clean_reads/                 # Decontaminated reads (only if --store_clean_reads)
+├── 01_quality_control/          # FastP reports and QC summary
+├── 02_taxonomy/                 # Taxonomic profiles, tables, figures
+├── 03_assembly/                 # Assembled and filtered contigs
+├── 04_binning/                  # Raw/refined bins, quality, taxonomy
+├── 05_arg_prediction/           # ARG results (read/contig/bin level)
+├── 06_contig_taxonomy/          # BlobTools contig taxonomy plots
+└── 07_functional_annotation/    # MetaCerberus annotations
 ```
 
 ---
