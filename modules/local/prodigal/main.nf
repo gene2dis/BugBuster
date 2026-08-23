@@ -54,6 +54,13 @@ process PRODIGAL_BINS {
 
         rm -rf refined_bins/
 	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        mkdir ${prefix}_bins_proteins
+        """
 }
 
 process PRODIGAL_CONTIGS {

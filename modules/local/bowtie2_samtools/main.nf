@@ -353,5 +353,12 @@ process BOWTIE2_SAMTOOLS_DEPTH {
             rm -f ${prefix}_bins_index*
             rm -f ${prefix}_bowtie_map.log
         done
-	""" 
+	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_bin1_all_reads.bam
+        """
 }

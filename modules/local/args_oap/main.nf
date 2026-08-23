@@ -30,4 +30,10 @@ process ARGS_OAP {
     rm -rf tmp_reads
     """
 
+    stub:
+        def prefix = "${meta.id}"
+
+    """
+    mkdir ${prefix}_args_oap_s1_out
+    """
 }

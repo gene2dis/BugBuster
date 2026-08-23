@@ -40,5 +40,15 @@ process QFILTER {
             echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
             echo -e "${prefix}\\t\${before_reads_fr}\\t\${after_reads_fr}" >> ${prefix}_fastp_report.tsv
         fi
-        """ 
+        """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        # Must hold an integer: the QC subworkflow does Integer.parseInt on this file
+        echo 1000 > after_reads_fr.txt
+        echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
+        echo -e "${prefix}\\t1000\\t1000" >> ${prefix}_fastp_report.tsv
+        """
 }

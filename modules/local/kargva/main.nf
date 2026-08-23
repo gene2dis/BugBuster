@@ -30,4 +30,11 @@ process KARGVA {
         rm -f *KARGVA_mappedReads.csv
         rm -f ${prefix}_all_reads.fastq.gz
         """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        echo "GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGVA_mappedGenes.csv
+        """
 }

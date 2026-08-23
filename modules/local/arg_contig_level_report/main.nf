@@ -26,4 +26,10 @@ process ARG_CONTIG_LEVEL_REPORT {
         pandas: \$(python -c "import pandas; print(pandas.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch Contig_tax_and_arg_prediction.tsv
+    touch versions.yml
+    """
 }

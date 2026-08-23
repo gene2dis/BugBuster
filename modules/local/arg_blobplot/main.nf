@@ -28,4 +28,11 @@ process ARG_BLOBPLOT {
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch arg_blobplot.png
+    touch arg_blobplot_data.pkl
+    touch versions.yml
+    """
 }

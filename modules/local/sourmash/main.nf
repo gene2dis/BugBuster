@@ -61,4 +61,13 @@ process SOURMASH {
         # Cleanup temporary files
         rm -f *.sig
         """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_smgather_${db_name}.with-lineages.csv
+        echo -e "Id\tSourmash DB\tUnclassified\tClassified" > ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
+        echo -e "${prefix}\t${db_name}\t1\t0" >> ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
+        """
 }

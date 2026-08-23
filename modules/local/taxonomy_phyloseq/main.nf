@@ -53,4 +53,12 @@ process TAXONOMY_PHYLOSEQ {
         h5py: \$(python -c "import h5py; print(h5py.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch ${db_name}_otu_table.tsv
+    touch ${db_name}_tax_table.tsv
+    touch ${db_name}_sample_metadata.tsv
+    touch versions.yml
+    """
 }

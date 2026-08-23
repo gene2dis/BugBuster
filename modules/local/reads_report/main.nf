@@ -14,5 +14,11 @@ process READS_REPORT {
     script:
         """
         report_unify.py ${args}
-	""" 
+	"""
+
+    stub:
+        """
+        touch Reads_report.csv
+        touch Reads_report.png
+        """
 }

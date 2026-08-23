@@ -32,6 +32,12 @@ process FORMAT_KRAKEN_DB {
         """
         ${params.kraken_ref_db[params.kraken2_db]["fmtscript"]} $db
         """
+
+    stub:
+        """
+        mkdir kraken_db
+        touch kraken_db/hash.k2d kraken_db/opts.k2d kraken_db/taxo.k2d
+        """
 }
 
 process FORMAT_BOWTIE_INDEX {
@@ -68,6 +74,11 @@ process FORMAT_NT_BLAST_DB {
         """
         ${params.blast_ref_db[params.blast_db]["fmtscript"]} $db
         """
+
+    stub:
+        """
+        touch nt.00.nin nt.00.nhr nt.00.nsq nt.nal
+        """
 }
 
 process FORMAT_TAXDUMP_FILES {
@@ -86,6 +97,11 @@ process FORMAT_TAXDUMP_FILES {
         """
         ${params.taxonomy_files[params.taxdump_files]["fmtscript"]} $db
         """
+
+    stub:
+        """
+        touch nodes.dmp names.dmp nucl_gb.accession2taxid
+        """
 }
 
 process DOWNLOAD_DEEPARG_DB {
@@ -102,6 +118,11 @@ process DOWNLOAD_DEEPARG_DB {
         deeparg \\
             download_data \\
             -o ./deeparg_db
+        """
+
+    stub:
+        """
+        mkdir deeparg_db
         """
 }
 
@@ -120,6 +141,11 @@ process FORMAT_CHECKM2_DB {
     script:
         """
         ${params.checkm2_ref_db[params.checkm2_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        touch uniref100.KO.1.dmnd
         """
 }
 
@@ -158,6 +184,12 @@ process DOWNLOAD_GTDBTK_DB {
         """
         ${params.gtdbtk_ref_db[params.gtdbtk_db]["fmtscript"]} $db
         """
+
+    stub:
+        """
+        mkdir gtdbtk_db
+        touch gtdbtk_db/metadata.txt
+        """
 }
 
 process SOURMASH_TAX_PREPARE {
@@ -175,5 +207,10 @@ process SOURMASH_TAX_PREPARE {
     script:
         """
         sourmash tax prepare -t ${tax_file} -o taxonomy.sqldb -F sql
+        """
+
+    stub:
+        """
+        touch taxonomy.sqldb
         """
 }

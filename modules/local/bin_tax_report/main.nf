@@ -28,4 +28,11 @@ process BIN_TAX_REPORT {
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch bin_tax_report.png
+    touch bin_tax_report.csv
+    touch versions.yml
+    """
 }

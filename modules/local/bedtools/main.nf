@@ -21,6 +21,13 @@ process BEDTOOLS {
             genomeCoverageBed -ibam \${bam} > \${bin_name}_cov.tsv       
             cat \${bin_name}_cov.tsv | awk '{print \$1, \$2*\$3, \$4, \$5}' | awk '{sum[\$1] += \$2; contig_length[\$1] = \$3} END { for (nombre in sum) { promedio = sum[nombre] / contig_length[nombre]; print nombre, promedio, sum[nombre], contig_length[nombre]; } }' | awk '{sum += \$2; count++; } END {promedio = sum / count; print "tmp1\ttmp2\t",count,"\t",promedio; }' > bin_depth_tmp.tsv
             cat bin_depth_tmp.tsv | sed "s/tmp1/${prefix}/g" | sed "s/tmp2/\${bin_name}/g" >> ${prefix}_bin_depth.tsv
-        done 
-	""" 
+        done
+	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        echo "sample\tbin_id\tTotal_contigs\taverage_cov" > ${prefix}_bin_depth.tsv
+        """
 }

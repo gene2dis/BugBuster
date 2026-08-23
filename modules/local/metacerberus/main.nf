@@ -27,6 +27,14 @@ process METACERBERUS_CONTIGS {
 
         mv ${prefix}_annotation/step_10-visualizeData ${prefix}_annotation_results
         """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        mkdir ${prefix}_annotation
+        mkdir ${prefix}_annotation_results
+        """
 }
 
 process METACERBERUS_BINS {

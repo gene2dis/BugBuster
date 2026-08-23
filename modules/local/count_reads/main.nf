@@ -31,5 +31,13 @@ process COUNT_READS {
 		echo "Id\tRaw reads" > ${prefix}_fastp_report.tsv
                 echo "${prefix}\t\${final_reads_count}" >> ${prefix}_fastp_report.tsv
 	fi
-	""" 
+	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        echo -e "Id\\tRaw reads" > ${prefix}_fastp_report.tsv
+        echo -e "${prefix}\\t1000" >> ${prefix}_fastp_report.tsv
+        """
 }

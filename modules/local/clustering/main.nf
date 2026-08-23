@@ -19,4 +19,12 @@ process CLUSTERING {
         mmseqs easy-cluster mmseq_db.faa Arg_cluster_100 tmp --min-seq-id 1.0 -c 0.9 --cov-mode 0 --threads $task.cpus
         rm mmseq_db.faa
 	"""
+
+    stub:
+        """
+        touch Arg_cluster_90_cluster.tsv
+        touch Arg_cluster_95_cluster.tsv
+        touch Arg_cluster_99_cluster.tsv
+        touch Arg_cluster_100_cluster.tsv
+        """
 }

@@ -28,4 +28,11 @@ process BIN_QUALITY_REPORT {
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch bin_quality_report.png
+    touch bin_quality_report.csv
+    touch versions.yml
+    """
 }

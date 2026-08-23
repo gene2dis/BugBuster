@@ -26,4 +26,9 @@ process ARG_FASTA_FORMATTER {
     rm -f *out.mapping.ARG
     rm -f *_proteins.faa
     """
+
+    stub:
+    """
+    touch stub_ARGs.faa
+    """
 }

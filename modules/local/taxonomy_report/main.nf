@@ -39,4 +39,10 @@ process TAXONOMY_REPORT {
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch Reads_report.csv
+    touch versions.yml
+    """
 }

@@ -34,4 +34,10 @@ process PHYLOSEQ_CONVERTER {
         bioconductor-phyloseq: \$(Rscript -e "cat(as.character(packageVersion('phyloseq')))" 2>/dev/null || echo "unknown")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch ${db_name}_phyloseq.RDS
+    touch versions.yml
+    """
 }

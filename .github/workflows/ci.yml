@@ -14,6 +14,9 @@ on:
 
 env:
   NXF_ANSI_LOG: false
+  # The config uses legacy syntax (e.g. top-level def check_max) that the
+  # strict parser, default since Nextflow 26.04, rejects
+  NXF_SYNTAX_PARSER: v1
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
@@ -39,11 +42,11 @@ jobs:
 
       - name: Run pipeline with test profile (stub)
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub --output ./results_stub
 
       - name: Run pipeline with test profile
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker --output ./results
 
   lint:
     name: Nextflow config lint
@@ -68,23 +71,32 @@ jobs:
             python3 -c "import json; json.load(open('nextflow_schema.json'))"
           fi
 
-  containers:
-    name: Check container availability
+  nf-test:
+    name: Run nf-test suite
     runs-on: ubuntu-latest
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4
 
-      - name: Check Docker containers
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "latest-everything"
+
+      - name: Install nf-test
         run: |
-          # Extract container images from modules
-          grep -r "container " modules/ --include="*.nf" | \
-            grep -oP "container\s+['\"]?\K[^'\"]+(?=['\"]?)" | \
-            sort -u | \
-            while read container; do
-              echo "Checking: $container"
-              docker pull $container || echo "Warning: Could not pull $container"
-            done
+          curl -fsSL https://get.nf-test.com | bash
+          sudo mv nf-test /usr/local/bin/
+
+      - name: Run nf-test
+        run: |
+          nf-test test
 
   changes:
     name: Check for changes

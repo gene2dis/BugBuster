@@ -27,4 +27,11 @@ process BLOBTOOLS {
                   --out ${prefix}_Blob_table \\
                   --rank all
 	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_Blob_table.blobDB.table.txt
+        """
 }

@@ -28,4 +28,11 @@ process KARGA {
                 echo "NA,NA,NA" >> ${prefix}_all_reads_KARGA_mappedGenes.csv
         fi
         """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        echo "GeneIdx,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGA_mappedGenes.csv
+        """
 }

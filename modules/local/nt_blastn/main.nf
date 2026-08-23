@@ -26,4 +26,11 @@ process NT_BLASTN {
             -evalue 1e-25 \\
             -out ${prefix}_assembly_vs_nt_megablast.out
 	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_assembly_vs_nt_megablast.out
+        """
 }

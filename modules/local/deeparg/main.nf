@@ -52,6 +52,13 @@ process DEEPARG_BINS {
         cd ..
         rm -rf tmp_bins
 	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        mkdir ${prefix}_deeparg_results
+        """
 }
 
 process DEEPARG_CONTIGS {
@@ -81,5 +88,12 @@ process DEEPARG_CONTIGS {
                 $args \\
                 --input ${prodigal_contigs} \\
                 --out ${prefix}_contigs_deep_arg.out
+        """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_contigs_deep_arg.out.mapping.ARG
         """
 }

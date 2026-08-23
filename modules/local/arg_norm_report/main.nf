@@ -26,4 +26,10 @@ process ARG_NORM_REPORT {
         pandas: \$(python -c "import pandas; print(pandas.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch arg_norm_report.csv
+    touch versions.yml
+    """
 }
