@@ -4,8 +4,8 @@ process TAXONOMY_PHYLOSEQ {
     
     conda "conda-forge::python=3.11 conda-forge::pandas=2.0 conda-forge::numpy=1.24 conda-forge::matplotlib=3.7 conda-forge::seaborn=0.12 conda-forge::h5py=3.8 bioconda::biom-format=2.1.14"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://jupyter/scipy-notebook:python-3.11' :
-        'jupyter/scipy-notebook:python-3.11' }"
+        'oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib_pruned:3b27e3935fded4e0' :
+        'community.wave.seqera.io/library/python_pandas_numpy_matplotlib_pruned:195b3e3e5f741210' }"
     
     input:
     path(input_files)
@@ -31,9 +31,6 @@ process TAXONOMY_PHYLOSEQ {
     def top_n_arg = top_n ?: 10
     def format_arg = task.ext.format ?: 'both'
     """
-    # Install biom-format if not present
-    pip install --quiet biom-format==2.1.14 2>/dev/null || true
-    
     taxonomy_phyloseq.py \\
         --profiler ${profiler} \\
         --input-files ${input_files} \\

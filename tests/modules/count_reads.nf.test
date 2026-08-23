@@ -1,0 +1,68 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    COUNT_READS Module Test
+
+    Regression test for audit item #21: the process used to have no container
+    (failing under docker profiles when quality_control=false) and assumed gzip
+    input while input_check.nf also accepts plain .fastq. Runs under the docker
+    profile so a broken/missing container fails the test, and asserts the exact
+    tab-separated report content for both report shapes.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test COUNT_READS Process"
+    script "../../modules/local/count_reads/main.nf"
+    process "COUNT_READS"
+
+    test("counts gzipped paired reads plus singletons") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'gz_test', single_end: false, has_singletons: true ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // 10 pairs (=20 reads) + 10 singletons in the fixtures
+            def lines = path(process.out.reads_report.get(0)).readLines()
+            assert lines[0] == "Id\tRaw reads\tRaw reads singletons"
+            assert lines[1] == "gz_test\t20\t10"
+        }
+    }
+
+    test("counts plain uncompressed paired reads without singletons") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'plain_test', single_end: false, has_singletons: false ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.reads_report.get(0)).readLines()
+            assert lines[0] == "Id\tRaw reads"
+            assert lines[1] == "plain_test\t20"
+        }
+    }
+}
