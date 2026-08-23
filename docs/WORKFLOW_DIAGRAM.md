@@ -100,8 +100,7 @@ flowchart TD
     
     Kraken -->|Yes| KrakenDB[FORMAT_KRAKEN_DB]
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
-    QCdb -->|Yes| PhiX[BUILD_PHIX_BOWTIE2_INDEX]
-    QCdb -->|Yes| Host[FORMAT_BOWTIE_INDEX]
+    QCdb -->|Yes| Decontam[BOWTIE2_BUILD_COMBINED]
     Bindb -->|Yes| CheckM2[FORMAT_CHECKM2_DB]
     Bindb -->|Yes| GTDBTK[DOWNLOAD_GTDBTK_DB]
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
@@ -112,7 +111,7 @@ flowchart TD
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `phix_index`, `host_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `karga_db`, `kargva_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `karga_db`, `kargva_db`
 
 ---
 

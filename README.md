@@ -123,8 +123,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 
 | Database | Size | Used For | Trigger Parameter | Custom Path Parameter |
 |----------|------|----------|-------------------|----------------------|
-| **phiX174 Index** | 8.1 MB | PhiX contamination removal | `quality_control=true` | `--custom_phiX_index` |
-| **Human Host Index** | 4.1 GB | Host read removal | `quality_control=true` | `--custom_bowtie_host_index` |
+| **phiX174 Genome** | 5.4 kB | PhiX contamination removal (combined index built locally) | `quality_control=true` | `--custom_phiX_fasta` |
+| **Human Host Genome (T2T-CHM13v2.0)** | 940 MB | Host read removal (combined index built locally) | `quality_control=true` | `--custom_host_fasta` (or `--custom_decontamination_index` for a pre-built index) |
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |

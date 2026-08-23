@@ -8,12 +8,10 @@
 */
 
 include { FORMAT_KRAKEN_DB        } from '../../modules/local/format_db/main'
-include { FORMAT_BOWTIE_INDEX     } from '../../modules/local/format_db/main'
 include { FORMAT_NT_BLAST_DB      } from '../../modules/local/format_db/main'
 include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
-include { BUILD_PHIX_BOWTIE2_INDEX } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
@@ -116,7 +114,17 @@ workflow PREPARE_DATABASES {
             
             // Combine lists and create single channel
             def all_fasta_files = phix_files + host_files
-            
+
+            // These entries must be genome FASTA (optionally gzipped) — a prebuilt
+            // bowtie2 index cannot be concatenated and rebuilt
+            def non_fasta = all_fasta_files.findAll { f ->
+                f.toString() ==~ /.*\.(zip|bt2l?|tar|tar\.gz|tgz)$/
+            }
+            if ( non_fasta ) {
+                error "Decontamination references must be genome FASTA files, but got: ${non_fasta.join(', ')}. " +
+                      "To use a pre-built Bowtie2 index, pass it via --custom_decontamination_index instead."
+            }
+
             // Build combined index from all FASTA files
             BOWTIE2_BUILD_COMBINED(
                 Channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect(),

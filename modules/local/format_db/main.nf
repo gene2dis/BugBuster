@@ -40,24 +40,6 @@ process FORMAT_KRAKEN_DB {
         """
 }
 
-process FORMAT_BOWTIE_INDEX {
-    tag "format_bowtie_index"
-    container 'ubuntu:22.04'
-
-    label 'process_download_single'
-
-    input:
-        path(db)
-
-    output:
-        path("*")
-
-    script:
-        """
-        ${params.bowtie_ref_host_index[params.host_db]["fmtscript"]}
-        """
-}
-
 process FORMAT_NT_BLAST_DB {
     tag "format_blast_db"
     container 'ubuntu:22.04'
@@ -146,25 +128,6 @@ process FORMAT_CHECKM2_DB {
     stub:
         """
         touch uniref100.KO.1.dmnd
-        """
-}
-
-process BUILD_PHIX_BOWTIE2_INDEX {
-
-    container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
-
-    label 'process_download_single'
-
-    input:
-        path(phiX_fasta)
-
-    output:
-        path("phiX_index")
-
-    script:
-        """
-        mkdir phiX_index
-        bowtie2-build ${phiX_fasta} phiX_index/phiX
         """
 }
 

@@ -174,10 +174,10 @@ wget -O /shared/databases/bugbuster/gtdbtk_r220.tar.gz \
     https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
 tar -xzf /shared/databases/bugbuster/gtdbtk_r220.tar.gz -C /shared/databases/bugbuster/
 
-# Download human host Bowtie2 index
-wget -O /shared/databases/bugbuster/chm13_plusY.zip \
-    https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip
-unzip /shared/databases/bugbuster/chm13_plusY.zip -d /shared/databases/bugbuster/host_index/
+# Download human host genome (T2T-CHM13v2.0); the pipeline builds the
+# combined phiX + host Bowtie2 index from FASTA on first use
+wget -P /shared/databases/bugbuster/ \
+    https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
 ```
 
 ### Using Custom Databases
@@ -189,7 +189,7 @@ nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_standard8 \
-    --custom_bowtie_host_index /shared/databases/bugbuster/host_index \
+    --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
     -profile docker
@@ -197,23 +197,24 @@ nextflow run main.nf \
 
 ### Using Custom Host Genomes
 
-To filter reads from non-human hosts, build a custom Bowtie2 index:
+To filter reads from non-human hosts, point the pipeline at the host genome
+FASTA (plain or gzipped) — it builds the combined phiX + host Bowtie2 index
+automatically:
 
 ```bash
 # Download your host genome
 wget -O host_genome.fasta.gz <URL_TO_HOST_GENOME>
-gunzip host_genome.fasta.gz
-
-# Build Bowtie2 index
-bowtie2-build host_genome.fasta host_index/host
 
 # Use in pipeline
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --custom_bowtie_host_index ./host_index \
+    --custom_host_fasta ./host_genome.fasta.gz \
     -profile docker
 ```
+
+If you already have a pre-built combined (phiX + host) Bowtie2 index, pass its
+directory with `--custom_decontamination_index` instead.
 
 ---
 
