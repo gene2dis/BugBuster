@@ -26,8 +26,6 @@ process CONTIG_FILTER_SUMMARY {
         'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
         'ubuntu:22.04' }"
     
-    publishDir "${params.output}/pipeline_info", mode: params.publish_dir_mode
-
     input:
     path(filter_reports)
     path(empty_reports)

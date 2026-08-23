@@ -134,6 +134,46 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the contig-level tax/ARG path") {
+        // Regression test for audit items #5 and #23:
+        // - #5: ARG_BLOBPLOT(ch_arg_contig_data) passed ARG_CONTIG_LEVEL_REPORT's
+        //   two output channels to a one-input process -> composition error that
+        //   killed every --contig_tax_and_arg run at startup. Success here means
+        //   the wiring composes.
+        // - #23: DEEPARG_CONTIGS results and the contig filtering summary must
+        //   be published into the documented layout (previously delivered nowhere).
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "assembly"
+                taxonomic_profiler = "none"
+                contig_tax_and_arg = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_CONTIGS") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("ARG_CONTIG_LEVEL_REPORT") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("ARG_BLOBPLOT") }
+
+            // DeepARG contig predictions published to the documented layout (audit #23)
+            assert path("${outputDir}/05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1_contigs_deep_arg.out.mapping.ARG").exists()
+            assert path("${outputDir}/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv").exists()
+
+            // Contig filtering summary published to pipeline_info (audit #23)
+            assert path("${outputDir}/pipeline_info/contig_filtering_summary.txt").exists()
+        }
+    }
+
     test("Stub run executes bin-level ARG clustering without contig_tax_and_arg") {
         // Regression test for audit item #15: --arg_bin_clustering used to be a
         // silent no-op unless contig_tax_and_arg was also set, because only the

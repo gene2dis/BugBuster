@@ -575,7 +575,8 @@ results/
 │   ├── execution_report_*.html                 # Resource usage report
 │   ├── execution_timeline_*.html               # Timeline visualization
 │   ├── execution_trace_*.txt                   # Task trace log
-│   └── pipeline_dag_*.svg                      # Pipeline DAG
+│   ├── pipeline_dag_*.svg                      # Pipeline DAG
+│   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── 01_quality_control/                         # Quality control (if quality_control=true)
 │   ├── fastp/                                  # FastP reports per sample
 │   │   └── {sample}/                           # Per-sample QC results
@@ -664,7 +665,9 @@ results/
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── prodigal/                           # ORF predictions
 │   │   │   └── {sample}/
-│   │   ├── deeparg/                            # DeepARG predictions (not published by default)
+│   │   ├── deeparg/                            # DeepARG predictions per sample
+│   │   │   └── {sample}/
+│   │   │       └── *_contigs_deep_arg.out.mapping.ARG
 │   │   ├── summary/                            # ARG summary reports
 │   │   │   └── Contig_tax_and_arg_prediction.tsv
 │   │   └── figures/                            # ARG visualization
