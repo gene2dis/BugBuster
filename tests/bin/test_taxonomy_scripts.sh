@@ -1,11 +1,14 @@
 #!/bin/bash
 #
-# Regression tests for audit item #4:
+# Regression tests for audit items #4 and #12:
 #   - bin/taxonomy_report.py must parse the raw headerless 6-column kraken2
-#     reports the nf-core KRAKEN2 module actually produces, and
+#     reports the nf-core KRAKEN2 module actually produces (#4),
 #   - bin/taxonomy_phyloseq.py must parse the kraken-style bracken reports
 #     (BRACKEN.out.txt) fed to it, merging samples on the union of taxa with
-#     zeros (not NaN) and a taxonomy table covering every sample.
+#     zeros (not NaN) and a taxonomy table covering every sample (#4), and
+#   - the sourmash branch must strip module filename decorations from sample
+#     ids, skip a no-match sample (the SOURMASH module's header-only fallback
+#     CSV), and fail loudly when no sample has any match (#12).
 #
 # The scripts run inside the same pinned image the report processes use,
 # against the committed fixtures in tests/data/taxonomy/.
@@ -209,6 +212,74 @@ NEXT_WORKDIR="${GARBLED_PH}"
 expect_fail "kraken2 phyloseq: garbled report fails" taxonomy_phyloseq.py --profiler kraken2 \
     --input-files bad.kraken2.report_bracken.txt \
     --db-name standard-8 --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+
+#
+# taxonomy_phyloseq.py — sourmash branch (audit #12)
+#
+echo "--- taxonomy_phyloseq.py (sourmash) ---"
+
+# The no-match fallback CSV is generated from the module itself so this test
+# cannot drift from what the pipeline really produces
+FALLBACK_HEADER=$(grep -o '"intersect_bp,[^"]*"' "${REPO_DIR}/modules/local/sourmash/main.nf" | tr -d '"' | head -1)
+if [ -z "${FALLBACK_HEADER}" ]; then
+    echo "✗ sourmash phyloseq: could not extract fallback CSV header from modules/local/sourmash/main.nf"
+    FAIL=$((FAIL + 1))
+else
+    echo "✓ sourmash phyloseq: fallback CSV header extracted from module"
+    PASS=$((PASS + 1))
+fi
+
+# The committed header-only fixture (used by the nf-test suite) must match
+# the module's fallback header
+if [ "$(head -1 "${FIXTURES}/sampleB_smgather_gtdb.with-lineages.csv")" = "${FALLBACK_HEADER}" ]; then
+    echo "✓ sourmash phyloseq: committed no-match fixture matches module fallback"
+    PASS=$((PASS + 1))
+else
+    echo "✗ sourmash phyloseq: sampleB fixture header drifted from module fallback"
+    FAIL=$((FAIL + 1))
+fi
+
+SMPH_WORK="${WORK}/taxonomy_phyloseq_sourmash"
+mkdir -p "${SMPH_WORK}"
+cp "${FIXTURES}/sampleA_smgather_gtdb.with-lineages.csv" "${SMPH_WORK}/"
+echo "${FALLBACK_HEADER}" > "${SMPH_WORK}/sampleB_smgather_gtdb.with-lineages.csv"
+NEXT_WORKDIR="${SMPH_WORK}"
+expect_pass "sourmash phyloseq: match + no-match samples parsed" taxonomy_phyloseq.py --profiler sourmash \
+    --input-files sampleA_smgather_gtdb.with-lineages.csv sampleB_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Phylum,Species --top-n 10
+check_grep "sourmash phyloseq: sample id has no .with-lineages suffix" "sourmash_gtdb_otu_table.tsv" \
+    "^name	sampleA$"
+check_grep "sourmash phyloseq: abundance computed from scaled column" "sourmash_gtdb_otu_table.tsv" \
+    "^GCA_000000001.1	200\(\.0\)\{0,1\}$"
+check_grep "sourmash phyloseq: lineage split into ranks" "sourmash_gtdb_tax_table.tsv" \
+    "^GCA_000000002.1	Bacteria	Bacillota	Bacilli	Bacillales	Bacillaceae	Bacillus	Bacillus subtilis$"
+check_grep "sourmash phyloseq: no-match sample warned and skipped" "../taxonomy_phyloseq_sourmash.log" \
+    "no sourmash matches for sample sampleB"
+
+# All samples empty (the audit-requested no-matches unit test): loud failure
+SMPH_EMPTY="${WORK}/taxonomy_phyloseq_sourmash_empty"
+mkdir -p "${SMPH_EMPTY}"
+echo "${FALLBACK_HEADER}" > "${SMPH_EMPTY}/sampleB_smgather_gtdb.with-lineages.csv"
+NEXT_WORKDIR="${SMPH_EMPTY}"
+expect_fail "sourmash phyloseq: all-samples-no-match fails" taxonomy_phyloseq.py --profiler sourmash \
+    --input-files sampleB_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+check_grep "sourmash phyloseq: no-match failure message is actionable" "../taxonomy_phyloseq_sourmash_empty.log" \
+    "No sourmash matches in any sample"
+
+# A gather CSV missing expected columns (e.g. the old fallback header with
+# match_name and no scaled) must fail loudly, not be silently skipped
+SMPH_BADHDR="${WORK}/taxonomy_phyloseq_sourmash_badhdr"
+mkdir -p "${SMPH_BADHDR}"
+printf 'query_filename,match_name,average_abund,lineage\nx.fq,GCA_1 Test,1.0,d__Bacteria\n' \
+    > "${SMPH_BADHDR}/sampleC_smgather_gtdb.with-lineages.csv"
+NEXT_WORKDIR="${SMPH_BADHDR}"
+expect_fail "sourmash phyloseq: malformed gather CSV fails" taxonomy_phyloseq.py --profiler sourmash \
+    --input-files sampleC_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
 
 echo ""

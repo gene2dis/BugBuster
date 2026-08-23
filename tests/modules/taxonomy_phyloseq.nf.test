@@ -61,6 +61,61 @@ nextflow_process {
         }
     }
 
+    test("strips sourmash filename decorations and skips a no-match sample") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sampleA_smgather_gtdb.with-lineages.csv", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sampleB_smgather_gtdb.with-lineages.csv", checkIfExists: true)
+                ]
+                input[1] = 'sourmash'
+                input[2] = 'gtdb'
+                input[3] = 'Phylum,Species'
+                input[4] = 10
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // sample id must be 'sampleA' — no '.with-lineages' or '_smgather_gtdb'
+            def otu = path(process.out.otu_table.get(0)).readLines()
+            assert otu[0] == "name\tsampleA"
+            assert otu.any { it.startsWith("GCA_000000001.1\t200") }
+
+            def tax = path(process.out.tax_table.get(0)).readLines()
+            assert tax.contains("GCA_000000002.1\tBacteria\tBacillota\tBacilli\tBacillales\tBacillaceae\tBacillus\tBacillus subtilis")
+        }
+    }
+
+    test("fails loudly when no sample has any sourmash match") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sampleB_smgather_gtdb.with-lineages.csv", checkIfExists: true)
+                ]
+                input[1] = 'sourmash'
+                input[2] = 'gtdb'
+                input[3] = 'Phylum,Species'
+                input[4] = 10
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+        }
+    }
+
     test("stub emits tables with the real filename prefix") {
         options "-stub"
 

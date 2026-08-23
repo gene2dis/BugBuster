@@ -176,23 +176,42 @@ class PhyloseqTableGenerator:
             Tuple of (otu_table, taxonomy_table)
         """
         all_data = []
-        
+
         for gather_file in gather_files:
             try:
                 df = pd.read_csv(gather_file)
-                
-                # Extract sample name from filename
-                sample_name = gather_file.stem.replace('_smgather', '').replace(f'_{self.db_name}', '')
-                df['sample_id'] = sample_name
-                
-                all_data.append(df)
             except Exception as e:
-                print(f"Warning: Failed to parse {gather_file}: {e}", file=sys.stderr)
+                raise ValueError(f"Failed to parse sourmash gather file {gather_file}: {e}")
+
+            # Extract sample name from filename (<id>_smgather_<db>.with-lineages.csv)
+            sample_name = gather_file.name.split('_smgather_')[0]
+
+            # Header-only CSV: the SOURMASH module's no-match fallback
+            if df.empty:
+                print(
+                    f"Warning: no sourmash matches for sample {sample_name} - "
+                    "excluded from phyloseq tables",
+                    file=sys.stderr
+                )
                 continue
-        
+
+            missing = {'name', 'unique_intersect_bp', 'scaled', 'average_abund', 'lineage'} - set(df.columns)
+            if missing:
+                raise ValueError(
+                    f"{gather_file} is missing expected gather columns: {sorted(missing)}"
+                )
+
+            df['sample_id'] = sample_name
+            all_data.append(df)
+
         if not all_data:
-            raise ValueError("No valid Sourmash gather files found")
-        
+            raise ValueError(
+                "No sourmash matches in any sample; phyloseq tables cannot be built. "
+                "Check the sourmash database and k-mer settings (the classification "
+                "report from TAXONOMY_REPORT shows per-sample classified fractions), "
+                "or rerun with --taxonomic_profiler none."
+            )
+
         combined = pd.concat(all_data, ignore_index=True)
         
         # Calculate abundance (unique k-mers * average abundance)

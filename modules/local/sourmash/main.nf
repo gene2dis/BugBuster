@@ -48,8 +48,10 @@ process SOURMASH {
             classified=\$(awk -F, '{sum += \$5} END {print sum}' ${prefix}_smgather_${db_name}.with-lineages.csv)
             unclassified=\$(echo "1 \${classified}" | awk '{print \$1 - \$2}')
         else
-            # No matches found - create empty output files
-            echo "query_filename,query_name,query_md5,query_bp,query_abundance,match_name,match_md5,gather_result_rank,f_match_orig,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,f_match,unique_intersect_bp,remaining_bp,query_containment_ani,match_containment_ani,average_containment_ani,max_containment_ani,n_unique_weighted_found,sum_weighted_found,total_weighted_hashes,lineage" > ${prefix}_smgather_${db_name}.with-lineages.csv
+            # No matches found - create a header-only CSV matching the real
+            # sourmash 4.8 gather + tax annotate output so downstream parsers
+            # can recognize the format (captured from sourmash 4.8.11)
+            echo "intersect_bp,f_orig_query,f_match,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,filename,name,md5,f_match_orig,unique_intersect_bp,gather_result_rank,remaining_bp,query_filename,query_name,query_md5,query_bp,ksize,moltype,scaled,query_n_hashes,query_abundance,query_containment_ani,match_containment_ani,average_containment_ani,max_containment_ani,potential_false_negative,n_unique_weighted_found,sum_weighted_found,total_weighted_hashes,lineage" > ${prefix}_smgather_${db_name}.with-lineages.csv
             classified=0
             unclassified=1
         fi
@@ -66,7 +68,7 @@ process SOURMASH {
         def prefix = "${meta.id}"
 
         """
-        touch ${prefix}_smgather_${db_name}.with-lineages.csv
+        echo "intersect_bp,f_orig_query,f_match,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,filename,name,md5,f_match_orig,unique_intersect_bp,gather_result_rank,remaining_bp,query_filename,query_name,query_md5,query_bp,ksize,moltype,scaled,query_n_hashes,query_abundance,query_containment_ani,match_containment_ani,average_containment_ani,max_containment_ani,potential_false_negative,n_unique_weighted_found,sum_weighted_found,total_weighted_hashes,lineage" > ${prefix}_smgather_${db_name}.with-lineages.csv
         echo -e "Id\tSourmash DB\tUnclassified\tClassified" > ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
         echo -e "${prefix}\t${db_name}\t1\t0" >> ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
         """
