@@ -137,6 +137,36 @@ if (invalid_binners) {
     exit 1
 }
 
+// Validate mode enums
+def valid_assembly_modes = ['assembly', 'coassembly', 'none']
+if (!(params.assembly_mode in valid_assembly_modes)) {
+    log.error "ERROR: Invalid --assembly_mode '${params.assembly_mode}'. Valid options: ${valid_assembly_modes.join(', ')}"
+    exit 1
+}
+def valid_profilers = ['kraken2', 'sourmash', 'none']
+if (!(params.taxonomic_profiler in valid_profilers)) {
+    log.error "ERROR: Invalid --taxonomic_profiler '${params.taxonomic_profiler}'. Valid options: ${valid_profilers.join(', ')}"
+    exit 1
+}
+
+// Reject contradictory feature combinations instead of silently skipping stages
+if (params.include_binning && params.assembly_mode == 'none') {
+    log.error "ERROR: --include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
+    exit 1
+}
+if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
+    log.error "ERROR: --contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
+    exit 1
+}
+if (params.arg_bin_clustering && !params.include_binning) {
+    log.error "ERROR: --arg_bin_clustering requires --include_binning (it runs on the refined bins)"
+    exit 1
+}
+if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
+    log.error "ERROR: --contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'"
+    exit 1
+}
+
 // Print run configuration
 log.info "  Run configuration:"
 log.info "  -------------------"
@@ -388,7 +418,8 @@ workflow {
     //
     if ( params.arg_bin_clustering && params.include_binning ) {
         ch_raw_orfs = PRODIGAL_BINS(ch_refined_bins)
-        ch_deeparg = DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db))
+        ch_deeparg = DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
+            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
         ch_arg_fasta = ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
         ch_clusters = CLUSTERING(ch_arg_fasta.collect())
     }

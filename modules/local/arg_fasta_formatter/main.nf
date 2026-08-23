@@ -28,7 +28,9 @@ process ARG_FASTA_FORMATTER {
     """
 
     stub:
+    // Per-sample name: a fixed name collides when CLUSTERING collects the
+    // outputs of every sample into one task
     """
-    touch stub_ARGs.faa
+    touch ${meta.id}_stub_ARGs.faa
     """
 }

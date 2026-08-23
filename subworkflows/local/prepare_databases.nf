@@ -139,15 +139,20 @@ workflow PREPARE_DATABASES {
     }
 
     //
-    // DeepARG, BLAST, and taxdump for contig-level analysis
+    // DeepARG for contig-level analysis and/or bin-level ARG clustering
     //
-    if ( params.contig_tax_and_arg ) {
+    if ( params.contig_tax_and_arg || params.arg_bin_clustering ) {
         if ( params.custom_deeparg_db ) {
             ch_deeparg_db = Channel.fromPath(params.custom_deeparg_db, checkIfExists: true)
         } else {
             ch_deeparg_db = DOWNLOAD_DEEPARG_DB()
         }
+    }
 
+    //
+    // BLAST and taxdump for contig-level taxonomy
+    //
+    if ( params.contig_tax_and_arg ) {
         if ( params.custom_blast_db ) {
             ch_blast_db = Channel.fromPath(params.custom_blast_db, checkIfExists: true)
         } else {

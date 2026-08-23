@@ -134,6 +134,75 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run executes bin-level ARG clustering without contig_tax_and_arg") {
+        // Regression test for audit item #15: --arg_bin_clustering used to be a
+        // silent no-op unless contig_tax_and_arg was also set, because only the
+        // latter populated the DeepARG DB channel (.combine(empty) -> processes
+        // never ran, run still "succeeded").
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "assembly"
+                taxonomic_profiler = "none"
+                include_binning    = true
+                binners            = "semibin,metabat2"
+                arg_bin_clustering = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_BINS") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("ARG_FASTA_FORMATTER") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("CLUSTERING") }
+        }
+    }
+
+    test("Rejects an invalid assembly_mode value") {
+        // Regression test for audit item #15: a typo in assembly_mode used to
+        // yield a "successful" QC-only run instead of an error.
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                assembly_mode = "asembly"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("Invalid --assembly_mode")
+        }
+    }
+
+    test("Rejects include_binning with assembly_mode none") {
+        // Regression test for audit item #15: contradictory feature combos must
+        // fail fast instead of silently skipping stages.
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                assembly_mode   = "none"
+                include_binning = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--include_binning requires an assembly")
+        }
+    }
+
     test("Run with stub mode") {
         options "-stub"
 
