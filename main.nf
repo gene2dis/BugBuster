@@ -334,8 +334,12 @@ workflow {
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
+        // The list wrap keeps a multi-file BLAST DB as ONE tuple element
+        // (path(nt_db)) instead of flattening it into the tuple, which staged
+        // only the first DB file into NT_BLASTN
         ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
-            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }))
+            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }
+            .map { db_files -> [db_files] }))
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -348,10 +352,13 @@ workflow {
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
             .join(NFCORE_SAMTOOLS_INDEX.out.bai)
+        // Wrap the collected taxdump files in a list so they arrive as ONE
+        // tuple element (path(tax_files)) instead of being flattened into the
+        // tuple — flattened, only the first file was staged into BLOBTOOLS
         ch_blob_table = BLOBTOOLS(
             ch_nt_blastn
                 .join(ch_index_bam)
-                .combine(PREPARE_DATABASES.out.taxdump.collect())
+                .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
         )
         BLOBPLOT(ch_blob_table.only_blob.collect())
 
@@ -373,7 +380,7 @@ workflow {
                 .concat(ch_blob_table.only_blob)
                 .collect()
         )
-        ARG_BLOBPLOT(ch_arg_contig_data)
+        ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
     }
 
     //

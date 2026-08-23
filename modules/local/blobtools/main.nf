@@ -14,13 +14,18 @@ process BLOBTOOLS {
         def prefix = "${meta.id}"
 
         """
+        # tax_files stages either loose taxdump files (FORMAT_TAXDUMP_FILES)
+        # or a directory (--custom_taxdump_files) — locate them either way
+        nodes_dmp=\$(find -L . -maxdepth 2 -name nodes.dmp | head -n 1)
+        names_dmp=\$(find -L . -maxdepth 2 -name names.dmp | head -n 1)
+
         blobtools create \\
                   --infile ${contigs} \\
                   --hitsfile ${blastn_hits} \\
-                  --nodes ${tax_files}/nodes.dmp \\
-                  --names ${tax_files}/names.dmp \\
+                  --nodes \${nodes_dmp} \\
+                  --names \${names_dmp} \\
                   --bam ${bam} \\
-                  --out ${prefix} 
+                  --out ${prefix}
 
         blobtools view \\
                   --input ${prefix}.blobDB.json \\

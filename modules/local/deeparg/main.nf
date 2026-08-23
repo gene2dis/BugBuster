@@ -20,7 +20,7 @@ process DEEPARG_BINS {
         cp -r ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
-        
+
         # Parallel processing of bins using background jobs
         pids=()
         for bin_prot in *.faa; do
@@ -81,12 +81,16 @@ process DEEPARG_CONTIGS {
         def prefix = "${meta.id}"
 
         """
+        # nf-core prodigal emits gzipped proteins; deeparg cannot read gzip.
+        # gzip -cdf also passes plain FASTA through unchanged.
+        gzip -cdf ${prodigal_contigs} > ${prefix}_proteins_input.faa
+
         deeparg predict \\
                 -d ${deeparg_db} \\
                 --model LS \\
                 --type prot \\
                 $args \\
-                --input ${prodigal_contigs} \\
+                --input ${prefix}_proteins_input.faa \\
                 --out ${prefix}_contigs_deep_arg.out
         """
 
