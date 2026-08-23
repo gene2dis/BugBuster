@@ -13,5 +13,7 @@ CLAUDE.md
 # Test artifacts
 work/
 .nf-test/
+.nf-test.log
 test_results/
 null/
+/databases/

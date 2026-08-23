@@ -17,8 +17,9 @@ process QFILTER {
         def prefix = "${meta.id}"
 
         """
-        # Handle both nf-core naming (*.fastp.json) and legacy naming (*_report.json)
-        json_file=\$(ls *.json 2>/dev/null | head -1)
+        # Paired-end fastp json; the singleton run's json (*Singleton*.json,
+        # handled below) may be staged alongside it
+        json_file=\$(ls *.json 2>/dev/null | grep -v Singleton | head -1)
         
         cat \$json_file | grep -zoP '.+_filtering.+\\n.+'| sed 's/"//g' | awk '{print \$1}' | grep -Pa 'total_reads:[0-9].+' | sed -e 's/,//g' -e '1s/total/before/' -e '2s/total/after/g'| tr '\\0' '\\n' | grep -Poa "after_reads.+" | cut -d':' -f2 | tr -d '\\n' > after_reads_fr.txt
         cat \$json_file | grep -zoP '.+_filtering.+\\n.+'| sed 's/"//g' | awk '{print \$1}' | grep -Pa 'total_reads:[0-9].+' | sed -e 's/,//g' -e '1s/total/before/' -e '2s/total/after/g'| tr '\\0' '\\n' | grep -Poa "before.+" | cut -d':' -f2 | tr -d '\\n' > before_reads_fr.txt

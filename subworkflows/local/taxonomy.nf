@@ -35,9 +35,13 @@ workflow TAXONOMY {
     // Kraken2 taxonomic profiling
     //
     if ( params.taxonomic_profiler == "kraken2" ) {
-        // Run Kraken2 classification
+        // Run Kraken2 classification on the paired reads only: the nf-core
+        // module passes the whole read list after --paired, which requires an
+        // even number of files (a staged singleton would abort kraken2)
         KRAKEN2(
-            reads,
+            reads.map { meta, reads_files ->
+                [ meta, reads_files.size() > 2 ? reads_files[0..1] : reads_files ]
+            },
             kraken_db.first(),
             false,  // save_output_fastqs
             false   // save_reads_assignment
