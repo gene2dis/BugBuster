@@ -23,7 +23,7 @@ Successfully implemented optimized single-pass decontamination that consolidates
 - **Features**:
   - Extracts unmapped reads (clean reads)
   - Supports paired-end and singleton reads
-  - Compatible with storeDir for immediate cleanup
+  - Optionally publishes clean reads via `--store_clean_reads`
   - Generates comprehensive decontamination reports
 
 ### Subworkflows Updated

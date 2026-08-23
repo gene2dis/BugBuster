@@ -4,41 +4,20 @@ This document describes the disk space optimization features implemented in BugB
 
 ## Overview
 
-The pipeline implements a **progressive cleanup strategy** that frees disk space **during execution**, not after. This is achieved through three complementary mechanisms:
+The pipeline implements a **progressive cleanup strategy** that frees disk space **during execution**, not after. This is achieved through two complementary mechanisms:
 
-1. **publishDir with mode 'move'** - Move (not copy) large outputs to final location, immediately freeing work directory space
-2. **Internal process cleanup** - Remove temporary files within processes as soon as they're no longer needed
-3. **Nextflow cleanup configuration** - Enable automatic work directory cleanup with resume support
+1. **Internal process cleanup** - Remove temporary files within processes as soon as they're no longer needed
+2. **Nextflow cleanup configuration** - Enable automatic work directory cleanup
+
+All publishing uses standard `publishDir` with `mode: 'copy'` (`publish_dir_mode`). Publishing never removes files from the work directory; disk is reclaimed by the internal cleanup steps below and by Nextflow's `cleanup` setting.
 
 ## Implementation Details
 
-### Phase 1: publishDir with mode 'move' for Large Intermediates
+### Phase 1: Key Output Publishing
 
-The following processes use `publishDir` with `mode: 'move'` to immediately free disk space by moving (not copying) outputs:
-
-#### BOWTIE2 (Clean Reads)
-- **Location**: `modules/local/bowtie2/main.nf`
-- **Moves to**: `output/clean_reads/{sample_id}/`
-- **When**: After phiX removal (final QC step)
-- **Mode**: `move` - files are moved from work directory, not copied
-- **Disk savings**: ~8-10 GB per sample
-- **Files moved**: `*_R1_map_phiX.fastq.gz`, `*_R2_map_phiX.fastq.gz`, `*_bowtie_report.tsv`
-
-#### BBMAP (Filtered Contigs)
-- **Location**: `modules/local/bbmap/main.nf`
-- **Moves to**: `output/assembly/{sample_id}/`
-- **When**: After contig length filtering
-- **Mode**: `move` - files are moved from work directory, not copied
-- **Disk savings**: ~2-5 GB per sample
-- **Files moved**: `*_filtered_contigs.fa`, `*_contig.stats`, `*_filter_report.txt`
-
-#### METAWRAP (Refined Bins)
-- **Location**: `modules/local/metawrap/main.nf`
-- **Moves to**: `output/bins/{sample_id}/`
-- **When**: After bin refinement
-- **Mode**: `move` - files are moved from work directory, not copied
-- **Disk savings**: ~1-3 GB per sample
-- **Files moved**: `*_metawrap_*_bins/` directory with all refined bins
+- **BOWTIE2_DECONTAMINATE (clean reads)**: published to `output/clean_reads/{sample_id}/` only when `--store_clean_reads` is set (enabled by the `low_disk` profile). Configured in `config/modules.config`.
+- **BBMAP (filtered contigs)**: always published to `output/03_assembly/per_sample/{sample_id}/` (or `03_assembly/coassembly/`) — `*_filtered_contigs.fa` and `*_contig.stats`.
+- **METAWRAP (refined bins)**: always published to `output/04_binning/per_sample/{sample_id}/refined_bins/` (or `04_binning/coassembly/refined_bins/`) — the `*_metawrap_*_bins/` directory.
 
 ### Phase 2: Internal Process Cleanup
 
@@ -91,8 +70,6 @@ The following processes clean up temporary files during execution:
   - `cleanup = true` - Enable automatic work directory cleanup
   - `enable_work_cleanup = true` - Pipeline parameter
   - `store_clean_reads = true` - Publish clean reads to `<output>/clean_reads/` (publishDir)
-  - `store_filtered_contigs = true` - Enable BBMAP storeDir
-  - `store_refined_bins = true` - Enable METAWRAP storeDir
   - `process.cache = 'lenient'` - Support resume with cleanup
 
 ## Usage
@@ -109,8 +86,8 @@ nextflow run main.nf \
 
 This automatically enables:
 - ✅ Work directory cleanup
-- ✅ storeDir for all large intermediates
-- ✅ Lenient cache for resume support
+- ✅ Clean-reads publishing (`store_clean_reads`)
+- ✅ Lenient cache
 
 ### Option 2: Enable via Command Line Parameters
 
@@ -120,30 +97,8 @@ nextflow run main.nf \
     --output ./results \
     --enable_work_cleanup \
     --store_clean_reads \
-    --store_filtered_contigs \
-    --store_refined_bins \
     -profile docker \
     -resume
-```
-
-### Option 3: Selective Cleanup
-
-Enable only specific cleanup features:
-
-```bash
-# Only clean reads storage
-nextflow run main.nf \
-    --input samplesheet.csv \
-    --output ./results \
-    --store_clean_reads \
-    -profile docker
-
-# Only filtered contigs storage
-nextflow run main.nf \
-    --input samplesheet.csv \
-    --output ./results \
-    --store_filtered_contigs \
-    -profile docker
 ```
 
 ## Monitoring Disk Usage
@@ -201,37 +156,13 @@ The script generates:
 | Final output directory | 50 GB | 50 GB | 0% (same) |
 | Total disk required | 300-350 GB | 130-170 GB | **50-60%** |
 
-## Timeline Example (3 Samples)
-
-```
-Time | Stage              | Action                    | Work Dir | Change
------|-------------------|---------------------------|----------|--------
-T0   | Start             | -                         | 0 GB     | -
-T1   | QC running        | FASTP + BOWTIE2           | 60 GB    | +60 GB
-T2   | QC complete       | Store clean reads         | 10 GB    | -50 GB ✅
-T3   | Assembly running  | MEGAHIT                   | 40 GB    | +30 GB
-T4   | Assembly cleanup  | Remove k-mer dirs         | 25 GB    | -15 GB ✅
-T5   | BBMAP complete    | Store filtered contigs    | 10 GB    | -15 GB ✅
-T6   | Alignment running | BOWTIE2_SAMTOOLS          | 50 GB    | +40 GB
-T7   | Alignment cleanup | Remove indices/temp BAMs  | 30 GB    | -20 GB ✅
-T8   | Binning running   | MetaBAT2/SemiBin/COMEBin  | 45 GB    | +15 GB
-T9   | Binning complete  | Store refined bins        | 10 GB    | -35 GB ✅
-T10  | Pipeline complete | Final cleanup             | 5 GB     | -5 GB ✅
-```
-
-**Key Point**: Disk space is freed progressively throughout execution, preventing the pipeline from running out of space.
-
 ## Resume Functionality
 
-The optimization preserves Nextflow's resume capability:
+### How Resume Interacts with Cleanup
 
-### How Resume Works with Cleanup
-
-1. **storeDir outputs** are permanent and never deleted
-2. **Cache strategy** is set to `lenient`
-3. **Nextflow checks** for outputs in storeDir locations
-4. **If outputs exist**, task is cached (not re-run)
-5. **If outputs missing**, task is re-executed
+1. `-resume` relies on the **work directory**: a task is cached only while its work dir (and outputs) still exist
+2. **Cache strategy** is set to `lenient` to tolerate internal cleanup of temporary files inside completed task dirs
+3. `cleanup = true` (the `low_disk` profile) deletes the work directory **at the end of a successful run**, so a completed `low_disk` run cannot be resumed; an interrupted one can
 
 ### Testing Resume
 
@@ -257,14 +188,12 @@ grep "Cached" .nextflow.log | wc -l
 
 ### What Gets Cached
 
-- ✅ Processes with storeDir outputs (BBMAP, METAWRAP)
 - ✅ Processes whose work dirs still exist (normal `-resume` behavior)
 
-> **Note**: publishing is not caching. `BOWTIE2_DECONTAMINATE` publishes clean
-> reads via publishDir when `store_clean_reads = true` and always re-runs when
-> its inputs or parameters change; `-resume` (the work dir) is the cache. With
-> `cleanup = true` the work dir is deleted at the end of the run, so completed
-> `low_disk` runs cannot be resumed.
+> **Note**: publishing is not caching. Published outputs (clean reads,
+> filtered contigs, refined bins) are copies for the user; every task
+> re-runs whenever its inputs or parameters change, regardless of what has
+> been published. `-resume` (the work dir) is the cache.
 
 ### What Gets Re-run
 
@@ -280,19 +209,17 @@ grep "Cached" .nextflow.log | wc -l
 
 **Solution**:
 1. Ensure you're using `-profile low_disk`
-2. Check that storeDir parameters are enabled
-3. Monitor disk usage with the monitoring script
-4. Consider reducing number of parallel samples
+2. Monitor disk usage with the monitoring script
+3. Consider reducing number of parallel samples
 
 ### Issue: Resume not working after cleanup
 
 **Cause**: Outputs not found in expected locations
 
 **Solution**:
-1. Verify `cache = 'lenient'` is set in `conf/base.config`
-2. Check that storeDir outputs exist in output directory
-3. Ensure output directory path hasn't changed
-4. Check `.nextflow.log` for cache lookup messages
+1. Verify the `work/` directory still exists (it is deleted at the end of a completed `low_disk` run)
+2. Verify `cache = 'lenient'` is set in `conf/base.config`
+3. Check `.nextflow.log` for cache lookup messages
 
 ### Issue: Work directory still growing
 
@@ -306,15 +233,12 @@ grep "Cached" .nextflow.log | wc -l
 
 ### Issue: Outputs missing from results directory
 
-**Cause**: storeDir only stores specific intermediate files
-
 **Solution**:
 1. Check that you're looking in the correct subdirectory:
-   - Clean reads: `output/clean_reads/{sample_id}/`
-   - Filtered contigs: `output/assembly/{sample_id}/`
-   - Refined bins: `output/bins/{sample_id}/`
-2. Other outputs use standard publishDir locations
-3. Check process-specific output directories
+   - Clean reads: `output/clean_reads/{sample_id}/` (only with `--store_clean_reads`)
+   - Filtered contigs: `output/03_assembly/per_sample/{sample_id}/` (or `03_assembly/coassembly/`)
+   - Refined bins: `output/04_binning/per_sample/{sample_id}/refined_bins/` (or `04_binning/coassembly/refined_bins/`)
+2. Other outputs use their numbered publishDir locations (see `config/modules.config`)
 
 ## Configuration Parameters
 
@@ -323,9 +247,7 @@ grep "Cached" .nextflow.log | wc -l
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `enable_work_cleanup` | `false` | Enable automatic work directory cleanup |
-| `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2, publishDir) |
-| `store_filtered_contigs` | `false` | Use storeDir for filtered contigs (BBMAP) |
-| `store_refined_bins` | `false` | Use storeDir for refined bins (METAWRAP) |
+| `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2_DECONTAMINATE, publishDir) |
 
 ### Process Settings
 
@@ -350,31 +272,23 @@ grep "Cached" .nextflow.log | wc -l
 
 | Mode | Behavior | Disk Impact | Use Case |
 |------|----------|-------------|----------|
-| **copy** | Copy files to output | No space freed | Default, safe for all outputs |
-| **move** | Move files to output | Immediate space freed | Large intermediates, cleanup enabled |
+| **copy** | Copy files to output | No space freed | Default; what BugBuster uses (`publish_dir_mode`) |
+| **move** | Move files to output | Immediate space freed | NOT used: it removes outputs downstream tasks still stage from the work dir and breaks `-resume` |
 | **symlink** | Create symbolic links | Minimal space | Read-only access |
 | **rellink** | Create relative links | Minimal space | Portable links |
-
-### Why mode 'move' Works for Cleanup
-
-- **Immediate**: Files are moved as soon as the process completes
-- **No duplication**: Files exist only in output directory, not in work directory
-- **Resume compatible**: Nextflow finds outputs in publishDir location with lenient cache
-- **Selective**: Only enabled when cleanup parameters are true
 
 ### Cache Strategies
 
 | Strategy | Behavior | Use Case |
 |----------|----------|----------|
 | `standard` | Check work dir only | Default, no cleanup |
-| `lenient` | Check work dir + publishDir/storeDir | With cleanup enabled |
+| `lenient` | Match inputs by path/size only (tolerates touched files) | With internal cleanup enabled |
 | `deep` | Check all inputs deeply | Strict reproducibility |
 
 ### Cleanup Timing
 
 - **Internal cleanup**: During process execution (rm commands in script)
-- **storeDir cleanup**: Immediately after outputs are moved
-- **Nextflow cleanup**: After downstream processes no longer need the work dir
+- **Nextflow cleanup** (`cleanup = true`): at the end of a successful run
 
 ## Version History
 

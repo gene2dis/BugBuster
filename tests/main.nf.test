@@ -96,6 +96,44 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run publishes assembly and binning outputs") {
+        // Pins the config-side publishing for BBMAP and METAWRAP
+        // (config/modules.config withName blocks): their outputs must land in
+        // the numbered layout. Guards the removal of the dead module-level
+        // publishDir mode 'move' blocks (audit #23) and any future selector
+        // rename that would silently stop publishing.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "assembly"
+                include_binning    = true
+                binners            = "semibin,metabat2"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("BBMAP") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("METAWRAP") }
+
+            // BBMAP outputs published to the numbered assembly layout
+            assert path("${outputDir}/03_assembly/per_sample/test_sample1/test_sample1_filtered_contigs.fa").exists()
+            assert path("${outputDir}/03_assembly/per_sample/test_sample1/test_sample1_contig.stats").exists()
+
+            // METAWRAP refined bins published to the numbered binning layout
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_metawrap_50_10_bins").exists()
+        }
+    }
+
     test("Run with stub mode") {
         options "-stub"
 

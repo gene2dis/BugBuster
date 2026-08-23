@@ -24,13 +24,7 @@ process METAWRAP {
         'https://depot.galaxyproject.org/singularity/metawrap:1.2--hdfd78af_2' :
         'quay.io/ffuentessantander/metawrap:1.2' }"
 
-    // Publish refined bins using 'move' mode to free disk space immediately
-    publishDir(
-        path: "${params.output}/bins/${meta.id}",
-        mode: 'move',
-        enabled: params.store_refined_bins,
-        saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-    )
+    // Publishing is configured in config/modules.config (withName: 'METAWRAP')
 
     input:
     tuple val(meta), path(bin_dirs)

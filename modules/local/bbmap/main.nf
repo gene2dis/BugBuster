@@ -25,13 +25,7 @@ process BBMAP {
         'https://depot.galaxyproject.org/singularity/bbmap:39.06--h92535d8_0' :
         'quay.io/biocontainers/bbmap:39.06--h92535d8_0' }"
 
-    // Publish filtered contigs using 'move' mode to free disk space immediately
-    publishDir(
-        path: "${params.output}/assembly/${meta.id}",
-        mode: 'move',
-        enabled: params.store_filtered_contigs,
-        saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-    )
+    // Publishing is configured in config/modules.config (withName: 'BBMAP')
 
     input:
     tuple val(meta), path(reads), path(contigs)
