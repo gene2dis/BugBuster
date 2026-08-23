@@ -18,9 +18,8 @@ Complete reference for all BugBuster pipeline parameters.
 10. [ARG Prediction Parameters](#arg-prediction-parameters)
 11. [Functional Annotation Parameters](#functional-annotation-parameters)
 12. [Alignment Parameters](#alignment-parameters)
-13. [Clustering Parameters](#clustering-parameters)
-14. [Resource Limit Parameters](#resource-limit-parameters)
-15. [Advanced Parameters](#advanced-parameters)
+13. [Resource Limit Parameters](#resource-limit-parameters)
+14. [Advanced Parameters](#advanced-parameters)
 
 ---
 
@@ -372,12 +371,12 @@ Override automatic downloads by providing custom database paths:
 
 ## Assembly Parameters
 
-### `--bbmap_lenght`
+### `--bbmap_length`
 - **Type**: Integer
 - **Default**: `1000`
 - **Minimum**: `0`
 - **Description**: Minimum contig length after BBMap filtering
-- **Example**: `--bbmap_lenght 1500`
+- **Example**: `--bbmap_length 1500`
 
 ---
 
@@ -625,80 +624,6 @@ Bowtie2 parameters for read alignment during host filtering:
 - **Default**: `S,1,0.75`
 - **Description**: Interval function for Bowtie2 seeding
 - **Example**: `--bowtie_i "S,1,0.5"`
-
----
-
-## Clustering Parameters
-
-MMseqs2 parameters for ARG clustering (used when `--arg_bin_clustering=true`):
-
-### `--mmseqs_start_sens`
-- **Type**: Integer
-- **Default**: `2`
-- **Description**: Starting sensitivity for MMseqs2
-- **Example**: `--mmseqs_start_sens 3`
-
-### `--mmseqs_s`
-- **Type**: Integer
-- **Default**: `7`
-- **Description**: Sensitivity level for MMseqs2
-- **Example**: `--mmseqs_s 8`
-
-### `--mmseqs_sens_steps`
-- **Type**: Integer
-- **Default**: `3`
-- **Description**: Number of sensitivity steps for MMseqs2
-- **Example**: `--mmseqs_sens_steps 4`
-
-### `--mmseqs_min_seq_id`
-- **Type**: Number
-- **Default**: `0.8`
-- **Range**: 0-1
-- **Description**: Minimum sequence identity for MMseqs2
-- **Example**: `--mmseqs_min_seq_id 0.9`
-
-### `--mmseqs_c`
-- **Type**: Number
-- **Default**: `0.7`
-- **Range**: 0-1
-- **Description**: Coverage threshold for MMseqs2
-- **Example**: `--mmseqs_c 0.8`
-
-### `--mmseqs_cov_mode`
-- **Type**: Integer
-- **Default**: `2`
-- **Description**: Coverage mode for MMseqs2
-- **Example**: `--mmseqs_cov_mode 1`
-
-### `--mmseqs_e`
-- **Type**: String
-- **Default**: `1e-20`
-- **Description**: E-value threshold for MMseqs2
-- **Example**: `--mmseqs_e 1e-25`
-
-### `--mmseqs_format_mode`
-- **Type**: Integer
-- **Default**: `4`
-- **Description**: Output format mode for MMseqs2
-- **Example**: `--mmseqs_format_mode 3`
-
-### `--mmseqs_alignment_mode`
-- **Type**: Integer
-- **Default**: `3`
-- **Description**: Alignment mode for MMseqs2
-- **Example**: `--mmseqs_alignment_mode 2`
-
-### `--mmseqs_max_seqs`
-- **Type**: Integer
-- **Default**: `10000`
-- **Description**: Maximum number of sequences for MMseqs2
-- **Example**: `--mmseqs_max_seqs 15000`
-
-### `--mmseqs_format_output`
-- **Type**: String
-- **Default**: `empty,query,target,evalue,pident,qcov,tcov,tseq`
-- **Description**: Output format fields for MMseqs2
-- **Example**: `--mmseqs_format_output "query,target,pident,evalue"`
 
 ---
 

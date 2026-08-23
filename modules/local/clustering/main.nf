@@ -1,3 +1,6 @@
+// Clusters predicted ARG proteins at four fixed identity tiers (90/95/99/100%).
+// The tiers are deliberate: the former single-valued mmseqs_* params could not
+// describe this design and were removed (audit #14).
 process CLUSTERING {
     container 'quay.io/biocontainers/mmseqs2:15.6f452--pl5321h6a68c12_1'
 

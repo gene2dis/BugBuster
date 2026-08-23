@@ -225,7 +225,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--bbmap_lenght` | `1000` | Minimum contig length after filtering |
+| `--bbmap_length` | `1000` | Minimum contig length after filtering |
 | `--binners` | `semibin` | Binners to run (comma-separated). `≥2` selected → MetaWRAP refinement enabled |
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
 | `--metawrap_completeness` | `50` | Minimum bin completeness (%) — used only when ≥2 binners |

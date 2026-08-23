@@ -36,6 +36,13 @@ nextflow_pipeline {
             assert report_text.contains("Id")
             assert report_text.contains("test_sample1")
             assert report_text.contains("test_sample2")
+
+            // Audit #14: fastp must actually receive the documented
+            // --qualified_quality_phred knob (fastp records its command line
+            // in the published JSON report)
+            def fastp_json = path("${outputDir}/01_quality_control/fastp/test_sample1/test_sample1.fastp.json")
+            assert fastp_json.exists()
+            assert fastp_json.text.contains("--qualified_quality_phred 20")
         }
     }
 
@@ -93,6 +100,11 @@ nextflow_pipeline {
             def report_text = path("${outputDir}/01_quality_control/summary/Reads_report.csv").text
             assert report_text.contains("singleton_test")
             assert report_text.toLowerCase().contains("singleton")
+
+            // Audit #14: the FASTP_SINGLETON selector must carry the knob too
+            def singleton_json = path("${outputDir}/01_quality_control/fastp/singleton_test/singleton_test_Singleton.fastp.json")
+            assert singleton_json.exists()
+            assert singleton_json.text.contains("--qualified_quality_phred 20")
         }
     }
 
@@ -131,6 +143,17 @@ nextflow_pipeline {
 
             // METAWRAP refined bins published to the numbered binning layout
             assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_metawrap_50_10_bins").exists()
+
+            // Audit #14: the single METABAT2 selector must deliver the FULL
+            // arg set; the previously winning selector dropped these three.
+            // The stub records its resolved ext.args into the bins dir.
+            def metabat_args = path("${outputDir}/04_binning/per_sample/test_sample1/raw_bins/metabat2/test_sample1_metabat_bins/metabat2_args.txt")
+            assert metabat_args.exists()
+            def args_text = metabat_args.text
+            assert args_text.contains("--pTNF 0")
+            assert args_text.contains("--minCV 1")
+            assert args_text.contains("--minCVSum 1")
+            assert args_text.contains("--minContig 2500")
         }
     }
 

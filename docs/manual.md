@@ -347,7 +347,7 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--bbmap_lenght` | `1000` | Minimum contig length after BBMap filtering |
+| `--bbmap_length` | `1000` | Minimum contig length after BBMap filtering |
 
 ### 6.8 Binning Options
 
@@ -427,24 +427,6 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_L` | `20` | Seed length |
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
-
-### 6.12 MMseqs2 Clustering Options
-
-Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--mmseqs_start_sens` | `2` | Starting sensitivity |
-| `--mmseqs_s` | `7` | Sensitivity level |
-| `--mmseqs_sens_steps` | `3` | Number of sensitivity steps |
-| `--mmseqs_min_seq_id` | `0.8` | Minimum sequence identity (0-1) |
-| `--mmseqs_c` | `0.7` | Coverage threshold (0-1) |
-| `--mmseqs_cov_mode` | `2` | Coverage mode |
-| `--mmseqs_e` | `1e-20` | E-value threshold |
-| `--mmseqs_format_mode` | `4` | Output format mode |
-| `--mmseqs_alignment_mode` | `3` | Alignment mode |
-| `--mmseqs_max_seqs` | `10000` | Maximum number of sequences |
-| `--mmseqs_format_output` | `empty,query,target,evalue,pident,qcov,tcov,tseq` | Output format fields |
 
 ### 6.12 MetaCerberus Options
 
@@ -603,7 +585,7 @@ results/
 ├── 03_assembly/                                # Genome assembly (if assembly_mode != 'none')
 │   ├── per_sample/                             # Per-sample assemblies (if assembly_mode='assembly')
 │   │   └── {sample}/
-│   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_lenght bp)
+│   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_length bp)
 │   │       ├── {sample}_contig.stats           # Assembly statistics
 │   │       └── {sample}_contigs.fa             # Raw MEGAHIT contigs
 │   └── coassembly/                             # Co-assembly (if assembly_mode='coassembly')

@@ -312,7 +312,7 @@
             "fa_icon": "fas fa-puzzle-piece",
             "description": "Parameters for genome assembly and contig filtering.",
             "properties": {
-                "bbmap_lenght": {
+                "bbmap_length": {
                     "type": "integer",
                     "default": 1000,
                     "minimum": 0,
@@ -524,85 +524,6 @@
                 }
             }
         },
-        "mmseqs2_options": {
-            "title": "MMseqs2 clustering options",
-            "type": "object",
-            "fa_icon": "fas fa-project-diagram",
-            "description": "Parameters for ARG clustering with MMseqs2.",
-            "hidden": true,
-            "properties": {
-                "mmseqs_start_sens": {
-                    "type": "integer",
-                    "default": 2,
-                    "description": "Starting sensitivity for MMseqs2.",
-                    "fa_icon": "fas fa-sliders-h"
-                },
-                "mmseqs_s": {
-                    "type": "integer",
-                    "default": 7,
-                    "description": "Sensitivity for MMseqs2.",
-                    "fa_icon": "fas fa-sliders-h"
-                },
-                "mmseqs_sens_steps": {
-                    "type": "integer",
-                    "default": 3,
-                    "description": "Number of sensitivity steps for MMseqs2.",
-                    "fa_icon": "fas fa-sort-numeric-up"
-                },
-                "mmseqs_min_seq_id": {
-                    "type": "number",
-                    "default": 0.8,
-                    "minimum": 0,
-                    "maximum": 1,
-                    "description": "Minimum sequence identity for MMseqs2.",
-                    "fa_icon": "fas fa-percentage"
-                },
-                "mmseqs_c": {
-                    "type": "number",
-                    "default": 0.7,
-                    "minimum": 0,
-                    "maximum": 1,
-                    "description": "Coverage threshold for MMseqs2.",
-                    "fa_icon": "fas fa-percentage"
-                },
-                "mmseqs_cov_mode": {
-                    "type": "integer",
-                    "default": 2,
-                    "description": "Coverage mode for MMseqs2.",
-                    "fa_icon": "fas fa-cog"
-                },
-                "mmseqs_e": {
-                    "type": "string",
-                    "default": "1e-20",
-                    "description": "E-value threshold for MMseqs2.",
-                    "fa_icon": "fas fa-calculator"
-                },
-                "mmseqs_format_mode": {
-                    "type": "integer",
-                    "default": 4,
-                    "description": "Output format mode for MMseqs2.",
-                    "fa_icon": "fas fa-file-export"
-                },
-                "mmseqs_alignment_mode": {
-                    "type": "integer",
-                    "default": 3,
-                    "description": "Alignment mode for MMseqs2.",
-                    "fa_icon": "fas fa-align-center"
-                },
-                "mmseqs_max_seqs": {
-                    "type": "integer",
-                    "default": 10000,
-                    "description": "Maximum number of sequences for MMseqs2.",
-                    "fa_icon": "fas fa-sort-numeric-up"
-                },
-                "mmseqs_format_output": {
-                    "type": "string",
-                    "default": "empty,query,target,evalue,pident,qcov,tcov,tseq",
-                    "description": "Output format fields for MMseqs2.",
-                    "fa_icon": "fas fa-list"
-                }
-            }
-        },
         "taxonomy_visualization_options": {
             "title": "Taxonomy visualization options",
             "type": "object",
@@ -732,7 +653,6 @@
         { "$ref": "#/definitions/binning_options" },
         { "$ref": "#/definitions/deeparg_options" },
         { "$ref": "#/definitions/bowtie2_options" },
-        { "$ref": "#/definitions/mmseqs2_options" },
         { "$ref": "#/definitions/taxonomy_visualization_options" },
         { "$ref": "#/definitions/database_storage_options" },
         { "$ref": "#/definitions/max_job_request_options" },
