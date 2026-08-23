@@ -13,8 +13,6 @@ process BOWTIE2_DECONTAMINATE {
 
     label 'process_high'
 
-    storeDir params.store_clean_reads ? "${params.output}/clean_reads/${meta.id}" : null
-
     input:
     tuple val(meta), path(reads), path(index_db)
     val db_alias

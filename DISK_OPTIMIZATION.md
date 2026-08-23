@@ -90,7 +90,7 @@ The following processes clean up temporary files during execution:
 - **Settings**:
   - `cleanup = true` - Enable automatic work directory cleanup
   - `enable_work_cleanup = true` - Pipeline parameter
-  - `store_clean_reads = true` - Enable BOWTIE2 storeDir
+  - `store_clean_reads = true` - Publish clean reads to `<output>/clean_reads/` (publishDir)
   - `store_filtered_contigs = true` - Enable BBMAP storeDir
   - `store_refined_bins = true` - Enable METAWRAP storeDir
   - `process.cache = 'lenient'` - Support resume with cleanup
@@ -257,9 +257,14 @@ grep "Cached" .nextflow.log | wc -l
 
 ### What Gets Cached
 
-- ✅ Processes with storeDir outputs (BOWTIE2, BBMAP, METAWRAP)
-- ✅ Processes with publishDir outputs (all other processes)
-- ✅ Processes whose work dirs were cleaned but outputs exist
+- ✅ Processes with storeDir outputs (BBMAP, METAWRAP)
+- ✅ Processes whose work dirs still exist (normal `-resume` behavior)
+
+> **Note**: publishing is not caching. `BOWTIE2_DECONTAMINATE` publishes clean
+> reads via publishDir when `store_clean_reads = true` and always re-runs when
+> its inputs or parameters change; `-resume` (the work dir) is the cache. With
+> `cleanup = true` the work dir is deleted at the end of the run, so completed
+> `low_disk` runs cannot be resumed.
 
 ### What Gets Re-run
 
@@ -318,7 +323,7 @@ grep "Cached" .nextflow.log | wc -l
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `enable_work_cleanup` | `false` | Enable automatic work directory cleanup |
-| `store_clean_reads` | `false` | Use storeDir for clean reads (BOWTIE2) |
+| `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2, publishDir) |
 | `store_filtered_contigs` | `false` | Use storeDir for filtered contigs (BBMAP) |
 | `store_refined_bins` | `false` | Use storeDir for refined bins (METAWRAP) |
 

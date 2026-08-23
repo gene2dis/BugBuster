@@ -97,9 +97,9 @@ nextflow run main.nf --custom_decontamination_index contaminants_index
 
 ## Output Files
 
-### Clean Reads
+### Clean Reads (with `--store_clean_reads`)
 ```
-results/clean_reads/
+results/clean_reads/sample1/
 ├── sample1_R1_clean.fastq.gz
 ├── sample1_R2_clean.fastq.gz
 └── sample1_Singleton_clean.fastq.gz (if present)
@@ -120,7 +120,7 @@ results/../databases/bowtie_index/contaminants_index/
 ## Performance Tips
 
 1. **Pre-build index** for multiple runs
-2. **Use `--store_clean_reads true`** to enable immediate cleanup
+2. **Use `--store_clean_reads true`** to keep clean reads in the output dir (`-resume` remains the task cache)
 3. **Use `-profile low_disk`** on constrained systems
 4. **Share `--databases_dir`** across projects
 
