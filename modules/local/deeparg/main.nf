@@ -17,6 +17,11 @@ process DEEPARG_BINS {
         def prefix = "${meta.id}"
 
         """
+        # The proteins dir may be empty (upstream bins dir held only a
+        # SKIPPED/FAILED marker) — nullglob keeps the *.faa loop from running
+        # deeparg on a literal '*.faa'
+        shopt -s nullglob
+
         cp -r ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
@@ -48,7 +53,7 @@ process DEEPARG_BINS {
         # Wait for all remaining jobs
         for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
         
-        mv *.mapping.ARG ../${prefix}_deeparg_results/
+        for arg_file in *.mapping.ARG; do mv "\$arg_file" ../${prefix}_deeparg_results/; done
         cd ..
         rm -rf tmp_bins
 	"""

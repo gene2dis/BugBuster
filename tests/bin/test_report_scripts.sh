@@ -210,6 +210,40 @@ NEXT_WORKDIR="${BT_EMPTY}"
 expect_fail "bin_tax: all-header-only input fails" bin_tax_report.py
 check_grep "bin_tax: failure message points at audit #6" "../bin_tax_empty.log" "audit #6"
 
+#
+# arg_norm_report.py — audit item #22: a sample where ARGs-OAP finds nothing
+# (nRead/nCell = 0) must yield empty normalization cells, not inf, in the
+# published CSVs.
+#
+echo "--- arg_norm_report.py ---"
+AN_WORK="${WORK}/arg_norm_zero_cells"
+mkdir -p "${AN_WORK}"
+KARGA_GENE='MEG_1|Drugs|Aminoglycosides|Aminoglycoside_resistance|APH3'
+KARGVA_GENE='ID0|K12A|x|Escherichia coli resistance to betalactams|x|BETALACTAM|Betalactams|multi|blaTEM|x|x|x|x|blaTEM_1|NA|x|E_coli_resistant|end'
+for s in s1 s2; do
+    printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n%s,95%%,10.0\n' "${KARGA_GENE}" \
+        > "${AN_WORK}/${s}_all_reads_KARGA_mappedGenes.csv"
+    printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n%s,3/10,85%%,10.0\n' "${KARGVA_GENE}" \
+        > "${AN_WORK}/${s}_all_reads_KARGVA_mappedGenes.csv"
+done
+mkdir -p "${AN_WORK}/s1_args_oap_s1_out" "${AN_WORK}/s2_args_oap_s1_out"
+printf 'sample\tnRead\tn16S\tnCell\ns1\t1000000\t50\t100\n' > "${AN_WORK}/s1_args_oap_s1_out/metadata.txt"
+# s2: ARGs-OAP found no reads/16S — the division-by-zero edge case
+printf 'sample\tnRead\tn16S\tnCell\ns2\t0\t0\t0\n' > "${AN_WORK}/s2_args_oap_s1_out/metadata.txt"
+NEXT_WORKDIR="${AN_WORK}"
+expect_pass "arg_norm: zero-count sample handled" arg_norm_report.py
+check_grep "arg_norm: KARGA normalization computed for s1" "KARGA_norm.csv" "^s1,1000000,50,100,.*,10.0,0.1$"
+check_file "arg_norm: KARGVA report created" "KARGVA_norm.csv"
+for f in KARGA_norm.csv KARGVA_norm.csv; do
+    if grep -qi "inf" "${AN_WORK}/${f}" 2>/dev/null; then
+        echo "✗ arg_norm: ${f} contains inf"
+        FAIL=$((FAIL + 1))
+    else
+        echo "✓ arg_norm: ${f} has no inf"
+        PASS=$((PASS + 1))
+    fi
+done
+
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "${FAIL}" -eq 0 ]
