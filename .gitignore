@@ -2,3 +2,16 @@
 .nextflow.log*
 
 results
+
+# Internal docs
+internal_docs
+
+# claude files
+.claude
+CLAUDE.md
+
+# Test artifacts
+work/
+.nf-test/
+test_results/
+null/
