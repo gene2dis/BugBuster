@@ -1,8 +1,10 @@
 process FORMAT_SM_DB {
     tag "format_sourmash_db"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
-    label 'process_download_single'
+    label 'process_download'
 
     input:
         path(db)
@@ -18,9 +20,11 @@ process FORMAT_SM_DB {
 
 process FORMAT_KRAKEN_DB {
     tag "format_kraken_db"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
-    label 'process_download_single'
+    label 'process_download'
 
     input:
         val(db)
@@ -42,7 +46,9 @@ process FORMAT_KRAKEN_DB {
 
 process FORMAT_NT_BLAST_DB {
     tag "format_blast_db"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
     label 'process_download_extensive'
 
@@ -65,9 +71,11 @@ process FORMAT_NT_BLAST_DB {
 
 process FORMAT_TAXDUMP_FILES {
     tag "format_taxdump"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
-    label 'process_download_single'
+    label 'process_download'
 
     input:
         val(db)
@@ -90,7 +98,7 @@ process DOWNLOAD_DEEPARG_DB {
 
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
 
-    label 'process_download_single'
+    label 'process_download'
 
     output:
         path("deeparg_db")
@@ -110,9 +118,11 @@ process DOWNLOAD_DEEPARG_DB {
 
 process FORMAT_CHECKM2_DB {
     tag "format_checkm2_db"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
-    label 'process_download_single'
+    label 'process_download'
 
     input:
         val(db)
@@ -133,9 +143,11 @@ process FORMAT_CHECKM2_DB {
 
 process DOWNLOAD_GTDBTK_DB {
     tag "download_gtdbtk_db"
-    container 'ubuntu:22.04'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
 
-    label 'process_download_single'
+    label 'process_download'
 
     input:
         val(db)

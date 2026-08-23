@@ -98,6 +98,17 @@ jobs:
         run: |
           nf-test test
 
+  db-scripts:
+    name: Test DB reformat scripts and pinned containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Run DB reformat script regression tests (audit #3, #10, #21)
+        run: |
+          tests/bin/test_db_reformat_scripts.sh
+
   changes:
     name: Check for changes
     runs-on: ubuntu-latest

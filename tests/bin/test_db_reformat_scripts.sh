@@ -1,0 +1,256 @@
+#!/bin/bash
+#
+# Regression tests for audit items #3 and #10:
+#   - the pinned download container must contain every tool the bin/ DB
+#     reformat scripts need (item #3), and
+#   - the reformat scripts must fail loudly on partial/corrupt downloads
+#     instead of caching a broken database with exit 0 (item #10).
+#
+# Each reformat script is run inside the same pinned image the format_db
+# processes use, against tiny fixtures served over a local HTTP server.
+#
+# Requirements: docker, python3 (both present on GitHub ubuntu-latest runners).
+#
+set -euo pipefail
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
+
+# Use the exact images pinned in the modules so the test cannot drift from them
+DOWNLOAD_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | grep -v '^oras://' | head -1)
+REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
+    | tr -d "'" | grep -v '^oras://' | head -1)
+
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+    echo "ERROR: could not extract pinned container images from the modules"
+    exit 1
+fi
+
+echo "=== DB reformat script test suite ==="
+echo "Download image: ${DOWNLOAD_IMG}"
+echo "Report image:   ${REPORT_IMG}"
+echo ""
+
+TMP_DIR=$(mktemp -d)
+SERVER_PID=""
+cleanup() {
+    [ -n "${SERVER_PID}" ] && kill "${SERVER_PID}" 2>/dev/null || true
+    rm -rf "${TMP_DIR}"
+}
+trap cleanup EXIT
+
+FIXTURES="${TMP_DIR}/fixtures"
+WORK="${TMP_DIR}/work"
+mkdir -p "${FIXTURES}" "${WORK}"
+
+#
+# Build fixtures
+#
+build_fixtures() {
+    local f="${FIXTURES}"
+    local staging="${TMP_DIR}/staging"
+
+    # Kraken2 DB tarball
+    mkdir -p "${staging}/kraken"
+    ( cd "${staging}/kraken" \
+        && echo k > hash.k2d && echo k > opts.k2d && echo k > taxo.k2d \
+        && tar -czf "${f}/k2_mini.tar.gz" hash.k2d opts.k2d taxo.k2d )
+
+    # NCBI taxdump tarball
+    mkdir -p "${staging}/taxdump"
+    ( cd "${staging}/taxdump" \
+        && echo n > nodes.dmp && echo n > names.dmp && echo n > division.dmp \
+        && echo g > gc.prt && echo r > readme.txt \
+        && tar -czf "${f}/taxdump.tar.gz" ./*.dmp gc.prt readme.txt )
+
+    # CheckM2 DB tarball
+    mkdir -p "${staging}/checkm2/CheckM2_database"
+    ( cd "${staging}/checkm2" \
+        && echo d > CheckM2_database/uniref100.KO.1.dmnd && echo c > CONTENTS.json \
+        && tar -czf "${f}/checkm2_database.tar.gz" CheckM2_database CONTENTS.json )
+
+    # GTDB-Tk data tarball (and an empty variant for the failure case)
+    mkdir -p "${staging}/gtdbtk/release220/markers"
+    ( cd "${staging}/gtdbtk" \
+        && echo m > release220/markers/marker.txt \
+        && tar -czf "${f}/gtdbtk_r220_data.tar.gz" release220 )
+    mkdir -p "${staging}/gtdbtk_empty/release220"
+    ( cd "${staging}/gtdbtk_empty" && tar -czf "${f}/gtdbtk_empty.tar.gz" release220 )
+
+    # Mock NCBI blast db repository: metadata JSON + 2 volumes + md5 files
+    mkdir -p "${f}/blastdb" "${staging}/blast"
+    ( cd "${staging}/blast" \
+        && echo t > taxdb.btd && echo t > taxdb.bti && echo t > taxonomy4blast.sqlite3 \
+        && echo v > nt.000.nin && echo v > nt.000.nhr \
+        && tar -czf "${f}/blastdb/nt.000.tar.gz" taxdb.btd taxdb.bti taxonomy4blast.sqlite3 nt.000.nin nt.000.nhr \
+        && rm ./* \
+        && echo v > nt.001.nin && echo v > nt.001.nhr \
+        && tar -czf "${f}/blastdb/nt.001.tar.gz" nt.001.nin nt.001.nhr )
+    ( cd "${f}/blastdb" \
+        && md5sum nt.000.tar.gz > nt.000.tar.gz.md5 \
+        && md5sum nt.001.tar.gz > nt.001.tar.gz.md5 \
+        && printf '{"dbname":"nt","files":["%s","%s"]}\n' \
+            "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.000.tar.gz" \
+            "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.001.tar.gz" > nt-nucl-metadata.json )
+
+    # Same blast repo but with a corrupted checksum for volume 001
+    cp -r "${f}/blastdb" "${f}/blastdb_badmd5"
+    sed 's/^./0/' "${f}/blastdb_badmd5/nt.001.tar.gz.md5" > "${f}/blastdb_badmd5/tmp.md5" \
+        && mv "${f}/blastdb_badmd5/tmp.md5" "${f}/blastdb_badmd5/nt.001.tar.gz.md5"
+
+    # A corrupt (truncated) gzip tarball
+    head -c 100 /dev/urandom > "${f}/corrupt.tar.gz"
+}
+build_fixtures
+
+#
+# Local HTTP server for the fixtures
+#
+PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+python3 -m http.server --bind 127.0.0.1 --directory "${FIXTURES}" "${PORT}" > /dev/null 2>&1 &
+SERVER_PID=$!
+for _ in $(seq 1 50); do
+    curl -sf "http://127.0.0.1:${PORT}/" > /dev/null && break
+    sleep 0.1
+done
+BASE_URL="http://127.0.0.1:${PORT}"
+
+#
+# Helpers
+#
+PASS=0
+FAIL=0
+
+run_script() {
+    # run_script <workdir> <script-name> [args...] — inside the download image
+    local workdir="$1" script="$2"
+    shift 2
+    docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp \
+        -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
+        -v "${workdir}:/dbwork" -w /dbwork \
+        "${DOWNLOAD_IMG}" bash "/pipeline_bin/${script}" "$@"
+}
+
+expect_pass() {
+    local desc="$1"; shift
+    local workdir="${WORK}/$(echo "${desc}" | tr ' /:' '___')"
+    mkdir -p "${workdir}"
+    if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
+        echo "✓ ${desc}"
+        PASS=$((PASS + 1))
+        LAST_WORKDIR="${workdir}"
+    else
+        echo "✗ ${desc} — expected success, got failure:"
+        tail -5 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+        LAST_WORKDIR="${workdir}"
+    fi
+}
+
+expect_fail() {
+    local desc="$1"; shift
+    local workdir="${WORK}/$(echo "${desc}" | tr ' /:' '___')"
+    mkdir -p "${workdir}"
+    if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
+        echo "✗ ${desc} — expected nonzero exit, script succeeded"
+        FAIL=$((FAIL + 1))
+    else
+        echo "✓ ${desc}"
+        PASS=$((PASS + 1))
+    fi
+}
+
+check_file() {
+    # check_file <desc> <path-relative-to-last-workdir>
+    if [ -e "${LAST_WORKDIR}/$2" ]; then
+        echo "✓ $1"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ $1 — missing: $2"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+#
+# kraken_db_reformat.sh
+#
+echo "--- kraken_db_reformat.sh ---"
+expect_pass "kraken: valid tarball" kraken_db_reformat.sh "${BASE_URL}/k2_mini.tar.gz"
+check_file "kraken: hash.k2d extracted" "k2_ref_db/hash.k2d"
+check_file "kraken: taxo.k2d extracted" "k2_ref_db/taxo.k2d"
+expect_fail "kraken: corrupt tarball fails" kraken_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_fail "kraken: 404 URL fails" kraken_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
+expect_fail "kraken: tarball without k2d files fails" kraken_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+
+#
+# tax_files_reformat.sh
+#
+echo "--- tax_files_reformat.sh ---"
+expect_pass "taxdump: valid tarball" tax_files_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+check_file "taxdump: nodes.dmp in tax_files" "tax_files/nodes.dmp"
+check_file "taxdump: names.dmp in tax_files" "tax_files/names.dmp"
+expect_fail "taxdump: corrupt tarball fails" tax_files_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_fail "taxdump: tarball without dmp files fails" tax_files_reformat.sh "${BASE_URL}/k2_mini.tar.gz"
+
+#
+# checkm2_db_reformat.sh
+#
+echo "--- checkm2_db_reformat.sh ---"
+expect_pass "checkm2: valid tarball" checkm2_db_reformat.sh "${BASE_URL}/checkm2_database.tar.gz"
+check_file "checkm2: dmnd file extracted" "uniref100.KO.1.dmnd"
+expect_fail "checkm2: corrupt tarball fails" checkm2_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_fail "checkm2: tarball without dmnd fails" checkm2_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+
+#
+# gtdb-tk_db_reformat.sh
+#
+echo "--- gtdb-tk_db_reformat.sh ---"
+expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r220_data.tar.gz"
+check_file "gtdbtk: release files extracted" "release220/markers/marker.txt"
+expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
+
+#
+# blast_nt_reformat.sh
+#
+echo "--- blast_nt_reformat.sh ---"
+expect_pass "blast: valid volume set" blast_nt_reformat.sh "${BASE_URL}/blastdb"
+check_file "blast: taxdb.btd in blast_nt_db" "blast_nt_db/taxdb.btd"
+check_file "blast: volume 000 index in blast_nt_db" "blast_nt_db/nt.000.nin"
+check_file "blast: volume 001 index in blast_nt_db" "blast_nt_db/nt.001.nin"
+expect_fail "blast: wrong md5 fails" blast_nt_reformat.sh "${BASE_URL}/blastdb_badmd5"
+expect_fail "blast: missing metadata fails" blast_nt_reformat.sh "${BASE_URL}/no_such_dir"
+
+#
+# sourmash_db_reformat.sh (no download; operates on staged CSVs)
+#
+echo "--- sourmash_db_reformat.sh ---"
+SM_WORK="${WORK}/sourmash_ok"
+mkdir -p "${SM_WORK}"
+echo "a,b" > "${SM_WORK}/lineages.csv"
+if run_script "${SM_WORK}" sourmash_db_reformat.sh > "${SM_WORK}.log" 2>&1 \
+    && [ -f "${SM_WORK}/lineages.csv.gz" ]; then
+    echo "✓ sourmash: csv compressed"
+    PASS=$((PASS + 1))
+else
+    echo "✗ sourmash: csv compressed"
+    FAIL=$((FAIL + 1))
+fi
+expect_fail "sourmash: no csv staged fails" sourmash_db_reformat.sh
+
+#
+# Report image smoke test (audit #21): all libraries importable, no runtime pip
+#
+echo "--- report container image ---"
+if docker run --rm "${REPORT_IMG}" python3 -c "import pandas, numpy, matplotlib, seaborn, h5py, biom" > /dev/null 2>&1; then
+    echo "✓ report image: pandas/numpy/matplotlib/seaborn/h5py/biom importable"
+    PASS=$((PASS + 1))
+else
+    echo "✗ report image: python imports failed"
+    FAIL=$((FAIL + 1))
+fi
+
+echo ""
+echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
+[ "${FAIL}" -eq 0 ]
