@@ -1,0 +1,135 @@
+# BugBuster Audit — Fix Plan
+
+**Date:** 2026-08-22 · **Baseline:** branch `fix-pending-issues`, commit `ad57fd6`
+**Source:** full-codebase review (workflow wiring, modules, config/docs/CI, `bin/` scripts), all P0 findings verified against the working tree. Published report: https://claude.ai/code/artifact/3b44f4d7-27ae-42ea-8634-037f1d2b5e14
+
+**How to use this file:** work through the attack order below. Check off items (`[x]`) as they land, and note the fixing commit next to the item. Line numbers reference the baseline commit and will drift as fixes land — re-locate by the quoted symbol/pattern, not the number. Several findings stem from recent refactors, so fixes should include regression tests, not just patches.
+
+---
+
+## Suggested attack order
+
+1. **Make CI real first** (#7) — set `output` in the test profile, add missing `stub:` blocks. Every other fix regresses invisibly until CI can pass and fail meaningfully.
+2. **Fix decontamination** (#1 host DB entry, #2 `--local` flag) — the default Quick Start path is broken without these.
+3. **Fix the database layer** (#3 containers/labels, #10 script hardening) — nothing downstream is trustworthy if databases arrive corrupt or not at all.
+4. **Parameterize the MetaWRAP dir regex** (#6) — default binning currently returns empty taxonomy/quality.
+5. **Repair kraken2 reporting** (#4) and the **contig-ARG arm** (#5).
+6. Then work P1 top-to-bottom (silent-wrong-results class), then P2, P3, P4.
+
+---
+
+## P0 — Broken in default or documented configurations
+
+- [x] **1. Host-decontamination DB: prebuilt Bowtie2 index ZIP fed to `bowtie2-build` as FASTA** — fixed in `81eb164`. Chose the genome-FASTA route: `human` entry now points at the T2T-CHM13v2.0 analysis-set FASTA (built locally into the combined phiX+host index); PREPARE_DATABASES fails fast on non-FASTA (`.zip`/`.bt2`/`.tar`) decontamination references, directing to `--custom_decontamination_index`. Dead prebuilt-index path removed (`FORMAT_BOWTIE_INDEX`, `BUILD_PHIX_BOWTIE2_INDEX`, `bin/bowtie_index_reformat.sh`, `bin/bowtie_index_build.sh` — the #28 "decide at #1" question is settled: not resurrected). Regression test: `tests/modules/bowtie2_build_combined.nf.test` (plain + gzipped FASTA input).
+  - `config/databases.config:2-8` — `human` entry is `chm13.draft_v1.0_plusY.zip` (prebuilt `.bt2` archive) with `fmtscript = bowtie_index_reformat.sh`.
+  - `subworkflows/local/prepare_databases.nf:108-124` treats it as genome FASTA and passes it to `BOWTIE2_BUILD_COMBINED`; `modules/local/bowtie2_build_combined/main.nf:33-45` `cat`s the raw ZIP (`.zip` misses the `*.gz` branch) → `bowtie2-build` fails. `FORMAT_BOWTIE_INDEX` is included (prepare_databases.nf:11) but never invoked.
+  - **Fix:** either route prebuilt-index entries through `FORMAT_BOWTIE_INDEX`/`bowtie_index_reformat.sh` and skip the rebuild, or point the `human` entry at a genome FASTA. Add a test-profile-sized regression path.
+
+- [x] **2. `BOWTIE2_DECONTAMINATE` uses local-mode scoring without `--local`** — fixed in `26ab4e2`: `--local` restored to the ext.args, dead `BOWTIE2` selector deleted. Regression net: the singleton end-to-end test added in `a6da21d` asserts exact clean-read counts against lambda-derived fixture reads (zero would be removed without `--local`).
+  - `config/modules.config:108-118` — args copied from the dead `withName: BOWTIE2` selector (`:91-106`, which has `--local`) minus the flag. Positive `--score-min G,15,6` / `--ma 2` are invalid/unreachable in end-to-end mode → task error or zero host reads flagged (contamination passes through silently).
+  - **Fix:** restore `--local` (or switch to deliberate end-to-end scoring params); delete the dead `BOWTIE2` selector while there.
+
+- [ ] **3. DB download processes run in `ubuntu:22.04`, which lacks their tools; download labels undefined**
+  - `modules/local/format_db/main.nf:3,21,39,57,75,110,147` — scripts need `wget`/`curl`/`unzip`/GNU `parallel`; none exist in the image (verified via `docker run`). Every auto-download path exits 127 under container profiles.
+  - Labels `process_download_single`/`process_download_extensive` are defined nowhere (`nextflow.config:343-390` has only `process_download`) → huge downloads get bare defaults, no retry.
+  - **Fix:** pin an image containing the needed tools (or a mulled/biocontainers utility image); define the two labels (or rename to `process_download`).
+
+- [ ] **4. kraken2 reporting path crashes every run (wrong file formats into both parsers)**
+  - `bin/taxonomy_report.py:48-83` expects the legacy headered TSV (`Id, Kraken DB, Unclassified, Classified`) produced only by the unused `modules/local/kraken2`; it's fed the raw 6-column nf-core KRAKEN2 report (`subworkflows/local/taxonomy.nf:55-57`) → KeyError → exit 1.
+  - `bin/taxonomy_phyloseq.py:83-87,490-506` does `json.load()` (BIOM-JSON) but is fed `BRACKEN.out.txt` (plain TSV, `taxonomy.nf:64-70`) → exit 1.
+  - **Fix:** rewrite both parsers for the actual nf-core kraken2/bracken formats (preferred) or reintroduce a report-reformat step. Sourmash branch is fine — don't touch it.
+
+- [ ] **5. `--contig_tax_and_arg` fails: channel-arity crash + gzipped DeepARG input**
+  - `main.nf:371-376` — `ARG_BLOBPLOT(ch_arg_contig_data)` passes ARG_CONTIG_LEVEL_REPORT's **two** output channels to a one-input process → Nextflow composition error at startup (kills the entire run). **Fix:** `ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)`.
+  - `main.nf:364-369` + `modules/local/deeparg/main.nf:77-84` — nf-core Prodigal emits `*.faa.gz`; `deeparg predict` can't read gzip. **Fix:** gunzip in the DEEPARG_CONTIGS script (e.g. `pigz -cdf`).
+
+- [ ] **6. Batch bin QC/taxonomy hardcodes `_metawrap_50_10_bins` → default config yields empty reports**
+  - `modules/local/gtdb_tk_batch/main.nf:63,81,85` — only metawrap-named dirs are classified; default `--binners semibin` (single binner → no MetaWRAP) or non-default `--metawrap_completeness/contamination` → `total_bins=0` → empty GTDB-Tk report, exit 0.
+  - `modules/local/checkm2_batch/main.nf:75` — same hardcoded pattern in the metawrap branch.
+  - **Fix:** derive the expected directory patterns from the binner list and the actual `params.metawrap_*` values (pass via `ext.args`/inputs, not regex literals).
+
+- [x] **7. CI structurally failing: missing `--output`, unwired `outdir`, 35/37 modules lack `stub:`** — fixed in `9bdef0d`. Root cause found beyond the item: the pipeline `params` block sat *after* the `profiles` block in nextflow.config, so every profile-set param (incl. all of conf/test.config) was silently overridden by defaults — block moved above `profiles`. test.config sets `output` + tiny committed decontamination FASTAs (`tests/data/decontamination/`); stubs added to all 35 in-use processes (dead ones left for #28); dead `outdir` removed from schema; CI: `--output` passed explicitly, containers job deleted, nf-test job added, `NXF_SYNTAX_PARSER=v1` set (strict parser default since NF 26.04 rejects the legacy config). Verified: `-profile test,docker` passes with `-stub` and in full.
+  - `.github/workflows/ci.yml:40-46` + `conf/test.config` never set `output`; `main.nf:118-125` exits 1. `nextflow_schema.json` documents an `outdir` alias mapped to nothing.
+  - Under `-stub`, processes without a stub run their **real** scripts: `QFILTER`'s grep chain fails on empty stubbed FASTP JSON (fatal under global pipefail, `conf/base.config:24`); stub-less `format_db` processes would really download databases. Modules **with** stubs (17): bbmap, bowtie2_build_combined, bowtie2_decontaminate, bowtie2_samtools (first proc only), calculate_depth, checkm2, checkm2_batch, comebin, contig_filter_summary, gtdb-tk, gtdb_tk_batch, megahit, metabat2, metawrap, multiqc, rgi_*, semibin. Everything else needs one.
+  - The "full" CI test also can't work: needs the 4.1 GB chm13 download + `bowtie2-build` under 6 GB/2 CPU (test.config).
+  - **Fix:** set `output` in test.config (or wire `outdir`→`output`); add stubs at least across the active test path, then everywhere; make the full CI test use a tiny custom decontamination index (`--custom_decontamination_index` with a small fixture); run `nf-test` in CI; make the containers job actually fail on pull errors or delete it (`ci.yml:71-111`).
+
+- [ ] **8. `RGI_BWT` low-coverage fallback misses two mandatory outputs**
+  - `modules/local/rgi_bwt/main.nf:60-70` fallback doesn't create declared non-optional `*.sorted.length_100.bam` (:15) and `*.reference_mapping_stats.txt` (:17) → MissingFileException in the exact case the fallback targets (added in commit 6b82cfe). Also ignores singleton reads (`:31-32`).
+  - **Fix:** create the two files in the fallback (or mark outputs `optional`), decide singleton policy alongside #9.
+  - *Note (2026-08-23):* singleton policy was decided with #9 (`a6da21d`): singletons are QC'd and carried downstream. RGI_BWT still ignores `reads[2]` — when fixing this item, either pass singletons to `rgi bwt` or document the exclusion.
+
+## P1 — Silent wrong results
+
+- [x] **9. Singletons silently discarded whenever `quality_control=true` (default)** — fixed in `a6da21d`. Policy decided (relevant to #8): singletons are processed through QC — dedicated single-end FASTP invocation (`FASTP_SINGLETON`, `ext.prefix` `<id>_Singleton`), rejoined before QFILTER (whose `*Singleton*.json` branch now actually runs → 5-column report), decontaminate `reads` emit glob widened to `{R1,R2,Singleton}`. Also guarded kraken2 to paired reads only (`--paired` aborts on odd file counts — latent bug on the QC-off path). `min_read_sample` still counts paired reads only (documented in `docs/manual.md`). Regression: committed FASTQ fixtures (`tests/bin/make_singleton_fixtures.py` → `tests/data/reads/`) + end-to-end pipeline test with exact clean pair/singleton count assertions.
+  - `input_check.nf:70-77` emits `[meta, [r1, r2, s]]`; nf-core FASTP paired branch (`modules/nf-core/fastp/main.nf:81-85`) uses only `reads[0..1]`. `meta.has_singletons` never read anywhere. `bowtie2_decontaminate/main.nf:23` reads-emit glob `${meta.id}_R*_clean.fastq.gz` excludes its own `_Singleton_clean` output. Singletons ARE used when QC is off → inconsistent, silent data loss.
+  - **Fix:** decide policy: either process singletons through QC (separate single-end FASTP invocation + include in decontaminate emit) or reject/warn on the `s` column when QC is on. Document it.
+
+- [ ] **10. DB reformat scripts can cache corrupt/partial databases with exit 0**
+  - `bin/blast_nt_reformat.sh:1-13` — no `set -e`; parallel wget failures swallowed; nt volume list scraped from an HTML listing with a fragile regex → incomplete nt DB cached by `-resume` forever → wrong contig taxonomy silently.
+  - `bin/checkm2_db_reformat.sh:3-9`, `bin/tax_files_reformat.sh:3-8` — exit status is the trailing cleanup command's → corrupt DB cached.
+  - **Fix:** `set -euo pipefail` in ALL bin/ shell scripts; wget `--tries`/`--continue`; use NCBI's provided md5 files for nt volumes; verify extraction (expected file count/manifest) before moving into place.
+
+- [ ] **11. `bin_summary.py` reads only the first quality/taxonomy file**
+  - `bin/bin_summary.py:71,83` — `glob(...)[0]` while BIN_SUMMARY (`binning.nf:256-260`) stages all reports (bac120 + ar53, per-binner). Nondeterministic summaries; whole domains dropped.
+  - **Fix:** read and concatenate all staged quality files and all tax files (bac120+ar53).
+
+- [ ] **12. `taxonomy_phyloseq.py` merge/naming bugs**
+  - `:495-506` — outer `pd.concat` leaves NaN (should be 0) and `tax_table = all_tax[0]` keeps taxonomy only from the first sample.
+  - `:191` — sourmash sample IDs retain `.with-lineages` suffix into OTU table/phyloseq RDS.
+  - `:205-210` — all-samples-empty sourmash fallback: module's fallback CSV header (`modules/local/sourmash/main.nf`, uses `match_name`, no `scaled`) doesn't satisfy the script's required columns → KeyError.
+  - **Fix:** `.fillna(0)`, build tax table from union of all samples, strip the suffix, align the fallback header with the parser (and add a no-matches unit test).
+
+- [ ] **13. Report steps mask failures**
+  - `bin/report_unify.py:245-262` exits 0 with no output on missing fastp reports; `modules/local/reads_report/main.nf:10-16` output `path("*")` re-emits staged inputs → task "succeeds" with no `Reads_report.csv`.
+  - `bin/taxonomy_report.py:137-144` rebuilds a stub reads report when input missing (silent QC-column loss).
+  - `bin/bin_quality_report.py:190-191`, `bin/bin_tax_report.py:176-177`, `bin/report_unify.py:232-233` — swallowed plot exceptions surface as opaque missing-`*.png`; `bin_quality_report.py:60-91` converts all-empty CheckM2 input into a "successful" empty report.
+  - **Fix:** exit non-zero on missing/empty required inputs; declare explicit output filenames instead of `path("*")`; let plot exceptions propagate.
+
+- [ ] **14. Documented knobs that do nothing**
+  - `fastp_qualified_quality_phred` (nextflow.config:213) never passed to fastp (`modules.config:14-26`) → fastp runs at builtin 15, not documented 20. **Fix:** add `--qualified_quality_phred`.
+  - Three conflicting METABAT2 selectors (`modules.config:160`, `:189`, `:384`); last-wins picks the reduced args at `:189` → `metabat_pTNF/minCV/minCVSum` silently ignored. **Fix:** collapse to one selector with the full arg set; delete `METABAT2_COASSEMBLY` (`:174`).
+  - `bbmap_lenght` typo in `nextflow_schema.json:322`, `README.md:228`, `docs/parameters.md:375-380`, `docs/manual.md:342,597` — real param is `bbmap_length` (nextflow.config:245). Users' values silently ignored. **Fix:** correct the docs/schema.
+  - `mmseqs_*` param family (nextflow.config:262-272) unused; `modules/local/clustering/main.nf:16-19` hardcodes values. **Fix:** wire into `ext.args` or delete the params.
+
+- [ ] **15. Silent no-op feature combos; unvalidated mode enums**
+  - `main.nf:382-387` — `--arg_bin_clustering` needs the DeepARG DB, populated only under `contig_tax_and_arg` (`prepare_databases.nf:136-141`); `.combine(empty)` → DEEPARG_BINS/ARG_FASTA_FORMATTER/CLUSTERING silently never run. Same silent no-op with `assembly_mode=none` (ch_refined_bins stays empty, `main.nf:297-299`).
+  - `assembly_mode`/`taxonomic_profiler` have no enum validation (unlike `binners`, main.nf:128-138): a typo → "successful" QC-only run.
+  - **Fix:** validate enums up front; make `arg_bin_clustering` populate the DeepARG DB channel itself; error on contradictory combos (`include_binning` + `assembly_mode=none`).
+
+- [x] **16. `storeDir` misuse reuses stale clean reads** — fixed in `1020695`: `storeDir` removed from `bowtie2_decontaminate`; clean reads now published via `publishDir` (same `clean_reads/<id>/` destination, gated on `store_clean_reads`, reads only). Docs (`DISK_OPTIMIZATION.md`, `DECONTAMINATION_QUICK_REFERENCE.md`, nextflow.config comments) updated: publishing ≠ caching, `-resume` is the cache, and `low_disk`'s `cleanup = true` makes completed runs non-resumable. Regression: the `a6da21d` end-to-end test runs with `store_clean_reads=true` and asserts the published files. (BBMAP/METAWRAP still use storeDir — same pattern, out of this item's scope.)
+  - `modules/local/bowtie2_decontaminate/main.nf:16` — `storeDir` under `store_clean_reads` (auto-set by `low_disk` profile, nextflow.config:142-152) skips the task whenever outputs exist, even if host DB/params/inputs changed.
+  - **Fix:** replace with `publishDir` (publishing ≠ caching); if disk-driven cleanup is the goal, document that `-resume` is the cache, not `storeDir`.
+
+## P2 — Feature-config failures and robustness
+
+- [ ] **17. RGI hardcoded 61-mer + per-task DB copies** — `rgi_kmer/main.nf:13-14` output globs vs `params.rgi_kmer_size` (:25); `rgi_report/main.nf:39` globs `*_61mer_analysis.txt`; `rgi_bwt/main.nf:42` + `rgi_kmer/main.nf:36` `cp -r` the multi-GB CARD/WildCARD DB per sample per retry (symlink instead — `localDB` already is one).
+- [ ] **18. KARGVA/KARGA JVM + container issues** — `kargva/main.nf:23`: JVM flags after class name are inert (default heap under 12 GB label → OOM); tie `-Xmx` to `task.memory` before the class name (KARGA does it right). `karga/main.nf:3`: host-specific `/bin/ps` + `libprocps.so.8` bind mounts, docker-only, and overridden by `conf/base.config:27` global `containerOptions` anyway — remove or bake `ps` into the image.
+- [ ] **19. `NT_BLASTN` under-resourced/fragile** — `nt_blastn/main.nf:4` `process_low` for full-nt megablast; no retry scaling; `:16` DB-basename detection can yield multi-line var; hardcoded `-evalue/-max_target_seqs/-max_hsps` → move to `ext.args`, raise label, harden basename detection (`*.nin/nal` lookup).
+- [ ] **20. pipefail vs `grep -c || echo 0` = `"0\n0"`** — `bbmap/main.nf:75,85`, `comebin/main.nf:55`, `contig_filter_summary/main.nf:114-115`. Use `grep -c ... || true` is NOT enough (still prints 0 + appended 0): use `set +o pipefail` locally or `n=$(grep -c ... ); n=${n:-0}` pattern with `|| :` on a separate line, or `awk` counting.
+- [ ] **21. Container fixes** — `count_reads/main.nf`: no container (fails under docker profiles when `quality_control=false`) and `zcat` assumes gzip while `input_check.nf:60` allows plain `.fastq`. `contig_filter_summary/main.nf:26`: depot singularity `ubuntu:20.04` URL doesn't exist. `taxonomy_report/main.nf:7` + `taxonomy_phyloseq/main.nf:7,35`: mutable `jupyter/scipy-notebook` tag + runtime `pip install biom-format || true` — build/pin a small image with pandas+matplotlib+biom.
+- [ ] **22. Edge-data crashes** — `prodigal/main.nf:27` `for file in *.fa` without nullglob (breaks on MetaWRAP SKIPPED/FAILED marker dirs); `bedtools/main.nf:22` awk division by zero for bins with no aligned reads; `bin/arg_norm_report.py:225-234` division by zero when ARGs-OAP `nCell=0` → `inf` in published CSVs.
+- [ ] **23. Publishing gaps** — TAXONOMY_PHYLOSEQ writes `plots/*.png` but publish pattern is top-level `'*.png'` (`modules.config:308-311`) → `02_taxonomy/figures` always empty. `DEEPARG_CONTIGS` has no publishDir (`modules.config:149-158`) → lands in generic `deeparg/`, not documented `05_arg_prediction/contig_level/`. `contig_filter_summary` publish disabled in config (`:341-345`) while module-level publishDir is overridden → report delivered nowhere. Also remove module-level `publishDir mode: 'move'` blocks in `bbmap`/`metawrap` (dead now, destructive if config entries ever renamed).
+- [ ] **24. Cloud profiles + coassembly depth** — `conf/aws.config:25,39,76`, `conf/gcp.config:65`, `conf/azure.config:92`: literal `your-bucket` placeholder workDirs via params (`aws_workdir`, `aws_queue`, `azure_pool`, ...) declared/documented nowhere; hardcoded `cliPath`. Declare + document the params, fail fast on placeholders. `bowtie2_samtools/main.nf:297-357` (BOWTIE2_SAMTOOLS_DEPTH): broken greedy `sed 's/.+?b//'` bin renaming, uncompressed per-bin SAMs, `${reads[2]} == null` string compare.
+
+## P3 — Docs, schema, config integrity
+
+- [ ] **25. Schema unenforced + drifted** — no nf-validation wiring anywhere (plugin only loaded by nf-test.config, unused). Missing from schema: `rgi_prediction` + all `rgi_*`, RGI custom DBs, `custom_decontamination_index`/`custom_phiX_fasta`/`custom_host_fasta`, cleanup/storage params, `bbmap_length`, `metacerberus_*`, `karga_db`/`kargva_db`/`blast_db`/`taxdump_files`. Dead in schema: `outdir`, `kraken_db_used`, `sourmash_db_name` (both also documented in `docs/parameters.md:316-339` — remove there too). Type mismatch: `mmseqs_e`. **Fix:** regenerate schema from real params (`nf-core pipelines schema build`), wire `validateParameters()`.
+- [ ] **26. Docs describe nonexistent behavior** — README.md:28 (10M-read filter; default `min_read_sample=0`), :35 (Kraken-Biom removed), :118 (`downloaded_db/` symlinks don't exist), output-tree omissions (args_oap/, rgi summary dirs); `main.nf:73-83` help profile list vs README table drift; MultiQC advertised but `main.nf:389-390` commented out (either re-enable or remove from docs + `assets/multiqc_config.yml`); `conf/institutional.config:50` one-element `custom_sourmash_db` example violates `[kmer, lineages]` contract; `config/databases.config:29` GTDB kraken `dbversion` says "Megares v3.0"; `file` vs `url` key inconsistency across DB entries (standardize + validate).
+- [ ] **27. Version/provenance hygiene** — manifest 1.0.0 (nextflow.config:17) vs CHANGELOG [Unreleased] holding shipped RGI; ~20 in-use modules missing `versions.yml` (args_oap, arg_fasta_formatter, bedtools, blobtools, bowtie2_samtools_depth, clustering, count_reads, deeparg×2, format_db all, karga, kargva, metacerberus, nt_blastn, prodigal×2, qfilter, reads_report, sourmash); no dbversion tracking for DeepARG/CARD; eager `${params.output}` interpolation (nextflow.config:25,28) creates literal `null/pipeline_info/` when output unset — declare `output` before first use or guard; `tracedir` param is dead (trace blocks at :401-416 hardcode paths).
+
+## P4 — Cleanup, tests, repo hygiene
+
+- [ ] **28. Dead code removal** — unused modules: `autometa`, `basalt` (contains a second `process METAWRAP` — name-collision landmine), `vamb` (empty script body), local `fastp`/`kraken2`/`bracken`/`samtools_index`/`bowtie2`/`multiqc`/`checkm2`/`gtdb-tk`, `compute_kmer_freq`, `publish_checkm2_reports`, `publish_gtdbtk_reports`. Included-never-invoked: `FORMAT_BOWTIE_INDEX`*, `BUILD_PHIX_BOWTIE2_INDEX`, `FORMAT_SM_DB`, `NFCORE_MEGAHIT` (*may be resurrected by fix #1 — decide there first). Stale files: `modules/local/bowtie2/main.nf.save`, `modules/local/kraken2/main.nf.save`. Dead modules.config selectors: `:91` BOWTIE2, `:174` METABAT2_COASSEMBLY, `:206` NFCORE_MEGAHIT, `:235` NFCORE_MULTIQC, `:424` CHECKM2, `:434` GTDB_TK, `:645` METACERBERUS_BINS, `:656` FORMAT_SM_DB, `:672` FORMAT_BOWTIE_INDEX, `:720` BUILD_PHIX_BOWTIE2_INDEX; duplicate PRODIGAL_CONTIGS selectors (`:217` vs `:601`). Dead bin scripts: `bowtie_index_build.sh` (empty), `tables_to_phyloseq.R`, `validate_outputs.py` (validates legacy layout), `r_scripts_temp/` tree. Dead wiring: `QC.out.reads_coassembly` → ASSEMBLY's unused `reads_coassembly` take (`assembly.nf:39`).
+- [ ] **29. Test debt** — `tests/modules/fastp.nf.test:10-11` points at nonexistent `../../modules/fastp/main.nf`; `tests/main.nf.test` assertions vacuous (success + dir-exists only); `tests/bin/test_taxonomy_scripts.sh:12,83` references missing `tests/data/taxonomy` and `test_taxonomy_integration.sh`; `tests/TAXONOMY_VALIDATION.md` references empty `tests/modules/taxonomy/`; `nf-test.config:26-28` loads unused `nf-validation@1.1.3`; nf-test never runs in CI. **Fix:** repair paths, add real content assertions (esp. regression tests for #1-#6, #9-#14), run nf-test in CI.
+  - **PARTIAL — test-path parts done in `df1d86a`** (+ nf-test CI job in `9bdef0d`): fastp.nf.test repointed to the live nf-core module with real content assertions, main.nf.test asserts on Reads_report.csv content and stub-run task execution, taxonomy script/doc dead references removed, nf-validation plugin load dropped, nf-test runs in CI (all 4 tests pass). **Remaining:** per-fix regression tests for #3-#6 and #10-#14 land with those items (#1: `tests/modules/bowtie2_build_combined.nf.test`; #2/#9/#16: singleton end-to-end test in `tests/main.nf.test`, both in `81eb164`/`a6da21d`).
+- [ ] **30. Repo hygiene** — untrack root `samplesheet.csv` (contains `/home/ffuentes/...` paths; Quick Start points at it — point README at `assets/samplesheet_example.csv` instead); `.gitignore`: add `work/`, `.nf-test/`, `null/`, anchor `results`.
+
+---
+
+## Notes for future sessions
+
+- Input validation quality items worth folding into #15's validation pass: no `r1 != r2` check, sample IDs only checked for whitespace (path-hostile chars flow into filenames), empty samplesheet → silent empty run (`input_check.nf:34-84`).
+- Verified-OK (don't "fix"): `BINNING(ASSEMBLY.out.bam, ...)` shape matches (`bam` emit is `[meta, contigs, bam]` despite the name); all DB channels are correctly `.combine()`/`.collect()`/`.first()`ed for per-sample use; all `.join()`s have matching meta keys; `refined_bins` is emitted in both single- and multi-binner branches.
+- Report-container facts (verified): the mulled image used by report modules ships python 3.9.12 / pandas 1.4.2 / matplotlib 3.5.2 / seaborn 0.11.2. `bin_tax_report.py`'s `plt.cm.get_cmap` breaks on matplotlib ≥3.9 if the container is ever bumped.
+- `check_max` is defined in nextflow.config and used by modules.config (RGI_BWT time directive) — include-order dependent; keep the includeConfig order if touching config layout.
