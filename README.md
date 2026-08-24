@@ -46,7 +46,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 21. Bin reports.
 22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-23. If requested ARG clustering **(work in progress)** [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
 24. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
@@ -199,7 +199,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
-| `--arg_bin_clustering` | `false` | ARG clustering (WIP) |
+| `--arg_bin_clustering` | `false` | Bin-level ARG prediction and clustering |
 
 ### Database Selection
 
