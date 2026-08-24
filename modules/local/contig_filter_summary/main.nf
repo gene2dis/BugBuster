@@ -109,8 +109,11 @@ HEADER
     echo "## Summary Statistics" >> contig_filtering_summary.txt
     echo "" >> contig_filtering_summary.txt
     
-    total_samples=\$(ls *_filter_report.txt 2>/dev/null | wc -l || echo 0)
-    empty_samples=\$(grep -l "all_contigs_filtered.*TRUE" *_filter_report.txt 2>/dev/null | wc -l || echo 0)
+    # Pipefail-safe counting: find exits 0 with no matches, and grep's
+    # zero-match exit 1 is swallowed inside the group so wc's count is not
+    # followed by an appended "0" (previously these could become "0\\n0")
+    total_samples=\$(find . -maxdepth 1 -name '*_filter_report.txt' | wc -l)
+    empty_samples=\$({ grep -l "all_contigs_filtered.*TRUE" *_filter_report.txt 2>/dev/null || true; } | wc -l)
     
     echo "Total samples processed: \$total_samples" >> contig_filtering_summary.txt
     echo "Samples with all contigs filtered: \$empty_samples" >> contig_filtering_summary.txt

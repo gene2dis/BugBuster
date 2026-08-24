@@ -1,0 +1,66 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CONTIG_FILTER_SUMMARY Module Test
+
+    Regression test for audit item #20: the summary statistics used
+    `ls ... | wc -l || echo 0` and `grep -l ... | wc -l || echo 0` under the
+    global pipefail shell. When grep matched nothing (no all-filtered samples —
+    the common case) the pipeline's exit status was grep's 1, so `|| echo 0`
+    appended a second "0" and the counts became "0\n0", corrupting the summary
+    and crashing the following bash arithmetic. Report fixtures live in
+    tests/data/reports/.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test CONTIG_FILTER_SUMMARY Process"
+    script "../../modules/local/contig_filter_summary/main.nf"
+    process "CONTIG_FILTER_SUMMARY"
+
+    test("summarizes reports when no sample was fully filtered") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/reports/sampleok_filter_report.txt", checkIfExists: true)
+                ]
+                input[1] = []
+                """
+            }
+        }
+
+        then {
+            // Previously the zero-match `grep -l | wc -l || echo 0` produced
+            // "0\n0" here, corrupting the summary and failing the arithmetic
+            assert process.success
+            def summary = path(process.out.summary_report[0]).text
+            assert summary.contains("Total samples processed: 1")
+            assert summary.contains("Samples with all contigs filtered: 0")
+            assert summary.contains("Percentage of samples with empty contigs: 0%")
+        }
+    }
+
+    test("counts all-filtered samples") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/reports/sampleok_filter_report.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/reports/sampleempty_filter_report.txt", checkIfExists: true)
+                ]
+                input[1] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def summary = path(process.out.summary_report[0]).text
+            assert summary.contains("Total samples processed: 2")
+            assert summary.contains("Samples with all contigs filtered: 1")
+            assert summary.contains("Percentage of samples with empty contigs: 50%")
+            assert summary.contains("sampleempty\t5\t0\t1000\tTRUE")
+        }
+    }
+}
