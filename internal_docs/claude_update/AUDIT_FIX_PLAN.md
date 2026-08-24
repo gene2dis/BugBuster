@@ -5,6 +5,8 @@
 
 **How to use this file:** work through the attack order below. Check off items (`[x]`) as they land, and note the fixing commit next to the item. Line numbers reference the baseline commit and will drift as fixes land — re-locate by the quoted symbol/pattern, not the number. Several findings stem from recent refactors, so fixes should include regression tests, not just patches.
 
+**Status (2026-08-24): all 30 items closed** (last batch #17-#20/#24 in `1b93437`; the samplesheet-validation follow-ups from "Notes for future sessions" landed in `2e8dfcc`). This file is now the historical record of the audit and its fixes; the "Notes for future sessions" facts (report-container versions, `check_max` include-order, verified-OK wirings) remain valid reference.
+
 ---
 
 ## Suggested attack order
@@ -138,7 +140,7 @@
 
 ## Notes for future sessions
 
-- Input validation quality items worth folding into #15's validation pass: no `r1 != r2` check, sample IDs only checked for whitespace (path-hostile chars flow into filenames), empty samplesheet → silent empty run (`input_check.nf:34-84`).
+- ~~Input validation quality items worth folding into #15's validation pass: no `r1 != r2` check, sample IDs only checked for whitespace (path-hostile chars flow into filenames), empty samplesheet → silent empty run (`input_check.nf:34-84`).~~ **Done (2026-08-24, `2e8dfcc`):** `input_check.nf` now rejects `r1 == r2` (and a singleton duplicating r1/r2), restricts sample ids to `[A-Za-z0-9][A-Za-z0-9_.-]*`, and errors on a header-only/empty samplesheet; three fail-fast pipeline tests in `tests/main.nf.test`, allowed charset documented in `docs/manual.md`.
 - Verified-OK (don't "fix"): `BINNING(ASSEMBLY.out.bam, ...)` shape matches (`bam` emit is `[meta, contigs, bam]` despite the name); all `.join()`s have matching meta keys; `refined_bins` is emitted in both single- and multi-binner branches. *(Correction 2026-08-23, from #5 in `83720f7`: the original "all DB channels are correctly combined" claim was wrong for the two multi-file DBs — taxdump into BLOBTOOLS and the BLAST DB into NT_BLASTN were flattened into the input tuple, staging only the first file. Both now wrapped as single list elements. The single-path DB channels really were fine.)*
 - Report-container facts (verified): the mulled image used by report modules ships python 3.9.12 / pandas 1.4.2 / matplotlib 3.5.2 / seaborn 0.11.2. `bin_tax_report.py`'s `plt.cm.get_cmap` breaks on matplotlib ≥3.9 if the container is ever bumped.
 - `check_max` is defined in nextflow.config and used by modules.config (RGI_BWT time directive) — include-order dependent; keep the includeConfig order if touching config layout.
