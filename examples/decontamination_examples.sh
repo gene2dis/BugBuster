@@ -34,7 +34,6 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  --host_db mouse \
   --custom_host_fasta /data/genomes/mouse_GRCm39.fasta
 
 # ==============================================================================
@@ -172,7 +171,7 @@ nextflow run main.nf -profile low_disk
 # ==============================================================================
 
 # Check decontamination statistics
-cat results/reads_report/reads_summary_report.tsv
+cat results/01_quality_control/summary/Reads_report.csv
 
 # View pipeline execution timeline
 open results/pipeline_info/execution_timeline_*.html

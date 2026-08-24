@@ -2,7 +2,7 @@
 
 ## Overview
 
-This guide explains how to specify multiple contaminant genomes in YAML parameter files for BugBuster's optimized single-pass decontamination.
+This guide explains how to specify multiple contaminant genomes (and other list-like options) in YAML parameter files for BugBuster.
 
 ## Basic Syntax
 
@@ -345,10 +345,8 @@ custom_decontamination_index: "/path/to/contaminants_index"
 
 ## Complete Example Files
 
-See the `examples/` directory for complete YAML examples:
+See the `examples/` directory for a complete YAML example:
 - `params_multiple_genomes.yaml` - Multiple genome configurations
-- `params_human_mouse.yaml` - Human + mouse specific example
-- `params_production.yaml` - Full production configuration
 
 ## Binning Configuration
 
@@ -453,4 +451,4 @@ metabat_minContig: 2500
 
 - **Nextflow Parameters**: https://www.nextflow.io/docs/latest/config.html#scope-params
 - **YAML Syntax**: https://yaml.org/spec/1.2/spec.html
-- **BugBuster Documentation**: `docs/decontamination_optimization.md`
+- **BugBuster Documentation**: [`manual.md`](manual.md), [`parameters.md`](parameters.md)

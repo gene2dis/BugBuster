@@ -1,6 +1,10 @@
 # BugBuster Deployment Guide
 
 This guide covers deploying BugBuster on different compute infrastructures.
+The cloud/HPC profile parameters used below (`aws_*`, `gcp_*`, `azure_*`,
+`slurm_*`) are formally documented in
+[`parameters.md` § Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters);
+the `--*_workdir` parameter of the chosen cloud profile is **required**.
 
 ## Table of Contents
 
@@ -106,7 +110,7 @@ nextflow run main.nf \
     -profile aws,docker \
     --aws_queue 'my-batch-queue' \
     --aws_region 'us-east-1' \
-    -work-dir s3://bucket/work
+    --aws_workdir s3://bucket/work
 ```
 
 ### With Spot Instances
@@ -115,13 +119,14 @@ AWS Batch automatically handles spot instance interruptions with the retry strat
 
 ### Fusion Filesystem (Recommended for Performance)
 
-Enable Fusion for improved S3 performance (requires Nextflow 23.10+):
+Enable Fusion for improved S3 performance:
 
 ```bash
 nextflow run main.nf \
     --input s3://bucket/samplesheet.csv \
     --output s3://bucket/results \
     -profile aws,docker \
+    --aws_workdir s3://bucket/work \
     -with-wave \
     -with-fusion
 ```
@@ -134,7 +139,7 @@ nextflow run main.nf \
 
 1. **Google Cloud SDK** authenticated
 2. **GCS bucket** for work directory and results
-3. **Google Cloud Batch** or **Life Sciences API** enabled
+3. **Google Cloud Batch** API enabled
 
 ### Authentication
 
@@ -153,7 +158,7 @@ nextflow run main.nf \
     -profile gcp,docker \
     --gcp_project 'my-project-id' \
     --gcp_region 'us-central1' \
-    -work-dir gs://bucket/work
+    --gcp_workdir gs://bucket/work
 ```
 
 ### With Preemptible/Spot Instances
@@ -165,7 +170,7 @@ nextflow run main.nf \
     -profile gcp,docker \
     --gcp_project 'my-project-id' \
     --gcp_spot true \
-    -work-dir gs://bucket/work
+    --gcp_workdir gs://bucket/work
 ```
 
 ---
@@ -195,7 +200,7 @@ nextflow run main.nf \
     --output az://container/results \
     -profile azure,docker \
     --azure_region 'eastus' \
-    -work-dir az://container/work
+    --azure_workdir az://container/work
 ```
 
 ### With Low-Priority (Spot) Instances
@@ -206,7 +211,7 @@ nextflow run main.nf \
     --output az://container/results \
     -profile azure,docker \
     --azure_spot true \
-    -work-dir az://container/work
+    --azure_workdir az://container/work
 ```
 
 ---

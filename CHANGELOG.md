@@ -30,7 +30,7 @@ next release is tagged.
   - Support for WildCARD variants for extended allelic diversity
   - Custom database support via `--custom_rgi_card_db` and `--custom_rgi_wildcard` parameters
   - Flexible database options: automatic download, pre-prepared complete database, or separate CARD + WildCARD
-  - Comprehensive documentation in `docs/RGI_IMPLEMENTATION_PLAN.md`, `docs/RGI_IMPLEMENTATION_SUMMARY.md`, and `docs/RGI_WILDCARD_USAGE.md`
+  - Comprehensive documentation in `docs/RGI_WILDCARD_USAGE.md` (originally also `docs/RGI_IMPLEMENTATION_{PLAN,SUMMARY}.md`, since consolidated)
   - RGI-specific parameters: `rgi_card_version`, `rgi_include_wildcard`, `rgi_aligner`, `rgi_kmer_size`, `rgi_min_kmer_coverage`
   - Integration with PREPARE_DATABASES subworkflow for automatic database management
   - Output includes per-sample results, pathogen predictions, and multi-sample summary reports with plots

@@ -2,9 +2,7 @@
 
 ## TL;DR
 
-BugBuster now removes phiX and host contamination in **one step** instead of two, making it **~45% faster** and using **50% less disk space**.
-
-**No changes needed to your existing commands** - everything works automatically!
+BugBuster removes phiX and host contamination in a **single pass** against one combined Bowtie2 index, built automatically from the phiX and host genome FASTAs.
 
 ---
 
@@ -53,13 +51,14 @@ nextflow run main.nf --input samples.csv --output results
 ```
 Automatically downloads and uses human CHM13 + phiX174.
 
-### 2. Mouse Samples
+### 2. Non-Human Host (e.g. Mouse)
 ```bash
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --host_db mouse
+  --custom_host_fasta /path/to/mouse_genome.fasta.gz
 ```
+(`--host_db` has a single built-in entry, `human`; other hosts are supplied as FASTA.)
 
 ### 3. Multiple Contaminants
 ```bash
@@ -107,12 +106,12 @@ results/clean_reads/sample1/
 
 ### Reports
 ```
-results/reads_report/reads_summary_report.tsv
+results/01_quality_control/summary/Reads_report.csv
 ```
 
 ### Combined Index (Cached)
 ```
-results/../databases/bowtie_index/contaminants_index/
+<databases_dir>/bowtie_index/contaminants_index/   # default: <output>/../databases
 ```
 
 ---
@@ -140,35 +139,27 @@ nextflow run main.nf -resume
 
 ### Check Statistics
 ```bash
-cat results/reads_report/reads_summary_report.tsv
+cat results/01_quality_control/summary/Reads_report.csv
 ```
 
 ---
 
-## What Changed?
+## How It Works
 
-### Before (Two Steps)
 ```
-Reads → Host Removal → Temp Files → PhiX Removal → Clean Reads
-```
-
-### After (One Step)
-```
-Reads → Combined Decontamination → Clean Reads
+Reads → Combined phiX + Host Decontamination (one Bowtie2 pass) → Clean Reads
 ```
 
-**Benefits:**
-- ⚡ 45% faster
-- 💾 50% less disk space
-- 🎯 Same biological results
-- ✅ Fully backward compatible
+A single alignment against the combined index replaces separate host and phiX
+passes: fewer temp files, less disk, one decontamination report per sample.
 
 ---
 
 ## Documentation
 
-- **Full Guide**: `docs/decontamination_optimization.md`
-- **Migration Guide**: `docs/MIGRATION_GUIDE.md`
+- **Manual**: [`manual.md`](manual.md)
+- **Parameter reference**: [`parameters.md`](parameters.md)
+- **Troubleshooting**: [`troubleshooting.md`](troubleshooting.md)
 - **Examples**: `examples/decontamination_examples.sh`
 
 ---

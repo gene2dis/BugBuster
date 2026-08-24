@@ -100,7 +100,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `false`
 - **Description**: Enable AMR gene prediction with pathogen-of-origin analysis using RGI and CARD database
 - **Example**: `--rgi_prediction true`
-- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for manual database preparation
+- **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for manual database preparation
 
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
@@ -245,7 +245,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to pre-prepared CARD database directory for RGI (must contain RGI-loaded data and KMA indices)
 - **Example**: `--custom_rgi_card_db /path/to/card_database`
-- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for database preparation instructions
+- **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for database preparation instructions
 
 ### `--custom_rgi_wildcard`
 - **Type**: String (directory path)

@@ -257,10 +257,118 @@ grep "version" /path/to/wildcard/index-for-model-sequences.txt
 4. **For Environmental Samples**: Always include WildCARD for better coverage
 5. **For Clinical Samples**: CARD-only may be sufficient
 
+## Manual CARD Database Preparation
+
+Prepare the CARD/WildCARD database yourself (e.g. to share it across projects, or
+on systems without internet access during pipeline execution), then point the
+pipeline at it with `--custom_rgi_card_db`.
+
+> **Important:** the pipeline expects the prepared directory to contain a
+> `localDB/` subdirectory (created by `rgi load --local` in that directory) —
+> runs fail fast if it is missing.
+
+### Step 1: Install RGI
+
+```bash
+# Conda/mamba (recommended)
+mamba create -n rgi -c conda-forge -c bioconda -c defaults rgi
+conda activate rgi
+rgi --version
+
+# Or Docker (the image the pipeline pins)
+docker pull quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0
+```
+
+### Step 2: Download CARD
+
+```bash
+mkdir -p /path/to/databases/rgi
+cd /path/to/databases/rgi
+
+# Latest version
+wget https://card.mcmaster.ca/latest/data
+tar -xvf data ./card.json
+
+# Or a specific version, e.g. 3.2.9
+wget https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2
+tar -xjf broadstreet-v3.2.9.tar.bz2
+
+grep '"version"' card.json | head -1
+```
+
+### Step 3: Load CARD (protein homolog models)
+
+Run these **inside the database directory** so `localDB/` is created there:
+
+```bash
+rgi clean --local
+rgi load --card_json card.json --local
+
+# Create annotated reference sequences (filename depends on CARD version)
+rgi card_annotation -i card.json > card_annotation.log 2>&1
+ls -lh card_database_v*.fasta
+
+rgi load -i card.json --card_annotation card_database_v<version>.fasta --local
+
+rgi database --version --local   # verify
+```
+
+### Step 4: Add WildCARD (optional but recommended)
+
+```bash
+wget -O wildcard_data.tar.bz2 https://card.mcmaster.ca/latest/variants
+mkdir -p wildcard
+tar -xjf wildcard_data.tar.bz2 -C wildcard
+gunzip wildcard/*.gz
+
+CARD_VERSION=$(grep '"version"' card.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+
+# CPU-intensive; may take 30-60 minutes
+rgi wildcard_annotation -i wildcard --card_json card.json -v ${CARD_VERSION} \
+    > wildcard_annotation.log 2>&1
+
+rgi load \
+    --card_json card.json \
+    --wildcard_annotation wildcard_database_v${CARD_VERSION}.fasta \
+    --wildcard_index wildcard/index-for-model-sequences.txt \
+    --card_annotation card_database_v<version>.fasta \
+    --local
+
+rgi database --version --local   # verify both are loaded
+```
+
+### Step 5: Use the prepared database
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --rgi_prediction true \
+    --custom_rgi_card_db /path/to/databases/rgi \
+    -profile docker
+```
+
+Aligner indices (KMA by default) are built by RGI on first use; verify with
+`ls localDB/` after a first run if in doubt.
+
+### Sizing
+
+- **CARD only**: ~500 MB
+- **CARD + WildCARD**: ~20-50 GB (version-dependent); allow ~100 GB of
+  temporary space during preparation
+- Use persistent storage, not temporary directories
+
+### Updating CARD
+
+```bash
+rgi clean --local
+wget https://card.mcmaster.ca/latest/data
+tar -xvf data ./card.json
+# repeat Steps 3-4
+```
+
 ## Related Documentation
 
-- **Full implementation details**: [`RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md)
-- **Manual database preparation**: See RGI_IMPLEMENTATION_PLAN.md Steps 1-5
 - **Parameter reference**: [`parameters.md`](parameters.md)
 - **Pipeline manual**: [`manual.md`](manual.md)
 

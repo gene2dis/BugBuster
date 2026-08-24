@@ -413,7 +413,7 @@ Parameters for RGI AMR gene prediction with pathogen-of-origin analysis:
 | `--rgi_kmer_size` | `61` | K-mer size for pathogen-of-origin prediction |
 | `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage threshold |
 
-**Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md).
+**Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) ("Manual CARD Database Preparation").
 
 ### 6.11 Bowtie2 Alignment Options
 
@@ -1035,6 +1035,10 @@ nextflow run main.nf \
 ---
 
 ## 11. Troubleshooting
+
+The dedicated [`troubleshooting.md`](troubleshooting.md) guide covers
+installation, input, resource, container, database, decontamination, cloud and
+output issues in depth. The most common cases:
 
 ### Common Issues
 

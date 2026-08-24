@@ -117,7 +117,7 @@ nextflow run main.nf \
     -work-dir gs://bucket/work
 ```
 
-See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions.
+See [docs/deployment.md](docs/deployment.md) for detailed deployment instructions, and [docs/troubleshooting.md](docs/troubleshooting.md) for solutions to common problems.
 
 ## Databases
 
