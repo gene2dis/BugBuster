@@ -127,3 +127,7 @@ jobs:
       - name: Run bin-directory recognition regression tests (audit #6)
         run: |
           tests/bin/test_identify_bin_dir.sh
+
+      - name: Run RGI_BWT low-coverage fallback regression tests (audit #8)
+        run: |
+          tests/bin/test_rgi_bwt_fallback.sh

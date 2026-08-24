@@ -241,9 +241,11 @@ sample3,/path/to/sample3_R1.fastq.gz,/path/to/sample3_R2.fastq.gz,/path/to/sampl
 Singleton reads are processed in both QC modes: with `--quality_control true`
 (default) they are trimmed by a dedicated single-end fastp run, decontaminated
 alongside the paired reads, and carried into downstream assembly/profiling
-steps that accept them. Two caveats: the `--min_read_sample` threshold counts
-paired reads only, and Kraken2 profiles the paired reads only (it runs in
-`--paired` mode); Sourmash and assembly use singletons as well.
+steps that accept them. A few caveats: the `--min_read_sample` threshold counts
+paired reads only; Kraken2 profiles the paired reads only (it runs in
+`--paired` mode); and read-level RGI ARG prediction (`--rgi_prediction`) also
+uses the paired reads only (`rgi bwt` accepts a single read pair). Sourmash
+and assembly use singletons as well.
 
 ### Input Requirements
 

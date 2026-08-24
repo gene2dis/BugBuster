@@ -239,6 +239,43 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the read-level RGI path") {
+        // Regression test for audit item #8: the RGI_BWT bam emit became
+        // optional (the low-coverage fallback creates no BAM and RGI_KMER is
+        // skipped for such samples). Success here pins that the
+        // RGI_BWT -> RGI_KMER -> RGI_REPORT chain still composes and publishes
+        // when alignments exist (the stub emits a bam like a real mapping run).
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                rgi_prediction     = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_BWT") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_KMER") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_REPORT") }
+
+            // RGI outputs published to the documented read-level layout
+            assert path("${outputDir}/05_arg_prediction/read_level/rgi/test_sample1/test_sample1_rgi_bwt.gene_mapping_data.txt").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/rgi/test_sample1/test_sample1_rgi_bwt.reference_mapping_stats.txt").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/rgi_kmer/test_sample1/test_sample1_rgi_kmer_61mer_analysis.json").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/rgi_summary/RGI_summary_report.csv").exists()
+        }
+    }
+
     test("Rejects an invalid assembly_mode value") {
         // Regression test for audit items #15/#25: a typo in assembly_mode used
         // to yield a "successful" QC-only run instead of an error. Now rejected
