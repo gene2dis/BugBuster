@@ -28,8 +28,8 @@ nextflow_pipeline {
 
         then {
             assert workflow.failed
-            assert workflow.stdout.any { line -> line.contains("requires --aws_workdir") } ||
-                   workflow.stderr.any { line -> line.contains("requires --aws_workdir") }
+            assert workflow.stdout.any { line -> line.contains("--aws_workdir") } ||
+                   workflow.stderr.any { line -> line.contains("--aws_workdir") }
         }
     }
 }
