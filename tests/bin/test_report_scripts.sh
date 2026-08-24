@@ -211,6 +211,54 @@ expect_fail "bin_tax: all-header-only input fails" bin_tax_report.py
 check_grep "bin_tax: failure message names the empty input" "../bin_tax_empty.log" "no bins were classified"
 
 #
+# bin_summary.py — audit item #11: ALL staged quality and taxonomy files must be
+# read (previously glob(...)[0] kept one arbitrary file of each, silently
+# dropping other binners' bins and whole domains such as archaea from ar53).
+#
+echo "--- bin_summary.py ---"
+BS_WORK="${WORK}/bin_summary_happy"
+mkdir -p "${BS_WORK}"
+# Depth files as produced by BEDTOOLS (one per read sample in co-assembly mode)
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\ns1\tbin.1\t10\t12.5\ns1\tbin.2\t8\t3.0\ns1\tbin.3\t5\t7.5\n' \
+    > "${BS_WORK}/s1_bin_depth.tsv"
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\ns2\tbin.1\t10\t2.5\ns2\tbin.2\t8\t9.0\ns2\tbin.3\t5\t1.5\n' \
+    > "${BS_WORK}/s2_bin_depth.tsv"
+# TWO quality reports: bin.3 lives only in the second one
+printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\nbin.1\t95.0\t2.0\t50000\t3000000\t2900\nbin.2\t90.0\t1.0\t40000\t2000000\t2100\n' \
+    > "${BS_WORK}/coassembly_semibin_quality_report.tsv"
+printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\nbin.3\t85.0\t3.0\t30000\t2500000\t2400\n' \
+    > "${BS_WORK}/coassembly_metabat_quality_report.tsv"
+# bac120 + ar53 summaries: the archaeal bin lives only in ar53; plus a zero-byte
+# ar53 file (what GTDB_TK_BATCH stubs/no-archaea samples produce) that must be skipped
+printf 'user_genome\tclassification\nbin.1\td__Bacteria;p__Bacillota;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis\nbin.3\td__Bacteria;p__Pseudomonadota;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli\n' \
+    > "${BS_WORK}/coassembly_gtdbtk_bac120.tsv"
+printf 'user_genome\tclassification\nbin.2\td__Archaea;p__Methanobacteriota;c__Methanobacteria;o__Methanobacteriales;f__Methanobacteriaceae;g__Methanobrevibacter;s__Methanobrevibacter smithii\n' \
+    > "${BS_WORK}/coassembly_gtdbtk_ar53.tsv"
+: > "${BS_WORK}/empty_gtdbtk_ar53.tsv"
+NEXT_WORKDIR="${BS_WORK}"
+expect_pass "bin_summary: all quality and taxonomy files combined" bin_summary.py
+check_grep "bin_summary: bin from second quality report present" "Bin_summary.csv" "^bin.3,85.0,3.0"
+check_grep "bin_summary: archaeal bin from ar53 present" "Bin_summary.csv" "^bin.2,.*Archaea,Methanobacteriota"
+check_grep "bin_summary: per-sample coverage columns pivoted" "Bin_summary.csv" "s1_avgcov,s2_avgcov"
+BS_ROWS=$(tail -n +2 "${BS_WORK}/Bin_summary.csv" 2>/dev/null | wc -l)
+if [ "${BS_ROWS}" -eq 3 ]; then
+    echo "✓ bin_summary: summary has all 3 bins"
+    PASS=$((PASS + 1))
+else
+    echo "✗ bin_summary: expected 3 rows, got ${BS_ROWS}"
+    FAIL=$((FAIL + 1))
+fi
+
+# All quality reports header-only: must exit non-zero, not write an empty summary
+BS_EMPTY="${WORK}/bin_summary_empty"
+mkdir -p "${BS_EMPTY}"
+cp "${BS_WORK}/s1_bin_depth.tsv" "${BS_WORK}/coassembly_gtdbtk_bac120.tsv" "${BS_EMPTY}/"
+printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\n' \
+    > "${BS_EMPTY}/coassembly_semibin_quality_report.tsv"
+NEXT_WORKDIR="${BS_EMPTY}"
+expect_fail "bin_summary: all-header-only quality input fails" bin_summary.py
+
+#
 # arg_norm_report.py — audit item #22: a sample where ARGs-OAP finds nothing
 # (nRead/nCell = 0) must yield empty normalization cells, not inf, in the
 # published CSVs.
