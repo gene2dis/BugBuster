@@ -63,6 +63,10 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 git clone https://github.com/gene2dis/BugBuster.git
 cd BugBuster
 
+# Create your samplesheet from the bundled example and edit it
+# with the paths to your reads (see "Samplesheet Format" below)
+cp assets/samplesheet_example.csv samplesheet.csv
+
 # Run with Docker
 nextflow run main.nf \
     --input samplesheet.csv \
@@ -156,7 +160,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 
 ## Samplesheet Format
 
-Create a CSV file with your sample information:
+Create a CSV file with your sample information (a template is provided at
+`assets/samplesheet_example.csv`):
 
 ```csv
 sample,r1,r2,s
