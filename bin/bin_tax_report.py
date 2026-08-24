@@ -94,16 +94,13 @@ def main():
     
     # Check if we have any data
     if not all_tax_reports:
-        # Fail loudly instead of publishing a "successful" empty taxonomy
-        # report: header-only GTDB-Tk summaries usually mean the batch step
-        # found no bin directories, not that no bins were classifiable.
+        # Fail loudly instead of publishing a "successful" empty taxonomy report.
         print(
             "ERROR: all GTDB-Tk summaries are empty (header-only) - no bins "
-            "were classified. With a single-binner setup (e.g. the default "
-            "'--binners semibin') or non-default MetaWRAP thresholds this "
-            "usually indicates the hardcoded bin-directory pattern bug in "
-            "gtdb_tk_batch (audit #6). Failing instead of writing an empty "
-            "taxonomy summary.",
+            "were classified. This means upstream binning produced no bins "
+            "for any sample (e.g. every binner was skipped or found nothing "
+            "on this data). Failing instead of writing an empty taxonomy "
+            "summary.",
             file=sys.stderr
         )
         sys.exit(1)

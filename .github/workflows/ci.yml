@@ -123,3 +123,7 @@ jobs:
       - name: Run report script regression tests (audit #13)
         run: |
           tests/bin/test_report_scripts.sh
+
+      - name: Run bin-directory recognition regression tests (audit #6)
+        run: |
+          tests/bin/test_identify_bin_dir.sh

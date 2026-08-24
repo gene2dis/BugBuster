@@ -58,16 +58,12 @@ def main():
         all_reports.append(df)
     
     if not all_reports:
-        # Fail loudly instead of publishing "successful" empty QC tables:
-        # header-only CheckM2 reports usually mean the batch step found no bin
-        # directories, not that the data is truly bin-free.
+        # Fail loudly instead of publishing "successful" empty QC tables.
         print(
             "ERROR: all CheckM2 quality reports are empty (header-only) - no "
-            "bins were assessed. With a single-binner setup (e.g. the default "
-            "'--binners semibin') or non-default MetaWRAP thresholds this "
-            "usually indicates the hardcoded bin-directory pattern bug in "
-            "checkm2_batch (audit #6). Failing instead of writing empty "
-            "quality tables.",
+            "bins were assessed. This means upstream binning produced no bins "
+            "for any sample (e.g. every binner was skipped or found nothing "
+            "on this data). Failing instead of writing empty quality tables.",
             file=sys.stderr
         )
         sys.exit(1)

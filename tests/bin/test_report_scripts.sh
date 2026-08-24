@@ -187,7 +187,7 @@ mkdir -p "${BQ_EMPTY}"
 printf 'Name\tCompleteness\tContamination\n' > "${BQ_EMPTY}/sampleA_semibin_quality_report.tsv"
 NEXT_WORKDIR="${BQ_EMPTY}"
 expect_fail "bin_quality: all-header-only input fails" bin_quality_report.py
-check_grep "bin_quality: failure message points at audit #6" "../bin_quality_empty.log" "audit #6"
+check_grep "bin_quality: failure message names the empty input" "../bin_quality_empty.log" "no bins were assessed"
 
 #
 # bin_tax_report.py (GTDB-Tk batch summary format)
@@ -208,7 +208,7 @@ mkdir -p "${BT_EMPTY}"
 printf 'user_genome\tclassification\tfastani_reference\n' > "${BT_EMPTY}/sampleA_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BT_EMPTY}"
 expect_fail "bin_tax: all-header-only input fails" bin_tax_report.py
-check_grep "bin_tax: failure message points at audit #6" "../bin_tax_empty.log" "audit #6"
+check_grep "bin_tax: failure message names the empty input" "../bin_tax_empty.log" "no bins were classified"
 
 #
 # arg_norm_report.py — audit item #22: a sample where ARGs-OAP finds nothing
