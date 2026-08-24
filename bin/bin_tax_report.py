@@ -40,16 +40,17 @@ def parse_gtdb_taxonomy(classification):
 def generate_colors(n):
     """Generate a pastel color palette."""
     # Use a colormap similar to rcartocolor Pastel
-    cmap = plt.cm.get_cmap('Pastel1')
+    # (plt.get_cmap, not plt.cm.get_cmap: the latter was removed in matplotlib 3.9)
+    cmap = plt.get_cmap('Pastel1')
     if n <= 9:
         colors = [cmap(i) for i in np.linspace(0, 1, 9)][:n]
     else:
         # For more colors, use Set3 which has more variety
-        cmap = plt.cm.get_cmap('Set3')
+        cmap = plt.get_cmap('Set3')
         colors = [cmap(i) for i in np.linspace(0, 1, min(n, 12))]
         if n > 12:
             # Generate additional colors
-            cmap2 = plt.cm.get_cmap('Pastel2')
+            cmap2 = plt.get_cmap('Pastel2')
             colors.extend([cmap2(i) for i in np.linspace(0, 1, n - 12)])
     return colors[:n]
 
