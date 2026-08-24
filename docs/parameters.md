@@ -218,11 +218,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Publish decontaminated reads to `<output>/clean_reads/<sample>/`. This is publishing only, not caching — `-resume` remains the mechanism for reusing completed work.
 - **Example**: `--store_clean_reads true`
 
-### `--enable_work_cleanup`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Set by the `low_disk` profile. Note that the flag by itself does **not** delete the work directory — automatic work-dir cleanup comes from Nextflow's `cleanup = true` setting, which is enabled by `-profile low_disk` (or a custom config). See [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
-- **Example**: `-profile low_disk`
+> **Note**: Automatic work-dir cleanup is not a pipeline parameter — it comes from Nextflow's `cleanup = true` setting, enabled by `-profile low_disk` (or a custom config). See [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
 
 ---
 
@@ -246,7 +242,7 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the Bowtie2 index from it
 - **Example**: `--custom_host_fasta /path/to/mouse_genome.fa`
 
-> **Deprecated**: `--custom_phiX_index` and `--custom_bowtie_host_index` are still accepted for backward compatibility but are **ignored** — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
+> **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
 
 ### `--custom_kraken_db`
 - **Type**: String (directory path)

@@ -109,7 +109,7 @@ or a validation error naming a parameter you passed.
 **Solution:**
 - Parameters are validated against `nextflow_schema.json` at startup; any parameter the pipeline does not declare aborts the run
 - Check the spelling against [`parameters.md`](parameters.md)
-- If you are following instructions written for an older release, the parameter may have been removed or renamed (e.g. `--kraken_db_used`, `--sourmash_db_name`, `--validationShowHiddenParams`, and all `--mmseqs_*` parameters no longer exist; `--bbmap_lenght` is now `--bbmap_length`)
+- If you are following instructions written for an older release, the parameter may have been removed or renamed (e.g. `--kraken_db_used`, `--sourmash_db_name`, `--validationShowHiddenParams`, `--enable_work_cleanup`, and all `--mmseqs_*` parameters no longer exist; `--bbmap_lenght` is now `--bbmap_length`; `--custom_phiX_index` and `--custom_bowtie_host_index` were replaced by `--custom_decontamination_index` / `--custom_phiX_fasta` / `--custom_host_fasta`)
 
 ---
 

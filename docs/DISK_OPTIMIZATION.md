@@ -68,7 +68,6 @@ The following processes clean up temporary files during execution:
 - **Profile**: `low_disk`
 - **Settings**:
   - `cleanup = true` - Enable automatic work directory cleanup
-  - `enable_work_cleanup = true` - Pipeline parameter
   - `store_clean_reads = true` - Publish clean reads to `<output>/clean_reads/` (publishDir)
   - `process.cache = 'lenient'` - Support resume with cleanup
 
@@ -88,7 +87,7 @@ This automatically enables:
 - ✅ Clean-reads publishing (`store_clean_reads`)
 - ✅ Lenient cache
 
-> **Note**: Work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a pipeline parameter — passing `--enable_work_cleanup` on the command line does **not** enable it. Use `-profile low_disk`, or add `cleanup = true` to a custom config passed with `-c`.
+> **Note**: Work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a pipeline parameter — there is no `--flag` for it. Use `-profile low_disk`, or add `cleanup = true` to a custom config passed with `-c`.
 
 To publish clean reads without the cleanup trade-off, use `--store_clean_reads` on its own:
 
@@ -246,7 +245,6 @@ grep "Cached" .nextflow.log | wc -l
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `enable_work_cleanup` | `false` | Set by the `low_disk` profile; informational only — actual work-dir cleanup comes from the profile's `cleanup = true` setting |
 | `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2_DECONTAMINATE, publishDir) |
 
 ### Process Settings

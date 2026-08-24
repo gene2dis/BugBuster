@@ -153,20 +153,6 @@
                     "description": "GTDB-TK database release version.",
                     "fa_icon": "fas fa-database"
                 },
-                "custom_phiX_index": {
-                    "type": "string",
-                    "format": "directory-path",
-                    "description": "Deprecated: use --custom_decontamination_index instead.",
-                    "fa_icon": "fas fa-folder",
-                    "hidden": true
-                },
-                "custom_bowtie_host_index": {
-                    "type": "string",
-                    "format": "directory-path",
-                    "description": "Deprecated: use --custom_decontamination_index instead.",
-                    "fa_icon": "fas fa-folder",
-                    "hidden": true
-                },
                 "custom_kraken_db": {
                     "type": "string",
                     "format": "directory-path",
@@ -714,11 +700,6 @@
                         "move"
                     ],
                     "hidden": true
-                },
-                "enable_work_cleanup": {
-                    "type": "boolean",
-                    "description": "Enable progressive work-dir cleanup during execution (also set by the low_disk profile).",
-                    "fa_icon": "fas fa-broom"
                 },
                 "store_clean_reads": {
                     "type": "boolean",
