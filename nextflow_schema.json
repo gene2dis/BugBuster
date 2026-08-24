@@ -1,16 +1,19 @@
 {
-    "$schema": "http://json-schema.org/draft-07/schema",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "$id": "https://raw.githubusercontent.com/gene2dis/BugBuster/main/nextflow_schema.json",
     "title": "gene2dis/BugBuster pipeline parameters",
     "description": "Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible",
     "type": "object",
-    "definitions": {
+    "$defs": {
         "input_output_options": {
             "title": "Input/output options",
             "type": "object",
             "fa_icon": "fas fa-terminal",
             "description": "Define where the pipeline should find input data and save output data.",
-            "required": ["input", "output"],
+            "required": [
+                "input",
+                "output"
+            ],
             "properties": {
                 "input": {
                     "type": "string",
@@ -45,7 +48,11 @@
                 "assembly_mode": {
                     "type": "string",
                     "default": "assembly",
-                    "enum": ["assembly", "coassembly", "none"],
+                    "enum": [
+                        "assembly",
+                        "coassembly",
+                        "none"
+                    ],
                     "description": "Mode of genome assembly.",
                     "help_text": "Choose 'assembly' for individual sample assembly, 'coassembly' to combine all samples, or 'none' to skip assembly.",
                     "fa_icon": "fas fa-puzzle-piece"
@@ -53,37 +60,36 @@
                 "taxonomic_profiler": {
                     "type": "string",
                     "default": "sourmash",
-                    "enum": ["kraken2", "sourmash", "none"],
+                    "enum": [
+                        "kraken2",
+                        "sourmash",
+                        "none"
+                    ],
                     "description": "Software for taxonomic profiling at read level.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "include_binning": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Enable metagenomic binning and refinement steps.",
                     "fa_icon": "fas fa-th"
                 },
                 "read_arg_prediction": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA.",
                     "fa_icon": "fas fa-dna"
                 },
                 "contig_tax_and_arg": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
                     "fa_icon": "fas fa-microscope"
                 },
                 "contig_level_metacerberus": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Enable contig-level functional annotation with MetaCerberus.",
                     "fa_icon": "fas fa-tags"
                 },
                 "arg_bin_clustering": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Enable ARG gene prediction and clustering for horizontal gene transfer inference.",
                     "fa_icon": "fas fa-project-diagram"
                 },
@@ -93,6 +99,11 @@
                     "minimum": 0,
                     "description": "Minimum number of reads required per sample after QC filtering.",
                     "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "rgi_prediction": {
+                    "type": "boolean",
+                    "description": "Enable RGI AMR gene prediction with pathogen-of-origin analysis.",
+                    "fa_icon": "fas fa-dna"
                 }
             }
         },
@@ -117,7 +128,10 @@
                 "kraken2_db": {
                     "type": "string",
                     "default": "standard-8",
-                    "enum": ["standard-8", "gtdb_220"],
+                    "enum": [
+                        "standard-8",
+                        "gtdb_220"
+                    ],
                     "description": "Kraken2 database selection.",
                     "fa_icon": "fas fa-database"
                 },
@@ -142,14 +156,16 @@
                 "custom_phiX_index": {
                     "type": "string",
                     "format": "directory-path",
-                    "description": "Path to custom PhiX Bowtie2 index directory.",
-                    "fa_icon": "fas fa-folder"
+                    "description": "Deprecated: use --custom_decontamination_index instead.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
                 },
                 "custom_bowtie_host_index": {
                     "type": "string",
                     "format": "directory-path",
-                    "description": "Path to custom host Bowtie2 index directory.",
-                    "fa_icon": "fas fa-folder"
+                    "description": "Deprecated: use --custom_decontamination_index instead.",
+                    "fa_icon": "fas fa-folder",
+                    "hidden": true
                 },
                 "custom_kraken_db": {
                     "type": "string",
@@ -203,6 +219,60 @@
                     "format": "file-path",
                     "description": "Path to custom KARGVA database FASTA file.",
                     "fa_icon": "fas fa-file"
+                },
+                "karga_db": {
+                    "type": "string",
+                    "default": "megares",
+                    "description": "Built-in KARGA reference database key (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "kargva_db": {
+                    "type": "string",
+                    "default": "kargva",
+                    "description": "Built-in KARGVA reference database key (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "blast_db": {
+                    "type": "string",
+                    "default": "nt",
+                    "description": "Built-in BLAST nucleotide database key (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "taxdump_files": {
+                    "type": "string",
+                    "default": "ncbi",
+                    "description": "Built-in NCBI taxdump files key (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_decontamination_index": {
+                    "type": "string",
+                    "description": "Path to a pre-built combined phiX + host Bowtie2 index (skips the local build).",
+                    "format": "path",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "custom_phiX_fasta": {
+                    "type": "string",
+                    "description": "Custom phiX FASTA used to build the combined decontamination index.",
+                    "format": "path",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "custom_host_fasta": {
+                    "type": "string",
+                    "description": "Custom host genome FASTA (plain or gzipped) used to build the combined decontamination index.",
+                    "format": "path",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "custom_rgi_card_db": {
+                    "type": "string",
+                    "description": "Path to a pre-prepared CARD database for RGI.",
+                    "format": "path",
+                    "fa_icon": "fas fa-folder-open"
+                },
+                "custom_rgi_wildcard": {
+                    "type": "string",
+                    "description": "Path to a WildCARD variants archive to combine with the CARD database.",
+                    "format": "path",
+                    "fa_icon": "fas fa-folder-open"
                 }
             }
         },
@@ -272,12 +342,6 @@
                     "description": "Kraken2 confidence threshold.",
                     "fa_icon": "fas fa-balance-scale"
                 },
-                "kraken_db_used": {
-                    "type": "string",
-                    "default": "gtdb_release207",
-                    "description": "Kraken2 database name for reports.",
-                    "fa_icon": "fas fa-tag"
-                },
                 "bracken_read_len": {
                     "type": "integer",
                     "default": 150,
@@ -287,20 +351,26 @@
                 "bracken_tax_level": {
                     "type": "string",
                     "default": "S",
-                    "enum": ["D", "P", "C", "O", "F", "G", "S"],
+                    "enum": [
+                        "D",
+                        "P",
+                        "C",
+                        "O",
+                        "F",
+                        "G",
+                        "S"
+                    ],
                     "description": "Taxonomic level for Bracken (D=Domain, P=Phylum, C=Class, O=Order, F=Family, G=Genus, S=Species).",
                     "fa_icon": "fas fa-layer-group"
-                },
-                "sourmash_db_name": {
-                    "type": "string",
-                    "default": "gtdb_release_220",
-                    "description": "Sourmash database name for reports.",
-                    "fa_icon": "fas fa-tag"
                 },
                 "sourmash_tax_rank": {
                     "type": "string",
                     "default": "species",
-                    "enum": ["genus", "species", "strain"],
+                    "enum": [
+                        "genus",
+                        "species",
+                        "strain"
+                    ],
                     "description": "Taxonomic rank for Sourmash classification.",
                     "fa_icon": "fas fa-layer-group"
                 }
@@ -409,7 +479,20 @@
                 "semibin_env_model": {
                     "type": "string",
                     "default": "human_gut",
-                    "enum": ["human_gut", "dog_gut", "ocean", "soil", "cat_gut", "human_oral", "mouse_gut", "pig_gut", "built_environment", "wastewater", "chicken_caecum", "global"],
+                    "enum": [
+                        "human_gut",
+                        "dog_gut",
+                        "ocean",
+                        "soil",
+                        "cat_gut",
+                        "human_oral",
+                        "mouse_gut",
+                        "pig_gut",
+                        "built_environment",
+                        "wastewater",
+                        "chicken_caecum",
+                        "global"
+                    ],
                     "description": "SemiBin environment model for binning.",
                     "fa_icon": "fas fa-globe"
                 }
@@ -439,7 +522,7 @@
                 },
                 "deeparg_arg_alignment_evalue": {
                     "type": "string",
-                    "default": "1e-10",
+                    "default": 1e-10,
                     "description": "Maximum E-value for DeepARG alignments.",
                     "fa_icon": "fas fa-calculator"
                 },
@@ -461,7 +544,10 @@
                 "deeparg_model_version": {
                     "type": "string",
                     "default": "v2",
-                    "enum": ["v1", "v2"],
+                    "enum": [
+                        "v1",
+                        "v2"
+                    ],
                     "description": "DeepARG model version.",
                     "fa_icon": "fas fa-code-branch"
                 }
@@ -545,7 +631,6 @@
                 },
                 "create_phyloseq_rds": {
                     "type": "boolean",
-                    "default": false,
                     "description": "Generate R phyloseq RDS files for downstream analysis.",
                     "fa_icon": "fas fa-file-code"
                 }
@@ -614,48 +699,173 @@
                     "fa_icon": "fas fa-question-circle",
                     "hidden": true
                 },
-                "version": {
-                    "type": "boolean",
-                    "description": "Display version and exit.",
-                    "fa_icon": "fas fa-question-circle",
-                    "hidden": true
-                },
                 "publish_dir_mode": {
                     "type": "string",
                     "default": "copy",
                     "description": "Method used to save pipeline results to output directory.",
                     "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
-                    "enum": ["symlink", "rellink", "link", "copy", "copyNoFollow", "move"],
+                    "enum": [
+                        "symlink",
+                        "rellink",
+                        "link",
+                        "copy",
+                        "copyNoFollow",
+                        "move"
+                    ],
                     "hidden": true
                 },
-                "validationShowHiddenParams": {
+                "enable_work_cleanup": {
                     "type": "boolean",
-                    "fa_icon": "far fa-eye-slash",
-                    "description": "Show all params when using `--help`.",
-                    "hidden": true
+                    "description": "Enable progressive work-dir cleanup during execution (also set by the low_disk profile).",
+                    "fa_icon": "fas fa-broom"
                 },
-                "validationSchemaIgnoreParams": {
+                "store_clean_reads": {
+                    "type": "boolean",
+                    "description": "Publish decontaminated reads to <output>/clean_reads/ (publishing, not caching: -resume is the cache).",
+                    "fa_icon": "fas fa-save"
+                },
+                "config_profile_name": {
                     "type": "string",
-                    "description": "Parameters to ignore during schema validation.",
-                    "hidden": true
+                    "description": "Institutional config profile name.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Institutional config profile description.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_contact": {
+                    "type": "string",
+                    "description": "Institutional config profile contact.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                },
+                "config_profile_url": {
+                    "type": "string",
+                    "description": "Institutional config profile URL.",
+                    "hidden": true,
+                    "fa_icon": "fas fa-users-cog"
+                }
+            }
+        },
+        "rgi_options": {
+            "title": "RGI options",
+            "type": "object",
+            "fa_icon": "fas fa-shield-virus",
+            "description": "Parameters for RGI AMR prediction with pathogen-of-origin (used when --rgi_prediction).",
+            "properties": {
+                "rgi_card_version": {
+                    "type": "string",
+                    "default": "latest",
+                    "description": "CARD version to download: 'latest' or a specific version.",
+                    "fa_icon": "fas fa-code-branch"
+                },
+                "rgi_include_wildcard": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Include WildCARD variants for extended allelic diversity.",
+                    "fa_icon": "fas fa-asterisk"
+                },
+                "rgi_aligner": {
+                    "type": "string",
+                    "default": "kma",
+                    "description": "Aligner used by rgi bwt.",
+                    "enum": [
+                        "kma",
+                        "bowtie2",
+                        "bwa"
+                    ],
+                    "fa_icon": "fas fa-align-left"
+                },
+                "rgi_kmer_size": {
+                    "type": "integer",
+                    "default": 61,
+                    "description": "K-mer size for pathogen-of-origin prediction.",
+                    "fa_icon": "fas fa-ruler"
+                },
+                "rgi_min_kmer_coverage": {
+                    "type": "integer",
+                    "default": 10,
+                    "description": "Minimum k-mer coverage for pathogen-of-origin prediction.",
+                    "fa_icon": "fas fa-layer-group"
+                }
+            }
+        },
+        "metacerberus_options": {
+            "title": "MetaCerberus options",
+            "type": "object",
+            "fa_icon": "fas fa-project-diagram",
+            "description": "Parameters for MetaCerberus functional annotation (used when --contig_level_metacerberus).",
+            "properties": {
+                "metacerberus_hmm": {
+                    "type": "string",
+                    "default": "KOFam_all, COG, VOG, PHROG, CAZy",
+                    "description": "HMM databases for MetaCerberus (quoted comma-separated list).",
+                    "fa_icon": "fas fa-list"
+                },
+                "metacerberus_minscore": {
+                    "type": "integer",
+                    "default": 25,
+                    "description": "Minimum HMM score for MetaCerberus annotations.",
+                    "fa_icon": "fas fa-sort-numeric-up"
+                },
+                "metacerberus_evalue": {
+                    "type": "number",
+                    "default": 1e-09,
+                    "description": "E-value threshold for MetaCerberus.",
+                    "fa_icon": "fas fa-calculator"
                 }
             }
         }
     },
     "allOf": [
-        { "$ref": "#/definitions/input_output_options" },
-        { "$ref": "#/definitions/pipeline_options" },
-        { "$ref": "#/definitions/database_options" },
-        { "$ref": "#/definitions/fastp_options" },
-        { "$ref": "#/definitions/taxonomy_options" },
-        { "$ref": "#/definitions/assembly_options" },
-        { "$ref": "#/definitions/binning_options" },
-        { "$ref": "#/definitions/deeparg_options" },
-        { "$ref": "#/definitions/bowtie2_options" },
-        { "$ref": "#/definitions/taxonomy_visualization_options" },
-        { "$ref": "#/definitions/database_storage_options" },
-        { "$ref": "#/definitions/max_job_request_options" },
-        { "$ref": "#/definitions/generic_options" }
+        {
+            "$ref": "#/$defs/input_output_options"
+        },
+        {
+            "$ref": "#/$defs/pipeline_options"
+        },
+        {
+            "$ref": "#/$defs/database_options"
+        },
+        {
+            "$ref": "#/$defs/fastp_options"
+        },
+        {
+            "$ref": "#/$defs/taxonomy_options"
+        },
+        {
+            "$ref": "#/$defs/assembly_options"
+        },
+        {
+            "$ref": "#/$defs/binning_options"
+        },
+        {
+            "$ref": "#/$defs/deeparg_options"
+        },
+        {
+            "$ref": "#/$defs/rgi_options"
+        },
+        {
+            "$ref": "#/$defs/metacerberus_options"
+        },
+        {
+            "$ref": "#/$defs/bowtie2_options"
+        },
+        {
+            "$ref": "#/$defs/taxonomy_visualization_options"
+        },
+        {
+            "$ref": "#/$defs/database_storage_options"
+        },
+        {
+            "$ref": "#/$defs/max_job_request_options"
+        },
+        {
+            "$ref": "#/$defs/generic_options"
+        }
     ]
 }

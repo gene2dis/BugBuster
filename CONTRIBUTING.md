@@ -33,7 +33,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 
 ### Requirements
 
-- Nextflow >= 23.04.0
+- Nextflow >= 24.04.0
 - Docker or Singularity
 - Git
 
@@ -225,6 +225,13 @@ nextflow run main.nf -profile test,docker -stub
 
 # Resume failed run
 nextflow run main.nf -profile test,docker -resume
+```
+
+Parameter validation uses the `nf-schema` plugin, which Nextflow downloads
+automatically on first run. For offline environments, pre-install it once:
+
+```bash
+nextflow plugin install nf-schema@2.4.2
 ```
 
 ### Linting

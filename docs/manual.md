@@ -62,7 +62,7 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
 
 | Software | Minimum Version | Purpose |
 |----------|-----------------|---------|
-| Nextflow | ≥23.04.0 | Workflow engine |
+| Nextflow | ≥24.04.0 | Workflow engine |
 | Java | 11-17 | Nextflow runtime |
 | Container runtime | - | Docker, Singularity, or Podman |
 

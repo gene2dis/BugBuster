@@ -11,6 +11,8 @@ nextflow.enable.dsl = 2
 
 import groovy.transform.Field
 
+include { validateParameters } from 'plugin/nf-schema'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     PIPELINE LOGO AND INFO
@@ -109,25 +111,18 @@ if (params.containsKey('version') && params.version) {
     exit 0
 }
 
+// Validate all parameters against nextflow_schema.json (nf-schema plugin):
+// required params (--input/--output), types, enums (assembly_mode,
+// taxonomic_profiler, ...). Cross-parameter rules the schema cannot express
+// are checked by hand below.
+validateParameters()
+
 // Print logo
 log.info logo
 log.info ""
 log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
 log.info "  ================================================"
 log.info ""
-
-// Validate required parameters
-if (!params.input) {
-    log.error "ERROR: --input parameter is required"
-    printHelp()
-    exit 1
-}
-
-if (!params.output) {
-    log.error "ERROR: --output parameter is required"
-    printHelp()
-    exit 1
-}
 
 // Parse and validate binners parameter
 def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
@@ -139,18 +134,6 @@ if (binners_list.isEmpty()) {
 }
 if (invalid_binners) {
     log.error "ERROR: Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}"
-    exit 1
-}
-
-// Validate mode enums
-def valid_assembly_modes = ['assembly', 'coassembly', 'none']
-if (!(params.assembly_mode in valid_assembly_modes)) {
-    log.error "ERROR: Invalid --assembly_mode '${params.assembly_mode}'. Valid options: ${valid_assembly_modes.join(', ')}"
-    exit 1
-}
-def valid_profilers = ['kraken2', 'sourmash', 'none']
-if (!(params.taxonomic_profiler in valid_profilers)) {
-    log.error "ERROR: Invalid --taxonomic_profiler '${params.taxonomic_profiler}'. Valid options: ${valid_profilers.join(', ')}"
     exit 1
 }
 

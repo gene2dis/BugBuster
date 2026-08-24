@@ -235,8 +235,10 @@ nextflow_pipeline {
     }
 
     test("Rejects an invalid assembly_mode value") {
-        // Regression test for audit item #15: a typo in assembly_mode used to
-        // yield a "successful" QC-only run instead of an error.
+        // Regression test for audit items #15/#25: a typo in assembly_mode used
+        // to yield a "successful" QC-only run instead of an error. Now rejected
+        // by nf-schema's enum validation (message-agnostic assertion: nf-schema
+        // wording changes between plugin versions).
         when {
             params {
                 input  = "${projectDir}/assets/test_samplesheet.csv"
@@ -248,7 +250,26 @@ nextflow_pipeline {
         then {
             assert workflow.failed
             def console_out = (workflow.stdout + workflow.stderr).join('\n')
-            assert console_out.contains("Invalid --assembly_mode")
+            assert console_out.contains("assembly_mode")
+        }
+    }
+
+    test("Rejects a wrong-typed parameter via nf-schema") {
+        // Regression test for audit item #25: nextflow_schema.json used to be
+        // decorative (nothing validated against it). A type violation must now
+        // fail the run and name the offending parameter.
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                metabat_maxP = "notanumber"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("metabat_maxP")
         }
     }
 
