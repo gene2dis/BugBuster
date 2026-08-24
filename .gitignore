@@ -15,6 +15,9 @@ internal_docs
 .claude
 CLAUDE.md
 
+# Editor config
+.vscode/
+
 # Test artifacts
 work/
 .nf-test/
