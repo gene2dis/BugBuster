@@ -98,6 +98,19 @@ Invalid sample name '...': use only letters, digits, underscore, dot or hyphen
 - Use only `A-Za-z0-9`, `_`, `.` or `-`, starting with a letter or digit
 - Replace spaces with underscores
 
+### Unrecognised parameter
+
+**Error:**
+```
+* --<name>: expected type: ... (unrecognised parameter)
+```
+or a validation error naming a parameter you passed.
+
+**Solution:**
+- Parameters are validated against `nextflow_schema.json` at startup; any parameter the pipeline does not declare aborts the run
+- Check the spelling against [`parameters.md`](parameters.md)
+- If you are following instructions written for an older release, the parameter may have been removed or renamed (e.g. `--kraken_db_used`, `--sourmash_db_name`, `--validationShowHiddenParams`, and all `--mmseqs_*` parameters no longer exist; `--bbmap_lenght` is now `--bbmap_length`)
+
 ---
 
 ## Resource Errors
@@ -223,9 +236,9 @@ Unable to find image 'container:tag' locally
 
 **Solution:**
 1. Check internet connectivity
-2. Verify container exists:
+2. Verify container exists (look up the exact tag in the module's `main.nf`):
    ```bash
-   docker pull quay.io/biocontainers/fastp:0.23.2--h79da9fb_0
+   docker pull quay.io/biocontainers/fastp:<tag>
    ```
 
 3. Use alternative registry if blocked
@@ -468,8 +481,8 @@ cat work/xx/xxxxxxxx/.command.err
 ### Test with stub mode
 
 ```bash
-# Dry run without executing actual commands
-nextflow run main.nf -profile docker -stub
+# Dry run without executing actual commands (test profile supplies the input/output params)
+nextflow run main.nf -profile test,docker -stub
 ```
 
 ### Preview the workflow graph

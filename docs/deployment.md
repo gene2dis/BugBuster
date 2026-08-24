@@ -64,6 +64,8 @@ nextflow run main.nf \
 
 ### Creating an Institutional Profile
 
+`conf/institutional.config` is a **template only** — no `institutional` profile is defined in `nextflow.config`, so it must be either registered as a profile (steps below) or passed directly with `-c conf/my_institution.config`.
+
 1. Copy the template:
    ```bash
    cp conf/institutional.config conf/my_institution.config
@@ -80,7 +82,10 @@ nextflow run main.nf \
 
 4. Run with your profile:
    ```bash
-   nextflow run main.nf -profile my_institution
+   nextflow run main.nf \
+       --input samplesheet.csv \
+       --output ./results \
+       -profile my_institution
    ```
 
 ---
@@ -263,10 +268,10 @@ nextflow run main.nf \
 For better performance, pre-download databases to shared storage:
 
 ```bash
-# Kraken2 Standard-8 (~8 GB)
-# Sourmash GTDB (~3 GB)
-# CheckM2 (~3 GB)
-# GTDB-TK (~85 GB)
+# Kraken2 Standard-8 (~7.5 GB)
+# Sourmash GTDB r220 (~17 GB)
+# CheckM2 (~2.9 GB)
+# GTDB-TK r220 (~109 GB)
 ```
 
 Then specify paths:

@@ -10,7 +10,7 @@ BugBuster removes phiX and host contamination in a **single pass** against one c
 
 ### Basic Usage
 ```bash
-nextflow run main.nf --input samples.csv --output results
+nextflow run main.nf --input samples.csv --output results -profile docker
 ```
 
 ### With Pre-built Index (Fastest)
@@ -18,7 +18,8 @@ nextflow run main.nf --input samples.csv --output results
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_decontamination_index /path/to/contaminants_index
+  --custom_decontamination_index /path/to/contaminants_index \
+  -profile docker
 ```
 
 ### Custom Host Genome
@@ -26,7 +27,8 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_host_fasta /path/to/host.fasta
+  --custom_host_fasta /path/to/host.fasta \
+  -profile docker
 ```
 
 ---
@@ -47,7 +49,7 @@ nextflow run main.nf \
 
 ### 1. Default (Human + PhiX)
 ```bash
-nextflow run main.nf --input samples.csv --output results
+nextflow run main.nf --input samples.csv --output results -profile docker
 ```
 Automatically downloads and uses human CHM13 + phiX174.
 
@@ -56,7 +58,8 @@ Automatically downloads and uses human CHM13 + phiX174.
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_host_fasta /path/to/mouse_genome.fasta.gz
+  --custom_host_fasta /path/to/mouse_genome.fasta.gz \
+  -profile docker
 ```
 (`--host_db` has a single built-in entry, `human`; other hosts are supplied as FASTA.)
 
@@ -65,7 +68,8 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_host_fasta "human.fasta,mouse.fasta,ecoli.fasta"
+  --custom_host_fasta "human.fasta,mouse.fasta,ecoli.fasta" \
+  -profile docker
 ```
 
 ### 4. Low Disk Space
@@ -73,7 +77,7 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  -profile low_disk
+  -profile docker,low_disk
 ```
 
 ---

@@ -74,28 +74,28 @@ The following processes clean up temporary files during execution:
 
 ## Usage
 
-### Option 1: Use the low_disk Profile (Recommended)
+### Use the low_disk Profile
 
 ```bash
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    -profile docker,low_disk \
-    -resume
+    -profile docker,low_disk
 ```
 
 This automatically enables:
-- ✅ Work directory cleanup
+- ✅ Work directory cleanup (`cleanup = true` — the work dir is deleted after a successful run, so **low_disk runs are not resumable**)
 - ✅ Clean-reads publishing (`store_clean_reads`)
 - ✅ Lenient cache
 
-### Option 2: Enable via Command Line Parameters
+> **Note**: Work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a pipeline parameter — passing `--enable_work_cleanup` on the command line does **not** enable it. Use `-profile low_disk`, or add `cleanup = true` to a custom config passed with `-c`.
+
+To publish clean reads without the cleanup trade-off, use `--store_clean_reads` on its own:
 
 ```bash
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --enable_work_cleanup \
     --store_clean_reads \
     -profile docker \
     -resume
@@ -246,7 +246,7 @@ grep "Cached" .nextflow.log | wc -l
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `enable_work_cleanup` | `false` | Enable automatic work directory cleanup |
+| `enable_work_cleanup` | `false` | Set by the `low_disk` profile; informational only — actual work-dir cleanup comes from the profile's `cleanup = true` setting |
 | `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2_DECONTAMINATE, publishDir) |
 
 ### Process Settings
@@ -292,6 +292,7 @@ grep "Cached" .nextflow.log | wc -l
 
 ## Version History
 
+- **v1.1.0dev** - Current: `low_disk` profile (work-dir cleanup + clean-reads publishing); storeDir replaced by conditional publishDir
 - **v1.0.0** - Initial disk optimization implementation
   - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
   - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS

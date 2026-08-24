@@ -132,8 +132,8 @@ BugBuster automatically downloads required databases on first use. Databases are
 
 | Database | Size | Used For | Download Trigger |
 |----------|------|----------|------------------|
-| **phiX174 Index** | 8.1 MB | PhiX contamination removal | `quality_control=true` |
-| **Human Host Index** | 4.1 GB | Host read removal | `quality_control=true` |
+| **phiX174 genome (FASTA)** | 5.4 kB | PhiX contamination removal | `quality_control=true` |
+| **Human host genome T2T-CHM13v2.0 (FASTA)** | 940 MB | Host read removal | `quality_control=true` |
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
@@ -269,6 +269,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 ## 6. Pipeline Parameters
 
+Parameters are validated against `nextflow_schema.json` at startup (nf-schema). Passing a parameter that the pipeline does not declare — including misspelled or removed ones — aborts the run with an "unrecognised parameter" error. See [`parameters.md`](parameters.md) for the complete reference.
+
 ### 6.1 Input/Output Options
 
 | Parameter | Default | Description |
@@ -308,8 +310,9 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 | Parameter | Description |
 |-----------|-------------|
-| `--custom_phiX_index` | Path to custom PhiX Bowtie2 index directory |
-| `--custom_bowtie_host_index` | Path to custom host Bowtie2 index directory |
+| `--custom_decontamination_index` | Path to a pre-built combined Bowtie2 index directory (host + phiX) |
+| `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
+| `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
@@ -339,10 +342,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
-| `--kraken_db_used` | `gtdb_release207` | Database name for reports |
 | `--bracken_read_len` | `150` | Read length for Bracken estimation |
 | `--bracken_tax_level` | `S` | Taxonomic level: D, P, C, O, F, G, S |
-| `--sourmash_db_name` | `gtdb_release_220` | Database name for Sourmash reports |
 | `--sourmash_tax_rank` | `species` | Rank: `genus`, `species`, `strain` |
 
 ### 6.7 Assembly Options
@@ -440,6 +441,8 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 
 **Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
 
+**Note:** the value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep embedded double quotes to stay a single argument. On the command line, wrap it in single quotes: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`.
+
 ### 6.13 Taxonomy Visualization Options
 
 Control taxonomic output visualization and formatting:
@@ -502,6 +505,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
+| `low_disk` | Minimize disk usage: automatic work-dir cleanup (`cleanup = true`, disables `-resume`) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
 
 **Combine profiles as needed:**
@@ -560,6 +564,7 @@ results/
 │   ├── execution_timeline_*.html               # Timeline visualization
 │   ├── execution_trace_*.txt                   # Task trace log
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
+│   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
@@ -575,7 +580,7 @@ results/
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
-│   ├── bracken/                                # Bracken abundance estimates
+│   ├── bracken/                                # Bracken abundance estimates (kraken2 only)
 │   │   └── {sample}_*.bracken                  # Per-sample Bracken results
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
@@ -669,10 +674,7 @@ results/
 │   └── figures/                                # BlobTools plots
 │       └── *.png
 └── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
-    ├── contigs/                                # Contig-level annotation
-    │   └── {sample}/
-    │       └── {sample}_annotation_results/
-    └── bins/                                   # Bin-level annotation
+    └── contigs/                                # Contig-level annotation
         └── {sample}/
             └── {sample}_annotation_results/
 ```
@@ -683,20 +685,19 @@ By default, databases are stored separately from results at `<output_dir>/../dat
 
 ```
 databases/                            # Database storage (configurable via --databases_dir)
-├── phiX_index/                       # PhiX174 Bowtie2 index
-├── host_index/                       # Host genome Bowtie2 index
-├── kraken2_standard8/                # Kraken2 Standard-8 database
-├── kraken2_gtdb220/                  # Kraken2 GTDB r220 database (if selected)
-├── sourmash_gtdb220/                 # Sourmash GTDB r220 database
+├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
+├── kraken/                           # Kraken2 database (selected via --kraken2_db)
+├── sourmash/                         # Sourmash database
 ├── taxdump/                          # NCBI taxonomy dump
-├── blast_nt/                         # NCBI NT BLAST database
-├── deeparg/                          # DeepARG database
-├── karga/                            # KARGA (MEGARes) database
-├── kargva/                           # KARGVA database
+├── blast/                            # NCBI NT BLAST database
+├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
-└── gtdbtk_r220/                      # GTDB-TK release 220 database
+└── gtdbtk/                           # GTDB-TK database
 ```
+
+The KARGA and KARGVA reference FASTAs are small and staged directly into the work
+directory when needed; they are not stored under `databases/`.
 
 ### Conditional Outputs
 
@@ -877,7 +878,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
-    --custom_bowtie_host_index /shared/db/host_index \
+    --custom_decontamination_index /shared/db/bowtie_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/gtdbtk_r220 \
@@ -892,7 +893,7 @@ For mouse gut microbiome:
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --custom_bowtie_host_index /path/to/mouse_bowtie2_index \
+    --custom_host_fasta /path/to/mouse_genome.fa \
     --semibin_env_model mouse_gut \
     --include_binning true \
     -profile docker
@@ -909,7 +910,6 @@ nextflow run main.nf \
     --taxonomic_profiler sourmash \
     --include_binning true \
     --semibin_env_model ocean \
-    --custom_bowtie_host_index null \
     -profile singularity
 ```
 
@@ -964,8 +964,8 @@ params {
     // Pre-downloaded databases
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
-    custom_gtdbtk_db         = '/shared/db/gtdbtk_r220'
-    custom_bowtie_host_index = '/shared/db/host_index'
+    custom_gtdbtk_db              = '/shared/db/gtdbtk_r220'
+    custom_decontamination_index  = '/shared/db/bowtie_index'
 }
 
 singularity {
@@ -1056,8 +1056,8 @@ nextflow run main.nf \
 #### Container Pull Failures
 
 ```bash
-# Pre-pull containers
-singularity pull docker://quay.io/biocontainers/fastp:0.23.4--h5f740d0_0
+# Pre-pull containers (look up the exact tag in the module's main.nf, e.g. modules/nf-core/fastp/main.nf)
+singularity pull docker://quay.io/biocontainers/fastp:<tag>
 
 # Or use a cache directory
 export NXF_SINGULARITY_CACHEDIR=/path/to/cache
@@ -1090,8 +1090,8 @@ squeue -u $USER
 # Check work directory exists
 ls -la work/
 
-# Force fresh run
-nextflow run main.nf ... -resume false
+# Force fresh run: simply omit -resume
+nextflow run main.nf ...
 
 # Clean and restart
 nextflow clean -f
@@ -1158,4 +1158,4 @@ https://github.com/gene2dis/BugBuster
 
 ---
 
-*BugBuster v1.0.0 - Built with Nextflow*
+*BugBuster v1.1.0dev - Built with Nextflow*

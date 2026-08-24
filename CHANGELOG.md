@@ -43,7 +43,11 @@ next release is tagged.
 - Enhanced ARG prediction capabilities with complementary tool (RGI alongside KARGA/KARGVA)
 - Documentation corrected to match real behavior (audit #26): sample read-count
   filter default, database storage location, output trees, profile lists;
-  MultiQC removed from docs and dead wiring (module retained for future use)
+  MultiQC removed from docs, dead wiring, and vendored modules (audit #28;
+  re-enabling requires re-vendoring via `nf-core modules install multiqc`)
+- Minimum Nextflow version raised from 23.04.0 to **24.04.0** with parameter
+  validation now enforced by the nf-schema 2.4.2 plugin (audit #25): unknown
+  `--params` are a hard startup error
 - Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
   wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
   `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
@@ -54,9 +58,9 @@ next release is tagged.
   decontamination DB and `--local` scoring, database download containers and
   script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,
   singleton read handling through QC, storeDir misuse, report failure masking,
-  silent no-op feature combos, edge-data crashes, publishing gaps (see
-  `internal_docs/claude_update/AUDIT_FIX_PLAN.md` for the itemized list and
-  fixing commits)
+  silent no-op feature combos, edge-data crashes, publishing gaps (the
+  itemized 30-point list and fixing commits are recorded in the per-item
+  `fix:`/`feat:` commit messages on that branch)
 
 ## [1.0.0] - 2024-01-10
 

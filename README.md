@@ -146,7 +146,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 ### Database Sources
 
 - **phiX_index**: [`phage phiX174 genome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank)
-- **host_db**: [`CHM13 plus Y bowtie2 index`](https://benlangmead.github.io/aws-indexes/bowtie)
+- **host_db**: [`T2T-CHM13v2.0 genome (chm13v2.0.fa.gz)`](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz)
 - **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
 - **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
 - **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
@@ -302,7 +302,7 @@ results/
 │   ├── per_sample/             # Per-sample assemblies
 │   └── coassembly/             # Co-assembly results
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/ or coassembly/
+│   ├── per_sample/{sample}/ or coassembly/
 │   │   ├── raw_bins/           # MetaBAT2, SemiBin, COMEBin
 │   │   ├── refined_bins/       # MetaWRAP refined bins
 │   │   ├── quality/            # CheckM2 reports
@@ -332,11 +332,26 @@ results/
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                # BlobTools plots
 └── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
+    └── contigs/{sample}/       # Per-sample contig annotation results
 ```
 
 **Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).
 
 For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output-structure).
+
+## Documentation
+
+| Document | Contents |
+|----------|----------|
+| [`docs/manual.md`](docs/manual.md) | Complete user manual: installation, databases, parameters, examples, output structure |
+| [`docs/parameters.md`](docs/parameters.md) | Full parameter reference with types, defaults, and examples |
+| [`docs/troubleshooting.md`](docs/troubleshooting.md) | Solutions to common problems |
+| [`docs/deployment.md`](docs/deployment.md) | Deployment on HPC (SLURM) and cloud (AWS, GCP, Azure) |
+| [`docs/WORKFLOW_DIAGRAM.md`](docs/WORKFLOW_DIAGRAM.md) | Pipeline stage diagram and the parameters that gate each stage |
+| [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](docs/DECONTAMINATION_QUICK_REFERENCE.md) | Host/phiX decontamination options and custom reference genomes |
+| [`docs/RGI_WILDCARD_USAGE.md`](docs/RGI_WILDCARD_USAGE.md) | Manual CARD/WildCARD database preparation for RGI |
+| [`docs/YAML_PARAMETERS_GUIDE.md`](docs/YAML_PARAMETERS_GUIDE.md) | Running the pipeline with `-params-file` YAML files |
+| [`docs/DISK_OPTIMIZATION.md`](docs/DISK_OPTIMIZATION.md) | Reducing disk usage (`low_disk` profile, work-dir cleanup) |
 
 ## Credits
 

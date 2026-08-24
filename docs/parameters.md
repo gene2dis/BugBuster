@@ -134,15 +134,15 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--phiX_index`
 - **Type**: String
 - **Default**: `phiX174`
-- **Description**: PhiX genome index selection for automatic download
-- **Size**: 8.1 MB
+- **Description**: PhiX genome selection for automatic download (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Size**: 5.4 kB
 - **Example**: `--phiX_index phiX174`
 
 ### `--host_db`
 - **Type**: String
 - **Default**: `human`
-- **Description**: Host genome database for read filtering
-- **Size**: 4.1 GB (CHM13 plus Y)
+- **Description**: Host genome for read filtering (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Size**: 940 MB (T2T-CHM13v2.0)
 - **Example**: `--host_db human`
 
 ### `--kraken2_db`
@@ -159,6 +159,34 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Sourmash database selection
 - **Size**: 17 GB
 - **Example**: `--sourmash_db gtdb_220_k31`
+
+### `--karga_db`
+- **Type**: String
+- **Default**: `megares`
+- **Description**: KARGA reference database selection (MEGARes)
+- **Size**: 9.2 MB
+- **Example**: `--karga_db megares`
+
+### `--kargva_db`
+- **Type**: String
+- **Default**: `kargva`
+- **Description**: KARGVA reference database selection
+- **Size**: 1.5 MB
+- **Example**: `--kargva_db kargva`
+
+### `--blast_db`
+- **Type**: String
+- **Default**: `nt`
+- **Description**: BLAST database selection for contig taxonomy
+- **Size**: 434 GB
+- **Example**: `--blast_db nt`
+
+### `--taxdump_files`
+- **Type**: String
+- **Default**: `ncbi`
+- **Description**: Taxonomy dump selection for BlobTools
+- **Size**: 448 MB
+- **Example**: `--taxdump_files ncbi`
 
 ### `--checkm2_db`
 - **Type**: String
@@ -182,19 +210,43 @@ Complete reference for all BugBuster pipeline parameters.
 
 ---
 
+## Output & Cleanup Options
+
+### `--store_clean_reads`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Publish decontaminated reads to `<output>/clean_reads/<sample>/`. This is publishing only, not caching — `-resume` remains the mechanism for reusing completed work.
+- **Example**: `--store_clean_reads true`
+
+### `--enable_work_cleanup`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Set by the `low_disk` profile. Note that the flag by itself does **not** delete the work directory — automatic work-dir cleanup comes from Nextflow's `cleanup = true` setting, which is enabled by `-profile low_disk` (or a custom config). See [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
+- **Example**: `-profile low_disk`
+
+---
+
 ## Custom Database Paths
 
 Override automatic downloads by providing custom database paths:
 
-### `--custom_phiX_index`
+### `--custom_decontamination_index`
 - **Type**: String (directory path)
-- **Description**: Path to custom PhiX Bowtie2 index directory
-- **Example**: `--custom_phiX_index /path/to/phiX_index`
+- **Description**: Path to a pre-built combined Bowtie2 decontamination index directory (host + phiX). Skips both the genome downloads and the index build.
+- **Example**: `--custom_decontamination_index /path/to/bowtie_index`
+- **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
-### `--custom_bowtie_host_index`
-- **Type**: String (directory path)
-- **Description**: Path to custom host Bowtie2 index directory
-- **Example**: `--custom_bowtie_host_index /path/to/host_index`
+### `--custom_phiX_fasta`
+- **Type**: String (file path)
+- **Description**: Path to a custom phiX genome FASTA; the pipeline builds the Bowtie2 index from it
+- **Example**: `--custom_phiX_fasta /path/to/phiX174.fasta`
+
+### `--custom_host_fasta`
+- **Type**: String (file path)
+- **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the Bowtie2 index from it
+- **Example**: `--custom_host_fasta /path/to/mouse_genome.fa`
+
+> **Deprecated**: `--custom_phiX_index` and `--custom_bowtie_host_index` are still accepted for backward compatibility but are **ignored** — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
 
 ### `--custom_kraken_db`
 - **Type**: String (directory path)
@@ -542,10 +594,11 @@ Override automatic downloads by providing custom database paths:
 
 ### `--metacerberus_hmm`
 - **Type**: String
-- **Default**: `"KOFam_all, COG, VOG, PHROG, CAZy"`
+- **Default**: `'"KOFam_all, COG, VOG, PHROG, CAZy"'`
 - **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
 - **Description**: Comma-separated list of HMM databases to use for MetaCerberus
-- **Example**: `--metacerberus_hmm "KOFam_prokaryote, COG, CAZy"`
+- **Example**: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`
+- **Note**: The value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep the embedded double quotes (wrap them in single quotes on the shell command line) to remain a single argument.
 
 ### `--metacerberus_minscore`
 - **Type**: Integer
@@ -651,11 +704,7 @@ Bowtie2 parameters for read alignment during host filtering:
 - **Description**: Display version and exit
 - **Example**: `--version`
 
-### `--validationShowHiddenParams`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Show all parameters when using `--help`
-- **Example**: `--validationShowHiddenParams`
+> **Note**: Parameters are validated against `nextflow_schema.json` at startup. Any parameter not declared by the pipeline — including misspelled or removed ones — aborts the run with an "unrecognised parameter" error.
 
 ---
 
@@ -759,4 +808,4 @@ nextflow run main.nf \
 
 ---
 
-*BugBuster v1.0.0 - Complete Parameter Reference*
+*BugBuster v1.1.0dev - Complete Parameter Reference*
