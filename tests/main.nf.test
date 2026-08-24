@@ -240,11 +240,16 @@ nextflow_pipeline {
     }
 
     test("Stub run wires the read-level RGI path") {
-        // Regression test for audit item #8: the RGI_BWT bam emit became
-        // optional (the low-coverage fallback creates no BAM and RGI_KMER is
-        // skipped for such samples). Success here pins that the
-        // RGI_BWT -> RGI_KMER -> RGI_REPORT chain still composes and publishes
-        // when alignments exist (the stub emits a bam like a real mapping run).
+        // Regression test for audit items #8 and #17:
+        // - #8: the RGI_BWT bam emit became optional (the low-coverage fallback
+        //   creates no BAM and RGI_KMER is skipped for such samples). Success
+        //   here pins that the RGI_BWT -> RGI_KMER -> RGI_REPORT chain still
+        //   composes and publishes when alignments exist (the stub emits a bam
+        //   like a real mapping run).
+        // - #17: RGI_KMER's output globs hardcoded 61 while the command (and
+        //   its stub) name files from params.rgi_kmer_size — a non-default k
+        //   died with MissingFileException. Running with k=51 pins the
+        //   parameterized globs.
         options "-stub"
 
         when {
@@ -255,6 +260,7 @@ nextflow_pipeline {
                 assembly_mode      = "none"
                 taxonomic_profiler = "none"
                 rgi_prediction     = true
+                rgi_kmer_size      = 51
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
@@ -268,10 +274,11 @@ nextflow_pipeline {
             assert workflow.trace.tasks().any { task -> task.name.contains("RGI_KMER") }
             assert workflow.trace.tasks().any { task -> task.name.contains("RGI_REPORT") }
 
-            // RGI outputs published to the documented read-level layout
+            // RGI outputs published to the documented read-level layout, with
+            // the kmer analysis named from the non-default k (audit #17)
             assert path("${outputDir}/05_arg_prediction/read_level/rgi/test_sample1/test_sample1_rgi_bwt.gene_mapping_data.txt").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/rgi/test_sample1/test_sample1_rgi_bwt.reference_mapping_stats.txt").exists()
-            assert path("${outputDir}/05_arg_prediction/read_level/rgi_kmer/test_sample1/test_sample1_rgi_kmer_61mer_analysis.json").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/rgi_kmer/test_sample1/test_sample1_rgi_kmer_51mer_analysis.json").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/rgi_summary/RGI_summary_report.csv").exists()
         }
     }

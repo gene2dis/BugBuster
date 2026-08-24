@@ -36,7 +36,7 @@ process RGI_REPORT {
         # Collect all allele mapping files
         allele_files = [f for f in Path('.').glob('*.allele_mapping_data.txt')]
         gene_files = [f for f in Path('.').glob('*.gene_mapping_data.txt')]
-        kmer_files = [f for f in Path('.').glob('*_61mer_analysis.txt')]
+        kmer_files = [f for f in Path('.').glob('*mer_analysis.txt')]
         
         print(f"Found {len(allele_files)} allele files")
         print(f"Found {len(gene_files)} gene files")

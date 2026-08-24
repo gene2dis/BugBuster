@@ -40,11 +40,17 @@ process RGI_BWT {
         fi
         set -u
 
-        # Copy database to local directory for RGI access
-        cp -r ${card_db} rgi_db
-        
-        # RGI --local flag looks for localDB/ in current directory
-        ln -s rgi_db/localDB localDB
+        # RGI --local looks for localDB/ in the current directory. Symlink the
+        # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
+        # per task (audit #17): reads go through the symlinks, while any file
+        # RGI creates at runtime lands in this task's localDB/, not the shared
+        # published database.
+        if [ ! -d ${card_db}/localDB ]; then
+            echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
+            exit 1
+        fi
+        mkdir localDB
+        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
         # Run RGI bwt (stderr redirected to log file to avoid flooding with low-coverage warnings)
         rgi bwt \\
