@@ -227,6 +227,17 @@ nextflow run main.nf -profile test,docker -stub
 nextflow run main.nf -profile test,docker -resume
 ```
 
+Local runs (nextflow and nf-test alike) leave working files in the repo
+root — `work/`, `.nextflow/`, `.nextflow.log*`, `.nf-test/`, `.nf-test.log`,
+`test_results/`. They are gitignored, but they accumulate; clean them with:
+
+```bash
+tests/bin/clean_test_artifacts.sh
+```
+
+(Real run outputs — `results/`, `results_stub/`, `databases/` — are left
+untouched.)
+
 Parameter validation uses the `nf-schema` plugin, which Nextflow downloads
 automatically on first run. For offline environments, pre-install it once:
 
