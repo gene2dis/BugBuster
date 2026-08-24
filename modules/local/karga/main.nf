@@ -1,6 +1,5 @@
 process KARGA {
     container 'quay.io/ffuentessantander/karga:1.1'
-    containerOptions '-v /bin/ps:/usr/bin/ps:ro -v /bin/ps:/bin/ps:ro -v /lib/x86_64-linux-gnu/libprocps.so.8:/lib64/libprocps.so.8:ro'
 
     label 'process_low'
 

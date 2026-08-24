@@ -21,7 +21,7 @@ process KARGVA {
 		cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
 	fi
 
-	java -cp /bin/ KARGVA k:17 d:${kargva_db} -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB ${prefix}_all_reads.fastq.gz
+	java -XX:ActiveProcessorCount=${task.cpus} -Xmx${task.memory.toGiga()}g -cp /bin/ KARGVA k:17 d:${kargva_db} ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGVA_mappedGenes.csv ]]; then
                 echo "GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGVA_mappedGenes.csv

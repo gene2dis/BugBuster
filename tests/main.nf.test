@@ -239,6 +239,40 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the read-level KARGA/KARGVA/ARGs-OAP path") {
+        // First test coverage of --read_arg_prediction (added with audit #18's
+        // KARGVA heap / KARGA containerOptions fixes): pins that the
+        // ARGS_OAP + KARGVA -> KARGA -> ARG_NORM_REPORT chain composes and
+        // the mapped-genes reports publish to the documented layout.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control     = true
+                assembly_mode       = "none"
+                taxonomic_profiler  = "none"
+                read_arg_prediction = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("ARGS_OAP") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("KARGVA") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("KARGA") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("ARG_NORM_REPORT") }
+
+            assert path("${outputDir}/05_arg_prediction/read_level/karga/test_sample1_all_reads_KARGA_mappedGenes.csv").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/kargva/test_sample1_all_reads_KARGVA_mappedGenes.csv").exists()
+        }
+    }
+
     test("Stub run wires the read-level RGI path") {
         // Regression test for audit items #8 and #17:
         // - #8: the RGI_BWT bam emit became optional (the low-coverage fallback
