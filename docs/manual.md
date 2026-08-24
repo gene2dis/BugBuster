@@ -233,7 +233,7 @@ sample3,/path/to/sample3_R1.fastq.gz,/path/to/sample3_R2.fastq.gz,/path/to/sampl
 
 | Column | Required | Description |
 |--------|----------|-------------|
-| `sample` | Yes | Unique sample identifier (alphanumeric, underscores allowed) |
+| `sample` | Yes | Unique sample identifier: letters, digits, underscore, dot or hyphen, starting with a letter or digit (it becomes file/directory names) |
 | `r1` | Yes | Absolute path to forward reads (R1) in FASTQ/FASTQ.GZ format |
 | `r2` | Yes | Absolute path to reverse reads (R2) in FASTQ/FASTQ.GZ format |
 | `s` | No | Absolute path to singleton reads (optional, leave empty if none) |
