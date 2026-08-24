@@ -8,6 +8,7 @@ process NT_BLASTN {
 
     output:
         tuple val(meta), path(contigs), path("*_megablast.out"), emit: megablast_to_blob
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -38,6 +39,11 @@ process NT_BLASTN {
             -num_threads $task.cpus \\
             -evalue 1e-25 \\
             -out ${prefix}_assembly_vs_nt_megablast.out
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            blastn: \$(blastn -version 2>&1 | head -n 1 | sed 's/^.*blastn: //')
+        END_VERSIONS
 	"""
 
     stub:
@@ -45,5 +51,10 @@ process NT_BLASTN {
 
         """
         touch ${prefix}_assembly_vs_nt_megablast.out
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            blastn: 2.15.0
+        END_VERSIONS
         """
 }

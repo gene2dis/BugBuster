@@ -154,6 +154,11 @@ nextflow_pipeline {
             assert args_text.contains("--minCV 1")
             assert args_text.contains("--minCVSum 1")
             assert args_text.contains("--minContig 2500")
+
+            // Audit #27: assembly/binning stage versions reach the aggregate
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("megahit:")
+            assert vtext.contains("metabat2:")
         }
     }
 
@@ -290,6 +295,16 @@ nextflow_pipeline {
             assert workflow.trace.succeeded().size() > 0
             assert workflow.trace.tasks().any { task -> task.name.contains("FASTP") }
             assert workflow.trace.tasks().any { task -> task.name.contains("QFILTER") }
+
+            // Audit #27: aggregated software versions must reach pipeline_info
+            def versions = path("${outputDir}/pipeline_info/software_versions.yml")
+            assert versions.exists()
+            def vtext = versions.text
+            assert vtext.contains('"gene2dis/BugBuster":')   // workflow block
+            assert vtext.contains("fastp:")                  // nf-core module
+            assert vtext.contains("bash:")                   // new QFILTER capture
+            // Content-dedup: ONE block per process despite two samples
+            assert vtext.count('"QC:FASTP":') == 1
         }
     }
 }

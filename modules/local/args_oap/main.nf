@@ -9,6 +9,7 @@ process ARGS_OAP {
 
     output:
         path("*args_oap_s1_out"), emit: args_oap_s1
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -28,6 +29,11 @@ process ARGS_OAP {
                        -t $task.cpus
 
     rm -rf tmp_reads
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        args_oap: \$(pip show args_oap 2>/dev/null | sed -n 's/Version: //p' || echo 3.2.4)
+    END_VERSIONS
     """
 
     stub:
@@ -35,5 +41,10 @@ process ARGS_OAP {
 
     """
     mkdir ${prefix}_args_oap_s1_out
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        args_oap: 3.2.4
+    END_VERSIONS
     """
 }

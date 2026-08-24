@@ -8,6 +8,7 @@ process PRODIGAL_BINS {
 
     output:
         tuple val(meta), path("*_bins_proteins"), emit: prodigal_bins
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -56,6 +57,11 @@ process PRODIGAL_BINS {
         mv tmp_bins/${prefix}_bins_proteins/ .
 
         rm -rf refined_bins/
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            prodigal: \$(prodigal -v 2>&1 | sed -n 's/Prodigal V\\(.*\\):.*/\\1/p')
+        END_VERSIONS
 	"""
 
     stub:
@@ -63,6 +69,11 @@ process PRODIGAL_BINS {
 
         """
         mkdir ${prefix}_bins_proteins
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            prodigal: 2.6.3
+        END_VERSIONS
         """
 }
 

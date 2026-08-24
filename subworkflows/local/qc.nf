@@ -93,6 +93,7 @@ workflow QC {
         // Extract and format QC reports
         //
         ch_fastp_reads_report = QFILTER(ch_fastp_combined)
+        ch_versions = ch_versions.mix(ch_fastp_reads_report.versions.first())
 
         //
         // Filter samples by minimum read count
@@ -117,6 +118,7 @@ workflow QC {
             ch_fastp_reads_filtered.combine(decontamination_index),
             "contaminants"
         )
+        ch_versions = ch_versions.mix(ch_decontaminated.versions.first())
 
         //
         // Collect read reports
@@ -127,6 +129,7 @@ workflow QC {
                 .collect(),
             "contaminants"
         ).report
+        ch_versions = ch_versions.mix(READS_REPORT.out.versions)
 
         ch_clean_reads = ch_decontaminated.reads
         ch_clean_reads_coassembly = ch_decontaminated.reads_coassembly
@@ -137,13 +140,15 @@ workflow QC {
         // Skip QC - just count reads
         //
         ch_count = COUNT_READS(reads)
-        
+        ch_versions = ch_versions.mix(ch_count.versions.first())
+
         ch_clean_reads = ch_count.reads
         ch_clean_reads_coassembly = ch_count.reads_coassembly
         ch_report = READS_REPORT(
             ch_count.reads_report.collect(),
             "none"
         ).report
+        ch_versions = ch_versions.mix(READS_REPORT.out.versions)
     }
 
     emit:

@@ -10,6 +10,7 @@ process BEDTOOLS {
 
     output:
         path("*_bin_depth.tsv"), emit: bin_depth
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -22,6 +23,11 @@ process BEDTOOLS {
             cat \${bin_name}_cov.tsv | awk '{print \$1, \$2*\$3, \$4, \$5}' | awk '{sum[\$1] += \$2; contig_length[\$1] = \$3} END { for (nombre in sum) { promedio = sum[nombre] / contig_length[nombre]; print nombre, promedio, sum[nombre], contig_length[nombre]; } }' | awk '{sum += \$2; count++; } END { if (count > 0) { promedio = sum / count } else { count = 0; promedio = 0 }; print "tmp1\ttmp2\t",count,"\t",promedio; }' > bin_depth_tmp.tsv
             cat bin_depth_tmp.tsv | sed "s/tmp1/${prefix}/g" | sed "s/tmp2/\${bin_name}/g" >> ${prefix}_bin_depth.tsv
         done
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bedtools: \$(bedtools --version | sed 's/bedtools v//')
+        END_VERSIONS
 	"""
 
     stub:
@@ -29,5 +35,10 @@ process BEDTOOLS {
 
         """
         printf "sample\\tbin_id\\tTotal_contigs\\taverage_cov\\n" > ${prefix}_bin_depth.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bedtools: 2.31.1
+        END_VERSIONS
         """
 }

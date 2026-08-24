@@ -32,6 +32,7 @@ workflow PREPARE_DATABASES {
     ch_gtdbtk_db        = Channel.empty()
     ch_checkm2_db       = Channel.empty()
     ch_rgi_card_db      = Channel.empty()
+    ch_versions         = Channel.empty()
 
     //
     // Kraken2 database
@@ -68,7 +69,9 @@ workflow PREPARE_DATABASES {
         }
         
         // Prepare taxonomy database ONCE (not per-sample)
-        ch_sourmash_tax_db = SOURMASH_TAX_PREPARE(ch_sourmash_lineages)
+        SOURMASH_TAX_PREPARE(ch_sourmash_lineages)
+        ch_sourmash_tax_db = SOURMASH_TAX_PREPARE.out.tax_db
+        ch_versions = ch_versions.mix(SOURMASH_TAX_PREPARE.out.versions)
         
         // Combine k-mer DB and prepared taxonomy DB for downstream use
         ch_sourmash_db = ch_sourmash_kmer
@@ -133,6 +136,7 @@ workflow PREPARE_DATABASES {
             
             // Extract only the index output (not versions)
             ch_decontamination_index = BOWTIE2_BUILD_COMBINED.out.index
+            ch_versions = ch_versions.mix(BOWTIE2_BUILD_COMBINED.out.versions)
         }
     } else {
         ch_decontamination_index = Channel.empty()
@@ -145,7 +149,9 @@ workflow PREPARE_DATABASES {
         if ( params.custom_deeparg_db ) {
             ch_deeparg_db = Channel.fromPath(params.custom_deeparg_db, checkIfExists: true)
         } else {
-            ch_deeparg_db = DOWNLOAD_DEEPARG_DB()
+            DOWNLOAD_DEEPARG_DB()
+            ch_deeparg_db = DOWNLOAD_DEEPARG_DB.out.deeparg_db
+            ch_versions = ch_versions.mix(DOWNLOAD_DEEPARG_DB.out.versions)
         }
     }
 
@@ -196,6 +202,7 @@ workflow PREPARE_DATABASES {
             ch_card_base = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
             ch_wildcard = Channel.fromPath(params.custom_rgi_wildcard, checkIfExists: true)
             ch_rgi_card_db = RGI_LOAD_WILDCARD(ch_card_base, ch_wildcard).card_db
+            ch_versions = ch_versions.mix(RGI_LOAD_WILDCARD.out.versions)
         } else if ( params.custom_rgi_card_db ) {
             // Use existing pre-prepared CARD database (may or may not include WildCARD)
             ch_rgi_card_db = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
@@ -205,6 +212,7 @@ workflow PREPARE_DATABASES {
                 params.rgi_card_version,
                 params.rgi_include_wildcard
             ).card_db
+            ch_versions = ch_versions.mix(RGI_LOAD.out.versions)
         }
     }
 
@@ -220,4 +228,5 @@ workflow PREPARE_DATABASES {
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db
+    versions               = ch_versions
 }

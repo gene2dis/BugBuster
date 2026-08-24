@@ -9,6 +9,7 @@ process METACERBERUS_CONTIGS {
     output:
         tuple val(meta), path("*annotation"), emit: reads
         path("*_annotation_results"), emit: results
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -26,6 +27,11 @@ process METACERBERUS_CONTIGS {
                      --dir_out ${prefix}_annotation
 
         mv ${prefix}_annotation/step_10-visualizeData ${prefix}_annotation_results
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            metacerberus: \$(metacerberus.py --version 2>&1 | grep -o '[0-9.]*' | head -n 1 || echo 1.2.1)
+        END_VERSIONS
         """
 
     stub:
@@ -34,6 +40,11 @@ process METACERBERUS_CONTIGS {
         """
         mkdir ${prefix}_annotation
         mkdir ${prefix}_annotation_results
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            metacerberus: 1.2.1
+        END_VERSIONS
         """
 }
 

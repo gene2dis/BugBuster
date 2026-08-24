@@ -105,7 +105,7 @@ process BOWTIE2_SAMTOOLS {
             
             # Generate versions file
             printf '"${task.process}":\n' > versions.yml
-            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ /.*/')" >> versions.yml
+            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
             printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
@@ -309,6 +309,7 @@ process BOWTIE2_SAMTOOLS_DEPTH {
 
     output:
         tuple val(meta), path("*_all_reads.bam"), emit: reads
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -353,6 +354,10 @@ process BOWTIE2_SAMTOOLS_DEPTH {
             rm -f ${prefix}_bins_index*
             rm -f ${prefix}_bowtie_map.log
         done
+
+        printf '"%s":\n' "${task.process}" > versions.yml
+        printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+        printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
 	"""
 
     stub:
@@ -360,5 +365,11 @@ process BOWTIE2_SAMTOOLS_DEPTH {
 
         """
         touch ${prefix}_bin1_all_reads.bam
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bowtie2: 2.5.1
+            samtools: 1.17
+        END_VERSIONS
         """
 }

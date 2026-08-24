@@ -96,7 +96,8 @@ workflow TAXONOMY {
             params.sourmash_db,
             params.sourmash_tax_rank
         )
-        
+        ch_versions = ch_versions.mix(ch_sm_taxonomy.versions.first())
+
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
             ch_sm_taxonomy.report.collect(),

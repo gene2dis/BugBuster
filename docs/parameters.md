@@ -312,12 +312,6 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Kraken2 confidence threshold for taxonomic assignment
 - **Example**: `--kraken_confidence 0.2`
 
-### `--kraken_db_used`
-- **Type**: String
-- **Default**: `gtdb_release207`
-- **Description**: Kraken2 database name for reports (metadata only)
-- **Example**: `--kraken_db_used gtdb_release220`
-
 ### `--bracken_read_len`
 - **Type**: Integer
 - **Default**: `150`
@@ -330,12 +324,6 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `D`, `P`, `C`, `O`, `F`, `G`, `S`
 - **Description**: Taxonomic level for Bracken (D=Domain, P=Phylum, C=Class, O=Order, F=Family, G=Genus, S=Species)
 - **Example**: `--bracken_tax_level G`
-
-### `--sourmash_db_name`
-- **Type**: String
-- **Default**: `gtdb_release_220`
-- **Description**: Sourmash database name for reports (metadata only)
-- **Example**: `--sourmash_db_name gtdb_release_220`
 
 ### `--sourmash_tax_rank`
 - **Type**: String

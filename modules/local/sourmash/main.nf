@@ -12,6 +12,7 @@ process SOURMASH {
     output:
         path("*.with-lineages.csv"), emit: sourmash_gather
 	path("*_report.tsv"), emit: report
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -62,6 +63,11 @@ process SOURMASH {
         
         # Cleanup temporary files
         rm -f *.sig
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            sourmash: \$(sourmash --version 2>&1 | sed 's/sourmash //')
+        END_VERSIONS
         """
 
     stub:
@@ -71,5 +77,10 @@ process SOURMASH {
         echo "intersect_bp,f_orig_query,f_match,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,filename,name,md5,f_match_orig,unique_intersect_bp,gather_result_rank,remaining_bp,query_filename,query_name,query_md5,query_bp,ksize,moltype,scaled,query_n_hashes,query_abundance,query_containment_ani,match_containment_ani,average_containment_ani,max_containment_ani,potential_false_negative,n_unique_weighted_found,sum_weighted_found,total_weighted_hashes,lineage" > ${prefix}_smgather_${db_name}.with-lineages.csv
         echo -e "Id\tSourmash DB\tUnclassified\tClassified" > ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
         echo -e "${prefix}\t${db_name}\t1\t0" >> ${meta.id}_${sourmash_rank}_${db_name}_report.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            sourmash: 4.8.11
+        END_VERSIONS
         """
 }

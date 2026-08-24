@@ -9,6 +9,7 @@ process BLOBTOOLS {
     output:
         tuple val(meta), path("*_Blob_tabl*"), emit: blob_table
         path("*_Blob_tabl*"), emit: only_blob
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -31,6 +32,11 @@ process BLOBTOOLS {
                   --input ${prefix}.blobDB.json \\
                   --out ${prefix}_Blob_table \\
                   --rank all
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            blobtools: \$(blobtools --version 2>&1 | tail -1 || echo 1.1.1)
+        END_VERSIONS
 	"""
 
     stub:
@@ -38,5 +44,10 @@ process BLOBTOOLS {
 
         """
         touch ${prefix}_Blob_table.blobDB.table.txt
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            blobtools: 1.1.1
+        END_VERSIONS
         """
 }

@@ -13,6 +13,7 @@ process COUNT_READS {
 	tuple val(meta), path(reads), emit: reads
         path(reads), emit: reads_coassembly
         path("*_fastp_report.tsv"), emit: reads_report
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -35,6 +36,11 @@ process COUNT_READS {
 		printf 'Id\\tRaw reads\\n' > ${prefix}_fastp_report.tsv
 		printf '%s\\t%s\\n' "${prefix}" "\${final_reads_count}" >> ${prefix}_fastp_report.tsv
 	fi
+
+	cat <<-END_VERSIONS > versions.yml
+	"${task.process}":
+	    gzip: \$(gzip --version | head -n 1 | awk '{print \$NF}')
+	END_VERSIONS
 	"""
 
     stub:
@@ -43,5 +49,10 @@ process COUNT_READS {
         """
         echo -e "Id\\tRaw reads" > ${prefix}_fastp_report.tsv
         echo -e "${prefix}\\t1000" >> ${prefix}_fastp_report.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            gzip: 1.10
+        END_VERSIONS
         """
 }

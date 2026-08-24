@@ -47,6 +47,9 @@ nextflow_process {
             assert lines.size() == 4
             assert lines[1] == "test\tbin.1\t 2 \t 0.1"
             assert lines[2] == "test\tbin.2\t 2 \t 0"
+
+            // Audit #27: module must report its tool version
+            assert path(process.out.versions.get(0)).text.contains("bedtools:")
             // The no-reference bin gets an explicit 0 row instead of crashing awk
             assert lines[3] == "test\tbin.3\t 0 \t 0"
 

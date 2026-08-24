@@ -11,6 +11,7 @@ process CLUSTERING {
 
     output:
         path("*_cluster.tsv"), emit: clusters
+        path "versions.yml", emit: versions
 
     script:
 
@@ -21,6 +22,11 @@ process CLUSTERING {
         mmseqs easy-cluster mmseq_db.faa Arg_cluster_99 tmp --min-seq-id 0.99 -c 0.9 --cov-mode 0 --threads $task.cpus
         mmseqs easy-cluster mmseq_db.faa Arg_cluster_100 tmp --min-seq-id 1.0 -c 0.9 --cov-mode 0 --threads $task.cpus
         rm mmseq_db.faa
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            mmseqs: \$(mmseqs version)
+        END_VERSIONS
 	"""
 
     stub:
@@ -29,5 +35,10 @@ process CLUSTERING {
         touch Arg_cluster_95_cluster.tsv
         touch Arg_cluster_99_cluster.tsv
         touch Arg_cluster_100_cluster.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            mmseqs: 15.6f452
+        END_VERSIONS
         """
 }

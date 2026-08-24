@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The pipeline self-reports this state as `1.1.0dev` (manifest version) until the
+next release is tagged.
+
 ### Added
+
+- **Provenance tracking (audit #27)**
+  - `versions.yml` emitted by every live module (previously ~20 in-use modules
+    emitted none) and, for the first time, aggregated: each run now writes a
+    deduplicated `pipeline_info/software_versions.yml` covering every executed
+    process plus the pipeline and Nextflow versions
+  - DeepARG database downloads record the tool version and download date; the
+    CARD version captured by RGI_LOAD now actually reaches the aggregate report
 
 - **RGI AMR Prediction**
   - New `--rgi_prediction` parameter to enable AMR gene prediction with pathogen-of-origin analysis
@@ -30,6 +41,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated docs/manual.md with RGI parameters, output structure, and usage examples
 - Updated docs/parameters.md with complete RGI parameter reference
 - Enhanced ARG prediction capabilities with complementary tool (RGI alongside KARGA/KARGVA)
+- Documentation corrected to match real behavior (audit #26): sample read-count
+  filter default, database storage location, output trees, profile lists;
+  MultiQC removed from docs and dead wiring (module retained for future use)
+- Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
+  wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
+  `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
+
+### Fixed
+
+- Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
+  decontamination DB and `--local` scoring, database download containers and
+  script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,
+  singleton read handling through QC, storeDir misuse, report failure masking,
+  silent no-op feature combos, edge-data crashes, publishing gaps (see
+  `internal_docs/claude_update/AUDIT_FIX_PLAN.md` for the itemized list and
+  fixing commits)
 
 ## [1.0.0] - 2024-01-10
 
@@ -66,8 +93,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Module Improvements**
   - Fixed bash null checks using Groovy conditionals
-  - Added `versions.yml` output for software tracking
-  - Added `stub` blocks for dry-run testing
+  - Added `versions.yml` output to some modules (full coverage and aggregation
+    landed later, in [Unreleased])
+  - Added `stub` blocks for some modules (full coverage landed later)
   - Added `meta.yml` descriptors for key modules
 
 - **Documentation**
@@ -100,3 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bin refinement with MetaWRAP
 - Quality assessment with CheckM2
 - Taxonomic classification with GTDB-TK
+
+[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gene2dis/BugBuster/releases/tag/v1.0.0
+[0.1.0]: https://github.com/gene2dis/BugBuster/tree/v0.1.0

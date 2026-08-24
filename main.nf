@@ -268,6 +268,12 @@ workflow {
     ch_clean_reads_coassembly = QC.out.reads_coassembly
     ch_reads_report          = QC.out.report
 
+    // Software provenance: every stage mixes its versions.yml files in here;
+    // they are aggregated into pipeline_info/software_versions.yml at the end
+    ch_versions = Channel.empty()
+        .mix(PREPARE_DATABASES.out.versions)
+        .mix(QC.out.versions)
+
     //
     // SUBWORKFLOW: Taxonomic profiling
     //
@@ -278,20 +284,29 @@ workflow {
             PREPARE_DATABASES.out.kraken_db,
             PREPARE_DATABASES.out.sourmash_db
         )
+        ch_versions = ch_versions.mix(TAXONOMY.out.versions)
     }
 
     //
     // ARG PREDICTION IN READS
     //
     if ( params.read_arg_prediction ) {
-        ch_args_oap = ARGS_OAP(ch_clean_reads)
+        ARGS_OAP(ch_clean_reads)
+        ch_args_oap = ARGS_OAP.out.args_oap_s1
         ch_argv_prediction = KARGVA(ch_clean_reads.combine(PREPARE_DATABASES.out.kargva_db))
-        ch_arg_prediction = KARGA(ch_argv_prediction.kargva_reads.combine(PREPARE_DATABASES.out.karga_db))
+        KARGA(ch_argv_prediction.kargva_reads.combine(PREPARE_DATABASES.out.karga_db))
+        ch_arg_prediction = KARGA.out.kargva
         ARG_NORM_REPORT(
             ch_arg_prediction
                 .concat(ch_argv_prediction.kargva_reports)
                 .concat(ch_args_oap)
                 .collect()
+        )
+        ch_versions = ch_versions.mix(
+            ARGS_OAP.out.versions.first(),
+            KARGVA.out.versions.first(),
+            KARGA.out.versions.first(),
+            ARG_NORM_REPORT.out.versions
         )
     }
 
@@ -321,6 +336,11 @@ workflow {
             ch_rgi_bwt.gene_mapping.map { meta, file -> file }.collect(),
             ch_rgi_kmer.kmer_json.map { meta, file -> file }.collect()
         )
+        ch_versions = ch_versions.mix(
+            ch_rgi_bwt.versions.first(),
+            ch_rgi_kmer.versions.first(),
+            RGI_REPORT.out.versions
+        )
     }
 
     //
@@ -338,6 +358,7 @@ workflow {
         
         ch_contigs_meta = ASSEMBLY.out.contigs_meta
         ch_bam_meta     = ASSEMBLY.out.bam_meta
+        ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
 
         //
         // SUBWORKFLOW: Binning
@@ -352,6 +373,7 @@ workflow {
                 ch_clean_reads
             )
             ch_refined_bins = BINNING.out.refined_bins
+            ch_versions = ch_versions.mix(BINNING.out.versions)
         }
 
         //
@@ -359,6 +381,7 @@ workflow {
         //
         if ( params.assembly_mode == "assembly" && params.contig_level_metacerberus ) {
             METACERBERUS_CONTIGS(ch_contigs_meta)
+            ch_versions = ch_versions.mix(METACERBERUS_CONTIGS.out.versions.first())
         }
     }
 
@@ -369,9 +392,10 @@ workflow {
         // The list wrap keeps a multi-file BLAST DB as ONE tuple element
         // (path(nt_db)) instead of flattening it into the tuple, which staged
         // only the first DB file into NT_BLASTN
-        ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
+        NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
             .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }
             .map { db_files -> [db_files] }))
+        ch_nt_blastn = NT_BLASTN.out.megablast_to_blob
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -413,22 +437,64 @@ workflow {
                 .collect()
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
+
+        ch_versions = ch_versions.mix(
+            NT_BLASTN.out.versions.first(),
+            NFCORE_SAMTOOLS_INDEX.out.versions.first(),
+            BLOBTOOLS.out.versions.first(),
+            BLOBPLOT.out.versions,
+            PRODIGAL_CONTIGS.out.versions.first(),
+            DEEPARG_CONTIGS.out.versions.first(),
+            ARG_CONTIG_LEVEL_REPORT.out.versions,
+            ARG_BLOBPLOT.out.versions
+        )
     }
 
     //
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
     if ( params.arg_bin_clustering && params.include_binning ) {
-        ch_raw_orfs = PRODIGAL_BINS(ch_refined_bins)
-        ch_deeparg = DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
+        PRODIGAL_BINS(ch_refined_bins)
+        ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
+        DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
             .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
-        ch_arg_fasta = ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
-        ch_clusters = CLUSTERING(ch_arg_fasta.collect())
+        ch_deeparg = DEEPARG_BINS.out.deeparg_bins
+        ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
+        ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
+        CLUSTERING(ch_arg_fasta.collect())
+
+        ch_versions = ch_versions.mix(
+            PRODIGAL_BINS.out.versions.first(),
+            DEEPARG_BINS.out.versions.first(),
+            ARG_FASTA_FORMATTER.out.versions.first(),
+            CLUSTERING.out.versions
+        )
     }
 
     // TODO: MultiQC aggregation is not wired. To re-enable: include the
     // nf-core module (modules/nf-core/multiqc), collect the per-tool reports
     // into a channel, and add a publishDir block in config/modules.config.
+
+    //
+    // Aggregate software versions -> pipeline_info/software_versions.yml
+    // Per-sample tasks of one process write byte-identical versions.yml files,
+    // so content-level unique() collapses them to one block per process.
+    // stripIndent() normalizes the varying heredoc indentation across modules.
+    //
+    ch_versions
+        .map { yml -> yml.text.stripIndent() }
+        .mix( Channel.of(
+            ( "\"${workflow.manifest.name}\":\n" +
+              "    pipeline: ${workflow.manifest.version}\n" +
+              "    nextflow: ${nextflow.version}\n" ).toString()
+        ) )
+        .unique()
+        .collectFile(
+            name: 'software_versions.yml',
+            storeDir: "${params.output}/pipeline_info",
+            sort: true,
+            newLine: false
+        )
 
 }
 

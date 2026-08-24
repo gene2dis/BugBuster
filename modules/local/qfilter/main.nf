@@ -12,6 +12,7 @@ process QFILTER {
     output:
         tuple val(meta), path(reads), path("after_reads_fr.txt"), emit: qfilter
 	path("*_fastp_report.tsv"), emit: reads_report
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -41,6 +42,12 @@ process QFILTER {
             echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
             echo -e "${prefix}\\t\${before_reads_fr}\\t\${after_reads_fr}" >> ${prefix}_fastp_report.tsv
         fi
+
+        # Shell-only module: record the interpreter version
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bash: \$(bash --version | head -n 1 | awk '{print \$4}')
+        END_VERSIONS
         """
 
     stub:
@@ -51,5 +58,10 @@ process QFILTER {
         echo 1000 > after_reads_fr.txt
         echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
         echo -e "${prefix}\\t1000\\t1000" >> ${prefix}_fastp_report.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bash: 5.1.16
+        END_VERSIONS
         """
 }

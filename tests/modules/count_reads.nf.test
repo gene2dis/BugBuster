@@ -39,6 +39,9 @@ nextflow_process {
             def lines = path(process.out.reads_report.get(0)).readLines()
             assert lines[0] == "Id\tRaw reads\tRaw reads singletons"
             assert lines[1] == "gz_test\t20\t10"
+
+            // Audit #27: module must report a versions.yml
+            assert path(process.out.versions.get(0)).text.contains("gzip:")
         }
     }
 

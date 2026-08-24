@@ -9,6 +9,7 @@ process KARGA {
 
     output:
         path("*_all_reads_KARGA_mappedGenes.csv"), emit: kargva
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -27,6 +28,14 @@ process KARGA {
                 echo "GeneIdx,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGA_mappedGenes.csv
                 echo "NA,NA,NA" >> ${prefix}_all_reads_KARGA_mappedGenes.csv
         fi
+
+        # KARGA is a bare Java class with no version flag: version from the
+        # container tag
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            karga: 1.1
+            java: \$(java -version 2>&1 | head -n 1 | sed 's/.*"\\(.*\\)".*/\\1/')
+        END_VERSIONS
         """
 
     stub:
@@ -34,5 +43,11 @@ process KARGA {
 
         """
         echo "GeneIdx,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGA_mappedGenes.csv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            karga: 1.1
+            java: 18.0.2.1
+        END_VERSIONS
         """
 }

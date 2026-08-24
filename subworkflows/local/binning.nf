@@ -246,18 +246,23 @@ workflow BINNING {
         // Per-sample mode: simple quality and taxonomy reports
         BIN_QUALITY_REPORT(ch_checkm_all_reports.map { _meta, reports -> reports }.collect())
         BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
+        ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
-        ch_bin_depth = BOWTIE2_SAMTOOLS_DEPTH(
+        BOWTIE2_SAMTOOLS_DEPTH(
             reads.combine(ch_refined_bins.map { _meta, bins -> bins })
         )
-        ch_bin_cov = BEDTOOLS(ch_bin_depth)
+        ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
+        BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
+        ch_bin_cov = BEDTOOLS.out.bin_depth
+        ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
 
         BIN_SUMMARY(
             ch_bin_cov.collect()
                 .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
                 .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect())
         )
+        ch_versions = ch_versions.mix(BIN_SUMMARY.out.versions)
     }
 
     emit:

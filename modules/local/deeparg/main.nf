@@ -8,6 +8,7 @@ process DEEPARG_BINS {
 
     output:
         tuple val(meta), path("*_deeparg_results"), emit: deeparg_bins
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -56,6 +57,11 @@ process DEEPARG_BINS {
         for arg_file in *.mapping.ARG; do mv "\$arg_file" ../${prefix}_deeparg_results/; done
         cd ..
         rm -rf tmp_bins
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+        END_VERSIONS
 	"""
 
     stub:
@@ -63,6 +69,11 @@ process DEEPARG_BINS {
 
         """
         mkdir ${prefix}_deeparg_results
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: 1.0.4
+        END_VERSIONS
         """
 }
 
@@ -77,6 +88,7 @@ process DEEPARG_CONTIGS {
     output:
         tuple val(meta), path("*.ARG"), emit: deeparg
         path("*.ARG"), emit: only_deeparg
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -97,6 +109,11 @@ process DEEPARG_CONTIGS {
                 $args \\
                 --input ${prefix}_proteins_input.faa \\
                 --out ${prefix}_contigs_deep_arg.out
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+        END_VERSIONS
         """
 
     stub:
@@ -104,5 +121,10 @@ process DEEPARG_CONTIGS {
 
         """
         touch ${prefix}_contigs_deep_arg.out.mapping.ARG
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: 1.0.4
+        END_VERSIONS
         """
 }
