@@ -1,7 +1,9 @@
 process NT_BLASTN {
     container 'quay.io/biocontainers/blast:2.15.0--pl5321h6f7f691_1'
 
-    label 'process_low'
+    // Full-nt megablast: memory-hungry (label scales memory/time by attempt
+    // under the global retry-on-OOM errorStrategy)
+    label 'process_high'
 
     input:
         tuple val(meta), path(contigs), path(nt_db)
@@ -11,6 +13,7 @@ process NT_BLASTN {
         path "versions.yml", emit: versions
 
     script:
+        def args = task.ext.args ?: ''
         def prefix = "${meta.id}"
 
         """
@@ -34,10 +37,8 @@ process NT_BLASTN {
             -query ${contigs} \\
             -db \${db_prefix} \\
             -outfmt '6 qseqid staxids bitscore std' \\
-            -max_target_seqs 1 \\
-            -max_hsps 1 \\
             -num_threads $task.cpus \\
-            -evalue 1e-25 \\
+            ${args} \\
             -out ${prefix}_assembly_vs_nt_megablast.out
 
         cat <<-END_VERSIONS > versions.yml
