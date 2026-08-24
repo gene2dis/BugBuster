@@ -1,0 +1,35 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Cloud profile fail-fast test (audit #24)
+
+    The aws/gcp/azure profiles used literal 's3://your-bucket/work'-style
+    placeholder workDirs; now the *_workdir param of the active cloud profile
+    is required and validated up front in main.nf. Lives in its own file
+    because the profile is a suite-level setting in nf-test (the rest of the
+    suite runs under the docker profile from nf-test.config).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Cloud profile workdir validation"
+    script "../main.nf"
+    profile "aws"
+
+    test("Rejects -profile aws without --aws_workdir") {
+        options "-preview"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.any { line -> line.contains("requires --aws_workdir") } ||
+                   workflow.stderr.any { line -> line.contains("requires --aws_workdir") }
+        }
+    }
+}

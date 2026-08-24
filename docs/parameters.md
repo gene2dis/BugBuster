@@ -659,6 +659,63 @@ Bowtie2 parameters for read alignment during host filtering:
 
 ---
 
+## Cloud & HPC Profile Parameters
+
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The `--*_workdir` parameter of the chosen cloud profile is **required** — the pipeline exits immediately with an error if it is missing.
+
+### AWS Batch (`-profile aws`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--aws_workdir` | *(required)* | S3 work directory, e.g. `s3://my-bucket/work` |
+| `--aws_queue` | `default` | AWS Batch job queue |
+| `--aws_region` | `us-east-1` | AWS region |
+| `--aws_cli_path` | `/home/ec2-user/miniconda/bin/aws` | Path to the `aws` CLI on the Batch AMI |
+| `--aws_job_role` | — | IAM job role ARN |
+| `--aws_execution_role` | — | IAM execution role ARN |
+| `--aws_volumes` | — | Container volumes for scratch space |
+
+### Google Cloud Batch (`-profile gcp`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--gcp_workdir` | *(required)* | GCS work directory, e.g. `gs://my-bucket/work` |
+| `--gcp_project` | — | GCP project id |
+| `--gcp_region` | `us-central1` | GCP location |
+| `--gcp_spot` | `false` | Use spot/preemptible instances |
+| `--gcp_boot_disk_size` | `50.GB` | Boot disk size per VM |
+| `--gcp_service_account` | — | Service account email |
+| `--gcp_network` / `--gcp_subnetwork` | — | VPC network settings |
+| `--gcp_private_address` | `false` | Use private IP addresses only |
+
+### Azure Batch (`-profile azure`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--azure_workdir` | *(required)* | Blob work directory, e.g. `az://my-container/work` |
+| `--azure_pool` | `auto` | Batch pool name |
+| `--azure_region` | `eastus` | Azure location |
+| `--azure_batch_account` / `--azure_batch_key` | — | Batch account credentials |
+| `--azure_storage_account` / `--azure_storage_key` | — | Storage account credentials |
+| `--azure_delete_pools` | `true` | Delete auto pools on completion |
+| `--azure_vm_type` | `Standard_D4_v3` | VM type for auto pools |
+| `--azure_vm_count` | `1` | Initial VM count |
+| `--azure_max_vms` | `10` | Maximum VM count |
+| `--azure_spot` | `false` | Use low-priority (spot) VMs |
+
+### SLURM (`-profile slurm`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--slurm_queue` | `normal` | Default partition |
+| `--slurm_queue_short` / `--slurm_queue_long` | — | Partitions for short/long jobs |
+| `--slurm_account` | — | Account for job submission |
+| `--slurm_queue_size` | `100` | Executor queue size |
+| `--singularity_cache` | — | Singularity image cache directory |
+| `--singularity_run_options` | — | Extra singularity run options |
+
+---
+
 ## Parameter Usage Examples
 
 ### Minimal Run

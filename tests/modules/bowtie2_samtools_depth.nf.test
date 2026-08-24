@@ -1,0 +1,68 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BOWTIE2_SAMTOOLS_DEPTH Module Test
+
+    Regression test for audit item #24: the per-bin loop used a broken
+    greedy-sed rename (only bins literally named bin.N survived it), wrote
+    uncompressed per-bin SAM intermediates, and branched on the Groovy
+    "null"-string compare of reads[2]. Now bin ids come from basename, bowtie2
+    pipes straight into samtools sort, and the singleton branch is decided in
+    Groovy. Both branches (with and without singletons) are exercised with the
+    committed read fixtures; alignment counts are irrelevant - the test pins
+    naming, piping, and the merge path.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BOWTIE2_SAMTOOLS_DEPTH Process"
+    script "../../modules/local/bowtie2_samtools/main.nf"
+    process "BOWTIE2_SAMTOOLS_DEPTH"
+
+    test("maps paired reads plus singletons against bins") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bams = process.out.reads[0][1] instanceof List ? process.out.reads[0][1] : [process.out.reads[0][1]]
+            assert bams.any { bam -> file(bam).name == "test_bin.1_all_reads.bam" }
+        }
+    }
+
+    test("maps paired reads without singletons") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bams = process.out.reads[0][1] instanceof List ? process.out.reads[0][1] : [process.out.reads[0][1]]
+            assert bams.any { bam -> file(bam).name == "test_bin.1_all_reads.bam" }
+        }
+    }
+}

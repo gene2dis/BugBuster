@@ -124,6 +124,23 @@ log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
 log.info "  ================================================"
 log.info ""
 
+// Cloud profiles need an object-storage work directory; there is no sane
+// default, so fail fast instead of falling back to a local ./work that the
+// cloud executor cannot use (audit #24)
+def cloud_workdir_requirements = [
+    aws  : ['aws_workdir', 's3://my-bucket/work'],
+    gcp  : ['gcp_workdir', 'gs://my-bucket/work'],
+    azure: ['azure_workdir', 'az://my-container/work'],
+]
+def active_profiles = workflow.profile.tokenize(',')
+cloud_workdir_requirements.each { profile_name, req ->
+    def (param_name, example) = req
+    if (active_profiles.contains(profile_name) && !params[param_name]) {
+        log.error "ERROR: -profile ${profile_name} requires --${param_name} (e.g. --${param_name} ${example})"
+        exit 1
+    }
+}
+
 // Parse and validate binners parameter
 def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
 def valid_binners = ['comebin', 'semibin', 'metabat2']

@@ -819,6 +819,215 @@
                     "fa_icon": "fas fa-calculator"
                 }
             }
+        },
+        "cloud_hpc_profile_options": {
+            "title": "Cloud & HPC profile options",
+            "type": "object",
+            "fa_icon": "fas fa-cloud",
+            "description": "Parameters consumed by the aws/gcp/azure/slurm profiles (conf/*.config). The *_workdir parameters are required when their profile is active.",
+            "properties": {
+                "aws_workdir": {
+                    "type": "string",
+                    "description": "S3 work directory (required with -profile aws), e.g. s3://my-bucket/work",
+                    "hidden": true
+                },
+                "aws_queue": {
+                    "type": "string",
+                    "description": "AWS Batch job queue",
+                    "default": "default",
+                    "hidden": true
+                },
+                "aws_region": {
+                    "type": "string",
+                    "description": "AWS region",
+                    "default": "us-east-1",
+                    "hidden": true
+                },
+                "aws_cli_path": {
+                    "type": "string",
+                    "description": "Path to the aws CLI on the Batch AMI",
+                    "default": "/home/ec2-user/miniconda/bin/aws",
+                    "hidden": true
+                },
+                "aws_job_role": {
+                    "type": "string",
+                    "description": "IAM job role ARN",
+                    "hidden": true
+                },
+                "aws_execution_role": {
+                    "type": "string",
+                    "description": "IAM execution role ARN",
+                    "hidden": true
+                },
+                "aws_volumes": {
+                    "type": "string",
+                    "description": "Container volumes for scratch space",
+                    "hidden": true
+                },
+                "gcp_workdir": {
+                    "type": "string",
+                    "description": "GCS work directory (required with -profile gcp), e.g. gs://my-bucket/work",
+                    "hidden": true
+                },
+                "gcp_project": {
+                    "type": "string",
+                    "description": "GCP project id",
+                    "hidden": true
+                },
+                "gcp_region": {
+                    "type": "string",
+                    "description": "GCP location",
+                    "default": "us-central1",
+                    "hidden": true
+                },
+                "gcp_spot": {
+                    "type": "boolean",
+                    "description": "Use spot/preemptible instances",
+                    "default": false,
+                    "hidden": true
+                },
+                "gcp_boot_disk_size": {
+                    "type": "string",
+                    "description": "Boot disk size per VM",
+                    "default": "50.GB",
+                    "hidden": true
+                },
+                "gcp_service_account": {
+                    "type": "string",
+                    "description": "Service account email",
+                    "hidden": true
+                },
+                "gcp_network": {
+                    "type": "string",
+                    "description": "VPC network",
+                    "hidden": true
+                },
+                "gcp_subnetwork": {
+                    "type": "string",
+                    "description": "VPC subnetwork",
+                    "hidden": true
+                },
+                "gcp_private_address": {
+                    "type": "boolean",
+                    "description": "Use private IP addresses only",
+                    "default": false,
+                    "hidden": true
+                },
+                "azure_workdir": {
+                    "type": "string",
+                    "description": "Azure Blob work directory (required with -profile azure), e.g. az://my-container/work",
+                    "hidden": true
+                },
+                "azure_pool": {
+                    "type": "string",
+                    "description": "Azure Batch pool name",
+                    "default": "auto",
+                    "hidden": true
+                },
+                "azure_region": {
+                    "type": "string",
+                    "description": "Azure location",
+                    "default": "eastus",
+                    "hidden": true
+                },
+                "azure_batch_account": {
+                    "type": "string",
+                    "description": "Azure Batch account name",
+                    "hidden": true
+                },
+                "azure_batch_key": {
+                    "type": "string",
+                    "description": "Azure Batch account key",
+                    "hidden": true
+                },
+                "azure_storage_account": {
+                    "type": "string",
+                    "description": "Azure storage account name",
+                    "hidden": true
+                },
+                "azure_storage_key": {
+                    "type": "string",
+                    "description": "Azure storage account key",
+                    "hidden": true
+                },
+                "azure_delete_pools": {
+                    "type": "boolean",
+                    "description": "Delete auto pools on completion",
+                    "default": true,
+                    "hidden": true
+                },
+                "azure_vm_type": {
+                    "type": "string",
+                    "description": "VM type for auto pools",
+                    "default": "Standard_D4_v3",
+                    "hidden": true
+                },
+                "azure_vm_count": {
+                    "type": "integer",
+                    "description": "Initial VM count",
+                    "default": 1,
+                    "hidden": true
+                },
+                "azure_max_vms": {
+                    "type": "integer",
+                    "description": "Maximum VM count",
+                    "default": 10,
+                    "hidden": true
+                },
+                "azure_spot": {
+                    "type": "boolean",
+                    "description": "Use low-priority (spot) VMs",
+                    "default": false,
+                    "hidden": true
+                },
+                "slurm_queue": {
+                    "type": "string",
+                    "description": "Default SLURM partition",
+                    "default": "normal",
+                    "hidden": true
+                },
+                "slurm_queue_short": {
+                    "type": "string",
+                    "description": "SLURM partition for short jobs",
+                    "hidden": true
+                },
+                "slurm_queue_long": {
+                    "type": "string",
+                    "description": "SLURM partition for long jobs",
+                    "hidden": true
+                },
+                "slurm_account": {
+                    "type": "string",
+                    "description": "SLURM account for job submission",
+                    "hidden": true
+                },
+                "slurm_queue_size": {
+                    "type": "integer",
+                    "description": "SLURM executor queue size",
+                    "default": 100,
+                    "hidden": true
+                },
+                "singularity_cache": {
+                    "type": "string",
+                    "description": "Singularity image cache directory",
+                    "hidden": true
+                },
+                "singularity_run_options": {
+                    "type": "string",
+                    "description": "Extra singularity run options",
+                    "hidden": true
+                },
+                "config_profile_name": {
+                    "type": "string",
+                    "description": "Institutional/profile config name (informational)",
+                    "hidden": true
+                },
+                "config_profile_description": {
+                    "type": "string",
+                    "description": "Institutional/profile config description (informational)",
+                    "hidden": true
+                }
+            }
         }
     },
     "allOf": [
@@ -866,6 +1075,9 @@
         },
         {
             "$ref": "#/$defs/generic_options"
+        },
+        {
+            "$ref": "#/$defs/cloud_hpc_profile_options"
         }
     ]
 }
