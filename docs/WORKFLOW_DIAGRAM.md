@@ -133,9 +133,7 @@ flowchart TD
 
 **Outputs:**
 - `reads`: Clean reads `[meta, reads]`
-- `reads_coassembly`: Collected reads for coassembly
 - `report`: QC summary report
-- `fastp_json`: FASTP JSON reports
 
 ---
 

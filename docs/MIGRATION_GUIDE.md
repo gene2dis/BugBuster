@@ -275,8 +275,7 @@ nextflow run main.nf \
 If you need to use the old two-step approach:
 
 1. Contact the maintainers for legacy module access
-2. The old `BOWTIE2` module is still available in `modules/local/bowtie2/`
-3. Legacy support can be provided if needed
+2. The old `BOWTIE2` module was removed from the pipeline; it remains available in the git history if ever needed
 
 **Note:** Rollback should not be necessary as the new approach is fully compatible.
 

@@ -354,12 +354,7 @@ Azure Batch authentication failed
    cat .nextflow.log | grep -i error
    ```
 
-2. Validate outputs:
-   ```bash
-   python bin/validate_outputs.py --output ./results
-   ```
-
-3. Check work directory for intermediate files
+2. Check work directory for intermediate files
 
 ### Corrupted output files
 

@@ -20,8 +20,7 @@ workflow QC {
 
     main:
     ch_versions = Channel.empty()
-    ch_fastp_json = Channel.empty()
-    
+
     if ( params.quality_control ) {
         //
         // Read quality filtering with nf-core Fastp
@@ -56,10 +55,9 @@ workflow QC {
             false   // save_merged
         )
 
-        // Collect versions and FASTP json for MultiQC
+        // Collect versions
         ch_versions = ch_versions.mix(FASTP.out.versions.first())
         ch_versions = ch_versions.mix(FASTP_SINGLETON.out.versions.first())
-        ch_fastp_json = FASTP.out.json.mix(FASTP_SINGLETON.out.json)
 
         //
         // Rejoin trimmed singletons with their paired reads, then combine with
@@ -132,7 +130,6 @@ workflow QC {
         ch_versions = ch_versions.mix(READS_REPORT.out.versions)
 
         ch_clean_reads = ch_decontaminated.reads
-        ch_clean_reads_coassembly = ch_decontaminated.reads_coassembly
         ch_report = ch_reads_report
 
     } else {
@@ -143,7 +140,6 @@ workflow QC {
         ch_versions = ch_versions.mix(ch_count.versions.first())
 
         ch_clean_reads = ch_count.reads
-        ch_clean_reads_coassembly = ch_count.reads_coassembly
         ch_report = READS_REPORT(
             ch_count.reads_report.collect(),
             "none"
@@ -153,8 +149,6 @@ workflow QC {
 
     emit:
     reads              = ch_clean_reads            // channel: [ val(meta), [ reads ] ]
-    reads_coassembly   = ch_clean_reads_coassembly // channel: path(reads)
     report             = ch_report                 // channel: path(report)
-    fastp_json         = ch_fastp_json             // channel: [ val(meta), path(json) ] for MultiQC
     versions           = ch_versions               // channel: path(versions.yml)
 }

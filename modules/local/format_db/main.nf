@@ -1,23 +1,3 @@
-process FORMAT_SM_DB {
-    tag "format_sourmash_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
-
-    label 'process_download'
-
-    input:
-        path(db)
-
-    output:
-        path("*")
-
-    script:
-        """
-        ${params.sourmash_ref_db[params.sourmash_db]["fmtscript"]} 
-	"""
-}
-
 process FORMAT_KRAKEN_DB {
     tag "format_kraken_db"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?

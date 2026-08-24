@@ -223,23 +223,6 @@ expect_fail "blast: wrong md5 fails" blast_nt_reformat.sh "${BASE_URL}/blastdb_b
 expect_fail "blast: missing metadata fails" blast_nt_reformat.sh "${BASE_URL}/no_such_dir"
 
 #
-# sourmash_db_reformat.sh (no download; operates on staged CSVs)
-#
-echo "--- sourmash_db_reformat.sh ---"
-SM_WORK="${WORK}/sourmash_ok"
-mkdir -p "${SM_WORK}"
-echo "a,b" > "${SM_WORK}/lineages.csv"
-if run_script "${SM_WORK}" sourmash_db_reformat.sh > "${SM_WORK}.log" 2>&1 \
-    && [ -f "${SM_WORK}/lineages.csv.gz" ]; then
-    echo "✓ sourmash: csv compressed"
-    PASS=$((PASS + 1))
-else
-    echo "✗ sourmash: csv compressed"
-    FAIL=$((FAIL + 1))
-fi
-expect_fail "sourmash: no csv staged fails" sourmash_db_reformat.sh
-
-#
 # Report image smoke test (audit #21): all libraries importable, no runtime pip
 #
 echo "--- report container image ---"

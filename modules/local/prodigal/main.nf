@@ -76,25 +76,3 @@ process PRODIGAL_BINS {
         END_VERSIONS
         """
 }
-
-process PRODIGAL_CONTIGS {
-    container 'quay.io/biocontainers/prodigal:2.6.3--h031d066_8'
-
-    label 'process_single'
-
-    input:
-        tuple val(meta), path(contigs)
-
-    output:
-        tuple val(meta), path("*_contigs_proteins.faa"), emit: prodigal_contigs
-
-    script:
-        def prefix = "${meta.id}"
-
-        """
-        prodigal -i ${contigs} \\
-                 -o ${prefix}_contigs_genes.gff \\
-                 -a ${prefix}_contigs_proteins.faa \\
-                 -p meta 
-        """
-}

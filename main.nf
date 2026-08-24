@@ -248,7 +248,6 @@ workflow {
     // In DSL2, process outputs can be referenced multiple times
     // No need to split channels - just use QC.out.reads directly in each consumer
     ch_clean_reads           = QC.out.reads
-    ch_clean_reads_coassembly = QC.out.reads_coassembly
     ch_reads_report          = QC.out.report
 
     // Software provenance: every stage mixes its versions.yml files in here;
@@ -335,8 +334,7 @@ workflow {
     
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
-            ch_clean_reads,
-            ch_clean_reads_coassembly
+            ch_clean_reads
         )
         
         ch_contigs_meta = ASSEMBLY.out.contigs_meta
@@ -453,10 +451,6 @@ workflow {
             CLUSTERING.out.versions
         )
     }
-
-    // TODO: MultiQC aggregation is not wired. To re-enable: include the
-    // nf-core module (modules/nf-core/multiqc), collect the per-tool reports
-    // into a channel, and add a publishDir block in config/modules.config.
 
     //
     // Aggregate software versions -> pipeline_info/software_versions.yml

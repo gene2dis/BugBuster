@@ -11,7 +11,7 @@
     
     INPUTS:
         reads: Channel of [meta, reads] tuples for per-sample assembly
-        reads_coassembly: Channel of collected reads for co-assembly mode
+                (co-assembly mode pools this same channel internally)
     
     OUTPUTS:
         contigs: [meta, reads, contigs] - Filtered contigs with reads for binning
@@ -27,7 +27,6 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { MEGAHIT as NFCORE_MEGAHIT } from '../../modules/nf-core/megahit/main'
 include { MEGAHIT              } from '../../modules/local/megahit/main'
 include { BBMAP                } from '../../modules/local/bbmap/main'
 include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main'
@@ -36,7 +35,6 @@ include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summar
 workflow ASSEMBLY {
     take:
     reads              // channel: [ val(meta), [ reads ] ]
-    reads_coassembly   // channel: path(reads) - collected reads for coassembly
 
     main:
     ch_versions = Channel.empty()
