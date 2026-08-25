@@ -11,7 +11,8 @@
 nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
-  --quality_control true
+  --quality_control true \
+  -profile docker
 
 # ==============================================================================
 # Example 2: Using Pre-built Combined Index
@@ -23,7 +24,8 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  --custom_decontamination_index /data/databases/contaminants_index
+  --custom_decontamination_index /data/databases/contaminants_index \
+  -profile docker
 
 # ==============================================================================
 # Example 3: Custom Host Genome (Mouse)
@@ -34,7 +36,8 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  --custom_host_fasta /data/genomes/mouse_GRCm39.fasta
+  --custom_host_fasta /data/genomes/mouse_GRCm39.fasta \
+  -profile docker
 
 # ==============================================================================
 # Example 4: Multiple Contaminant Genomes
@@ -46,19 +49,20 @@ nextflow run main.nf \
   --output results \
   --quality_control true \
   --custom_phiX_fasta /data/genomes/phix.fasta \
-  --custom_host_fasta /data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/ecoli.fasta
+  --custom_host_fasta /data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/ecoli.fasta \
+  -profile docker
 
 # ==============================================================================
 # Example 5: Low Disk Space Mode
 # ==============================================================================
-# Enable progressive cleanup and use storeDir for clean reads
-# Minimizes disk usage during pipeline execution
+# Enable automatic work-dir cleanup and clean-reads publishing
+# Minimizes disk usage; note: low_disk runs are not resumable (cleanup = true)
 
 nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  -profile low_disk
+  -profile docker,low_disk
 
 # ==============================================================================
 # Example 6: Custom Bowtie2 Parameters
@@ -70,7 +74,8 @@ nextflow run main.nf \
   --output results \
   --quality_control true \
   --bowtie_k 5 \
-  --bowtie_score_min 'L,-0.6,-0.6'
+  --bowtie_score_min 'L,-0.6,-0.6' \
+  -profile docker
 
 # ==============================================================================
 # Example 7: Skip Quality Control (No Decontamination)
@@ -80,7 +85,8 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
-  --quality_control false
+  --quality_control false \
+  -profile docker
 
 # ==============================================================================
 # Example 8: Building Combined Index Manually
@@ -99,7 +105,8 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  --custom_decontamination_index contaminants_index
+  --custom_decontamination_index contaminants_index \
+  -profile docker
 
 # ==============================================================================
 # Example 9: Slurm Cluster with Custom Resources
@@ -110,7 +117,7 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  -profile slurm \
+  -profile slurm,singularity \
   --max_memory 256.GB \
   --max_cpus 32
 
@@ -124,6 +131,7 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
+  -profile docker \
   -resume
 
 # ==============================================================================
@@ -146,7 +154,8 @@ nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
-  --databases_dir /shared/databases
+  --databases_dir /shared/databases \
+  -profile docker
 
 # ==============================================================================
 # Performance Optimization Tips
@@ -155,16 +164,13 @@ nextflow run main.nf \
 # Tip 1: Pre-build and cache the combined index
 # Build once, use many times across different sample sets
 
-# Tip 2: Use storeDir for clean reads in production
-# Enables immediate work directory cleanup
-nextflow run main.nf --store_clean_reads true
+# Tip 2: Publish clean reads for reuse outside the pipeline
+# (publishing only - '-resume' remains the task cache)
+nextflow run main.nf --input samplesheet.csv --output results --store_clean_reads true -profile docker
 
-# Tip 3: Enable work directory cleanup for disk space
-# Automatically removes intermediate files
-nextflow run main.nf --enable_work_cleanup true
-
-# Tip 4: Use low_disk profile for constrained systems
-nextflow run main.nf -profile low_disk
+# Tip 3: Use the low_disk profile for constrained systems
+# (enables Nextflow's 'cleanup = true' work-dir cleanup; runs are not resumable)
+nextflow run main.nf --input samplesheet.csv --output results -profile docker,low_disk
 
 # ==============================================================================
 # Monitoring and Debugging

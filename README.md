@@ -45,7 +45,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
 20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 21. Bin reports.
-22. If requested functional anotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+22. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
 23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
 24. Assembly modes: "coassembly", "assembly", "none"
 

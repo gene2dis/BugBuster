@@ -52,6 +52,31 @@ next release is tagged.
   wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
   `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
 
+### Removed
+
+**Breaking**: parameter validation is now strict (nf-schema
+`failUnrecognisedParams`), so passing any removed parameter aborts the run at
+startup instead of being silently ignored. Update existing command lines and
+`-params-file` YAMLs accordingly.
+
+- `--custom_phiX_index` and `--custom_bowtie_host_index` — replaced by
+  `--custom_decontamination_index` (pre-built combined index),
+  `--custom_phiX_fasta`, and `--custom_host_fasta` (the pipeline builds the
+  combined Bowtie2 index from FASTAs); the old params had been silent no-ops
+- `--enable_work_cleanup` — was never consumed; work-dir cleanup is Nextflow's
+  `cleanup = true`, enabled by `-profile low_disk`
+- `--kraken_db_used`, `--sourmash_db_name` — report database names are derived
+  from the selected database
+- `--store_filtered_contigs`, `--store_refined_bins` — were no-ops; filtered
+  contigs and refined bins are always published
+- `--tracedir` — trace/report/timeline/DAG always go to
+  `<output>/pipeline_info/`
+- `--validationShowHiddenParams`, `--validationSchemaIgnoreParams` —
+  nf-validation 1.x options superseded by the nf-schema `validation {}` scope
+- All eleven `--mmseqs_*` parameters — unused; clustering settings are fixed
+  tiers in `modules/local/clustering`
+- Renamed: `--bbmap_lenght` → `--bbmap_length`
+
 ### Fixed
 
 - Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
