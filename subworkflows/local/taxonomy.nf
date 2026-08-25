@@ -29,7 +29,7 @@ workflow TAXONOMY {
     sourmash_db     // channel: path(sourmash_db)
 
     main:
-    ch_versions = Channel.empty()
+    ch_versions = channel.empty()
 
     //
     // Kraken2 taxonomic profiling

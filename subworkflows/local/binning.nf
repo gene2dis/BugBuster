@@ -52,10 +52,10 @@ workflow BINNING {
     reads           // channel: [ val(meta), [ reads ] ] - optional, only for co-assembly bin coverage
 
     main:
-    ch_versions = Channel.empty()
+    ch_versions = channel.empty()
 
     // Parse selected binners
-    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
+    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { b -> b.trim().toLowerCase() }
     def use_metabat2 = 'metabat2' in binners_list
     def use_semibin  = 'semibin' in binners_list
     def use_comebin  = 'comebin' in binners_list
@@ -86,7 +86,7 @@ workflow BINNING {
     }
 
     // Collect all selected binner outputs into a single channel
-    ch_binner_bins = Channel.empty()
+    ch_binner_bins = channel.empty()
     if (use_metabat2) ch_binner_bins = ch_binner_bins.mix(METABAT2.out.bins)
     if (use_semibin)  ch_binner_bins = ch_binner_bins.mix(SEMIBIN.out.bins)
     if (use_comebin)  ch_binner_bins = ch_binner_bins.mix(COMEBIN.out.bins)
@@ -97,7 +97,7 @@ workflow BINNING {
         ch_bins_grouped = ch_binner_bins
             .map { meta, bins -> [meta.id, meta, bins] }
             .groupTuple(by: 0, size: num_binners)
-            .map { id, metas, bins_list -> [metas[0], bins_list] }
+            .map { _id, metas, bins_list -> [metas[0], bins_list] }
 
         METAWRAP(ch_bins_grouped)
         ch_refined_bins = METAWRAP.out.bins
@@ -115,8 +115,8 @@ workflow BINNING {
     ch_all_sample_bins = ch_all_bins_for_checkm
         .toList()
         .map { items ->
-            def meta_list = items.collect { it[0] }.unique { it.id }
-            def all_paths = items.collect { it[1] }
+            def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
+            def all_paths = items.collect { item -> item[1] }
             [meta_list, all_paths]
         }
     

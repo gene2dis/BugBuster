@@ -33,7 +33,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 
 ### Requirements
 
-- Nextflow >= 24.04.0
+- Nextflow >= 25.10.0
 - Docker or Singularity
 - Git
 
@@ -50,13 +50,9 @@ nextflow run main.nf -profile test,docker -stub
 nf-test test
 ```
 
-> **Note**: On Nextflow >= 26.04 the strict config parser rejects this pipeline's
-> legacy config syntax. CI sets `NXF_SYNTAX_PARSER=v1` for this reason; do the
-> same locally if you see a config parser error:
->
-> ```bash
-> export NXF_SYNTAX_PARSER=v1
-> ```
+> **Note**: The pipeline is strict-syntax clean (the parser that is default
+> since Nextflow 26.04). Keep it that way: run `nextflow lint .` on your changes
+> and fix any errors it reports before opening a PR.
 
 ## Making Changes
 
@@ -259,7 +255,7 @@ Parameter validation uses the `nf-schema` plugin, which Nextflow downloads
 automatically on first run. For offline environments, pre-install it once:
 
 ```bash
-nextflow plugin install nf-schema@2.4.2
+nextflow plugin install nf-schema@2.8.0
 ```
 
 ### Linting

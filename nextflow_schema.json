@@ -715,6 +715,12 @@
                     "description": "Publish decontaminated reads to <output>/clean_reads/ (publishing, not caching: -resume is the cache).",
                     "fa_icon": "fas fa-save"
                 },
+                "trace_report_suffix": {
+                    "type": "string",
+                    "description": "Timestamp suffix for the execution timeline/report/trace/dag file names.",
+                    "hidden": true,
+                    "fa_icon": "far fa-clock"
+                },
                 "config_profile_name": {
                     "type": "string",
                     "description": "Institutional config profile name.",

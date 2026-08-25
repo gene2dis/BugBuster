@@ -22,26 +22,26 @@ workflow PREPARE_DATABASES {
     
     main:
     // Initialize empty channels
-    ch_kraken_db        = Channel.empty()
-    ch_sourmash_db      = Channel.empty()
-    ch_karga_db         = Channel.empty()
-    ch_kargva_db        = Channel.empty()
-    ch_deeparg_db       = Channel.empty()
-    ch_blast_db         = Channel.empty()
-    ch_taxdump          = Channel.empty()
-    ch_gtdbtk_db        = Channel.empty()
-    ch_checkm2_db       = Channel.empty()
-    ch_rgi_card_db      = Channel.empty()
-    ch_versions         = Channel.empty()
+    ch_kraken_db        = channel.empty()
+    ch_sourmash_db      = channel.empty()
+    ch_karga_db         = channel.empty()
+    ch_kargva_db        = channel.empty()
+    ch_deeparg_db       = channel.empty()
+    ch_blast_db         = channel.empty()
+    ch_taxdump          = channel.empty()
+    ch_gtdbtk_db        = channel.empty()
+    ch_checkm2_db       = channel.empty()
+    ch_rgi_card_db      = channel.empty()
+    ch_versions         = channel.empty()
 
     //
     // Kraken2 database
     //
     if ( params.taxonomic_profiler == "kraken2" ) {
         if ( params.custom_kraken_db ) {
-            ch_kraken_db = Channel.fromPath(params.custom_kraken_db, checkIfExists: true)
+            ch_kraken_db = channel.fromPath(params.custom_kraken_db, checkIfExists: true)
         } else {
-            ch_kraken_ref = Channel.fromList(params.kraken_ref_db[params.kraken2_db]["url"])
+            ch_kraken_ref = channel.fromList(params.kraken_ref_db[params.kraken2_db]["url"])
             ch_kraken_db = FORMAT_KRAKEN_DB(ch_kraken_ref)
         }
     }
@@ -52,7 +52,7 @@ workflow PREPARE_DATABASES {
     if ( params.taxonomic_profiler == "sourmash" ) {
         if ( params.custom_sourmash_db ) {
             // Custom database: expect list with [kmer_db, lineages_file]
-            ch_sourmash_files = Channel.fromList(params.custom_sourmash_db)
+            ch_sourmash_files = channel.fromList(params.custom_sourmash_db)
                 .map { filepath -> file(filepath, checkIfExists: true) }
                 .collect()
             
@@ -60,7 +60,7 @@ workflow PREPARE_DATABASES {
             ch_sourmash_lineages = ch_sourmash_files.map { files -> files[1] }
         } else {
             // Reference database: download both k-mer and lineages files
-            ch_sourmash_files = Channel.fromList(params.sourmash_ref_db[params.sourmash_db]["url"])
+            ch_sourmash_files = channel.fromList(params.sourmash_ref_db[params.sourmash_db]["url"])
                 .map { filepath -> file(filepath) }
                 .collect()
             
@@ -84,16 +84,16 @@ workflow PREPARE_DATABASES {
     //
     if ( params.read_arg_prediction ) {
         if ( params.custom_karga_db ) {
-            ch_karga_db = Channel.of(file(params.custom_karga_db, checkIfExists: true))
+            ch_karga_db = channel.of(file(params.custom_karga_db, checkIfExists: true))
         } else {
-            ch_karga_db = Channel.fromList(params.karga_ref_db[params.karga_db]["url"])
+            ch_karga_db = channel.fromList(params.karga_ref_db[params.karga_db]["url"])
                 .map { filepath -> file(filepath) }
         }
 
         if ( params.custom_kargva_db ) {
-            ch_kargva_db = Channel.of(file(params.custom_kargva_db, checkIfExists: true))
+            ch_kargva_db = channel.of(file(params.custom_kargva_db, checkIfExists: true))
         } else {
-            ch_kargva_db = Channel.fromList(params.kargva_ref_db[params.kargva_db]["url"])
+            ch_kargva_db = channel.fromList(params.kargva_ref_db[params.kargva_db]["url"])
                 .map { filepath -> file(filepath) }
         }
     }
@@ -104,7 +104,7 @@ workflow PREPARE_DATABASES {
     if ( params.quality_control ) {
         if ( params.custom_decontamination_index ) {
             // Use pre-built combined index
-            ch_decontamination_index = Channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
+            ch_decontamination_index = channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
         } else {
             // Collect FASTA file paths into lists
             def phix_files = params.custom_phiX_fasta ? 
@@ -130,7 +130,7 @@ workflow PREPARE_DATABASES {
 
             // Build combined index from all FASTA files
             BOWTIE2_BUILD_COMBINED(
-                Channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect(),
+                channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect(),
                 "contaminants"
             )
             
@@ -139,7 +139,7 @@ workflow PREPARE_DATABASES {
             ch_versions = ch_versions.mix(BOWTIE2_BUILD_COMBINED.out.versions)
         }
     } else {
-        ch_decontamination_index = Channel.empty()
+        ch_decontamination_index = channel.empty()
     }
 
     //
@@ -147,7 +147,7 @@ workflow PREPARE_DATABASES {
     //
     if ( params.contig_tax_and_arg || params.arg_bin_clustering ) {
         if ( params.custom_deeparg_db ) {
-            ch_deeparg_db = Channel.fromPath(params.custom_deeparg_db, checkIfExists: true)
+            ch_deeparg_db = channel.fromPath(params.custom_deeparg_db, checkIfExists: true)
         } else {
             DOWNLOAD_DEEPARG_DB()
             ch_deeparg_db = DOWNLOAD_DEEPARG_DB.out.deeparg_db
@@ -160,16 +160,16 @@ workflow PREPARE_DATABASES {
     //
     if ( params.contig_tax_and_arg ) {
         if ( params.custom_blast_db ) {
-            ch_blast_db = Channel.fromPath(params.custom_blast_db, checkIfExists: true)
+            ch_blast_db = channel.fromPath(params.custom_blast_db, checkIfExists: true)
         } else {
-            ch_blast_ref = Channel.fromList(params.blast_ref_db[params.blast_db]["url"])
+            ch_blast_ref = channel.fromList(params.blast_ref_db[params.blast_db]["url"])
             ch_blast_db = FORMAT_NT_BLAST_DB(ch_blast_ref)
         }
 
         if ( params.custom_taxdump_files ) {
-            ch_taxdump = Channel.fromPath(params.custom_taxdump_files, checkIfExists: true)
+            ch_taxdump = channel.fromPath(params.custom_taxdump_files, checkIfExists: true)
         } else {
-            ch_taxdump_ref = Channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
+            ch_taxdump_ref = channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
             ch_taxdump = FORMAT_TAXDUMP_FILES(ch_taxdump_ref)
         }
     }
@@ -179,16 +179,16 @@ workflow PREPARE_DATABASES {
     //
     if ( params.include_binning ) {
         if ( params.custom_gtdbtk_db ) {
-            ch_gtdbtk_db = Channel.fromPath(params.custom_gtdbtk_db, checkIfExists: true)
+            ch_gtdbtk_db = channel.fromPath(params.custom_gtdbtk_db, checkIfExists: true)
         } else {
-            ch_gtdbtk_ref = Channel.fromList(params.gtdbtk_ref_db[params.gtdbtk_db]["url"])
+            ch_gtdbtk_ref = channel.fromList(params.gtdbtk_ref_db[params.gtdbtk_db]["url"])
             ch_gtdbtk_db = DOWNLOAD_GTDBTK_DB(ch_gtdbtk_ref)
         }
 
         if ( params.custom_checkm2_db ) {
-            ch_checkm2_db = Channel.fromPath(params.custom_checkm2_db, checkIfExists: true)
+            ch_checkm2_db = channel.fromPath(params.custom_checkm2_db, checkIfExists: true)
         } else {
-            ch_checkm2_ref = Channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
+            ch_checkm2_ref = channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
             ch_checkm2_db = FORMAT_CHECKM2_DB(ch_checkm2_ref)
         }
     }
@@ -199,13 +199,13 @@ workflow PREPARE_DATABASES {
     if ( params.rgi_prediction ) {
         if ( params.custom_rgi_card_db && params.custom_rgi_wildcard ) {
             // Use existing CARD database and add custom WildCARD
-            ch_card_base = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
-            ch_wildcard = Channel.fromPath(params.custom_rgi_wildcard, checkIfExists: true)
+            ch_card_base = channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
+            ch_wildcard = channel.fromPath(params.custom_rgi_wildcard, checkIfExists: true)
             ch_rgi_card_db = RGI_LOAD_WILDCARD(ch_card_base, ch_wildcard).card_db
             ch_versions = ch_versions.mix(RGI_LOAD_WILDCARD.out.versions)
         } else if ( params.custom_rgi_card_db ) {
             // Use existing pre-prepared CARD database (may or may not include WildCARD)
-            ch_rgi_card_db = Channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
+            ch_rgi_card_db = channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
         } else {
             // Download and prepare CARD database (with optional WildCARD)
             ch_rgi_card_db = RGI_LOAD(

@@ -37,13 +37,13 @@ workflow ASSEMBLY {
     reads              // channel: [ val(meta), [ reads ] ]
 
     main:
-    ch_versions = Channel.empty()
-    ch_contigs_with_reads = Channel.empty()
-    ch_contigs_only = Channel.empty()
-    ch_bam_with_contigs = Channel.empty()
-    ch_bam_only = Channel.empty()
-    ch_filter_reports = Channel.empty()
-    ch_empty_reports = Channel.empty()
+    ch_versions = channel.empty()
+    ch_contigs_with_reads = channel.empty()
+    ch_contigs_only = channel.empty()
+    ch_bam_with_contigs = channel.empty()
+    ch_bam_only = channel.empty()
+    ch_filter_reports = channel.empty()
+    ch_empty_reports = channel.empty()
 
     //
     // Per-sample assembly mode

@@ -7,10 +7,6 @@
 ----------------------------------------------------------------------------------------
 */
 
-nextflow.enable.dsl = 2
-
-import groovy.transform.Field
-
 include { validateParameters } from 'plugin/nf-schema'
 
 /*
@@ -19,7 +15,8 @@ include { validateParameters } from 'plugin/nf-schema'
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
-@Field def logo = '''
+def pipelineLogo() {
+    return '''
 \u001B[0m
      \u001B[31m╔███████████╗       \u001B[36m██████╗ ██╗   ██╗ ██████╗
    \u001B[31m╔██╝   \u001B[32m▄ ▄   \u001B[31m╚▀█╗\u001B[36m     ██╔══██╗██║   ██║██╔════╝
@@ -35,6 +32,7 @@ include { validateParameters } from 'plugin/nf-schema'
      \u001B[31m╚███████████╝\u001B[36m       ╚═════╝  ╚═════╝ ╚══════╝   ╚═╝   ╚══════╝╚═╝  ╚═╝
 \u001B[0m
 '''
+}
 
 def printVersion() {
     log.info ""
@@ -44,7 +42,7 @@ def printVersion() {
 }
 
 def printHelp() {
-    log.info logo
+    log.info pipelineLogo()
     log.info """
     \u001B[1;33mUsage:\u001B[0m
 
@@ -92,101 +90,6 @@ def printHelp() {
     For more information, visit: ${workflow.manifest.homePage}
     """
 }
-
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    VALIDATE INPUTS AND PRINT INFO
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
-
-// Show help message
-if (params.help) {
-    printHelp()
-    exit 0
-}
-
-// Show version
-if (params.containsKey('version') && params.version) {
-    printVersion()
-    exit 0
-}
-
-// Validate all parameters against nextflow_schema.json (nf-schema plugin):
-// required params (--input/--output), types, enums (assembly_mode,
-// taxonomic_profiler, ...). Cross-parameter rules the schema cannot express
-// are checked by hand below.
-validateParameters()
-
-// Print logo
-log.info logo
-log.info ""
-log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
-log.info "  ================================================"
-log.info ""
-
-// Cloud profiles need an object-storage work directory; there is no sane
-// default, so fail fast instead of falling back to a local ./work that the
-// cloud executor cannot use (audit #24)
-def cloud_workdir_requirements = [
-    aws  : ['aws_workdir', 's3://my-bucket/work', 's3://'],
-    gcp  : ['gcp_workdir', 'gs://my-bucket/work', 'gs://'],
-    azure: ['azure_workdir', 'az://my-container/work', 'az://'],
-]
-def active_profiles = workflow.profile.tokenize(',')
-cloud_workdir_requirements.each { profile_name, req ->
-    def (param_name, example, scheme) = req
-    def workdir_ok = params[param_name] || workflow.workDir.toString().startsWith(scheme)
-    if (active_profiles.contains(profile_name) && !workdir_ok) {
-        log.error "ERROR: -profile ${profile_name} requires an object-storage work directory: pass --${param_name} ${example} (or -work-dir ${example})"
-        exit 1
-    }
-}
-
-// Parse and validate binners parameter
-def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { it.trim().toLowerCase() }
-def valid_binners = ['comebin', 'semibin', 'metabat2']
-def invalid_binners = binners_list.findAll { !(it in valid_binners) }
-if (binners_list.isEmpty()) {
-    log.error "ERROR: --binners must specify at least one binner. Valid options: ${valid_binners.join(', ')}"
-    exit 1
-}
-if (invalid_binners) {
-    log.error "ERROR: Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}"
-    exit 1
-}
-
-// Reject contradictory feature combinations instead of silently skipping stages
-if (params.include_binning && params.assembly_mode == 'none') {
-    log.error "ERROR: --include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
-    exit 1
-}
-if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
-    log.error "ERROR: --contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
-    exit 1
-}
-if (params.arg_bin_clustering && !params.include_binning) {
-    log.error "ERROR: --arg_bin_clustering requires --include_binning (it runs on the refined bins)"
-    exit 1
-}
-if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
-    log.error "ERROR: --contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'"
-    exit 1
-}
-
-// Print run configuration
-log.info "  Run configuration:"
-log.info "  -------------------"
-log.info "  Input samplesheet    : ${params.input}"
-log.info "  Output directory     : ${params.output}"
-log.info "  Quality control      : ${params.quality_control}"
-log.info "  Assembly mode        : ${params.assembly_mode}"
-log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
-log.info "  Include binning      : ${params.include_binning}"
-log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
-log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
-log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
-log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
-log.info ""
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -243,7 +146,94 @@ include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 */
 
 workflow {
-    
+
+    //
+    // Help / version, parameter validation, and startup banner. Strict syntax
+    // does not allow top-level statements, so this runs first in the workflow.
+    //
+
+    // Show help message
+    if (params.help) {
+        printHelp()
+        System.exit(0)
+    }
+
+    // Show version
+    if (params.containsKey('version') && params.version) {
+        printVersion()
+        System.exit(0)
+    }
+
+    // Validate all parameters against nextflow_schema.json (nf-schema plugin):
+    // required params (--input/--output), types, enums (assembly_mode,
+    // taxonomic_profiler, ...). Cross-parameter rules the schema cannot express
+    // are checked by hand below.
+    validateParameters()
+
+    // Print logo
+    log.info pipelineLogo()
+    log.info ""
+    log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
+    log.info "  ================================================"
+    log.info ""
+
+    // Cloud profiles need an object-storage work directory; there is no sane
+    // default, so fail fast instead of falling back to a local ./work that the
+    // cloud executor cannot use (audit #24)
+    def cloud_workdir_requirements = [
+        aws  : ['aws_workdir', 's3://my-bucket/work', 's3://'],
+        gcp  : ['gcp_workdir', 'gs://my-bucket/work', 'gs://'],
+        azure: ['azure_workdir', 'az://my-container/work', 'az://'],
+    ]
+    def active_profiles = workflow.profile.tokenize(',')
+    cloud_workdir_requirements.each { profile_name, req ->
+        def (param_name, example, scheme) = req
+        def workdir_ok = params[param_name] || workflow.workDir.toString().startsWith(scheme)
+        if (active_profiles.contains(profile_name) && !workdir_ok) {
+            error("-profile ${profile_name} requires an object-storage work directory: pass --${param_name} ${example} (or -work-dir ${example})")
+        }
+    }
+
+    // Parse and validate binners parameter
+    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { b -> b.trim().toLowerCase() }
+    def valid_binners = ['comebin', 'semibin', 'metabat2']
+    def invalid_binners = binners_list.findAll { b -> !(b in valid_binners) }
+    if (binners_list.isEmpty()) {
+        error("--binners must specify at least one binner. Valid options: ${valid_binners.join(', ')}")
+    }
+    if (invalid_binners) {
+        error("Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}")
+    }
+
+    // Reject contradictory feature combinations instead of silently skipping stages
+    if (params.include_binning && params.assembly_mode == 'none') {
+        error("--include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
+    if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
+        error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
+    if (params.arg_bin_clustering && !params.include_binning) {
+        error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
+    }
+    if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
+        error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
+    }
+
+    // Print run configuration
+    log.info "  Run configuration:"
+    log.info "  -------------------"
+    log.info "  Input samplesheet    : ${params.input}"
+    log.info "  Output directory     : ${params.output}"
+    log.info "  Quality control      : ${params.quality_control}"
+    log.info "  Assembly mode        : ${params.assembly_mode}"
+    log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
+    log.info "  Include binning      : ${params.include_binning}"
+    log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
+    log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
+    log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
+    log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+    log.info ""
+
     //
     // SUBWORKFLOW: Validate and parse input samplesheet
     //
@@ -270,7 +260,7 @@ workflow {
 
     // Software provenance: every stage mixes its versions.yml files in here;
     // they are aggregated into pipeline_info/software_versions.yml at the end
-    ch_versions = Channel.empty()
+    ch_versions = channel.empty()
         .mix(PREPARE_DATABASES.out.versions)
         .mix(QC.out.versions)
 
@@ -332,9 +322,9 @@ workflow {
         
         // Generate summary report
         RGI_REPORT(
-            ch_rgi_bwt.allele_mapping.map { meta, file -> file }.collect(),
-            ch_rgi_bwt.gene_mapping.map { meta, file -> file }.collect(),
-            ch_rgi_kmer.kmer_json.map { meta, file -> file }.collect()
+            ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(),
+            ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(),
+            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect()
         )
         ch_versions = ch_versions.mix(
             ch_rgi_bwt.versions.first(),
@@ -346,9 +336,9 @@ workflow {
     //
     // SUBWORKFLOW: Assembly
     //
-    ch_contigs_meta = Channel.empty()
-    ch_bam_meta     = Channel.empty()
-    ch_refined_bins = Channel.empty()
+    ch_contigs_meta = channel.empty()
+    ch_bam_meta     = channel.empty()
+    ch_refined_bins = channel.empty()
     
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
@@ -478,7 +468,7 @@ workflow {
     //
     ch_versions
         .map { yml -> yml.text.stripIndent() }
-        .mix( Channel.of(
+        .mix( channel.of(
             ( "\"${workflow.manifest.name}\":\n" +
               "    pipeline: ${workflow.manifest.version}\n" +
               "    nextflow: ${nextflow.version}\n" ).toString()
@@ -491,40 +481,39 @@ workflow {
             newLine: false
         )
 
-}
+    //
+    // COMPLETION HANDLERS
+    // Registered at the end of the workflow body (strict syntax disallows
+    // top-level handlers): a validation error() above throws before these run,
+    // so they do not fire on startup failures — same behavior as before.
+    //
+    workflow.onComplete = {
+        def msg = """\
+            Pipeline execution summary
+            ---------------------------
+            Completed at : ${workflow.complete}
+            Duration     : ${workflow.duration}
+            Success      : ${workflow.success}
+            Exit status  : ${workflow.exitStatus}
+            Work dir     : ${workflow.workDir}
+            Output dir   : ${params.output}
+            """
+            .stripIndent()
 
-/*
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    COMPLETION HANDLER
-~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-*/
+        log.info msg
 
-workflow.onComplete {
-    def msg = """\
-        Pipeline execution summary
-        ---------------------------
-        Completed at : ${workflow.complete}
-        Duration     : ${workflow.duration}
-        Success      : ${workflow.success}
-        Exit status  : ${workflow.exitStatus}
-        Work dir     : ${workflow.workDir}
-        Output dir   : ${params.output}
-        """
-        .stripIndent()
-
-    log.info msg
-
-    if (workflow.success) {
-        log.info "\u001B[32m========================================\u001B[0m"
-        log.info "\u001B[32m  Pipeline completed successfully!\u001B[0m"
-        log.info "\u001B[32m========================================\u001B[0m"
-    } else {
-        log.error "\u001B[31m========================================\u001B[0m"
-        log.error "\u001B[31m  Pipeline completed with errors\u001B[0m"
-        log.error "\u001B[31m========================================\u001B[0m"
+        if (workflow.success) {
+            log.info "\u001B[32m========================================\u001B[0m"
+            log.info "\u001B[32m  Pipeline completed successfully!\u001B[0m"
+            log.info "\u001B[32m========================================\u001B[0m"
+        } else {
+            log.error "\u001B[31m========================================\u001B[0m"
+            log.error "\u001B[31m  Pipeline completed with errors\u001B[0m"
+            log.error "\u001B[31m========================================\u001B[0m"
+        }
     }
-}
 
-workflow.onError {
-    log.error "Pipeline failed. Check error message above or in ${params.output}/pipeline_info/"
+    workflow.onError = {
+        log.error "Pipeline failed. Check error message above or in ${params.output}/pipeline_info/"
+    }
 }
