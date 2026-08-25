@@ -70,26 +70,31 @@
                 },
                 "include_binning": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable metagenomic binning and refinement steps.",
                     "fa_icon": "fas fa-th"
                 },
                 "read_arg_prediction": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA.",
                     "fa_icon": "fas fa-dna"
                 },
                 "contig_tax_and_arg": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
                     "fa_icon": "fas fa-microscope"
                 },
                 "contig_level_metacerberus": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable contig-level functional annotation with MetaCerberus.",
                     "fa_icon": "fas fa-tags"
                 },
                 "arg_bin_clustering": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable ARG gene prediction and clustering for horizontal gene transfer inference.",
                     "fa_icon": "fas fa-project-diagram"
                 },
@@ -102,6 +107,7 @@
                 },
                 "rgi_prediction": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Enable RGI AMR gene prediction with pathogen-of-origin analysis.",
                     "fa_icon": "fas fa-dna"
                 }
@@ -617,6 +623,7 @@
                 },
                 "create_phyloseq_rds": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Generate R phyloseq RDS files for downstream analysis.",
                     "fa_icon": "fas fa-file-code"
                 }
@@ -681,6 +688,7 @@
             "properties": {
                 "help": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Display help text.",
                     "fa_icon": "fas fa-question-circle",
                     "hidden": true
@@ -703,6 +711,7 @@
                 },
                 "store_clean_reads": {
                     "type": "boolean",
+                    "default": false,
                     "description": "Publish decontaminated reads to <output>/clean_reads/ (publishing, not caching: -resume is the cache).",
                     "fa_icon": "fas fa-save"
                 },
