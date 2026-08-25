@@ -33,7 +33,7 @@ Please be respectful and constructive in all interactions. We welcome contributi
 
 ### Requirements
 
-- Nextflow >= 23.04.0
+- Nextflow >= 24.04.0
 - Docker or Singularity
 - Git
 
@@ -45,7 +45,18 @@ nextflow run main.nf -profile test,docker
 
 # Dry run (stub mode)
 nextflow run main.nf -profile test,docker -stub
+
+# nf-test suite (what CI runs alongside the profile runs)
+nf-test test
 ```
+
+> **Note**: On Nextflow >= 26.04 the strict config parser rejects this pipeline's
+> legacy config syntax. CI sets `NXF_SYNTAX_PARSER=v1` for this reason; do the
+> same locally if you see a config parser error:
+>
+> ```bash
+> export NXF_SYNTAX_PARSER=v1
+> ```
 
 ## Making Changes
 
@@ -225,6 +236,30 @@ nextflow run main.nf -profile test,docker -stub
 
 # Resume failed run
 nextflow run main.nf -profile test,docker -resume
+
+# nf-test suite (configured in nf-test.config: testsDir tests/, docker profile)
+nf-test test
+
+# Single nf-test file
+nf-test test tests/modules/fastp.nf.test
+```
+
+Local runs (nextflow and nf-test alike) leave working files in the repo
+root — `work/`, `.nextflow/`, `.nextflow.log*`, `.nf-test/`, `.nf-test.log`,
+`test_results/`. They are gitignored, but they accumulate; clean them with:
+
+```bash
+tests/bin/clean_test_artifacts.sh
+```
+
+(Real run outputs — `results/`, `results_stub/`, `databases/` — are left
+untouched.)
+
+Parameter validation uses the `nf-schema` plugin, which Nextflow downloads
+automatically on first run. For offline environments, pre-install it once:
+
+```bash
+nextflow plugin install nf-schema@2.4.2
 ```
 
 ### Linting

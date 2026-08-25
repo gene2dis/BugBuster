@@ -14,6 +14,9 @@ on:
 
 env:
   NXF_ANSI_LOG: false
+  # The config uses legacy syntax (e.g. top-level def check_max) that the
+  # strict parser, default since Nextflow 26.04, rejects
+  NXF_SYNTAX_PARSER: v1
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
@@ -26,7 +29,7 @@ jobs:
     strategy:
       matrix:
         NXF_VER:
-          - "23.04.0"
+          - "24.04.4"
           - "latest-everything"
     steps:
       - name: Check out pipeline code
@@ -39,11 +42,11 @@ jobs:
 
       - name: Run pipeline with test profile (stub)
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub --output ./results_stub
 
       - name: Run pipeline with test profile
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker --output ./results
 
   lint:
     name: Nextflow config lint
@@ -68,44 +71,63 @@ jobs:
             python3 -c "import json; json.load(open('nextflow_schema.json'))"
           fi
 
-  containers:
-    name: Check container availability
+  nf-test:
+    name: Run nf-test suite
     runs-on: ubuntu-latest
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4
 
-      - name: Check Docker containers
-        run: |
-          # Extract container images from modules
-          grep -r "container " modules/ --include="*.nf" | \
-            grep -oP "container\s+['\"]?\K[^'\"]+(?=['\"]?)" | \
-            sort -u | \
-            while read container; do
-              echo "Checking: $container"
-              docker pull $container || echo "Warning: Could not pull $container"
-            done
-
-  changes:
-    name: Check for changes
-    runs-on: ubuntu-latest
-    outputs:
-      modules: ${{ steps.filter.outputs.modules }}
-      subworkflows: ${{ steps.filter.outputs.subworkflows }}
-      configs: ${{ steps.filter.outputs.configs }}
-    steps:
-      - name: Check out pipeline code
-        uses: actions/checkout@v4
-
-      - uses: dorny/paths-filter@v3
-        id: filter
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
-          filters: |
-            modules:
-              - 'modules/**'
-            subworkflows:
-              - 'subworkflows/**'
-            configs:
-              - 'conf/**'
-              - 'nextflow.config'
-              - 'nextflow_schema.json'
+          distribution: "temurin"
+          java-version: "17"
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: "latest-everything"
+
+      - name: Install nf-test
+        run: |
+          curl -fsSL https://get.nf-test.com | bash
+          sudo mv nf-test /usr/local/bin/
+
+      - name: Run nf-test
+        run: |
+          nf-test test
+
+  db-scripts:
+    name: Test DB reformat scripts and pinned containers
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Run DB reformat script regression tests (audit #3, #10, #21)
+        run: |
+          tests/bin/test_db_reformat_scripts.sh
+
+  report-scripts:
+    name: Test taxonomy/report scripts and pinned container
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Run taxonomy script regression tests (audit #4, #12)
+        run: |
+          tests/bin/test_taxonomy_scripts.sh
+
+      - name: Run report script regression tests (audit #13)
+        run: |
+          tests/bin/test_report_scripts.sh
+
+      - name: Run bin-directory recognition regression tests (audit #6)
+        run: |
+          tests/bin/test_identify_bin_dir.sh
+
+      - name: Run RGI_BWT low-coverage fallback regression tests (audit #8)
+        run: |
+          tests/bin/test_rgi_bwt_fallback.sh

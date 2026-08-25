@@ -1,6 +1,10 @@
 # BugBuster Deployment Guide
 
 This guide covers deploying BugBuster on different compute infrastructures.
+The cloud/HPC profile parameters used below (`aws_*`, `gcp_*`, `azure_*`,
+`slurm_*`) are formally documented in
+[`parameters.md` § Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters);
+the `--*_workdir` parameter of the chosen cloud profile is **required**.
 
 ## Table of Contents
 
@@ -60,6 +64,8 @@ nextflow run main.nf \
 
 ### Creating an Institutional Profile
 
+`conf/institutional.config` is a **template only** — no `institutional` profile is defined in `nextflow.config`, so it must be either registered as a profile (steps below) or passed directly with `-c conf/my_institution.config`.
+
 1. Copy the template:
    ```bash
    cp conf/institutional.config conf/my_institution.config
@@ -76,7 +82,10 @@ nextflow run main.nf \
 
 4. Run with your profile:
    ```bash
-   nextflow run main.nf -profile my_institution
+   nextflow run main.nf \
+       --input samplesheet.csv \
+       --output ./results \
+       -profile my_institution
    ```
 
 ---
@@ -106,7 +115,7 @@ nextflow run main.nf \
     -profile aws,docker \
     --aws_queue 'my-batch-queue' \
     --aws_region 'us-east-1' \
-    -work-dir s3://bucket/work
+    --aws_workdir s3://bucket/work
 ```
 
 ### With Spot Instances
@@ -115,13 +124,14 @@ AWS Batch automatically handles spot instance interruptions with the retry strat
 
 ### Fusion Filesystem (Recommended for Performance)
 
-Enable Fusion for improved S3 performance (requires Nextflow 23.10+):
+Enable Fusion for improved S3 performance:
 
 ```bash
 nextflow run main.nf \
     --input s3://bucket/samplesheet.csv \
     --output s3://bucket/results \
     -profile aws,docker \
+    --aws_workdir s3://bucket/work \
     -with-wave \
     -with-fusion
 ```
@@ -134,7 +144,7 @@ nextflow run main.nf \
 
 1. **Google Cloud SDK** authenticated
 2. **GCS bucket** for work directory and results
-3. **Google Cloud Batch** or **Life Sciences API** enabled
+3. **Google Cloud Batch** API enabled
 
 ### Authentication
 
@@ -153,7 +163,7 @@ nextflow run main.nf \
     -profile gcp,docker \
     --gcp_project 'my-project-id' \
     --gcp_region 'us-central1' \
-    -work-dir gs://bucket/work
+    --gcp_workdir gs://bucket/work
 ```
 
 ### With Preemptible/Spot Instances
@@ -165,7 +175,7 @@ nextflow run main.nf \
     -profile gcp,docker \
     --gcp_project 'my-project-id' \
     --gcp_spot true \
-    -work-dir gs://bucket/work
+    --gcp_workdir gs://bucket/work
 ```
 
 ---
@@ -195,7 +205,7 @@ nextflow run main.nf \
     --output az://container/results \
     -profile azure,docker \
     --azure_region 'eastus' \
-    -work-dir az://container/work
+    --azure_workdir az://container/work
 ```
 
 ### With Low-Priority (Spot) Instances
@@ -206,7 +216,7 @@ nextflow run main.nf \
     --output az://container/results \
     -profile azure,docker \
     --azure_spot true \
-    -work-dir az://container/work
+    --azure_workdir az://container/work
 ```
 
 ---
@@ -258,10 +268,10 @@ nextflow run main.nf \
 For better performance, pre-download databases to shared storage:
 
 ```bash
-# Kraken2 Standard-8 (~8 GB)
-# Sourmash GTDB (~3 GB)
-# CheckM2 (~3 GB)
-# GTDB-TK (~85 GB)
+# Kraken2 Standard-8 (~7.5 GB)
+# Sourmash GTDB r220 (~17 GB)
+# CheckM2 (~2.9 GB)
+# GTDB-TK r220 (~109 GB)
 ```
 
 Then specify paths:

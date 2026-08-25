@@ -219,19 +219,22 @@ def main():
     karga_with_reads = reads_and_cells.merge(karga_filtered, on='sample', how='left')
     kargva_with_reads = reads_and_cells.merge(kargva_filtered, on='sample', how='left')
     
+    # Zero read/cell counts (e.g. ARGs-OAP finds no 16S -> nCell=0) must yield
+    # empty cells, not inf, in the published CSVs
+
     # Normalize KARGA
     if not karga_filtered.empty and not karga_filtered['GeneIdx'].isna().all():
         karga_norm = karga_with_reads.copy()
-        karga_norm['CPM_ARGs'] = karga_norm['AverageKMerDepth'] * (1 / (karga_norm['nRead'] / 1e6))
-        karga_norm['copies_per_cell'] = karga_norm['AverageKMerDepth'] / karga_norm['nCell']
+        karga_norm['CPM_ARGs'] = karga_norm['AverageKMerDepth'] * (1 / (karga_norm['nRead'].replace(0, float('nan')) / 1e6))
+        karga_norm['copies_per_cell'] = karga_norm['AverageKMerDepth'] / karga_norm['nCell'].replace(0, float('nan'))
     else:
         karga_norm = karga_with_reads
-    
+
     # Normalize KARGVA
     if not kargva_filtered.empty and not kargva_filtered['GeneIdx'].isna().all():
         kargva_norm = kargva_with_reads.copy()
-        kargva_norm['CPM_ARGs'] = kargva_norm['AverageKMerDepth'] * (1 / (kargva_norm['nRead'] / 1e6))
-        kargva_norm['copies_per_cell'] = kargva_norm['AverageKMerDepth'] / kargva_norm['nCell']
+        kargva_norm['CPM_ARGs'] = kargva_norm['AverageKMerDepth'] * (1 / (kargva_norm['nRead'].replace(0, float('nan')) / 1e6))
+        kargva_norm['copies_per_cell'] = kargva_norm['AverageKMerDepth'] / kargva_norm['nCell'].replace(0, float('nan'))
     else:
         kargva_norm = kargva_with_reads
     

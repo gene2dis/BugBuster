@@ -2,9 +2,7 @@
 
 ## TL;DR
 
-BugBuster now removes phiX and host contamination in **one step** instead of two, making it **~45% faster** and using **50% less disk space**.
-
-**No changes needed to your existing commands** - everything works automatically!
+BugBuster removes phiX and host contamination in a **single pass** against one combined Bowtie2 index, built automatically from the phiX and host genome FASTAs.
 
 ---
 
@@ -12,7 +10,7 @@ BugBuster now removes phiX and host contamination in **one step** instead of two
 
 ### Basic Usage
 ```bash
-nextflow run main.nf --input samples.csv --output results
+nextflow run main.nf --input samples.csv --output results -profile docker
 ```
 
 ### With Pre-built Index (Fastest)
@@ -20,7 +18,8 @@ nextflow run main.nf --input samples.csv --output results
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_decontamination_index /path/to/contaminants_index
+  --custom_decontamination_index /path/to/contaminants_index \
+  -profile docker
 ```
 
 ### Custom Host Genome
@@ -28,7 +27,8 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_host_fasta /path/to/host.fasta
+  --custom_host_fasta /path/to/host.fasta \
+  -profile docker
 ```
 
 ---
@@ -49,24 +49,27 @@ nextflow run main.nf \
 
 ### 1. Default (Human + PhiX)
 ```bash
-nextflow run main.nf --input samples.csv --output results
+nextflow run main.nf --input samples.csv --output results -profile docker
 ```
 Automatically downloads and uses human CHM13 + phiX174.
 
-### 2. Mouse Samples
+### 2. Non-Human Host (e.g. Mouse)
 ```bash
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --host_db mouse
+  --custom_host_fasta /path/to/mouse_genome.fasta.gz \
+  -profile docker
 ```
+(`--host_db` has a single built-in entry, `human`; other hosts are supplied as FASTA.)
 
 ### 3. Multiple Contaminants
 ```bash
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --custom_host_fasta "human.fasta,mouse.fasta,ecoli.fasta"
+  --custom_host_fasta "human.fasta,mouse.fasta,ecoli.fasta" \
+  -profile docker
 ```
 
 ### 4. Low Disk Space
@@ -74,7 +77,7 @@ nextflow run main.nf \
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  -profile low_disk
+  -profile docker,low_disk
 ```
 
 ---
@@ -97,9 +100,9 @@ nextflow run main.nf --custom_decontamination_index contaminants_index
 
 ## Output Files
 
-### Clean Reads
+### Clean Reads (with `--store_clean_reads`)
 ```
-results/clean_reads/
+results/clean_reads/sample1/
 ├── sample1_R1_clean.fastq.gz
 ├── sample1_R2_clean.fastq.gz
 └── sample1_Singleton_clean.fastq.gz (if present)
@@ -107,12 +110,12 @@ results/clean_reads/
 
 ### Reports
 ```
-results/reads_report/reads_summary_report.tsv
+results/01_quality_control/summary/Reads_report.csv
 ```
 
 ### Combined Index (Cached)
 ```
-results/../databases/bowtie_index/contaminants_index/
+<databases_dir>/bowtie_index/contaminants_index/   # default: <output>/../databases
 ```
 
 ---
@@ -120,7 +123,7 @@ results/../databases/bowtie_index/contaminants_index/
 ## Performance Tips
 
 1. **Pre-build index** for multiple runs
-2. **Use `--store_clean_reads true`** to enable immediate cleanup
+2. **Use `--store_clean_reads true`** to keep clean reads in the output dir (`-resume` remains the task cache)
 3. **Use `-profile low_disk`** on constrained systems
 4. **Share `--databases_dir`** across projects
 
@@ -140,35 +143,27 @@ nextflow run main.nf -resume
 
 ### Check Statistics
 ```bash
-cat results/reads_report/reads_summary_report.tsv
+cat results/01_quality_control/summary/Reads_report.csv
 ```
 
 ---
 
-## What Changed?
+## How It Works
 
-### Before (Two Steps)
 ```
-Reads → Host Removal → Temp Files → PhiX Removal → Clean Reads
-```
-
-### After (One Step)
-```
-Reads → Combined Decontamination → Clean Reads
+Reads → Combined phiX + Host Decontamination (one Bowtie2 pass) → Clean Reads
 ```
 
-**Benefits:**
-- ⚡ 45% faster
-- 💾 50% less disk space
-- 🎯 Same biological results
-- ✅ Fully backward compatible
+A single alignment against the combined index replaces separate host and phiX
+passes: fewer temp files, less disk, one decontamination report per sample.
 
 ---
 
 ## Documentation
 
-- **Full Guide**: `docs/decontamination_optimization.md`
-- **Migration Guide**: `docs/MIGRATION_GUIDE.md`
+- **Manual**: [`manual.md`](manual.md)
+- **Parameter reference**: [`parameters.md`](parameters.md)
+- **Troubleshooting**: [`troubleshooting.md`](troubleshooting.md)
 - **Examples**: `examples/decontamination_examples.sh`
 
 ---

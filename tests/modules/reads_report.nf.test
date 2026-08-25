@@ -1,0 +1,94 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    READS_REPORT Module Test
+
+    Regression test for audit item #13: the module used to declare path("*")
+    as its only output, which always matched the staged input TSVs — so a
+    report_unify.py run that produced nothing still "succeeded" and re-emitted
+    its inputs as results. The module now declares Reads_report.csv explicitly
+    and the script exits non-zero when no fastp reports are present.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test READS_REPORT Process"
+    script "../../modules/local/reads_report/main.nf"
+    process "READS_REPORT"
+
+    test("unifies fastp and decontamination reports") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/reports/s1_fastp_report.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/reports/s1_contaminants_decontamination_report.tsv", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // exactly the report — no re-emitted staged input TSVs
+            assert process.out.report.size() == 1
+            assert file(process.out.report.get(0)).name == "Reads_report.csv"
+
+            def lines = path(process.out.report.get(0)).readLines()
+            assert lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed)"
+            assert lines[1] == "s1,1000,900,850"
+
+            // filtered mode also draws the boxplot
+            assert process.out.plot.size() == 1
+            assert file(process.out.plot.get(0)).name == "Box_plot_reads.png"
+        }
+    }
+
+    test("fails when no fastp reports are staged") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/reports/s1_contaminants_decontamination_report.tsv", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+        }
+    }
+
+    test("stub emits the report on the named channel") {
+        options "-stub"
+
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/reports/s1_fastp_report.tsv", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.report.get(0)).name == "Reads_report.csv"
+        }
+    }
+}

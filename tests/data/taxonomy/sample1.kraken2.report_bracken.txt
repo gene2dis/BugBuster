@@ -1,0 +1,16 @@
+ 12.50	125	125	U	0	unclassified
+ 87.50	875	0	R	1	root
+ 87.50	875	0	R1	131567	  cellular organisms
+ 87.50	875	0	D	2	    Bacteria
+ 61.00	610	0	P	1224	      Pseudomonadota
+ 61.00	610	0	C	1236	        Gammaproteobacteria
+ 61.00	610	0	O	91347	          Enterobacterales
+ 61.00	610	0	F	543	            Enterobacteriaceae
+ 61.00	610	0	G	561	              Escherichia
+ 61.00	610	610	S	562	                Escherichia coli
+ 26.50	265	0	P	1239	      Bacillota
+ 26.50	265	0	C	91061	        Bacilli
+ 26.50	265	0	O	1385	          Bacillales
+ 26.50	265	0	F	186817	            Bacillaceae
+ 26.50	265	0	G	1386	              Bacillus
+ 26.50	265	265	S	1423	                Bacillus subtilis

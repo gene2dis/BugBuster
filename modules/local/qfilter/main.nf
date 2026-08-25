@@ -12,13 +12,15 @@ process QFILTER {
     output:
         tuple val(meta), path(reads), path("after_reads_fr.txt"), emit: qfilter
 	path("*_fastp_report.tsv"), emit: reads_report
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
 
         """
-        # Handle both nf-core naming (*.fastp.json) and legacy naming (*_report.json)
-        json_file=\$(ls *.json 2>/dev/null | head -1)
+        # Paired-end fastp json; the singleton run's json (*Singleton*.json,
+        # handled below) may be staged alongside it
+        json_file=\$(ls *.json 2>/dev/null | grep -v Singleton | head -1)
         
         cat \$json_file | grep -zoP '.+_filtering.+\\n.+'| sed 's/"//g' | awk '{print \$1}' | grep -Pa 'total_reads:[0-9].+' | sed -e 's/,//g' -e '1s/total/before/' -e '2s/total/after/g'| tr '\\0' '\\n' | grep -Poa "after_reads.+" | cut -d':' -f2 | tr -d '\\n' > after_reads_fr.txt
         cat \$json_file | grep -zoP '.+_filtering.+\\n.+'| sed 's/"//g' | awk '{print \$1}' | grep -Pa 'total_reads:[0-9].+' | sed -e 's/,//g' -e '1s/total/before/' -e '2s/total/after/g'| tr '\\0' '\\n' | grep -Poa "before.+" | cut -d':' -f2 | tr -d '\\n' > before_reads_fr.txt
@@ -40,5 +42,26 @@ process QFILTER {
             echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
             echo -e "${prefix}\\t\${before_reads_fr}\\t\${after_reads_fr}" >> ${prefix}_fastp_report.tsv
         fi
-        """ 
+
+        # Shell-only module: record the interpreter version
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bash: \$(bash --version | head -n 1 | awk '{print \$4}')
+        END_VERSIONS
+        """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        # Must hold an integer: the QC subworkflow does Integer.parseInt on this file
+        echo 1000 > after_reads_fr.txt
+        echo -e "Id\\tRaw reads\\tFastp" > ${prefix}_fastp_report.tsv
+        echo -e "${prefix}\\t1000\\t1000" >> ${prefix}_fastp_report.tsv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bash: 5.1.16
+        END_VERSIONS
+        """
 }

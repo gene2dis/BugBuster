@@ -1,0 +1,5 @@
+sample_id	sampleok
+contigs_before_filter	10
+contigs_after_filter	8
+min_length_threshold	1000
+all_contigs_filtered	FALSE

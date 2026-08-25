@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+The pipeline self-reports this state as `1.1.0dev` (manifest version) until the
+next release is tagged.
+
 ### Added
+
+- **Provenance tracking (audit #27)**
+  - `versions.yml` emitted by every live module (previously ~20 in-use modules
+    emitted none) and, for the first time, aggregated: each run now writes a
+    deduplicated `pipeline_info/software_versions.yml` covering every executed
+    process plus the pipeline and Nextflow versions
+  - DeepARG database downloads record the tool version and download date; the
+    CARD version captured by RGI_LOAD now actually reaches the aggregate report
 
 - **RGI AMR Prediction**
   - New `--rgi_prediction` parameter to enable AMR gene prediction with pathogen-of-origin analysis
@@ -19,7 +30,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Support for WildCARD variants for extended allelic diversity
   - Custom database support via `--custom_rgi_card_db` and `--custom_rgi_wildcard` parameters
   - Flexible database options: automatic download, pre-prepared complete database, or separate CARD + WildCARD
-  - Comprehensive documentation in `docs/RGI_IMPLEMENTATION_PLAN.md`, `docs/RGI_IMPLEMENTATION_SUMMARY.md`, and `docs/RGI_WILDCARD_USAGE.md`
+  - Comprehensive documentation in `docs/RGI_WILDCARD_USAGE.md` (originally also `docs/RGI_IMPLEMENTATION_{PLAN,SUMMARY}.md`, since consolidated)
   - RGI-specific parameters: `rgi_card_version`, `rgi_include_wildcard`, `rgi_aligner`, `rgi_kmer_size`, `rgi_min_kmer_coverage`
   - Integration with PREPARE_DATABASES subworkflow for automatic database management
   - Output includes per-sample results, pathogen predictions, and multi-sample summary reports with plots
@@ -30,6 +41,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated docs/manual.md with RGI parameters, output structure, and usage examples
 - Updated docs/parameters.md with complete RGI parameter reference
 - Enhanced ARG prediction capabilities with complementary tool (RGI alongside KARGA/KARGVA)
+- Documentation corrected to match real behavior (audit #26): sample read-count
+  filter default, database storage location, output trees, profile lists;
+  MultiQC removed from docs, dead wiring, and vendored modules (audit #28;
+  re-enabling requires re-vendoring via `nf-core modules install multiqc`)
+- Minimum Nextflow version raised from 23.04.0 to **24.04.0** with parameter
+  validation now enforced by the nf-schema 2.4.2 plugin (audit #25): unknown
+  `--params` are a hard startup error
+- Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
+  wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
+  `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
+
+### Removed
+
+**Breaking**: parameter validation is now strict (nf-schema
+`failUnrecognisedParams`), so passing any removed parameter aborts the run at
+startup instead of being silently ignored. Update existing command lines and
+`-params-file` YAMLs accordingly.
+
+- `--custom_phiX_index` and `--custom_bowtie_host_index` — replaced by
+  `--custom_decontamination_index` (pre-built combined index),
+  `--custom_phiX_fasta`, and `--custom_host_fasta` (the pipeline builds the
+  combined Bowtie2 index from FASTAs); the old params had been silent no-ops
+- `--enable_work_cleanup` — was never consumed; work-dir cleanup is Nextflow's
+  `cleanup = true`, enabled by `-profile low_disk`
+- `--kraken_db_used`, `--sourmash_db_name` — report database names are derived
+  from the selected database
+- `--store_filtered_contigs`, `--store_refined_bins` — were no-ops; filtered
+  contigs and refined bins are always published
+- `--tracedir` — trace/report/timeline/DAG always go to
+  `<output>/pipeline_info/`
+- `--validationShowHiddenParams`, `--validationSchemaIgnoreParams` —
+  nf-validation 1.x options superseded by the nf-schema `validation {}` scope
+- All eleven `--mmseqs_*` parameters — unused; clustering settings are fixed
+  tiers in `modules/local/clustering`
+- Renamed: `--bbmap_lenght` → `--bbmap_length`
+
+### Fixed
+
+- Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
+  decontamination DB and `--local` scoring, database download containers and
+  script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,
+  singleton read handling through QC, storeDir misuse, report failure masking,
+  silent no-op feature combos, edge-data crashes, publishing gaps (the
+  itemized 30-point list and fixing commits are recorded in the per-item
+  `fix:`/`feat:` commit messages on that branch)
 
 ## [1.0.0] - 2024-01-10
 
@@ -66,8 +122,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Module Improvements**
   - Fixed bash null checks using Groovy conditionals
-  - Added `versions.yml` output for software tracking
-  - Added `stub` blocks for dry-run testing
+  - Added `versions.yml` output to some modules (full coverage and aggregation
+    landed later, in [Unreleased])
+  - Added `stub` blocks for some modules (full coverage landed later)
   - Added `meta.yml` descriptors for key modules
 
 - **Documentation**
@@ -100,3 +157,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Bin refinement with MetaWRAP
 - Quality assessment with CheckM2
 - Taxonomic classification with GTDB-TK
+
+[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/gene2dis/BugBuster/releases/tag/v1.0.0
+[0.1.0]: https://github.com/gene2dis/BugBuster/tree/v0.1.0

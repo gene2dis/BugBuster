@@ -1,4 +1,27 @@
 .nextflow
 .nextflow.log*
 
-results
+# Run outputs
+/results/
+/results_stub/
+
+# User-created samplesheet (copy of assets/samplesheet_example.csv)
+/samplesheet.csv
+
+# Internal docs
+internal_docs
+
+# claude files
+.claude
+CLAUDE.md
+
+# Editor config
+.vscode/
+
+# Test artifacts
+work/
+.nf-test/
+.nf-test.log
+test_results/
+null/
+/databases/

@@ -13,17 +13,16 @@ process BOWTIE2_DECONTAMINATE {
 
     label 'process_high'
 
-    storeDir params.store_clean_reads ? "${params.output}/clean_reads/${meta.id}" : null
-
     input:
     tuple val(meta), path(reads), path(index_db)
     val db_alias
 
     output:
-    tuple val(meta), path("${meta.id}_R*_clean.fastq.gz"), emit: reads
-    path("*_decontamination_report.tsv")                  , emit: report
-    path("${meta.id}_*_clean.fastq.gz")                   , emit: reads_coassembly
-    path "versions.yml"                                   , emit: versions
+    // Multi-file glob outputs are sorted lexicographically: [R1, R2, Singleton]
+    tuple val(meta), path("${meta.id}_{R1,R2,Singleton}_clean.fastq.gz"), emit: reads
+    path("*_decontamination_report.tsv")                                , emit: report
+    path("${meta.id}_*_clean.fastq.gz")                                 , emit: reads_coassembly
+    path "versions.yml"                                                 , emit: versions
 
     when:
     task.ext.when == null || task.ext.when
@@ -89,10 +88,19 @@ process BOWTIE2_DECONTAMINATE {
 
     stub:
     def prefix = meta.id
+    def has_singleton = reads.size() > 2
     """
-    touch ${prefix}_R1_clean.fastq.gz
-    touch ${prefix}_R2_clean.fastq.gz
-    touch ${prefix}_${db_alias}_decontamination_report.tsv
+    echo -n '' | gzip > ${prefix}_R1_clean.fastq.gz
+    echo -n '' | gzip > ${prefix}_R2_clean.fastq.gz
+    ${has_singleton ? "echo -n '' | gzip > ${prefix}_Singleton_clean.fastq.gz" : ""}
+
+    ${has_singleton ? """
+    echo -e \"Id\\tClean reads (${db_alias} removed)\\tClean singletons (${db_alias} removed)\" > ${prefix}_${db_alias}_decontamination_report.tsv
+    echo -e \"${prefix}\\t1000\\t100\" >> ${prefix}_${db_alias}_decontamination_report.tsv
+    """ : """
+    echo -e \"Id\\tClean reads (${db_alias} removed)\" > ${prefix}_${db_alias}_decontamination_report.tsv
+    echo -e \"${prefix}\\t1000\" >> ${prefix}_${db_alias}_decontamination_report.tsv
+    """}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

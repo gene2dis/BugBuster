@@ -1,0 +1,75 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BBMAP Module Test
+
+    Regression test for audit item #20: contig counting used
+    `grep -c '^>' file || echo 0` under the global pipefail shell — on a
+    zero-match file grep prints "0" AND exits 1, so `|| echo 0` appended a
+    second line and the count variable became "0\n0", crashing the later
+    integer test. A sample whose contigs are ALL below the length threshold
+    (the second test) died in exactly the case the report was meant to flag.
+    Fixtures from tests/bin/make_contig_fixtures.py.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BBMAP Process"
+    script "../../modules/local/bbmap/main.nf"
+    process "BBMAP"
+
+    test("filters short contigs and reports before/after counts") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/contigs/mixed_length_contigs.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def report = path(process.out.filter_report[0]).text
+            assert report.contains("contigs_before_filter\t3")
+            assert report.contains("contigs_after_filter\t2")
+            assert report.contains("all_contigs_filtered\tFALSE")
+            def contigs = path(process.out.contigs_only[0][1]).text
+            assert contigs.contains(">contig_long1")
+            assert !contigs.contains(">contig_short")
+        }
+    }
+
+    test("survives a sample where all contigs are filtered out") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/contigs/short_only_contigs.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            // Previously this crashed: contigs_after became "0\n0" and the
+            // `[ ... -eq 0 ]` check errored with "integer expression expected"
+            assert process.success
+            def report = path(process.out.filter_report[0]).text
+            assert report.contains("contigs_before_filter\t2")
+            assert report.contains("contigs_after_filter\t0")
+            assert report.contains("all_contigs_filtered\tTRUE")
+        }
+    }
+}

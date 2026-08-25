@@ -1,0 +1,61 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    PRODIGAL_BINS Module Test
+
+    Regression test for audit item #22: the `for file in *.fa` loop ran without
+    nullglob, so a bins dir holding only a MetaWRAP SKIPPED/FAILED marker (no
+    *.fa) fed prodigal a literal '*.fa' and crashed the task. It must now
+    succeed with empty output dirs. Fixtures come from
+    tests/bin/make_bin_fixtures.py.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test PRODIGAL_BINS Process"
+    script "../../modules/local/prodigal/main.nf"
+    process "PRODIGAL_BINS"
+
+    test("succeeds on a bins dir holding only a SKIPPED marker") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'markertest' ],
+                    file("${projectDir}/tests/data/bins/marker_only_bins", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // No bins -> empty proteins dir, not a crashed task
+            def proteins_dir = new File(process.out.prodigal_bins.get(0).get(1).toString())
+            assert proteins_dir.isDirectory()
+            assert proteins_dir.list().size() == 0
+        }
+    }
+
+    test("predicts proteins for a real bin") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'ptest' ],
+                    file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def proteins_dir = new File(process.out.prodigal_bins.get(0).get(1).toString())
+            assert proteins_dir.isDirectory()
+            assert new File(proteins_dir, "ptest_bin.1_proteins.faa").exists()
+        }
+    }
+}

@@ -4,8 +4,8 @@ process TAXONOMY_PHYLOSEQ {
     
     conda "conda-forge::python=3.11 conda-forge::pandas=2.0 conda-forge::numpy=1.24 conda-forge::matplotlib=3.7 conda-forge::seaborn=0.12 conda-forge::h5py=3.8 bioconda::biom-format=2.1.14"
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'docker://jupyter/scipy-notebook:python-3.11' :
-        'jupyter/scipy-notebook:python-3.11' }"
+        'oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib_pruned:3b27e3935fded4e0' :
+        'community.wave.seqera.io/library/python_pandas_numpy_matplotlib_pruned:195b3e3e5f741210' }"
     
     input:
     path(input_files)
@@ -19,7 +19,7 @@ process TAXONOMY_PHYLOSEQ {
     path("*_tax_table.tsv"), emit: tax_table
     path("*_sample_metadata.tsv"), emit: sample_metadata
     path("*_phyloseq_data.h5"), emit: phyloseq_h5, optional: true
-    path("plots/*.png"), emit: plots, optional: true
+    path("*.png"), emit: plots, optional: true
     path("versions.yml"), emit: versions
     
     when:
@@ -31,9 +31,6 @@ process TAXONOMY_PHYLOSEQ {
     def top_n_arg = top_n ?: 10
     def format_arg = task.ext.format ?: 'both'
     """
-    # Install biom-format if not present
-    pip install --quiet biom-format==2.1.14 2>/dev/null || true
-    
     taxonomy_phyloseq.py \\
         --profiler ${profiler} \\
         --input-files ${input_files} \\
@@ -52,5 +49,14 @@ process TAXONOMY_PHYLOSEQ {
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
         h5py: \$(python -c "import h5py; print(h5py.__version__)")
     END_VERSIONS
+    """
+
+    stub:
+    """
+    touch ${profiler}_${db_name}_otu_table.tsv
+    touch ${profiler}_${db_name}_tax_table.tsv
+    touch ${profiler}_${db_name}_sample_metadata.tsv
+    touch ${profiler}_${db_name}_phyloseq_data.h5
+    touch versions.yml
     """
 }

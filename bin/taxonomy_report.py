@@ -10,6 +10,7 @@ License: MIT
 """
 
 import argparse
+import re
 import sys
 from pathlib import Path
 from typing import List, Tuple
@@ -47,40 +48,59 @@ class TaxonomyReportGenerator:
     
     def parse_kraken2_reports(self, report_files: List[Path]) -> pd.DataFrame:
         """
-        Parse Kraken2 report TSV files.
-        
-        Expected format: Id, Kraken DB, Unclassified, Classified
-        
+        Parse standard kraken2 report files (nf-core KRAKEN2 output).
+
+        Each report is a headerless 6-column TSV: percent of reads, clade
+        reads, taxon reads, rank code, taxid, name. The sample id comes from
+        the filename (``<id>.kraken2.report.txt``); the unclassified fraction
+        is the percent of the ``U`` row (0 when every read was classified).
+
         Args:
-            report_files: List of Kraken2 report TSV files
-            
+            report_files: List of raw kraken2 report files
+
         Returns:
-            DataFrame with combined Kraken2 reports
+            DataFrame with columns Id, Kraken DB, Unclassified, Classified
         """
-        all_reports = []
-        
+        rows = []
+
         for report_file in report_files:
             try:
                 df = pd.read_csv(
                     report_file,
                     sep='\t',
-                    dtype={
-                        'Id': str,
-                        'Kraken DB': str,
-                        'Unclassified': float,
-                        'Classified': float
-                    }
+                    header=None,
+                    names=['percent', 'clade_reads', 'taxon_reads', 'rank', 'taxid', 'name'],
                 )
-                all_reports.append(df)
             except Exception as e:
-                print(f"Warning: Failed to parse {report_file}: {e}", file=sys.stderr)
-                continue
-        
-        if not all_reports:
+                raise ValueError(f"Failed to parse kraken2 report {report_file}: {e}")
+
+            if df.empty or df[['rank', 'taxid', 'name']].isna().any().any():
+                raise ValueError(
+                    f"{report_file} does not look like a kraken2 report "
+                    "(expected 6 tab-separated columns: percent, clade reads, "
+                    "taxon reads, rank code, taxid, name)"
+                )
+
+            percent = pd.to_numeric(df['percent'], errors='coerce')
+            if percent.isna().any():
+                raise ValueError(f"Non-numeric percent column in kraken2 report {report_file}")
+
+            unclassified_rows = percent[df['rank'] == 'U']
+            unclassified = float(unclassified_rows.iloc[0]) if len(unclassified_rows) else 0.0
+
+            sample_id = re.sub(r'(\.kraken2)?(\.report)?\.txt$', '', report_file.name)
+
+            rows.append({
+                'Id': sample_id,
+                'Kraken DB': self.db_name,
+                'Unclassified': unclassified,
+                'Classified': 100.0 - unclassified,
+            })
+
+        if not rows:
             raise ValueError("No valid Kraken2 reports found")
-        
-        combined = pd.concat(all_reports, ignore_index=True)
-        return combined
+
+        return pd.DataFrame(rows, columns=['Id', 'Kraken DB', 'Unclassified', 'Classified'])
     
     def parse_sourmash_reports(self, report_files: List[Path]) -> pd.DataFrame:
         """
@@ -136,12 +156,11 @@ class TaxonomyReportGenerator:
         """
         try:
             reads_report = pd.read_csv(reads_report_path)
-        except FileNotFoundError:
-            print(f"Warning: Reads report not found at {reads_report_path}", file=sys.stderr)
-            return taxonomy_data
         except Exception as e:
-            print(f"Warning: Failed to read reads report: {e}", file=sys.stderr)
-            return taxonomy_data
+            raise ValueError(
+                f"Required reads report {reads_report_path} is missing or "
+                f"unreadable: {e}"
+            )
         
         # Merge on 'Id' column
         # Use suffixes to handle any overlapping columns

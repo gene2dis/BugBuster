@@ -12,7 +12,7 @@
     
     Output:
         all_reports: tuple val(meta), path(quality_reports) - per sample
-        metawrap_report: tuple val(meta), path(metawrap_quality_report) - per sample
+        metawrap_report: tuple val(meta), path(metawrap_quality_report) - per sample (optional; only when MetaWRAP ran)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */
@@ -30,7 +30,7 @@ process CHECKM2_BATCH {
 
     output:
     tuple val(meta_list), path("*_*_quality_report.tsv"), emit: all_reports
-    tuple val(meta_list), path("*_metawrap_quality_report.tsv"), emit: metawrap_report
+    tuple val(meta_list), path("*_metawrap_quality_report.tsv"), emit: metawrap_report, optional: true
     path "versions.yml", emit: versions
 
     when:
@@ -38,48 +38,28 @@ process CHECKM2_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
+    def metawrap_suffix = task.ext.metawrap_dir_suffix ?: "metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"
     """
     set -euo pipefail
-    
+
     # Create organized directory structure
     mkdir -p batch_bins
-    
+
     # Process ALL staged bin directories - parse sample_id and binner from directory names
-    # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow
+    # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. Every staged dir is a
+    # binner output, so identify_bin_dir.sh fails loudly on naming drift (audit #6);
+    # the MetaWRAP dir name depends on params.metawrap_* and is passed in via ext.
     for staged_dir in bin_*/; do
         staged_dir=\${staged_dir%/}  # Remove trailing slash
-        
+
         # Get the actual bin directory inside
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
-        
-        bin_dir_name=\$(basename "\$bin_dir")
-        
-        # Parse directory name to extract sample_id and binner
-        # Pattern: {sample_id}_{binner}_bins or {sample_id}_{binner}_output_bins
-        if [[ "\$bin_dir_name" =~ ^(.+)_metabat_bins\$ ]]; then
-            sample_id="\${BASH_REMATCH[1]}"
-            binner="metabat"
-        elif [[ "\$bin_dir_name" =~ ^(.+)_semibin_output_bins\$ ]]; then
-            sample_id="\${BASH_REMATCH[1]}"
-            binner="semibin"
-        elif [[ "\$bin_dir_name" =~ ^(.+)_comebin_bins\$ ]] || [[ "\$bin_dir_name" =~ comebin_res_bins\$ ]]; then
-            # COMEBin has nested structure - extract sample from parent or use directory listing
-            if [[ "\$bin_dir_name" =~ ^(.+)_comebin ]]; then
-                sample_id="\${BASH_REMATCH[1]}"
-            else
-                # For comebin_res_bins symlink, get sample from symlink target
-                sample_id=\$(readlink -f "\$bin_dir" | grep -oP '[^/]+(?=_comebin)' || echo "unknown")
-            fi
-            binner="comebin"
-        elif [[ "\$bin_dir_name" =~ ^(.+)_metawrap_50_10_bins\$ ]]; then
-            sample_id="\${BASH_REMATCH[1]}"
-            binner="metawrap"
-        else
-            echo "Skipping unrecognized directory: \$bin_dir_name"
-            continue
-        fi
-        
+
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${metawrap_suffix}")
+        sample_id=\${id_line%%\$'\\t'*}
+        binner=\${id_line##*\$'\\t'}
+
         echo "Processing \$bin_dir -> sample_id=\$sample_id, binner=\$binner"
         
         mkdir -p "batch_bins/\${sample_id}_\${binner}"
@@ -96,8 +76,22 @@ process CHECKM2_BATCH {
         fi
     done
     
-    # Run CheckM2 on each binner's combined bins across all samples
-    for binner in metabat semibin comebin metawrap; do
+    # Run CheckM2 on each binner's combined bins across all samples.
+    # The binner list is derived from the staged directories (batch_bins/<sample>_<binner>)
+    # instead of a fixed set, so no header-only reports are fabricated for binners
+    # that never ran (audit #6).
+    discovered_binners=\$(for d in batch_bins/*/; do
+        [ -d "\$d" ] || continue
+        b=\$(basename "\$d")
+        echo "\${b##*_}"
+    done | sort -u)
+
+    if [ -z "\$discovered_binners" ]; then
+        echo "ERROR: no binner output directories were staged/recognized" >&2
+        exit 1
+    fi
+
+    for binner in \$discovered_binners; do
         # Collect all bins for this binner across all samples
         mkdir -p combined_\${binner}
         

@@ -18,9 +18,8 @@ Complete reference for all BugBuster pipeline parameters.
 10. [ARG Prediction Parameters](#arg-prediction-parameters)
 11. [Functional Annotation Parameters](#functional-annotation-parameters)
 12. [Alignment Parameters](#alignment-parameters)
-13. [Clustering Parameters](#clustering-parameters)
-14. [Resource Limit Parameters](#resource-limit-parameters)
-15. [Advanced Parameters](#advanced-parameters)
+13. [Resource Limit Parameters](#resource-limit-parameters)
+14. [Advanced Parameters](#advanced-parameters)
 
 ---
 
@@ -101,7 +100,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `false`
 - **Description**: Enable AMR gene prediction with pathogen-of-origin analysis using RGI and CARD database
 - **Example**: `--rgi_prediction true`
-- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for manual database preparation
+- **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for manual database preparation
 
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
@@ -135,15 +134,15 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--phiX_index`
 - **Type**: String
 - **Default**: `phiX174`
-- **Description**: PhiX genome index selection for automatic download
-- **Size**: 8.1 MB
+- **Description**: PhiX genome selection for automatic download (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Size**: 5.4 kB
 - **Example**: `--phiX_index phiX174`
 
 ### `--host_db`
 - **Type**: String
 - **Default**: `human`
-- **Description**: Host genome database for read filtering
-- **Size**: 4.1 GB (CHM13 plus Y)
+- **Description**: Host genome for read filtering (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Size**: 940 MB (T2T-CHM13v2.0)
 - **Example**: `--host_db human`
 
 ### `--kraken2_db`
@@ -160,6 +159,34 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Sourmash database selection
 - **Size**: 17 GB
 - **Example**: `--sourmash_db gtdb_220_k31`
+
+### `--karga_db`
+- **Type**: String
+- **Default**: `megares`
+- **Description**: KARGA reference database selection (MEGARes)
+- **Size**: 9.2 MB
+- **Example**: `--karga_db megares`
+
+### `--kargva_db`
+- **Type**: String
+- **Default**: `kargva`
+- **Description**: KARGVA reference database selection
+- **Size**: 1.5 MB
+- **Example**: `--kargva_db kargva`
+
+### `--blast_db`
+- **Type**: String
+- **Default**: `nt`
+- **Description**: BLAST database selection for contig taxonomy
+- **Size**: 434 GB
+- **Example**: `--blast_db nt`
+
+### `--taxdump_files`
+- **Type**: String
+- **Default**: `ncbi`
+- **Description**: Taxonomy dump selection for BlobTools
+- **Size**: 448 MB
+- **Example**: `--taxdump_files ncbi`
 
 ### `--checkm2_db`
 - **Type**: String
@@ -183,19 +210,39 @@ Complete reference for all BugBuster pipeline parameters.
 
 ---
 
+## Output & Cleanup Options
+
+### `--store_clean_reads`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Publish decontaminated reads to `<output>/clean_reads/<sample>/`. This is publishing only, not caching — `-resume` remains the mechanism for reusing completed work.
+- **Example**: `--store_clean_reads true`
+
+> **Note**: Automatic work-dir cleanup is not a pipeline parameter — it comes from Nextflow's `cleanup = true` setting, enabled by `-profile low_disk` (or a custom config). See [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
+
+---
+
 ## Custom Database Paths
 
 Override automatic downloads by providing custom database paths:
 
-### `--custom_phiX_index`
+### `--custom_decontamination_index`
 - **Type**: String (directory path)
-- **Description**: Path to custom PhiX Bowtie2 index directory
-- **Example**: `--custom_phiX_index /path/to/phiX_index`
+- **Description**: Path to a pre-built combined Bowtie2 decontamination index directory (host + phiX). Skips both the genome downloads and the index build.
+- **Example**: `--custom_decontamination_index /path/to/bowtie_index`
+- **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
-### `--custom_bowtie_host_index`
-- **Type**: String (directory path)
-- **Description**: Path to custom host Bowtie2 index directory
-- **Example**: `--custom_bowtie_host_index /path/to/host_index`
+### `--custom_phiX_fasta`
+- **Type**: String (file path)
+- **Description**: Path to a custom phiX genome FASTA; the pipeline builds the Bowtie2 index from it
+- **Example**: `--custom_phiX_fasta /path/to/phiX174.fasta`
+
+### `--custom_host_fasta`
+- **Type**: String (file path)
+- **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the Bowtie2 index from it
+- **Example**: `--custom_host_fasta /path/to/mouse_genome.fa`
+
+> **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
 
 ### `--custom_kraken_db`
 - **Type**: String (directory path)
@@ -246,7 +293,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to pre-prepared CARD database directory for RGI (must contain RGI-loaded data and KMA indices)
 - **Example**: `--custom_rgi_card_db /path/to/card_database`
-- **Note**: See [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md) for database preparation instructions
+- **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for database preparation instructions
 
 ### `--custom_rgi_wildcard`
 - **Type**: String (directory path)
@@ -313,12 +360,6 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Kraken2 confidence threshold for taxonomic assignment
 - **Example**: `--kraken_confidence 0.2`
 
-### `--kraken_db_used`
-- **Type**: String
-- **Default**: `gtdb_release207`
-- **Description**: Kraken2 database name for reports (metadata only)
-- **Example**: `--kraken_db_used gtdb_release220`
-
 ### `--bracken_read_len`
 - **Type**: Integer
 - **Default**: `150`
@@ -331,12 +372,6 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `D`, `P`, `C`, `O`, `F`, `G`, `S`
 - **Description**: Taxonomic level for Bracken (D=Domain, P=Phylum, C=Class, O=Order, F=Family, G=Genus, S=Species)
 - **Example**: `--bracken_tax_level G`
-
-### `--sourmash_db_name`
-- **Type**: String
-- **Default**: `gtdb_release_220`
-- **Description**: Sourmash database name for reports (metadata only)
-- **Example**: `--sourmash_db_name gtdb_release_220`
 
 ### `--sourmash_tax_rank`
 - **Type**: String
@@ -372,12 +407,12 @@ Override automatic downloads by providing custom database paths:
 
 ## Assembly Parameters
 
-### `--bbmap_lenght`
+### `--bbmap_length`
 - **Type**: Integer
 - **Default**: `1000`
 - **Minimum**: `0`
 - **Description**: Minimum contig length after BBMap filtering
-- **Example**: `--bbmap_lenght 1500`
+- **Example**: `--bbmap_length 1500`
 
 ---
 
@@ -555,10 +590,11 @@ Override automatic downloads by providing custom database paths:
 
 ### `--metacerberus_hmm`
 - **Type**: String
-- **Default**: `"KOFam_all, COG, VOG, PHROG, CAZy"`
+- **Default**: `'"KOFam_all, COG, VOG, PHROG, CAZy"'`
 - **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
 - **Description**: Comma-separated list of HMM databases to use for MetaCerberus
-- **Example**: `--metacerberus_hmm "KOFam_prokaryote, COG, CAZy"`
+- **Example**: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`
+- **Note**: The value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep the embedded double quotes (wrap them in single quotes on the shell command line) to remain a single argument.
 
 ### `--metacerberus_minscore`
 - **Type**: Integer
@@ -628,80 +664,6 @@ Bowtie2 parameters for read alignment during host filtering:
 
 ---
 
-## Clustering Parameters
-
-MMseqs2 parameters for ARG clustering (used when `--arg_bin_clustering=true`):
-
-### `--mmseqs_start_sens`
-- **Type**: Integer
-- **Default**: `2`
-- **Description**: Starting sensitivity for MMseqs2
-- **Example**: `--mmseqs_start_sens 3`
-
-### `--mmseqs_s`
-- **Type**: Integer
-- **Default**: `7`
-- **Description**: Sensitivity level for MMseqs2
-- **Example**: `--mmseqs_s 8`
-
-### `--mmseqs_sens_steps`
-- **Type**: Integer
-- **Default**: `3`
-- **Description**: Number of sensitivity steps for MMseqs2
-- **Example**: `--mmseqs_sens_steps 4`
-
-### `--mmseqs_min_seq_id`
-- **Type**: Number
-- **Default**: `0.8`
-- **Range**: 0-1
-- **Description**: Minimum sequence identity for MMseqs2
-- **Example**: `--mmseqs_min_seq_id 0.9`
-
-### `--mmseqs_c`
-- **Type**: Number
-- **Default**: `0.7`
-- **Range**: 0-1
-- **Description**: Coverage threshold for MMseqs2
-- **Example**: `--mmseqs_c 0.8`
-
-### `--mmseqs_cov_mode`
-- **Type**: Integer
-- **Default**: `2`
-- **Description**: Coverage mode for MMseqs2
-- **Example**: `--mmseqs_cov_mode 1`
-
-### `--mmseqs_e`
-- **Type**: String
-- **Default**: `1e-20`
-- **Description**: E-value threshold for MMseqs2
-- **Example**: `--mmseqs_e 1e-25`
-
-### `--mmseqs_format_mode`
-- **Type**: Integer
-- **Default**: `4`
-- **Description**: Output format mode for MMseqs2
-- **Example**: `--mmseqs_format_mode 3`
-
-### `--mmseqs_alignment_mode`
-- **Type**: Integer
-- **Default**: `3`
-- **Description**: Alignment mode for MMseqs2
-- **Example**: `--mmseqs_alignment_mode 2`
-
-### `--mmseqs_max_seqs`
-- **Type**: Integer
-- **Default**: `10000`
-- **Description**: Maximum number of sequences for MMseqs2
-- **Example**: `--mmseqs_max_seqs 15000`
-
-### `--mmseqs_format_output`
-- **Type**: String
-- **Default**: `empty,query,target,evalue,pident,qcov,tcov,tseq`
-- **Description**: Output format fields for MMseqs2
-- **Example**: `--mmseqs_format_output "query,target,pident,evalue"`
-
----
-
 ## Resource Limit Parameters
 
 ### `--max_cpus`
@@ -738,11 +700,64 @@ MMseqs2 parameters for ARG clustering (used when `--arg_bin_clustering=true`):
 - **Description**: Display version and exit
 - **Example**: `--version`
 
-### `--validationShowHiddenParams`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Show all parameters when using `--help`
-- **Example**: `--validationShowHiddenParams`
+> **Note**: Parameters are validated against `nextflow_schema.json` at startup. Any parameter not declared by the pipeline — including misspelled or removed ones — aborts the run with an "unrecognised parameter" error.
+
+---
+
+## Cloud & HPC Profile Parameters
+
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The `--*_workdir` parameter of the chosen cloud profile is **required** — the pipeline exits immediately with an error if it is missing.
+
+### AWS Batch (`-profile aws`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--aws_workdir` | *(required)* | S3 work directory, e.g. `s3://my-bucket/work` |
+| `--aws_queue` | `default` | AWS Batch job queue |
+| `--aws_region` | `us-east-1` | AWS region |
+| `--aws_cli_path` | `/home/ec2-user/miniconda/bin/aws` | Path to the `aws` CLI on the Batch AMI |
+| `--aws_job_role` | — | IAM job role ARN |
+| `--aws_execution_role` | — | IAM execution role ARN |
+| `--aws_volumes` | — | Container volumes for scratch space |
+
+### Google Cloud Batch (`-profile gcp`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--gcp_workdir` | *(required)* | GCS work directory, e.g. `gs://my-bucket/work` |
+| `--gcp_project` | — | GCP project id |
+| `--gcp_region` | `us-central1` | GCP location |
+| `--gcp_spot` | `false` | Use spot/preemptible instances |
+| `--gcp_boot_disk_size` | `50.GB` | Boot disk size per VM |
+| `--gcp_service_account` | — | Service account email |
+| `--gcp_network` / `--gcp_subnetwork` | — | VPC network settings |
+| `--gcp_private_address` | `false` | Use private IP addresses only |
+
+### Azure Batch (`-profile azure`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--azure_workdir` | *(required)* | Blob work directory, e.g. `az://my-container/work` |
+| `--azure_pool` | `auto` | Batch pool name |
+| `--azure_region` | `eastus` | Azure location |
+| `--azure_batch_account` / `--azure_batch_key` | — | Batch account credentials |
+| `--azure_storage_account` / `--azure_storage_key` | — | Storage account credentials |
+| `--azure_delete_pools` | `true` | Delete auto pools on completion |
+| `--azure_vm_type` | `Standard_D4_v3` | VM type for auto pools |
+| `--azure_vm_count` | `1` | Initial VM count |
+| `--azure_max_vms` | `10` | Maximum VM count |
+| `--azure_spot` | `false` | Use low-priority (spot) VMs |
+
+### SLURM (`-profile slurm`)
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--slurm_queue` | `normal` | Default partition |
+| `--slurm_queue_short` / `--slurm_queue_long` | — | Partitions for short/long jobs |
+| `--slurm_account` | — | Account for job submission |
+| `--slurm_queue_size` | `100` | Executor queue size |
+| `--singularity_cache` | — | Singularity image cache directory |
+| `--singularity_run_options` | — | Extra singularity run options |
 
 ---
 
@@ -789,4 +804,4 @@ nextflow run main.nf \
 
 ---
 
-*BugBuster v1.0.0 - Complete Parameter Reference*
+*BugBuster v1.1.0dev - Complete Parameter Reference*

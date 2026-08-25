@@ -1,0 +1,15 @@
+100.00	800	0	R	1	root
+100.00	800	0	R1	131567	  cellular organisms
+100.00	800	0	D	2	    Bacteria
+ 50.00	400	0	P	1224	      Pseudomonadota
+ 50.00	400	0	C	1236	        Gammaproteobacteria
+ 50.00	400	0	O	91347	          Enterobacterales
+ 50.00	400	0	F	543	            Enterobacteriaceae
+ 50.00	400	0	G	561	              Escherichia
+ 50.00	400	400	S	562	                Escherichia coli
+ 50.00	400	0	P	1239	      Bacillota
+ 50.00	400	0	C	91061	        Bacilli
+ 50.00	400	0	O	1385	          Bacillales
+ 50.00	400	0	F	90964	            Staphylococcaceae
+ 50.00	400	0	G	1279	              Staphylococcus
+ 50.00	400	400	S	1280	                Staphylococcus aureus

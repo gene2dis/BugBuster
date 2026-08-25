@@ -1,0 +1,62 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BEDTOOLS Module Test
+
+    Regression test for audit item #22: the coverage-averaging awk chain did
+    `sum / count` with count=0 when genomeCoverageBed emitted no rows for a
+    bin (a BAM with no reference sequences, e.g. from an empty bin FASTA),
+    killing the task with "Division by zero". Such bins must now get an
+    explicit 0-coverage row. Fixtures come from tests/bin/make_bam_fixtures.sh:
+      - test_bin.1_all_reads.bam  two reads on a 1 kb contig (avg cov 0.1)
+      - test_bin.2_all_reads.bam  @SQ header, no aligned reads (zero-depth rows)
+      - test_bin.3_all_reads.bam  no reference sequences (the crash case)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BEDTOOLS Process"
+    script "../../modules/local/bedtools/main.nf"
+    process "BEDTOOLS"
+
+    test("computes bin depth incl. bins with no aligned reads") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/bam/test_bin.1_all_reads.bam", checkIfExists: true),
+                        file("${projectDir}/tests/data/bam/test_bin.2_all_reads.bam", checkIfExists: true),
+                        file("${projectDir}/tests/data/bam/test_bin.3_all_reads.bam", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def depth_file = path(process.out.bin_depth.get(0))
+            def lines = depth_file.readLines()
+            assert lines[0] == "sample\tbin_id\tTotal_contigs\taverage_cov"
+
+            // One row per bin (contig count includes genomeCoverageBed's
+            // "genome" pseudo-row — pre-existing behavior)
+            assert lines.size() == 4
+            assert lines[1] == "test\tbin.1\t 2 \t 0.1"
+            assert lines[2] == "test\tbin.2\t 2 \t 0"
+
+            // Audit #27: module must report its tool version
+            assert path(process.out.versions.get(0)).text.contains("bedtools:")
+            // The no-reference bin gets an explicit 0 row instead of crashing awk
+            assert lines[3] == "test\tbin.3\t 0 \t 0"
+
+            // No inf/nan may survive into the published coverage table
+            def content = depth_file.text.toLowerCase()
+            assert !content.contains("inf")
+            assert !content.contains("nan")
+        }
+    }
+}

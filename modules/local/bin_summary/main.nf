@@ -26,4 +26,10 @@ process BIN_SUMMARY {
         pandas: \$(python -c "import pandas; print(pandas.__version__)")
     END_VERSIONS
     """
+
+    stub:
+    """
+    touch Bin_summary.csv
+    touch versions.yml
+    """
 }

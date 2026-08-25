@@ -8,6 +8,7 @@ process PRODIGAL_BINS {
 
     output:
         tuple val(meta), path("*_bins_proteins"), emit: prodigal_bins
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -15,6 +16,9 @@ process PRODIGAL_BINS {
         """
         #!/bin/bash
         set -euo pipefail
+        # A bins dir may hold only a SKIPPED/FAILED marker (see METAWRAP) —
+        # without nullglob the *.fa loop would feed prodigal a literal '*.fa'
+        shopt -s nullglob
 
         cp -r ${metawrap} tmp_bins
         cd tmp_bins
@@ -46,34 +50,29 @@ process PRODIGAL_BINS {
         # Wait for all remaining jobs to complete
         for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
         
-        mv *_genes.gff ${prefix}_bins_genes
-        mv *_proteins.faa ${prefix}_bins_proteins
+        for gff in *_genes.gff; do mv "\$gff" ${prefix}_bins_genes/; done
+        for faa in *_proteins.faa; do mv "\$faa" ${prefix}_bins_proteins/; done
         cd ..
         mv tmp_bins/${prefix}_bins_genes/ .
         mv tmp_bins/${prefix}_bins_proteins/ .
 
         rm -rf refined_bins/
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            prodigal: \$(prodigal -v 2>&1 | sed -n 's/Prodigal V\\(.*\\):.*/\\1/p')
+        END_VERSIONS
 	"""
-}
 
-process PRODIGAL_CONTIGS {
-    container 'quay.io/biocontainers/prodigal:2.6.3--h031d066_8'
-
-    label 'process_single'
-
-    input:
-        tuple val(meta), path(contigs)
-
-    output:
-        tuple val(meta), path("*_contigs_proteins.faa"), emit: prodigal_contigs
-
-    script:
+    stub:
         def prefix = "${meta.id}"
 
         """
-        prodigal -i ${contigs} \\
-                 -o ${prefix}_contigs_genes.gff \\
-                 -a ${prefix}_contigs_proteins.faa \\
-                 -p meta 
+        mkdir ${prefix}_bins_proteins
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            prodigal: 2.6.3
+        END_VERSIONS
         """
 }

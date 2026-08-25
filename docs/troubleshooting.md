@@ -9,8 +9,11 @@ This guide covers common issues and solutions when running BugBuster.
 - [Resource Errors](#resource-errors)
 - [Container Issues](#container-issues)
 - [Database Issues](#database-issues)
+- [Decontamination Issues](#decontamination-issues)
 - [Cloud Execution Issues](#cloud-execution-issues)
 - [Output Issues](#output-issues)
+- [Debug Mode](#debug-mode)
+- [Quick Fixes Checklist](#quick-fixes-checklist)
 - [Getting Help](#getting-help)
 
 ---
@@ -21,7 +24,7 @@ This guide covers common issues and solutions when running BugBuster.
 
 **Error:**
 ```
-ERROR: Nextflow version 23.04.0 or later is required
+ERROR: Nextflow version 24.04.0 or later is required
 ```
 
 **Solution:**
@@ -83,16 +86,30 @@ ERROR: Cannot find file: /path/to/reads.fastq.gz
 2. Check file permissions: `ls -la /path/to/reads.fastq.gz`
 3. Ensure files are not compressed with unsupported format
 
-### Sample name with spaces
+### Invalid sample name
 
 **Error:**
 ```
-ERROR: Sample names cannot contain spaces
+Invalid sample name '...': use only letters, digits, underscore, dot or hyphen
 ```
 
 **Solution:**
-- Replace spaces with underscores in sample names
-- Avoid special characters: use only `A-Za-z0-9_-`
+- Sample names become file and directory names throughout the pipeline
+- Use only `A-Za-z0-9`, `_`, `.` or `-`, starting with a letter or digit
+- Replace spaces with underscores
+
+### Unrecognised parameter
+
+**Error:**
+```
+* --<name>: expected type: ... (unrecognised parameter)
+```
+or a validation error naming a parameter you passed.
+
+**Solution:**
+- Parameters are validated against `nextflow_schema.json` at startup; any parameter the pipeline does not declare aborts the run
+- Check the spelling against [`parameters.md`](parameters.md)
+- If you are following instructions written for an older release, the parameter may have been removed or renamed (e.g. `--kraken_db_used`, `--sourmash_db_name`, `--validationShowHiddenParams`, `--enable_work_cleanup`, and all `--mmseqs_*` parameters no longer exist; `--bbmap_lenght` is now `--bbmap_length`; `--custom_phiX_index` and `--custom_bowtie_host_index` were replaced by `--custom_decontamination_index` / `--custom_phiX_fasta` / `--custom_host_fasta`)
 
 ---
 
@@ -219,9 +236,9 @@ Unable to find image 'container:tag' locally
 
 **Solution:**
 1. Check internet connectivity
-2. Verify container exists:
+2. Verify container exists (look up the exact tag in the module's `main.nf`):
    ```bash
-   docker pull quay.io/biocontainers/fastp:0.23.2--h79da9fb_0
+   docker pull quay.io/biocontainers/fastp:<tag>
    ```
 
 3. Use alternative registry if blocked
@@ -278,6 +295,72 @@ MemoryError in GTDB-TK
        }
    }
    ```
+
+---
+
+## Decontamination Issues
+
+### Process BOWTIE2_BUILD_COMBINED failed
+
+**Possible causes:** FASTA files not found, insufficient memory, or corrupted FASTA files.
+
+**Solutions:**
+
+1. Verify the phiX/host FASTA files exist and are valid:
+   ```bash
+   ls -lh /path/to/host.fasta
+   zcat -f /path/to/host.fasta | head -n 5
+   gunzip -t /path/to/host.fasta.gz   # for gzipped input
+   ```
+2. Increase memory for the index build:
+   ```bash
+   nextflow run main.nf ... --max_memory 64.GB
+   ```
+
+### Process BOWTIE2_DECONTAMINATE failed
+
+**Possible causes:** index not built correctly, corrupted read files, or insufficient disk space.
+
+**Solutions:**
+
+1. Check the index files (under your databases directory, `<output>/../databases` by default):
+   ```bash
+   ls -lh <databases_dir>/bowtie_index/contaminants_index/
+   # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2
+   ```
+2. Verify read files decompress cleanly: `zcat sample_R1.fastq.gz | head -n 4`
+3. Check disk space: `df -h .`
+
+### Multiple host genomes not being used
+
+**Symptom:** only one genome is used for decontamination.
+
+`custom_host_fasta` takes a **comma-separated string** — not a YAML list, and
+with no spaces after the commas:
+
+```yaml
+# Correct - comma-separated string
+custom_host_fasta: "/path/file1.fasta,/path/file2.fasta,/path/file3.fasta"
+
+# Incorrect - spaces after commas
+custom_host_fasta: "/path/file1.fasta, /path/file2.fasta"
+
+# Incorrect - YAML list (not supported)
+custom_host_fasta:
+  - "/path/file1.fasta"
+  - "/path/file2.fasta"
+```
+
+### Slow index building or decontamination
+
+- Pre-build the index once and reuse it:
+  ```bash
+  cat phix.fasta host.fasta > contaminants.fasta
+  bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
+
+  nextflow run main.nf ... --custom_decontamination_index contaminants_index
+  ```
+- Faster (less sensitive) alignment settings: `--bowtie_k 1 --bowtie_score_min "L,-0.6,-0.6"`
 
 ---
 
@@ -354,12 +437,7 @@ Azure Batch authentication failed
    cat .nextflow.log | grep -i error
    ```
 
-2. Validate outputs:
-   ```bash
-   python bin/validate_outputs.py --output ./results
-   ```
-
-3. Check work directory for intermediate files
+2. Check work directory for intermediate files
 
 ### Corrupted output files
 
@@ -403,9 +481,28 @@ cat work/xx/xxxxxxxx/.command.err
 ### Test with stub mode
 
 ```bash
-# Dry run without executing actual commands
-nextflow run main.nf -profile docker -stub
+# Dry run without executing actual commands (test profile supplies the input/output params)
+nextflow run main.nf -profile test,docker -stub
 ```
+
+### Preview the workflow graph
+
+```bash
+# Resolve parameters and wiring without executing any process
+nextflow run main.nf -profile docker --input samplesheet.csv --output ./results -preview
+```
+
+---
+
+## Quick Fixes Checklist
+
+- [ ] Using the latest pipeline version
+- [ ] Samplesheet exists and is formatted correctly (`sample,r1,r2,s` header)
+- [ ] FASTA/FASTQ files exist and paths are absolute
+- [ ] Sufficient disk space and memory allocated
+- [ ] YAML syntax is correct (comma-separated strings, no spaces after commas)
+- [ ] Work directory exists (for `-resume`)
+- [ ] Container runtime works (Docker/Singularity)
 
 ---
 

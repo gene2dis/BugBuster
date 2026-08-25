@@ -78,9 +78,14 @@ process METABAT2 {
     
     stub:
     prefix = meta.id
+    def args = task.ext.args ?: ''
     """
     mkdir -p ${prefix}_metabat_bins
-    
+
+    # Record the resolved ext.args so stub-level pipeline tests can pin the
+    # config wiring (audit #14: conflicting selectors dropped params silently)
+    echo "metabat2 ${args}" > ${prefix}_metabat_bins/metabat2_args.txt
+
     # Create stub bin files
     cat > ${prefix}_metabat_bins/${prefix}_metabat_bin.1.fa << 'EOF'
 >contig_1

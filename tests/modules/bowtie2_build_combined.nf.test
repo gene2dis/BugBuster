@@ -1,0 +1,42 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BOWTIE2_BUILD_COMBINED Module Test
+
+    Regression test for audit item #1: the combined decontamination index must
+    build from genome FASTA inputs, both plain and gzipped (the default host DB
+    entry used to be a prebuilt-index ZIP that broke this process).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BOWTIE2_BUILD_COMBINED Process"
+    script "../../modules/local/bowtie2_build_combined/main.nf"
+    process "BOWTIE2_BUILD_COMBINED"
+
+    test("builds combined index from plain and gzipped FASTA") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/decontamination/phiX174.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta.gz", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // A complete small bowtie2 index: 4 forward + 2 reverse files
+            def index_dir = process.out.index.get(0)
+            ['1', '2', '3', '4', 'rev.1', 'rev.2'].each { part ->
+                assert path("${index_dir}/contaminants.${part}.bt2").exists()
+            }
+
+            assert process.out.versions
+        }
+    }
+}

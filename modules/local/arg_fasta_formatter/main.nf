@@ -9,8 +9,9 @@ process ARG_FASTA_FORMATTER {
 
     output:
         path("*_ARGs.faa"), emit: arg_reports
+        path "versions.yml", emit: versions
 
-    script: 
+    script:
 
     """
     cp -r ${proteins}/* . 
@@ -25,5 +26,24 @@ process ARG_FASTA_FORMATTER {
     rm -f *mapping.potential.ARG
     rm -f *out.mapping.ARG
     rm -f *_proteins.faa
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: \$(python3 --version 2>&1 | sed 's/Python //')
+        biopython: \$(python3 -c "import Bio; print(Bio.__version__)")
+    END_VERSIONS
+    """
+
+    stub:
+    // Per-sample name: a fixed name collides when CLUSTERING collects the
+    // outputs of every sample into one task
+    """
+    touch ${meta.id}_stub_ARGs.faa
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.8.10
+        biopython: 1.78
+    END_VERSIONS
     """
 }

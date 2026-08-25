@@ -8,6 +8,7 @@ process DEEPARG_BINS {
 
     output:
         tuple val(meta), path("*_deeparg_results"), emit: deeparg_bins
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -17,10 +18,15 @@ process DEEPARG_BINS {
         def prefix = "${meta.id}"
 
         """
+        # The proteins dir may be empty (upstream bins dir held only a
+        # SKIPPED/FAILED marker) — nullglob keeps the *.faa loop from running
+        # deeparg on a literal '*.faa'
+        shopt -s nullglob
+
         cp -r ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
-        
+
         # Parallel processing of bins using background jobs
         pids=()
         for bin_prot in *.faa; do
@@ -48,10 +54,27 @@ process DEEPARG_BINS {
         # Wait for all remaining jobs
         for pid in "\${pids[@]}"; do wait "\$pid" || exit 1; done
         
-        mv *.mapping.ARG ../${prefix}_deeparg_results/
+        for arg_file in *.mapping.ARG; do mv "\$arg_file" ../${prefix}_deeparg_results/; done
         cd ..
         rm -rf tmp_bins
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+        END_VERSIONS
 	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        mkdir ${prefix}_deeparg_results
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: 1.0.4
+        END_VERSIONS
+        """
 }
 
 process DEEPARG_CONTIGS {
@@ -65,6 +88,7 @@ process DEEPARG_CONTIGS {
     output:
         tuple val(meta), path("*.ARG"), emit: deeparg
         path("*.ARG"), emit: only_deeparg
+        path "versions.yml", emit: versions
 
     when:
         task.ext.when == null || task.ext.when
@@ -74,12 +98,33 @@ process DEEPARG_CONTIGS {
         def prefix = "${meta.id}"
 
         """
+        # nf-core prodigal emits gzipped proteins; deeparg cannot read gzip.
+        # gzip -cdf also passes plain FASTA through unchanged.
+        gzip -cdf ${prodigal_contigs} > ${prefix}_proteins_input.faa
+
         deeparg predict \\
                 -d ${deeparg_db} \\
                 --model LS \\
                 --type prot \\
                 $args \\
-                --input ${prodigal_contigs} \\
+                --input ${prefix}_proteins_input.faa \\
                 --out ${prefix}_contigs_deep_arg.out
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+        END_VERSIONS
+        """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_contigs_deep_arg.out.mapping.ARG
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: 1.0.4
+        END_VERSIONS
         """
 }

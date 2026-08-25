@@ -62,7 +62,7 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
 
 | Software | Minimum Version | Purpose |
 |----------|-----------------|---------|
-| Nextflow | ≥23.04.0 | Workflow engine |
+| Nextflow | ≥24.04.0 | Workflow engine |
 | Java | 11-17 | Nextflow runtime |
 | Container runtime | - | Docker, Singularity, or Podman |
 
@@ -126,14 +126,14 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/downloaded_db/` with symbolic links for reuse.
+BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, so they can be reused across pipeline runs.
 
 ### Automatic Download Databases
 
 | Database | Size | Used For | Download Trigger |
 |----------|------|----------|------------------|
-| **phiX174 Index** | 8.1 MB | PhiX contamination removal | `quality_control=true` |
-| **Human Host Index** | 4.1 GB | Host read removal | `quality_control=true` |
+| **phiX174 genome (FASTA)** | 5.4 kB | PhiX contamination removal | `quality_control=true` |
+| **Human host genome T2T-CHM13v2.0 (FASTA)** | 940 MB | Host read removal | `quality_control=true` |
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
@@ -174,10 +174,10 @@ wget -O /shared/databases/bugbuster/gtdbtk_r220.tar.gz \
     https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
 tar -xzf /shared/databases/bugbuster/gtdbtk_r220.tar.gz -C /shared/databases/bugbuster/
 
-# Download human host Bowtie2 index
-wget -O /shared/databases/bugbuster/chm13_plusY.zip \
-    https://genome-idx.s3.amazonaws.com/bt/chm13.draft_v1.0_plusY.zip
-unzip /shared/databases/bugbuster/chm13_plusY.zip -d /shared/databases/bugbuster/host_index/
+# Download human host genome (T2T-CHM13v2.0); the pipeline builds the
+# combined phiX + host Bowtie2 index from FASTA on first use
+wget -P /shared/databases/bugbuster/ \
+    https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
 ```
 
 ### Using Custom Databases
@@ -189,7 +189,7 @@ nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_standard8 \
-    --custom_bowtie_host_index /shared/databases/bugbuster/host_index \
+    --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
     -profile docker
@@ -197,23 +197,24 @@ nextflow run main.nf \
 
 ### Using Custom Host Genomes
 
-To filter reads from non-human hosts, build a custom Bowtie2 index:
+To filter reads from non-human hosts, point the pipeline at the host genome
+FASTA (plain or gzipped) — it builds the combined phiX + host Bowtie2 index
+automatically:
 
 ```bash
 # Download your host genome
 wget -O host_genome.fasta.gz <URL_TO_HOST_GENOME>
-gunzip host_genome.fasta.gz
-
-# Build Bowtie2 index
-bowtie2-build host_genome.fasta host_index/host
 
 # Use in pipeline
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --custom_bowtie_host_index ./host_index \
+    --custom_host_fasta ./host_genome.fasta.gz \
     -profile docker
 ```
+
+If you already have a pre-built combined (phiX + host) Bowtie2 index, pass its
+directory with `--custom_decontamination_index` instead.
 
 ---
 
@@ -232,10 +233,19 @@ sample3,/path/to/sample3_R1.fastq.gz,/path/to/sample3_R2.fastq.gz,/path/to/sampl
 
 | Column | Required | Description |
 |--------|----------|-------------|
-| `sample` | Yes | Unique sample identifier (alphanumeric, underscores allowed) |
+| `sample` | Yes | Unique sample identifier: letters, digits, underscore, dot or hyphen, starting with a letter or digit (it becomes file/directory names) |
 | `r1` | Yes | Absolute path to forward reads (R1) in FASTQ/FASTQ.GZ format |
 | `r2` | Yes | Absolute path to reverse reads (R2) in FASTQ/FASTQ.GZ format |
 | `s` | No | Absolute path to singleton reads (optional, leave empty if none) |
+
+Singleton reads are processed in both QC modes: with `--quality_control true`
+(default) they are trimmed by a dedicated single-end fastp run, decontaminated
+alongside the paired reads, and carried into downstream assembly/profiling
+steps that accept them. A few caveats: the `--min_read_sample` threshold counts
+paired reads only; Kraken2 profiles the paired reads only (it runs in
+`--paired` mode); and read-level RGI ARG prediction (`--rgi_prediction`) also
+uses the paired reads only (`rgi bwt` accepts a single read pair). Sourmash
+and assembly use singletons as well.
 
 ### Input Requirements
 
@@ -258,6 +268,8 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 ---
 
 ## 6. Pipeline Parameters
+
+Parameters are validated against `nextflow_schema.json` at startup (nf-schema). Passing a parameter that the pipeline does not declare — including misspelled or removed ones — aborts the run with an "unrecognised parameter" error. See [`parameters.md`](parameters.md) for the complete reference.
 
 ### 6.1 Input/Output Options
 
@@ -298,8 +310,9 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 
 | Parameter | Description |
 |-----------|-------------|
-| `--custom_phiX_index` | Path to custom PhiX Bowtie2 index directory |
-| `--custom_bowtie_host_index` | Path to custom host Bowtie2 index directory |
+| `--custom_decontamination_index` | Path to a pre-built combined Bowtie2 index directory (host + phiX) |
+| `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
+| `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
@@ -329,17 +342,15 @@ sample3,az://container/data/sample3_R1.fastq.gz,az://container/data/sample3_R2.f
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
-| `--kraken_db_used` | `gtdb_release207` | Database name for reports |
 | `--bracken_read_len` | `150` | Read length for Bracken estimation |
 | `--bracken_tax_level` | `S` | Taxonomic level: D, P, C, O, F, G, S |
-| `--sourmash_db_name` | `gtdb_release_220` | Database name for Sourmash reports |
 | `--sourmash_tax_rank` | `species` | Rank: `genus`, `species`, `strain` |
 
 ### 6.7 Assembly Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--bbmap_lenght` | `1000` | Minimum contig length after BBMap filtering |
+| `--bbmap_length` | `1000` | Minimum contig length after BBMap filtering |
 
 ### 6.8 Binning Options
 
@@ -403,7 +414,7 @@ Parameters for RGI AMR gene prediction with pathogen-of-origin analysis:
 | `--rgi_kmer_size` | `61` | K-mer size for pathogen-of-origin prediction |
 | `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage threshold |
 
-**Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_IMPLEMENTATION_PLAN.md`](RGI_IMPLEMENTATION_PLAN.md).
+**Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) ("Manual CARD Database Preparation").
 
 ### 6.11 Bowtie2 Alignment Options
 
@@ -420,24 +431,6 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.12 MMseqs2 Clustering Options
-
-Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--mmseqs_start_sens` | `2` | Starting sensitivity |
-| `--mmseqs_s` | `7` | Sensitivity level |
-| `--mmseqs_sens_steps` | `3` | Number of sensitivity steps |
-| `--mmseqs_min_seq_id` | `0.8` | Minimum sequence identity (0-1) |
-| `--mmseqs_c` | `0.7` | Coverage threshold (0-1) |
-| `--mmseqs_cov_mode` | `2` | Coverage mode |
-| `--mmseqs_e` | `1e-20` | E-value threshold |
-| `--mmseqs_format_mode` | `4` | Output format mode |
-| `--mmseqs_alignment_mode` | `3` | Alignment mode |
-| `--mmseqs_max_seqs` | `10000` | Maximum number of sequences |
-| `--mmseqs_format_output` | `empty,query,target,evalue,pident,qcov,tcov,tseq` | Output format fields |
-
 ### 6.12 MetaCerberus Options
 
 | Parameter | Default | Description |
@@ -447,6 +440,8 @@ Parameters for ARG clustering (used when `--arg_bin_clustering=true`):
 | `--metacerberus_evalue` | `1e-09` | Maximum E-value |
 
 **Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
+
+**Note:** the value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep embedded double quotes to stay a single argument. On the command line, wrap it in single quotes: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`.
 
 ### 6.13 Taxonomy Visualization Options
 
@@ -466,7 +461,7 @@ Control taxonomic output visualization and formatting:
 |-----------|---------|-------------|
 | `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
 
-By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs. Symbolic links are created in `<output>/downloaded_db/` for reference.
+By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
 
 ### 6.15 Resource Limit Options
 
@@ -510,6 +505,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
+| `low_disk` | Minimize disk usage: automatic work-dir cleanup (`cleanup = true`, disables `-resume`) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
 
 **Combine profiles as needed:**
@@ -567,7 +563,11 @@ results/
 │   ├── execution_report_*.html                 # Resource usage report
 │   ├── execution_timeline_*.html               # Timeline visualization
 │   ├── execution_trace_*.txt                   # Task trace log
-│   └── pipeline_dag_*.svg                      # Pipeline DAG
+│   ├── pipeline_dag_*.svg                      # Pipeline DAG
+│   ├── software_versions.yml                   # Versions of every tool used in the run
+│   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
+├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
+│   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control (if quality_control=true)
 │   ├── fastp/                                  # FastP reports per sample
 │   │   └── {sample}/                           # Per-sample QC results
@@ -580,7 +580,7 @@ results/
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
-│   ├── bracken/                                # Bracken abundance estimates
+│   ├── bracken/                                # Bracken abundance estimates (kraken2 only)
 │   │   └── {sample}_*.bracken                  # Per-sample Bracken results
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
@@ -594,7 +594,7 @@ results/
 ├── 03_assembly/                                # Genome assembly (if assembly_mode != 'none')
 │   ├── per_sample/                             # Per-sample assemblies (if assembly_mode='assembly')
 │   │   └── {sample}/
-│   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_lenght bp)
+│   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_length bp)
 │   │       ├── {sample}_contig.stats           # Assembly statistics
 │   │       └── {sample}_contigs.fa             # Raw MEGAHIT contigs
 │   └── coassembly/                             # Co-assembly (if assembly_mode='coassembly')
@@ -656,7 +656,9 @@ results/
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── prodigal/                           # ORF predictions
 │   │   │   └── {sample}/
-│   │   ├── deeparg/                            # DeepARG predictions (not published by default)
+│   │   ├── deeparg/                            # DeepARG predictions per sample
+│   │   │   └── {sample}/
+│   │   │       └── *_contigs_deep_arg.out.mapping.ARG
 │   │   ├── summary/                            # ARG summary reports
 │   │   │   └── Contig_tax_and_arg_prediction.tsv
 │   │   └── figures/                            # ARG visualization
@@ -672,10 +674,7 @@ results/
 │   └── figures/                                # BlobTools plots
 │       └── *.png
 └── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
-    ├── contigs/                                # Contig-level annotation
-    │   └── {sample}/
-    │       └── {sample}_annotation_results/
-    └── bins/                                   # Bin-level annotation
+    └── contigs/                                # Contig-level annotation
         └── {sample}/
             └── {sample}_annotation_results/
 ```
@@ -686,20 +685,19 @@ By default, databases are stored separately from results at `<output_dir>/../dat
 
 ```
 databases/                            # Database storage (configurable via --databases_dir)
-├── phiX_index/                       # PhiX174 Bowtie2 index
-├── host_index/                       # Host genome Bowtie2 index
-├── kraken2_standard8/                # Kraken2 Standard-8 database
-├── kraken2_gtdb220/                  # Kraken2 GTDB r220 database (if selected)
-├── sourmash_gtdb220/                 # Sourmash GTDB r220 database
+├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
+├── kraken/                           # Kraken2 database (selected via --kraken2_db)
+├── sourmash/                         # Sourmash database
 ├── taxdump/                          # NCBI taxonomy dump
-├── blast_nt/                         # NCBI NT BLAST database
-├── deeparg/                          # DeepARG database
-├── karga/                            # KARGA (MEGARes) database
-├── kargva/                           # KARGVA database
+├── blast/                            # NCBI NT BLAST database
+├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
-└── gtdbtk_r220/                      # GTDB-TK release 220 database
+└── gtdbtk/                           # GTDB-TK database
 ```
+
+The KARGA and KARGVA reference FASTAs are small and staged directly into the work
+directory when needed; they are not stored under `databases/`.
 
 ### Conditional Outputs
 
@@ -880,7 +878,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
-    --custom_bowtie_host_index /shared/db/host_index \
+    --custom_decontamination_index /shared/db/bowtie_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/gtdbtk_r220 \
@@ -895,7 +893,7 @@ For mouse gut microbiome:
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --custom_bowtie_host_index /path/to/mouse_bowtie2_index \
+    --custom_host_fasta /path/to/mouse_genome.fa \
     --semibin_env_model mouse_gut \
     --include_binning true \
     -profile docker
@@ -912,7 +910,6 @@ nextflow run main.nf \
     --taxonomic_profiler sourmash \
     --include_binning true \
     --semibin_env_model ocean \
-    --custom_bowtie_host_index null \
     -profile singularity
 ```
 
@@ -967,8 +964,8 @@ params {
     // Pre-downloaded databases
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
-    custom_gtdbtk_db         = '/shared/db/gtdbtk_r220'
-    custom_bowtie_host_index = '/shared/db/host_index'
+    custom_gtdbtk_db              = '/shared/db/gtdbtk_r220'
+    custom_decontamination_index  = '/shared/db/bowtie_index'
 }
 
 singularity {
@@ -1039,6 +1036,10 @@ nextflow run main.nf \
 
 ## 11. Troubleshooting
 
+The dedicated [`troubleshooting.md`](troubleshooting.md) guide covers
+installation, input, resource, container, database, decontamination, cloud and
+output issues in depth. The most common cases:
+
 ### Common Issues
 
 #### Out of Memory Errors
@@ -1055,8 +1056,8 @@ nextflow run main.nf \
 #### Container Pull Failures
 
 ```bash
-# Pre-pull containers
-singularity pull docker://quay.io/biocontainers/fastp:0.23.4--h5f740d0_0
+# Pre-pull containers (look up the exact tag in the module's main.nf, e.g. modules/nf-core/fastp/main.nf)
+singularity pull docker://quay.io/biocontainers/fastp:<tag>
 
 # Or use a cache directory
 export NXF_SINGULARITY_CACHEDIR=/path/to/cache
@@ -1089,8 +1090,8 @@ squeue -u $USER
 # Check work directory exists
 ls -la work/
 
-# Force fresh run
-nextflow run main.nf ... -resume false
+# Force fresh run: simply omit -resume
+nextflow run main.nf ...
 
 # Clean and restart
 nextflow clean -f
@@ -1157,4 +1158,4 @@ https://github.com/gene2dis/BugBuster
 
 ---
 
-*BugBuster v1.0.0 - Built with Nextflow*
+*BugBuster v1.1.0dev - Built with Nextflow*

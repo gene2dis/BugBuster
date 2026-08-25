@@ -51,8 +51,9 @@ process COMEBIN {
     rm -rf ${prefix}_comebin_bins
     mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
     
-    # Validate minimum contig count
-    contig_count=\$(grep -c "^>" ${contigs} || true)
+    # Validate minimum contig count (awk always exits 0 and always prints a
+    # number; 'grep -c ... || true' left the variable empty when grep failed)
+    contig_count=\$(awk '/^>/{n++} END{print n+0}' ${contigs})
     
     if [[ \$contig_count -lt 10 ]]; then
         echo "WARNING: Only \$contig_count contigs. Skipping COMEBIN (requires ≥10)." >&2

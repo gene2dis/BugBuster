@@ -62,25 +62,48 @@ def main():
     # Separate Total_contigs for later join
     bin_tmp = bin_depth_wide[['bin_id', 'Total_contigs']].copy()
     
-    # Read bin quality report
+    # Read ALL bin quality reports (per-binner, per-sample); previously only the
+    # first glob hit was read, dropping every other staged report (audit #11)
     quality_files = glob.glob('*quality_report.tsv')
     if not quality_files:
         print("ERROR: No quality report files found (*quality_report.tsv)", file=sys.stderr)
         sys.exit(1)
-    
-    bin_quality = pd.read_csv(quality_files[0], sep='\t')
+
+    quality_dfs = []
+    for file in sorted(quality_files):
+        try:
+            quality_dfs.append(pd.read_csv(file, sep='\t'))
+        except pd.errors.EmptyDataError:
+            print(f"WARNING: skipping empty quality report {file}", file=sys.stderr)
+
+    bin_quality = pd.concat(quality_dfs, ignore_index=True) if quality_dfs else pd.DataFrame()
+    if bin_quality.empty:
+        print("ERROR: all quality reports are empty - no bins were assessed", file=sys.stderr)
+        sys.exit(1)
+
     bin_quality = bin_quality[[
-        'Name', 'Completeness', 'Contamination', 
+        'Name', 'Completeness', 'Contamination',
         'Contig_N50', 'Genome_Size', 'Total_Coding_Sequences'
     ]]
-    
-    # Read bin taxonomy
+
+    # Read ALL bin taxonomy summaries (bac120 + ar53); GTDB-Tk writes a zero-byte
+    # or header-only ar53 file when no archaea are found
     tax_files = glob.glob('*gtdbtk*.tsv')
     if not tax_files:
         print("ERROR: No GTDB-Tk taxonomy files found (*gtdbtk*.tsv)", file=sys.stderr)
         sys.exit(1)
-    
-    bin_tax = pd.read_csv(tax_files[0], sep='\t')
+
+    tax_dfs = []
+    for file in sorted(tax_files):
+        try:
+            tax_dfs.append(pd.read_csv(file, sep='\t'))
+        except pd.errors.EmptyDataError:
+            print(f"WARNING: skipping empty taxonomy file {file}", file=sys.stderr)
+
+    bin_tax = pd.concat(tax_dfs, ignore_index=True) if tax_dfs else pd.DataFrame()
+    if bin_tax.empty:
+        print("ERROR: all GTDB-Tk summaries are empty - no bins were classified", file=sys.stderr)
+        sys.exit(1)
     
     # Parse taxonomy classification
     taxonomy_parsed = bin_tax['classification'].apply(parse_gtdb_taxonomy)

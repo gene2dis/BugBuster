@@ -11,6 +11,8 @@ nextflow.enable.dsl = 2
 
 import groovy.transform.Field
 
+include { validateParameters } from 'plugin/nf-schema'
+
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     PIPELINE LOGO AND INFO
@@ -74,8 +76,13 @@ def printHelp() {
       -profile docker               Run with Docker containers
       -profile singularity          Run with Singularity containers
       -profile podman               Run with Podman containers
-      -profile conda                Run with Conda environments
-      -profile slurm_singularity    Run on SLURM with Singularity
+      -profile apptainer            Run with Apptainer containers
+      -profile conda                Run with Conda environments (containers recommended)
+      -profile slurm                Run on a SLURM HPC cluster (combine: slurm,singularity)
+      -profile aws                  Run on AWS Batch (combine: aws,docker)
+      -profile gcp                  Run on Google Cloud Batch (combine: gcp,docker)
+      -profile azure                Run on Azure Batch (combine: azure,docker)
+      -profile low_disk             Progressive work-dir cleanup (runs not resumable)
       -profile test                 Run with minimal test dataset
 
     \u001B[1;33mOther options:\u001B[0m
@@ -104,6 +111,12 @@ if (params.containsKey('version') && params.version) {
     exit 0
 }
 
+// Validate all parameters against nextflow_schema.json (nf-schema plugin):
+// required params (--input/--output), types, enums (assembly_mode,
+// taxonomic_profiler, ...). Cross-parameter rules the schema cannot express
+// are checked by hand below.
+validateParameters()
+
 // Print logo
 log.info logo
 log.info ""
@@ -111,17 +124,22 @@ log.info "  ${workflow.manifest.name} v${workflow.manifest.version}"
 log.info "  ================================================"
 log.info ""
 
-// Validate required parameters
-if (!params.input) {
-    log.error "ERROR: --input parameter is required"
-    printHelp()
-    exit 1
-}
-
-if (!params.output) {
-    log.error "ERROR: --output parameter is required"
-    printHelp()
-    exit 1
+// Cloud profiles need an object-storage work directory; there is no sane
+// default, so fail fast instead of falling back to a local ./work that the
+// cloud executor cannot use (audit #24)
+def cloud_workdir_requirements = [
+    aws  : ['aws_workdir', 's3://my-bucket/work', 's3://'],
+    gcp  : ['gcp_workdir', 'gs://my-bucket/work', 'gs://'],
+    azure: ['azure_workdir', 'az://my-container/work', 'az://'],
+]
+def active_profiles = workflow.profile.tokenize(',')
+cloud_workdir_requirements.each { profile_name, req ->
+    def (param_name, example, scheme) = req
+    def workdir_ok = params[param_name] || workflow.workDir.toString().startsWith(scheme)
+    if (active_profiles.contains(profile_name) && !workdir_ok) {
+        log.error "ERROR: -profile ${profile_name} requires an object-storage work directory: pass --${param_name} ${example} (or -work-dir ${example})"
+        exit 1
+    }
 }
 
 // Parse and validate binners parameter
@@ -134,6 +152,24 @@ if (binners_list.isEmpty()) {
 }
 if (invalid_binners) {
     log.error "ERROR: Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}"
+    exit 1
+}
+
+// Reject contradictory feature combinations instead of silently skipping stages
+if (params.include_binning && params.assembly_mode == 'none') {
+    log.error "ERROR: --include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
+    exit 1
+}
+if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
+    log.error "ERROR: --contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'"
+    exit 1
+}
+if (params.arg_bin_clustering && !params.include_binning) {
+    log.error "ERROR: --arg_bin_clustering requires --include_binning (it runs on the refined bins)"
+    exit 1
+}
+if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
+    log.error "ERROR: --contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'"
     exit 1
 }
 
@@ -200,9 +236,6 @@ include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/m
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
-	// MULTIQC REPORTING
-include { MULTIQC as NFCORE_MULTIQC } from './modules/nf-core/multiqc/main'
-
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     RUN MAIN WORKFLOW
@@ -233,8 +266,13 @@ workflow {
     // In DSL2, process outputs can be referenced multiple times
     // No need to split channels - just use QC.out.reads directly in each consumer
     ch_clean_reads           = QC.out.reads
-    ch_clean_reads_coassembly = QC.out.reads_coassembly
     ch_reads_report          = QC.out.report
+
+    // Software provenance: every stage mixes its versions.yml files in here;
+    // they are aggregated into pipeline_info/software_versions.yml at the end
+    ch_versions = Channel.empty()
+        .mix(PREPARE_DATABASES.out.versions)
+        .mix(QC.out.versions)
 
     //
     // SUBWORKFLOW: Taxonomic profiling
@@ -246,20 +284,29 @@ workflow {
             PREPARE_DATABASES.out.kraken_db,
             PREPARE_DATABASES.out.sourmash_db
         )
+        ch_versions = ch_versions.mix(TAXONOMY.out.versions)
     }
 
     //
     // ARG PREDICTION IN READS
     //
     if ( params.read_arg_prediction ) {
-        ch_args_oap = ARGS_OAP(ch_clean_reads)
+        ARGS_OAP(ch_clean_reads)
+        ch_args_oap = ARGS_OAP.out.args_oap_s1
         ch_argv_prediction = KARGVA(ch_clean_reads.combine(PREPARE_DATABASES.out.kargva_db))
-        ch_arg_prediction = KARGA(ch_argv_prediction.kargva_reads.combine(PREPARE_DATABASES.out.karga_db))
+        KARGA(ch_argv_prediction.kargva_reads.combine(PREPARE_DATABASES.out.karga_db))
+        ch_arg_prediction = KARGA.out.kargva
         ARG_NORM_REPORT(
             ch_arg_prediction
                 .concat(ch_argv_prediction.kargva_reports)
                 .concat(ch_args_oap)
                 .collect()
+        )
+        ch_versions = ch_versions.mix(
+            ARGS_OAP.out.versions.first(),
+            KARGVA.out.versions.first(),
+            KARGA.out.versions.first(),
+            ARG_NORM_REPORT.out.versions
         )
     }
 
@@ -289,6 +336,11 @@ workflow {
             ch_rgi_bwt.gene_mapping.map { meta, file -> file }.collect(),
             ch_rgi_kmer.kmer_json.map { meta, file -> file }.collect()
         )
+        ch_versions = ch_versions.mix(
+            ch_rgi_bwt.versions.first(),
+            ch_rgi_kmer.versions.first(),
+            RGI_REPORT.out.versions
+        )
     }
 
     //
@@ -300,12 +352,12 @@ workflow {
     
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
-            ch_clean_reads,
-            ch_clean_reads_coassembly
+            ch_clean_reads
         )
         
         ch_contigs_meta = ASSEMBLY.out.contigs_meta
         ch_bam_meta     = ASSEMBLY.out.bam_meta
+        ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
 
         //
         // SUBWORKFLOW: Binning
@@ -320,6 +372,7 @@ workflow {
                 ch_clean_reads
             )
             ch_refined_bins = BINNING.out.refined_bins
+            ch_versions = ch_versions.mix(BINNING.out.versions)
         }
 
         //
@@ -327,6 +380,7 @@ workflow {
         //
         if ( params.assembly_mode == "assembly" && params.contig_level_metacerberus ) {
             METACERBERUS_CONTIGS(ch_contigs_meta)
+            ch_versions = ch_versions.mix(METACERBERUS_CONTIGS.out.versions.first())
         }
     }
 
@@ -334,8 +388,13 @@ workflow {
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
-        ch_nt_blastn = NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
-            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }))
+        // The list wrap keeps a multi-file BLAST DB as ONE tuple element
+        // (path(nt_db)) instead of flattening it into the tuple, which staged
+        // only the first DB file into NT_BLASTN
+        NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
+            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }
+            .map { db_files -> [db_files] }))
+        ch_nt_blastn = NT_BLASTN.out.megablast_to_blob
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -348,10 +407,13 @@ workflow {
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
             .join(NFCORE_SAMTOOLS_INDEX.out.bai)
+        // Wrap the collected taxdump files in a list so they arrive as ONE
+        // tuple element (path(tax_files)) instead of being flattened into the
+        // tuple — flattened, only the first file was staged into BLOBTOOLS
         ch_blob_table = BLOBTOOLS(
             ch_nt_blastn
                 .join(ch_index_bam)
-                .combine(PREPARE_DATABASES.out.taxdump.collect())
+                .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
         )
         BLOBPLOT(ch_blob_table.only_blob.collect())
 
@@ -373,21 +435,61 @@ workflow {
                 .concat(ch_blob_table.only_blob)
                 .collect()
         )
-        ARG_BLOBPLOT(ch_arg_contig_data)
+        ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
+
+        ch_versions = ch_versions.mix(
+            NT_BLASTN.out.versions.first(),
+            NFCORE_SAMTOOLS_INDEX.out.versions.first(),
+            BLOBTOOLS.out.versions.first(),
+            BLOBPLOT.out.versions,
+            PRODIGAL_CONTIGS.out.versions.first(),
+            DEEPARG_CONTIGS.out.versions.first(),
+            ARG_CONTIG_LEVEL_REPORT.out.versions,
+            ARG_BLOBPLOT.out.versions
+        )
     }
 
     //
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
     if ( params.arg_bin_clustering && params.include_binning ) {
-        ch_raw_orfs = PRODIGAL_BINS(ch_refined_bins)
-        ch_deeparg = DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db))
-        ch_arg_fasta = ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
-        ch_clusters = CLUSTERING(ch_arg_fasta.collect())
+        PRODIGAL_BINS(ch_refined_bins)
+        ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
+        DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
+            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
+        ch_deeparg = DEEPARG_BINS.out.deeparg_bins
+        ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
+        ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
+        CLUSTERING(ch_arg_fasta.collect())
+
+        ch_versions = ch_versions.mix(
+            PRODIGAL_BINS.out.versions.first(),
+            DEEPARG_BINS.out.versions.first(),
+            ARG_FASTA_FORMATTER.out.versions.first(),
+            CLUSTERING.out.versions
+        )
     }
 
-    // TODO: Re-enable MultiQC aggregate reporting once module wiring is stabilized
-    // NFCORE_MULTIQC(ch_multiqc_files, config, [], [], [], [])
+    //
+    // Aggregate software versions -> pipeline_info/software_versions.yml
+    // Per-sample tasks of one process write byte-identical versions.yml files,
+    // so content-level unique() collapses them to one block per process.
+    // stripIndent() normalizes the varying heredoc indentation across modules.
+    //
+    ch_versions
+        .map { yml -> yml.text.stripIndent() }
+        .mix( Channel.of(
+            ( "\"${workflow.manifest.name}\":\n" +
+              "    pipeline: ${workflow.manifest.version}\n" +
+              "    nextflow: ${nextflow.version}\n" ).toString()
+        ) )
+        .unique()
+        .collectFile(
+            name: 'software_versions.yml',
+            storeDir: "${params.output}/pipeline_info",
+            sort: true,
+            newLine: false
+        )
 
 }
 

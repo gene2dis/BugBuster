@@ -10,8 +10,8 @@ process RGI_KMER {
         path(card_db)
 
     output:
-        tuple val(meta), path("*_61mer_analysis.json"), emit: kmer_json
-        tuple val(meta), path("*_61mer_analysis.txt"), emit: kmer_txt
+        tuple val(meta), path("*_${params.rgi_kmer_size ?: 61}mer_analysis.json"), emit: kmer_json
+        tuple val(meta), path("*_${params.rgi_kmer_size ?: 61}mer_analysis.txt"), emit: kmer_txt
         tuple val(meta), path("*.allele.txt"), emit: allele_predictions, optional: true
         tuple val(meta), path("*.gene.txt"), emit: gene_predictions, optional: true
         path("versions.yml"), emit: versions
@@ -32,11 +32,17 @@ process RGI_KMER {
         fi
         set -u
 
-        # Copy database to local directory for RGI access
-        cp -r ${card_db} rgi_db
-        
-        # RGI --local flag looks for localDB/ in current directory
-        ln -s rgi_db/localDB localDB
+        # RGI --local looks for localDB/ in the current directory. Symlink the
+        # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
+        # per task (audit #17): reads go through the symlinks, while any file
+        # RGI creates at runtime lands in this task's localDB/, not the shared
+        # published database.
+        if [ ! -d ${card_db}/localDB ]; then
+            echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
+            exit 1
+        fi
+        mkdir localDB
+        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
         # Run RGI kmer_query for pathogen-of-origin prediction
         rgi kmer_query \\

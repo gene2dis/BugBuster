@@ -105,7 +105,7 @@ process BOWTIE2_SAMTOOLS {
             
             # Generate versions file
             printf '"${task.process}":\n' > versions.yml
-            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ /.*/')" >> versions.yml
+            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
             printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
@@ -309,49 +309,67 @@ process BOWTIE2_SAMTOOLS_DEPTH {
 
     output:
         tuple val(meta), path("*_all_reads.bam"), emit: reads
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
+        def has_singletons = reads.size() > 2
 
         """
         for bin in ${bins}/*.fa; do
-            bin_name=`echo \${bin} | sed -E 's/.+?b//g' | sed 's/.fa//g' | sed 's/in/bin/g'`
+            # Bin ids are the FASTA basenames; the old greedy-sed renaming only
+            # worked for bins literally named bin.N (audit #24)
+            bin_name=\$(basename "\${bin}" .fa)
 
-	    bowtie2-build \${bin} ${prefix}_bins_index
+            bowtie2-build \${bin} ${prefix}_bins_index
 
+            # Pipe straight into samtools sort - no uncompressed per-bin SAM
+            # intermediates (audit #24)
             bowtie2 \\
-            -x ${prefix}_bins_index \\
-            -p $task.cpus \\
-            -1 ${reads[0]} \\
-            -2 ${reads[1]} \\
-	    -S ${prefix}_\${bin_name}_paired_reads.sam 2> ${prefix}_bowtie_map.log 
+                -x ${prefix}_bins_index \\
+                -p $task.cpus \\
+                -1 ${reads[0]} \\
+                -2 ${reads[1]} \\
+                2> ${prefix}_bowtie_map.log \\
+            | samtools sort -@ $task.cpus \\
+                  -o ${prefix}_\${bin_name}_paired_reads.bam -
 
-	    samtools sort -@ $task.cpus \\
-                  -o ${prefix}_\${bin_name}_paired_reads.bam \\
-                  ${prefix}_\${bin_name}_paired_reads.sam
+            ${ has_singletons ? """
+            bowtie2 \\
+                -x ${prefix}_bins_index \\
+                -p $task.cpus \\
+                -U ${reads[2]} \\
+                2> ${prefix}_bowtie_singleton_map.log \\
+            | samtools sort -@ $task.cpus \\
+                  -o ${prefix}_\${bin_name}_singletons_reads.bam -
 
-	    if [[ ${reads[2]} == null ]]; then
-		    mv ${prefix}_\${bin_name}_paired_reads.bam ${prefix}_\${bin_name}_all_reads.bam
-            fi
-
-	    if [[ ${reads[2]} != null ]]; then
-	            bowtie2 \\
-	            -x ${prefix}_bins_index \\
-	            -p $task.cpus \\
-	            -U ${reads[2]} \\
-	            -S ${prefix}_\${bin_name}_singletons.sam 2> ${prefix}_bowtie_singleton_map.log
-
-		    samtools sort -@ $task.cpus \\
-                          -o ${prefix}_\${bin_name}_singletons_reads.bam \\
-                          ${prefix}_\${bin_name}_singletons.sam
-
-		    samtools merge ${prefix}_\${bin_name}_all_reads.bam ${prefix}_\${bin_name}_paired_reads.bam ${prefix}_\${bin_name}_singletons_reads.bam
-	            rm -f ${prefix}_bowtie_singleton_map.log
-                    rm -f ${prefix}_\${bin_name}_singletons.sam
-            fi
-            rm -f ${prefix}_\${bin_name}_paired_reads.sam
+            samtools merge ${prefix}_\${bin_name}_all_reads.bam \\
+                ${prefix}_\${bin_name}_paired_reads.bam \\
+                ${prefix}_\${bin_name}_singletons_reads.bam
+            rm -f ${prefix}_\${bin_name}_paired_reads.bam ${prefix}_\${bin_name}_singletons_reads.bam
+            rm -f ${prefix}_bowtie_singleton_map.log
+            """ : """
+            mv ${prefix}_\${bin_name}_paired_reads.bam ${prefix}_\${bin_name}_all_reads.bam
+            """ }
             rm -f ${prefix}_bins_index*
             rm -f ${prefix}_bowtie_map.log
         done
-	""" 
+
+        printf '"%s":\n' "${task.process}" > versions.yml
+        printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+        printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
+	"""
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        touch ${prefix}_bin1_all_reads.bam
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            bowtie2: 2.5.1
+            samtools: 1.17
+        END_VERSIONS
+        """
 }

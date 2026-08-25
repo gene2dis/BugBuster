@@ -1,0 +1,5 @@
+sample_id	sampleempty
+contigs_before_filter	5
+contigs_after_filter	0
+min_length_threshold	1000
+all_contigs_filtered	TRUE

@@ -40,45 +40,43 @@ process GTDB_TK_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
+    def metawrap_suffix = task.ext.metawrap_dir_suffix ?: "metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"
     """
     set -euo pipefail
-    
+
     # Create combined directory with prefixed bin names
     mkdir -p combined_bins
-    
+
     total_bins=0
-    
+
     # Process ALL staged bin directories - parse sample_id from directory names
-    # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow
+    # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. The input channel
+    # already carries exactly the dirs to classify (single-binner outputs, or
+    # MetaWRAP-refined dirs), so every dir must be recognized; identify_bin_dir.sh
+    # fails loudly on naming drift (audit #6).
     for staged_dir in bin_*/; do
         staged_dir=\${staged_dir%/}  # Remove trailing slash
-        
+
         # Get the actual bin directory inside
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
-        
-        bin_dir_name=\$(basename "\$bin_dir")
-        
-        # Parse directory name to extract sample_id (metawrap bins only for GTDB-Tk)
-        if [[ "\$bin_dir_name" =~ ^(.+)_metawrap_50_10_bins\$ ]]; then
-            sample_id="\${BASH_REMATCH[1]}"
-            
-            echo "Processing \$bin_dir_name -> sample_id=\$sample_id"
-            
-            # Find all .fa/.fasta/.fna files recursively
-            bin_count=\$(find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
-            
-            if [ "\$bin_count" -gt 0 ]; then
-                echo "Found \$bin_count bins for sample \${sample_id}"
-                # Copy bins with prefixed names to track origin
-                find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
-                    bin_name=\$(basename "\$bin_file")
-                    cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name}"
-                done
-                total_bins=\$((total_bins + bin_count))
-            fi
-        else
-            echo "Skipping non-metawrap directory: \$bin_dir"
+
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${metawrap_suffix}")
+        sample_id=\${id_line%%\$'\\t'*}
+
+        echo "Processing \$(basename "\$bin_dir") -> sample_id=\$sample_id"
+
+        # Find all .fa/.fasta/.fna files recursively
+        bin_count=\$(find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
+
+        if [ "\$bin_count" -gt 0 ]; then
+            echo "Found \$bin_count bins for sample \${sample_id}"
+            # Copy bins with prefixed names to track origin
+            find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
+                bin_name=\$(basename "\$bin_file")
+                cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name}"
+            done
+            total_bins=\$((total_bins + bin_count))
         fi
     done
     

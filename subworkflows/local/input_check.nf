@@ -20,6 +20,9 @@ workflow INPUT_CHECK {
         .ifEmpty { error "Cannot find samplesheet file: ${samplesheet}" }
         .splitCsv(header: true, sep: ',', strip: true)
         .map { row -> validate_input(row) }
+        // A header-only (or empty) samplesheet previously yielded a
+        // "successful" run that processed nothing
+        .ifEmpty { error "Samplesheet contains no samples: ${samplesheet}" }
         .set { reads }
 
     emit:
@@ -47,14 +50,22 @@ def validate_input(row) {
     def meta = [:]
     meta.id = row.sample.toString().trim()
 
-    // Validate sample name (no spaces, special chars)
-    if (meta.id ==~ /.*\s.*/) {
-        error "Invalid sample name '${meta.id}': Sample names cannot contain spaces"
+    // Sample ids become file and directory names throughout the pipeline:
+    // restrict to path-safe characters (previously only whitespace was
+    // rejected, letting '/', ':' etc. flow into filenames)
+    if (!(meta.id ==~ /[A-Za-z0-9][A-Za-z0-9_.\-]*/)) {
+        error "Invalid sample name '${meta.id}': use only letters, digits, underscore, dot or hyphen, starting with a letter or digit"
     }
 
     // Check file existence
     def r1_file = file(row.r1.toString().trim(), checkIfExists: true)
     def r2_file = file(row.r2.toString().trim(), checkIfExists: true)
+
+    // A copy-paste mistake (same file for both mates) would otherwise run
+    // "successfully" and produce garbage
+    if (r1_file == r2_file) {
+        error "Invalid samplesheet: r1 and r2 are the same file for sample '${meta.id}': ${r1_file}"
+    }
 
     // Validate file extensions
     def valid_extensions = ['.fastq', '.fq', '.fastq.gz', '.fq.gz']
@@ -71,6 +82,9 @@ def validate_input(row) {
         def s_file = file(row.s.toString().trim(), checkIfExists: true)
         if (!valid_extensions.any { s_file.name.endsWith(it) }) {
             error "Invalid singleton file extension for sample '${meta.id}': ${s_file.name}. Must be one of: ${valid_extensions.join(', ')}"
+        }
+        if (s_file == r1_file || s_file == r2_file) {
+            error "Invalid samplesheet: singleton file duplicates r1/r2 for sample '${meta.id}': ${s_file}"
         }
         meta.single_end = false
         meta.has_singletons = true

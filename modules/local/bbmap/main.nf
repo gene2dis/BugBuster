@@ -25,13 +25,7 @@ process BBMAP {
         'https://depot.galaxyproject.org/singularity/bbmap:39.06--h92535d8_0' :
         'quay.io/biocontainers/bbmap:39.06--h92535d8_0' }"
 
-    // Publish filtered contigs using 'move' mode to free disk space immediately
-    publishDir(
-        path: "${params.output}/assembly/${meta.id}",
-        mode: 'move',
-        enabled: params.store_filtered_contigs,
-        saveAs: { filename -> filename.equals('versions.yml') ? null : filename }
-    )
+    // Publishing is configured in config/modules.config (withName: 'BBMAP')
 
     input:
     tuple val(meta), path(reads), path(contigs)
@@ -71,8 +65,9 @@ process BBMAP {
         exit 1
     fi
     
-    # Count contigs before filtering
-    contigs_before=\$(grep -c '^>' "${contigs}" || echo 0)
+    # Count contigs before filtering (awk always exits 0, unlike 'grep -c'
+    # whose zero-match exit 1 turned the count into "0\\n0" under pipefail)
+    contigs_before=\$(${contigs.name.endsWith('.gz') ? "gzip -cd" : "cat"} "${contigs}" | awk '/^>/{n++} END{print n+0}')
     
     # BBMap reformat.sh handles both gzipped and uncompressed contigs
     reformat.sh \\
@@ -82,7 +77,7 @@ process BBMAP {
         ${args}
     
     # Count contigs after filtering
-    contigs_after=\$(grep -c '^>' ${prefix}_filtered_contigs.fa || echo 0)
+    contigs_after=\$(awk '/^>/{n++} END{print n+0}' ${prefix}_filtered_contigs.fa)
     
     # Generate filter report
     cat > ${prefix}_filter_report.txt <<-REPORT

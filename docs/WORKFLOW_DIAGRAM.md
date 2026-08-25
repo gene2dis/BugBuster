@@ -23,6 +23,10 @@ flowchart TD
     %% Read-level ARG Branch
     CleanReads -->|if read_arg_prediction| ReadARG[Read-level ARG Prediction<br/>KARGVA → KARGA → ARGS_OAP]
     ReadARG --> ARGNorm[ARG_NORM_REPORT]
+
+    %% RGI Branch
+    CleanReads -->|if rgi_prediction| RGI[RGI AMR Prediction<br/>RGI_BWT → RGI_KMER]
+    RGI --> RGIReport[RGI_REPORT]
     
     %% Assembly Branch
     CleanReads -->|if assembly_mode != none| Assembly[ASSEMBLY SUBWORKFLOW<br/>MEGAHIT Assembly]
@@ -31,7 +35,7 @@ flowchart TD
     
     %% Binning Branch
     Contigs -->|if include_binning| Binning[BINNING SUBWORKFLOW<br/>Selected binners from:<br/>MetaBAT2, SemiBin, COMEBin]
-    Binning --> RefinedBins[Refined Bins<br/>MetaWRAP (if ≥2 binners) + CheckM2 + GTDB-TK]
+    Binning --> RefinedBins["Refined Bins<br/>MetaWRAP (if ≥2 binners) + CheckM2 + GTDB-TK"]
     
     %% Contig-level Analysis Branch
     Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy & ARG<br/>NT_BLASTN + BLOBTOOLS]
@@ -47,13 +51,11 @@ flowchart TD
     BinARG --> ARGFormat[ARG_FASTA_FORMATTER]
     ARGFormat --> Clustering[CLUSTERING]
     
-    %% MultiQC Reporting
-    QC --> MultiQC[MULTIQC<br/>Aggregate QC Reports]
-    Taxonomy --> MultiQC
-    
     %% End
-    MultiQC --> End([Results Output])
+    QC --> End([Results Output])
+    Taxonomy --> End
     ARGNorm --> End
+    RGIReport --> End
     ARGBlobplot --> End
     Clustering --> End
     MetaCerberus --> End
@@ -66,7 +68,7 @@ flowchart TD
     classDef database fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     
     class InputCheck,QC,Taxonomy,Assembly,Binning subworkflow
-    class ReadARG,ContigTax,ContigARG,BinARG,MetaCerberus,MultiQC module
+    class ReadARG,RGI,ContigTax,ContigARG,BinARG,MetaCerberus module
     class CleanReads,Contigs decision
     class PrepDB database
 ```
@@ -97,11 +99,11 @@ flowchart TD
     Start --> Bindb{Binning<br/>Enabled?}
     Start --> Contigdb{Contig Analysis<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
+    Start --> RGIdb{RGI<br/>Enabled?}
     
     Kraken -->|Yes| KrakenDB[FORMAT_KRAKEN_DB]
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
-    QCdb -->|Yes| PhiX[BUILD_PHIX_BOWTIE2_INDEX]
-    QCdb -->|Yes| Host[FORMAT_BOWTIE_INDEX]
+    QCdb -->|Yes| Decontam[BOWTIE2_BUILD_COMBINED]
     Bindb -->|Yes| CheckM2[FORMAT_CHECKM2_DB]
     Bindb -->|Yes| GTDBTK[DOWNLOAD_GTDBTK_DB]
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
@@ -109,10 +111,11 @@ flowchart TD
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
+    RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `phix_index`, `host_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `karga_db`, `kargva_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 
@@ -121,13 +124,12 @@ flowchart TD
 flowchart TD
     Reads[Raw Reads] --> QCCheck{quality_control<br/>enabled?}
     
-    QCCheck -->|Yes| FASTP[FASTP<br/>Quality Filtering]
+    QCCheck -->|Yes| FASTP["FASTP (+ FASTP_SINGLETON)<br/>Quality Filtering"]
     FASTP --> QFILTER[QFILTER<br/>Extract QC Reports]
     QFILTER --> MinReads{Reads >=<br/>min_read_sample?}
-    MinReads -->|Yes| HostFilter[BOWTIE2_HOST<br/>Remove Host Contamination]
+    MinReads -->|Yes| Decontaminate[BOWTIE2_DECONTAMINATE<br/>Single pass vs combined<br/>phiX + host index]
     MinReads -->|No| Skip1[Skip Sample]
-    HostFilter --> PhiXFilter[BOWTIE2_PHIX<br/>Remove PhiX Contamination]
-    PhiXFilter --> ReadsReport[READS_REPORT]
+    Decontaminate --> ReadsReport[READS_REPORT]
     
     QCCheck -->|No| CountReads[COUNT_READS<br/>Count Only]
     CountReads --> ReadsReport
@@ -137,9 +139,7 @@ flowchart TD
 
 **Outputs:**
 - `reads`: Clean reads `[meta, reads]`
-- `reads_coassembly`: Collected reads for coassembly
 - `report`: QC summary report
-- `fastp_json`: FASTP JSON for MultiQC
 
 ---
 
@@ -273,7 +273,8 @@ flowchart TD
 | `taxonomic_profiler` | `'kraken2'` | Profiler: 'kraken2', 'sourmash', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
-| `read_arg_prediction` | `false` | Enable read-level ARG prediction |
+| `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |
+| `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
 | `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
@@ -306,21 +307,94 @@ flowchart LR
 ## Module Categories
 
 ### Core Analysis Modules
-- **Quality Control**: FASTP, QFILTER, BOWTIE2 (host/PhiX removal)
+- **Quality Control**: FASTP, FASTP_SINGLETON, QFILTER, BOWTIE2_DECONTAMINATE (combined phiX + host removal), COUNT_READS
 - **Taxonomy**: KRAKEN2, BRACKEN, SOURMASH
 - **Assembly**: MEGAHIT, BBMAP
 - **Binning**: METABAT2, SEMIBIN, COMEBIN, METAWRAP
 - **Quality Assessment**: CHECKM2, GTDB-TK
 
 ### ARG Prediction Modules
-- **Read-level**: KARGVA, KARGA, ARGS_OAP
+- **Read-level**: KARGVA, KARGA, ARGS_OAP, RGI_BWT, RGI_KMER, RGI_REPORT
 - **Contig-level**: DEEPARG_CONTIGS
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
 - **Functional**: METACERBERUS, PRODIGAL
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
-- **Reporting**: MultiQC, custom report generators
+- **Reporting**: custom report generators
+
+---
+
+## Module Reference
+
+### Subworkflows
+| Subworkflow | Description |
+|-------------|-------------|
+| `INPUT_CHECK` | Validate samplesheet format and file existence |
+| `PREPARE_DATABASES` | Download and format all required databases |
+| `QC` | Quality control and phiX/host decontamination |
+| `TAXONOMY` | Taxonomic profiling with Kraken2 or Sourmash |
+| `ASSEMBLY` | Metagenome assembly (per-sample or co-assembly) |
+| `BINNING` | Unified binning workflow (mode-agnostic) |
+
+### Quality Control (QC Subworkflow)
+| Module | Description |
+|--------|-------------|
+| `FASTP` / `FASTP_SINGLETON` | Read quality filtering and adapter trimming (paired + singleton reads) |
+| `QFILTER` | Extract QC reports and filter by read count |
+| `BOWTIE2_DECONTAMINATE` | Single-pass removal of phiX and host reads against the combined index |
+| `COUNT_READS` | Read counting when `--quality_control false` |
+| `READS_REPORT` | Generate read count summary report |
+
+### Taxonomic Profiling
+| Module | Description |
+|--------|-------------|
+| `KRAKEN2` | K-mer based taxonomic classification |
+| `BRACKEN` | Abundance estimation from Kraken2 |
+| `SOURMASH` | MinHash-based taxonomic profiling |
+| `TAXONOMY_PHYLOSEQ` / `PHYLOSEQ_CONVERTER` | Phyloseq-style tables and optional R object |
+
+### Assembly
+| Module | Description |
+|--------|-------------|
+| `MEGAHIT` | De novo metagenome assembly |
+| `BBMAP` | Contig length filtering |
+| `BOWTIE2_SAMTOOLS` | Align reads back to contigs |
+| `CONTIG_FILTER_SUMMARY` | Track samples whose contigs were fully filtered |
+
+### Binning (BINNING Subworkflow - Mode-Agnostic)
+| Module | Condition | Description |
+|--------|-----------|-------------|
+| `CALCULATE_DEPTH` | if `metabat2` selected | Calculate contig depth from BAM files |
+| `METABAT2` | if `metabat2` in `--binners` | Binning by coverage and composition |
+| `SEMIBIN` | if `semibin` in `--binners` | Semi-supervised binning |
+| `COMEBIN` | if `comebin` in `--binners` | Contrastive learning binning |
+| `METAWRAP` | if ≥2 binners selected | Bin refinement and consolidation |
+| `CHECKM2_BATCH` | always | Bin completeness and contamination |
+| `GTDB_TK_BATCH` | always | Bin taxonomic classification |
+| `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | assembly mode | Per-sample quality/taxonomy reports |
+| `BOWTIE2_SAMTOOLS_DEPTH` / `BEDTOOLS` / `BIN_SUMMARY` | co-assembly mode | Bin coverage and comprehensive summary |
+
+### ARG / AMR Prediction
+| Module | Description |
+|--------|-------------|
+| `KARGA` | Read-level ARG detection |
+| `KARGVA` | Read-level ARG variant detection |
+| `ARGS_OAP` | Read-level ARG detection and normalization factors |
+| `ARG_NORM_REPORT` | Normalized read-level ARG summary |
+| `RGI_BWT` / `RGI_KMER` / `RGI_REPORT` | CARD-based AMR prediction with pathogen-of-origin |
+| `DEEPARG_CONTIGS` / `DEEPARG_BINS` | ARG prediction on contigs / bins |
+
+### Contig Analysis
+| Module | Description |
+|--------|-------------|
+| `NT_BLASTN` | Contig taxonomic assignment via megablast |
+| `SAMTOOLS_INDEX` | Index BAM files for BLOBTOOLS |
+| `BLOBTOOLS` / `BLOBPLOT` | Contig taxonomy tables and plots |
+| `PRODIGAL_CONTIGS` / `PRODIGAL_BINS` | ORF prediction on contigs / bins |
+| `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | Contig-level ARG report and visualization |
+| `ARG_FASTA_FORMATTER` / `CLUSTERING` | Bin-level ARG formatting and clustering |
+| `METACERBERUS_CONTIGS` | Functional annotation (per-sample assembly mode only) |
 
 ---
 
@@ -328,22 +402,15 @@ flowchart LR
 
 ```
 results/
-├── qc/                          # Quality control reports
-├── taxonomy/                    # Taxonomic profiles
-├── assembly/                    # Assembled contigs
-├── binning/                     # Refined bins
-│   ├── metabat2/
-│   ├── semibin/
-│   ├── comebin/
-│   ├── metawrap/
-│   ├── checkm2/
-│   └── gtdbtk/
-├── arg_prediction/              # ARG analysis results
-│   ├── reads/
-│   ├── contigs/
-│   └── bins/
-├── annotation/                  # Functional annotations
-└── multiqc/                     # Aggregated QC report
+├── pipeline_info/               # Execution reports and logs
+├── clean_reads/                 # Decontaminated reads (only if --store_clean_reads)
+├── 01_quality_control/          # FastP reports and QC summary
+├── 02_taxonomy/                 # Taxonomic profiles, tables, figures
+├── 03_assembly/                 # Assembled and filtered contigs
+├── 04_binning/                  # Raw/refined bins, quality, taxonomy
+├── 05_arg_prediction/           # ARG results (read/contig/bin level)
+├── 06_contig_taxonomy/          # BlobTools contig taxonomy plots
+└── 07_functional_annotation/    # MetaCerberus annotations
 ```
 
 ---
@@ -363,6 +430,11 @@ results/
 --taxonomic_profiler none --read_arg_prediction false
 ```
 
+### Mode 4: Co-assembly Mode
+```bash
+--assembly_mode coassembly
+```
+
 ### Mode 5: Binning with Single Fast Binner (Default)
 ```bash
 --include_binning true --binners semibin
@@ -374,13 +446,3 @@ results/
 # or all three:
 --include_binning true --binners semibin,metabat2,comebin
 ```
-
-### Mode 4: Co-assembly Mode
-```bash
---assembly_mode coassembly
-```
-
----
-
-**Pipeline Version**: As defined in `nextflow.config`  
-**Last Updated**: Based on current codebase analysis

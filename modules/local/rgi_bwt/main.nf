@@ -12,7 +12,7 @@ process RGI_BWT {
     output:
         tuple val(meta), path("*.allele_mapping_data.txt"), emit: allele_mapping
         tuple val(meta), path("*.gene_mapping_data.txt"), emit: gene_mapping
-        tuple val(meta), path("*.sorted.length_100.bam"), emit: bam
+        tuple val(meta), path("*.sorted.length_100.bam"), emit: bam, optional: true
         path("*.overall_mapping_stats.txt"), emit: overall_stats
         path("*.reference_mapping_stats.txt"), emit: reference_stats
         path("*.artifacts_mapping_stats.txt"), emit: artifacts_stats, optional: true
@@ -27,7 +27,9 @@ process RGI_BWT {
         def aligner = params.rgi_aligner ?: 'kma'
         def wildcard = params.rgi_include_wildcard ? '--include_wildcard' : ''
         
-        // Handle paired-end reads with optional singletons
+        // rgi bwt only accepts --read_one/--read_two, so read-level RGI runs on
+        // the paired reads only; singleton reads (reads[2], carried since the
+        // audit #9 QC rework) are deliberately excluded (documented in the manual)
         def read_one = reads[0]
         def read_two = reads.size() > 1 ? reads[1] : ''
         
@@ -38,11 +40,17 @@ process RGI_BWT {
         fi
         set -u
 
-        # Copy database to local directory for RGI access
-        cp -r ${card_db} rgi_db
-        
-        # RGI --local flag looks for localDB/ in current directory
-        ln -s rgi_db/localDB localDB
+        # RGI --local looks for localDB/ in the current directory. Symlink the
+        # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
+        # per task (audit #17): reads go through the symlinks, while any file
+        # RGI creates at runtime lands in this task's localDB/, not the shared
+        # published database.
+        if [ ! -d ${card_db}/localDB ]; then
+            echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
+            exit 1
+        fi
+        mkdir localDB
+        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
         # Run RGI bwt (stderr redirected to log file to avoid flooding with low-coverage warnings)
         rgi bwt \\
@@ -56,17 +64,13 @@ process RGI_BWT {
             ${args} \\
             2>${prefix}_rgi_bwt.log
 
-        # Verify output files were created, create dummy files if RGI failed due to low/no coverage
+        # Low-coverage fallback (audit #8): if RGI produced no mapping results,
+        # create every declared non-optional output (NA allele/gene tables plus
+        # both stats files). No BAM is created - the bam emit is optional and
+        # RGI_KMER is skipped for this sample (no alignments to query).
         if [ ! -f "${prefix}_rgi_bwt.allele_mapping_data.txt" ]; then
             echo "WARNING: RGI bwt did not produce expected output files - creating dummy outputs for low coverage sample"
-            echo -e "ORF_ID\tContig\tStart\tStop\tOrientation\tCut_Off\tPass_Bitscore\tBest_Hit_ARO\tBest_Identities\tAROMatch\tSNPs_In_Best_Hit_ORTH\tOther_Hits\tUnique_Identifier\tBest_Hit_ARO_category\tBest_Resistomes\tAROs\tARO_category\tResistomes\tPredicted_DNA\tPredicted_Protein\tCARD_Protein_Sequence\tPercentage_Length_of_CARD_Protein\tID\tModel_ID\tNudged\tNote\tOther_Hit_Accession" > ${prefix}_rgi_bwt.allele_mapping_data.txt
-            echo "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> ${prefix}_rgi_bwt.allele_mapping_data.txt
-            
-            echo -e "ORF_ID\tARO Term\tARO Accession\tReference Model Type\tReference DB\tAlleles with Mapped Reads\tReference Allele\t%Coverage of Reference Allele\tMinimum Bidirectional Coverage\tAverage Bidirectional Coverage\t%Identity to Reference Allele\tAntibiotic\tClass\tResistance Mechanism\tAMR Gene Family\tDrug Class" > ${prefix}_rgi_bwt.gene_mapping_data.txt
-            echo "NA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA\tNA" >> ${prefix}_rgi_bwt.gene_mapping_data.txt
-            
-            touch ${prefix}_rgi_bwt.overall_mapping_stats.txt
-            echo "No mapping statistics available - insufficient reads" > ${prefix}_rgi_bwt.overall_mapping_stats.txt
+            rgi_bwt_lowcov_fallback.sh ${prefix}_rgi_bwt
         fi
 
         # Create versions file

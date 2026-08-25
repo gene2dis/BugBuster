@@ -9,6 +9,7 @@ process KARGVA {
     output:
         tuple val(meta), path("*_all_reads_KARGVA_mappedGenes.csv"), path(reads), emit: kargva_reads
         path("*_all_reads_KARGVA_mappedGenes.csv"), emit: kargva_reports
+        path "versions.yml", emit: versions
 
     script:
         def prefix = "${meta.id}"
@@ -20,7 +21,7 @@ process KARGVA {
 		cat ${reads[0]} ${reads[1]} > ${prefix}_all_reads.fastq.gz
 	fi
 
-	java -cp /bin/ KARGVA k:17 d:${kargva_db} -XX:ActiveProcessorCount=${task.cpus} -Xmx32GB ${prefix}_all_reads.fastq.gz
+	java -XX:ActiveProcessorCount=${task.cpus} -Xmx${task.memory.toGiga()}g -cp /bin/ KARGVA k:17 d:${kargva_db} ${prefix}_all_reads.fastq.gz
 
         if [[ ! -e ${prefix}_all_reads_KARGVA_mappedGenes.csv ]]; then
                 echo "GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGVA_mappedGenes.csv
@@ -29,5 +30,26 @@ process KARGVA {
 
         rm -f *KARGVA_mappedReads.csv
         rm -f ${prefix}_all_reads.fastq.gz
+
+        # KARGVA is a bare Java class with no version flag: version from the
+        # container tag
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            kargva: 1.0
+            java: \$(java -version 2>&1 | head -n 1 | sed 's/.*"\\(.*\\)".*/\\1/')
+        END_VERSIONS
+        """
+
+    stub:
+        def prefix = "${meta.id}"
+
+        """
+        echo "GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth" > ${prefix}_all_reads_KARGVA_mappedGenes.csv
+
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            kargva: 1.0
+            java: 18.0.2.1
+        END_VERSIONS
         """
 }
