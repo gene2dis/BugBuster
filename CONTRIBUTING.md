@@ -255,7 +255,7 @@ Parameter validation uses the `nf-schema` plugin, which Nextflow downloads
 automatically on first run. For offline environments, pre-install it once:
 
 ```bash
-nextflow plugin install nf-schema@2.8.0
+nextflow plugin install nf-schema@2.7.3
 ```
 
 ### Linting
