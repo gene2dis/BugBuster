@@ -2,20 +2,12 @@
 
 This folder contains the original R scripts extracted from `quay.io/ffuentessantander/r_reports:1.1` container.
 
-## Scripts to Migrate
-
-### Reporting/Analysis Scripts
-- `Report_unify.R` → used by `reads_report` module
-- `Read_arg_norm.R` → used by `arg_norm_report` module
-- `Tax_unify_report.R` → used by `tax_report_kraken2` and `tax_report_sourmash` modules
-- `Blobplot.R` → used by `blobplot` module
-- `Bin_summary.R` → used by `bin_summary` module
-- `Tax_kraken_to_phyloseq.R` → used by `kraken_to_phyloseq` module
-- Additional scripts for other modules (arg_blobplot, bin_quality_report, bin_tax_report, etc.)
+The migration is complete: every reporting module now calls a Python script in `bin/`
+(except phyloseq conversion, kept in R). The original R scripts are **retained here on
+purpose** as the reference for visually verifying that the ported scripts produce
+equivalent outputs — do not delete this folder until that verification is done.
 
 ## Migration Status
-
-Scripts will be migrated incrementally, module by module.
 
 **Status Legend:**
 - ⏳ Pending
@@ -23,26 +15,22 @@ Scripts will be migrated incrementally, module by module.
 - ✅ Migrated
 - 🔴 Keep in R
 
-| Module | Script | Status | Target Language | Notes |
-|--------|--------|--------|-----------------|-------|
-| reads_report | Report_unify.R | ⏳ | TBD | |
-| arg_norm_report | Read_arg_norm.R | ⏳ | TBD | |
-| tax_report_kraken2 | Tax_unify_report.R | ⏳ | TBD | |
-| tax_report_sourmash | Tax_unify_report.R | ⏳ | TBD | |
-| blobplot | Blobplot.R | ⏳ | TBD | |
-| arg_blobplot | (TBD) | ⏳ | TBD | |
-| bin_summary | Bin_summary.R | ⏳ | TBD | |
-| bin_quality_report | (TBD) | ⏳ | TBD | |
-| bin_tax_report | (TBD) | ⏳ | TBD | |
-| kraken_to_phyloseq | Tax_kraken_to_phyloseq.R | ⏳ | TBD | Likely keep R (phyloseq) |
-| sourmash_to_phyloseq | (TBD) | ⏳ | TBD | Likely keep R (phyloseq) |
-| arg_contig_level_report | (TBD) | ⏳ | TBD | |
+| Module | Original script | Status | Replacement in `bin/` | Notes |
+|--------|-----------------|--------|-----------------------|-------|
+| reads_report | Report_unify.R | ✅ | `report_unify.py` | |
+| arg_norm_report | Read_arg_norm.R | ✅ | `arg_norm_report.py` | |
+| taxonomy_report (kraken2 + sourmash) | Tax_unify_report.R | ✅ | `taxonomy_report.py` | One module handles both profilers |
+| blobplot | Blobplot.R | ✅ | `blobplot.py` | |
+| arg_blobplot | (TBD) | ✅ | `arg_blobplot.py` (+ `blobplot.py`) | |
+| bin_summary | Bin_summary.R | ✅ | `bin_summary.py` | |
+| bin_quality_report | (TBD) | ✅ | `bin_quality_report.py` | |
+| bin_tax_report | (TBD) | ✅ | `bin_tax_report.py` | |
+| arg_contig_level_report | (TBD) | ✅ | `arg_contig_level_report.py` | |
+| taxonomy_phyloseq | Tax_kraken_to_phyloseq.R | ✅ | `taxonomy_phyloseq.py` | Builds phyloseq-ready tables in Python |
+| phyloseq_converter | Tax_kraken_to_phyloseq.R | 🔴 | `tables_to_phyloseq_simple.R` | RDS creation needs the R phyloseq package |
 
-## Workflow
+## Verification workflow
 
-1. Add original R scripts to this folder
-2. Analyze script for migration (per user request)
-3. Create migrated version in `bin/` (Python or R)
-4. Update module to use new script and container
-5. Test and validate
-6. Mark as complete in table above
+1. Run the pipeline (or the relevant module test) with the Python scripts.
+2. Compare the outputs (tables/plots) against those produced by the original R scripts in this folder.
+3. Once a script's outputs are verified, it no longer needs its R original; remove this folder when all are verified.

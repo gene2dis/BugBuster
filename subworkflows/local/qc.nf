@@ -19,7 +19,7 @@ workflow QC {
     decontamination_index   // channel: path(decontamination_index) - combined phiX + host index
 
     main:
-    ch_versions = Channel.empty()
+    ch_versions = channel.empty()
 
     if ( params.quality_control ) {
         //
@@ -36,7 +36,7 @@ workflow QC {
         }
 
         ch_singleton_input = reads
-            .filter { meta, reads_files -> reads_files.size() > 2 }
+            .filter { _meta, reads_files -> reads_files.size() > 2 }
             .map { meta, reads_files ->
                 [ meta + [single_end: true], [ reads_files[2] ], [] ]
             }

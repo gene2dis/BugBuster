@@ -14,9 +14,6 @@ on:
 
 env:
   NXF_ANSI_LOG: false
-  # The config uses legacy syntax (e.g. top-level def check_max) that the
-  # strict parser, default since Nextflow 26.04, rejects
-  NXF_SYNTAX_PARSER: v1
 
 concurrency:
   group: "${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}"
@@ -29,7 +26,7 @@ jobs:
     strategy:
       matrix:
         NXF_VER:
-          - "24.04.4"
+          - "25.10.7"
           - "latest-everything"
     steps:
       - name: Check out pipeline code

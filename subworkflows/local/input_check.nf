@@ -15,7 +15,9 @@ workflow INPUT_CHECK {
     main:
     check_duplicates(samplesheet)
 
-    channel
+    emit:
+    // channel: [ val(meta), [ reads ] ]
+    reads = channel
         .fromPath(samplesheet)
         .ifEmpty { error "Cannot find samplesheet file: ${samplesheet}" }
         .splitCsv(header: true, sep: ',', strip: true)
@@ -23,10 +25,6 @@ workflow INPUT_CHECK {
         // A header-only (or empty) samplesheet previously yielded a
         // "successful" run that processed nothing
         .ifEmpty { error "Samplesheet contains no samples: ${samplesheet}" }
-        .set { reads }
-
-    emit:
-    reads // channel: [ val(meta), [ reads ] ]
 }
 
 /**
@@ -69,10 +67,10 @@ def validate_input(row) {
 
     // Validate file extensions
     def valid_extensions = ['.fastq', '.fq', '.fastq.gz', '.fq.gz']
-    if (!valid_extensions.any { r1_file.name.endsWith(it) }) {
+    if (!valid_extensions.any { ext -> r1_file.name.endsWith(ext) }) {
         error "Invalid R1 file extension for sample '${meta.id}': ${r1_file.name}. Must be one of: ${valid_extensions.join(', ')}"
     }
-    if (!valid_extensions.any { r2_file.name.endsWith(it) }) {
+    if (!valid_extensions.any { ext -> r2_file.name.endsWith(ext) }) {
         error "Invalid R2 file extension for sample '${meta.id}': ${r2_file.name}. Must be one of: ${valid_extensions.join(', ')}"
     }
 
@@ -80,7 +78,7 @@ def validate_input(row) {
     def reads = []
     if (row.s && row.s.toString().trim()) {
         def s_file = file(row.s.toString().trim(), checkIfExists: true)
-        if (!valid_extensions.any { s_file.name.endsWith(it) }) {
+        if (!valid_extensions.any { ext -> s_file.name.endsWith(ext) }) {
             error "Invalid singleton file extension for sample '${meta.id}': ${s_file.name}. Must be one of: ${valid_extensions.join(', ')}"
         }
         if (s_file == r1_file || s_file == r2_file) {
@@ -119,7 +117,7 @@ def get_sample_ids(samplesheet) {
  */
 def check_duplicates(samplesheet) {
     def ids = get_sample_ids(samplesheet)
-    def duplicates = ids.groupBy { it }.findAll { it.value.size() > 1 }.keySet()
+    def duplicates = ids.groupBy { id -> id }.findAll { entry -> entry.value.size() > 1 }.keySet()
     if (duplicates) {
         error "Duplicate sample IDs found in samplesheet: ${duplicates.join(', ')}"
     }

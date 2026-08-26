@@ -24,7 +24,7 @@ This guide covers common issues and solutions when running BugBuster.
 
 **Error:**
 ```
-ERROR: Nextflow version 24.04.0 or later is required
+ERROR: Nextflow version 25.10.0 or later is required
 ```
 
 **Solution:**
