@@ -654,8 +654,6 @@ results/
 │   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
 │   │       └── *.csv
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
-│   │   ├── prodigal/                           # ORF predictions
-│   │   │   └── {sample}/
 │   │   ├── deeparg/                            # DeepARG predictions per sample
 │   │   │   └── {sample}/
 │   │   │       └── *_contigs_deep_arg.out.mapping.ARG
@@ -673,9 +671,15 @@ results/
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                                # BlobTools plots
 │       └── *.png
-└── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
-    └── contigs/                                # Contig-level annotation
-        └── {sample}/
+└── 07_functional_annotation/                   # Functional annotation
+    ├── gene_calling/                           # Pyrodigal ORF predictions on contigs
+    │   └── {sample}/                           # (if contig_tax_and_arg=true or contig_level_functional=true)
+    │       ├── {sample}.faa.gz
+    │       ├── {sample}.fna.gz
+    │       ├── {sample}.gff.gz
+    │       └── {sample}.score.gz
+    └── contigs/                                # MetaCerberus contig-level annotation
+        └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
 ```
 
@@ -717,7 +721,8 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
-| `07_functional_annotation/` | `contig_level_metacerberus=true` | Functional annotation results |
+| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
+| `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---
 

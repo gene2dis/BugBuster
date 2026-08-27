@@ -114,6 +114,12 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable contig-level functional annotation with MetaCerberus
 - **Example**: `--contig_level_metacerberus true`
 
+### `--contig_level_functional`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Enable the contig-level functional annotation branch. Currently runs shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`); annotation tools follow in later releases. Requires an assembly (`--assembly_mode assembly` or `coassembly`)
+- **Example**: `--contig_level_functional true`
+
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`

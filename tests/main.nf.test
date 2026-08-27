@@ -197,10 +197,12 @@ nextflow_pipeline {
             assert path("${outputDir}/05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1_contigs_deep_arg.out.mapping.ARG").exists()
             assert path("${outputDir}/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv").exists()
 
-            // PRODIGAL_CONTIGS ORFs published to the documented layout (audit #28:
-            // the duplicate selector's '*contigs*' pattern matched no output and
-            // overrode the real publishDir, so nothing was ever published)
-            assert path("${outputDir}/05_arg_prediction/contig_level/prodigal/test_sample1/test_sample1.faa.gz").exists()
+            // Shared PYRODIGAL gene calling ran and its ORFs are published to
+            // the documented layout (design doc Q6/Q9: gene calling moved from
+            // 05_arg_prediction/contig_level/prodigal/ to
+            // 07_functional_annotation/gene_calling/)
+            assert workflow.trace.tasks().any { task -> task.name.contains("PYRODIGAL") }
+            assert path("${outputDir}/07_functional_annotation/gene_calling/test_sample1/test_sample1.faa.gz").exists()
 
             // Contig filtering summary published to pipeline_info (audit #23)
             assert path("${outputDir}/pipeline_info/contig_filtering_summary.txt").exists()

@@ -1,0 +1,44 @@
+Changes in component 'nf-core/pyrodigal'
+Changes in 'pyrodigal/main.nf':
+--- modules/nf-core/pyrodigal/main.nf
++++ modules/nf-core/pyrodigal/main.nf
+@@ -16,7 +16,7 @@
+     tuple val(meta), path("*.fna.gz")                   , emit: fna
+     tuple val(meta), path("*.faa.gz")                   , emit: faa
+     tuple val(meta), path("*.score.gz")                 , emit: score
+-    tuple val("${task.process}"), val('pyrodigal'), eval("pyrodigal --version |& sed 's/pyrodigal v//'"), emit: versions_pyrodigal, topic: versions
++    path "versions.yml"                                 , emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -38,6 +38,12 @@
+         -s ${prefix}.score
+ 
+     pigz -nmf ${prefix}*
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        pyrodigal: \$(pyrodigal --version |& sed 's/pyrodigal v//')
++        pigz: \$(pigz -V 2>&1 | sed 's/pigz //g')
++    END_VERSIONS
+     """
+ 
+     stub:
+@@ -47,5 +53,11 @@
+     echo "" | gzip > ${prefix}.fna.gz
+     echo "" | gzip > ${prefix}.faa.gz
+     echo "" | gzip > ${prefix}.score.gz
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        pyrodigal: \$(pyrodigal --version |& sed 's/pyrodigal v//')
++        pigz: \$(pigz -V 2>&1 | sed 's/pigz //g')
++    END_VERSIONS
+     """
+ }
+
+'modules/nf-core/pyrodigal/environment.yml' is unchanged
+'modules/nf-core/pyrodigal/meta.yml' is unchanged
+'modules/nf-core/pyrodigal/tests/main.nf.test' is unchanged
+'modules/nf-core/pyrodigal/tests/main.nf.test.snap' is unchanged
+************************************************************

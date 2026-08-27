@@ -92,6 +92,12 @@
                     "description": "Enable contig-level functional annotation with MetaCerberus.",
                     "fa_icon": "fas fa-tags"
                 },
+                "contig_level_functional": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling; eggNOG-mapper et al. in later tasks). Requires an assembly.",
+                    "fa_icon": "fas fa-sitemap"
+                },
                 "arg_bin_clustering": {
                     "type": "boolean",
                     "default": false,

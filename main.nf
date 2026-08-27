@@ -63,6 +63,7 @@ def printHelp() {
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
+      --contig_level_functional     Enable contig-level functional annotation (default: ${params.contig_level_functional})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -117,8 +118,11 @@ include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samt
 include { BLOBPLOT         } from './modules/local/blobplot/main'
 
 	// ORF PREDICTION IN CONTIGS AND BINS
+	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
+	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
+	// (contig_level_functional)
 include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
-include { PRODIGAL as PRODIGAL_CONTIGS } from './modules/nf-core/prodigal/main'
+include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
 include { KARGVA           } from './modules/local/kargva/main'
@@ -212,6 +216,9 @@ workflow {
     if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
         error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
+    if (params.contig_level_functional && params.assembly_mode == 'none') {
+        error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
     if (params.arg_bin_clustering && !params.include_binning) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
@@ -232,6 +239,7 @@ workflow {
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+    log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info ""
 
     //
@@ -375,6 +383,31 @@ workflow {
     }
 
     //
+    // SHARED GENE CALLING ON CONTIGS
+    // One Pyrodigal pass (metagenome mode, both assembly modes) whose FAA feeds
+    // DeepARG and whose FAA/GFF feed the functional annotation branch (Q9).
+    //
+    ch_contig_proteins  = channel.empty()
+    ch_contig_genes_gff = channel.empty()
+
+    if ( (params.contig_tax_and_arg || params.contig_level_functional) && params.assembly_mode != "none" ) {
+        //
+        // Run nf-core PYRODIGAL for contig ORF prediction
+        // nf-core PYRODIGAL signature:
+        //   input:  tuple val(meta), path(fasta) + val(output_format)
+        //   output: tuple val(meta), path("*.faa.gz"), emit: faa
+        //           tuple val(meta), path("*.gff.gz"), emit: annotations
+        //
+        PYRODIGAL(
+            ch_contigs_meta,
+            "gff"  // output_format
+        )
+        ch_contig_proteins  = PYRODIGAL.out.faa
+        ch_contig_genes_gff = PYRODIGAL.out.annotations
+        ch_versions = ch_versions.mix(PYRODIGAL.out.versions.first())
+    }
+
+    //
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
@@ -407,17 +440,7 @@ workflow {
         )
         BLOBPLOT(ch_blob_table.only_blob.collect())
 
-        //
-        // Run nf-core PRODIGAL for contig ORF prediction
-        // nf-core PRODIGAL signature:
-        //   input:  tuple val(meta), path(genome) + val(output_format)
-        //   output: tuple val(meta), path("*.faa.gz"), emit: amino_acid_fasta
-        //
-        PRODIGAL_CONTIGS(
-            ch_contigs_meta,
-            "gff"  // output_format
-        )
-        ch_contig_proteins = PRODIGAL_CONTIGS.out.amino_acid_fasta
+        // Contig proteins come from the shared PYRODIGAL step above
         ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
             .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
@@ -432,7 +455,6 @@ workflow {
             NFCORE_SAMTOOLS_INDEX.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
-            PRODIGAL_CONTIGS.out.versions.first(),
             DEEPARG_CONTIGS.out.versions.first(),
             ARG_CONTIG_LEVEL_REPORT.out.versions,
             ARG_BLOBPLOT.out.versions
