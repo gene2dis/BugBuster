@@ -162,6 +162,35 @@ process DOWNLOAD_GTDBTK_DB {
         """
 }
 
+process FORMAT_EGGNOG_DB {
+    tag "format_eggnog_db"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("eggnog_db")
+
+    script:
+        """
+        ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        mkdir eggnog_db
+        touch eggnog_db/eggnog.db eggnog_db/eggnog.db.fieldpresence.bin \\
+            eggnog_db/eggnog.db.taxids.bin eggnog_db/eggnog.taxa.db \\
+            eggnog_db/eggnog.taxa.db.traverse.pkl eggnog_db/eggnog_proteins.dmnd \\
+            eggnog_db/go-basic.obo
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

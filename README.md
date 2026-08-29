@@ -142,6 +142,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
 | **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
+| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3; requires the singularity/apptainer profile while v3 is in beta) | `contig_level_functional=true` | `--custom_eggnog_db` |
 
 ### Database Sources
 
@@ -157,6 +158,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
+- **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
 
 ## Samplesheet Format
 

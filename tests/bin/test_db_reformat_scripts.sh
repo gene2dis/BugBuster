@@ -99,6 +99,20 @@ build_fixtures() {
     sed 's/^./0/' "${f}/blastdb_badmd5/nt.001.tar.gz.md5" > "${f}/blastdb_badmd5/tmp.md5" \
         && mv "${f}/blastdb_badmd5/tmp.md5" "${f}/blastdb_badmd5/nt.001.tar.gz.md5"
 
+    # Mock eggNOG emapper-3.0 data repository: the seven uncompressed data
+    # files the reformat script fetches from the base URL
+    mkdir -p "${f}/eggnogdb"
+    for egf in eggnog.db eggnog.db.fieldpresence.bin eggnog.db.taxids.bin \
+               eggnog.taxa.db eggnog.taxa.db.traverse.pkl eggnog_proteins.dmnd \
+               go-basic.obo; do
+        echo e > "${f}/eggnogdb/${egf}"
+    done
+
+    # Same eggNOG repo but with an empty eggnog.db (files are uncompressed, so
+    # zero length is the detectable download corruption)
+    cp -r "${f}/eggnogdb" "${f}/eggnogdb_empty"
+    : > "${f}/eggnogdb_empty/eggnog.db"
+
     # A corrupt (truncated) gzip tarball
     head -c 100 /dev/urandom > "${f}/corrupt.tar.gz"
 }
@@ -221,6 +235,19 @@ check_file "blast: volume 000 index in blast_nt_db" "blast_nt_db/nt.000.nin"
 check_file "blast: volume 001 index in blast_nt_db" "blast_nt_db/nt.001.nin"
 expect_fail "blast: wrong md5 fails" blast_nt_reformat.sh "${BASE_URL}/blastdb_badmd5"
 expect_fail "blast: missing metadata fails" blast_nt_reformat.sh "${BASE_URL}/no_such_dir"
+
+#
+# eggnog_db_reformat.sh
+#
+echo "--- eggnog_db_reformat.sh ---"
+expect_pass "eggnog: valid data files" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb"
+check_file "eggnog: eggnog.db in eggnog_db" "eggnog_db/eggnog.db"
+check_file "eggnog: taxid cache in eggnog_db" "eggnog_db/eggnog.db.taxids.bin"
+check_file "eggnog: eggnog.taxa.db in eggnog_db" "eggnog_db/eggnog.taxa.db"
+check_file "eggnog: diamond db in eggnog_db" "eggnog_db/eggnog_proteins.dmnd"
+check_file "eggnog: go-basic.obo in eggnog_db" "eggnog_db/go-basic.obo"
+expect_fail "eggnog: empty eggnog.db fails" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb_empty"
+expect_fail "eggnog: missing files fail" eggnog_db_reformat.sh "${BASE_URL}/no_such_dir"
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

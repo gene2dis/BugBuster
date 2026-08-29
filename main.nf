@@ -63,7 +63,7 @@ def printHelp() {
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
-      --contig_level_functional     Enable contig-level functional annotation (default: ${params.contig_level_functional})
+      --contig_level_functional     Enable contig-level functional annotation; needs singularity/apptainer (default: ${params.contig_level_functional})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -105,6 +105,7 @@ include { QC                 } from './subworkflows/local/qc'
 include { TAXONOMY           } from './subworkflows/local/taxonomy'
 include { ASSEMBLY           } from './subworkflows/local/assembly'
 include { BINNING            } from './subworkflows/local/binning'
+include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotation'
 
 // Modules for functionality not covered by subworkflows
 
@@ -224,6 +225,24 @@ workflow {
     }
     if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
         error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
+    }
+
+    // eggNOG-mapper v3 is a beta that ships only an Apptainer image (no
+    // bioconda/biocontainer/docker image), so the functional branch can only
+    // execute under singularity/apptainer for now (design doc Section 2, Q11).
+    // Stub runs are exempt: the module stubs run without a container, keeping
+    // CI and nf-test green under the docker profile.
+    if (params.contig_level_functional && !workflow.stubRun
+            && !(workflow.containerEngine in ['singularity', 'apptainer'])) {
+        error("--contig_level_functional requires a singularity or apptainer container engine: eggNOG-mapper v3 (beta) ships only an Apptainer image, no docker image exists yet. Use -profile singularity or -profile apptainer for this branch (docker support returns when eggNOG-mapper v3.0.0 final is released on bioconda)")
+    }
+
+    // low_disk deletes work dirs as the run progresses (not resumable) — a bad
+    // pairing with the long functional annotation runs and their large
+    // databases, where -resume matters most (design doc Q10: warn, stay
+    // results-neutral)
+    if (workflow.profile.tokenize(',').contains('low_disk') && params.contig_level_functional) {
+        log.warn "--contig_level_functional under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7, ~44 GB) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -405,6 +424,18 @@ workflow {
         ch_contig_proteins  = PYRODIGAL.out.faa
         ch_contig_genes_gff = PYRODIGAL.out.annotations
         ch_versions = ch_versions.mix(PYRODIGAL.out.versions.first())
+    }
+
+    //
+    // SUBWORKFLOW: Contig-level functional annotation (eggNOG-mapper)
+    //
+    if ( params.contig_level_functional && params.assembly_mode != "none" ) {
+        FUNCTIONAL_ANNOTATION(
+            ch_contig_proteins,
+            PREPARE_DATABASES.out.eggnog_db
+                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
+        )
+        ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
     }
 
     //

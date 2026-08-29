@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: With MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
 
 ### Pipeline Workflow
 
@@ -291,9 +291,21 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3); see engine note below |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
+
+> **Engine note for `--contig_level_functional`:** eggNOG-mapper v3 is in beta and its
+> authors publish only an Apptainer image, so this branch requires
+> `-profile singularity` or `-profile apptainer`. Nextflow uses one container engine
+> per run, which means enabling this branch switches the **entire run** to that
+> engine — every other tool runs from the same pinned images, automatically
+> converted, so results are unchanged (expect a one-time image-conversion delay on
+> first run). Because the cloud profiles (`aws`, `gcp`, `azure`) are docker-based,
+> this branch cannot run on cloud batch executors during the beta. Runs without
+> this flag are unaffected on every engine. Docker/cloud support returns when
+> eggNOG-mapper v3.0.0 final is released on bioconda.
 
 ### 6.3 Database Selection Options
 
@@ -305,6 +317,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
 | `--gtdbtk_db` | `release_220` | `release_220` | GTDB-TK database release |
+| `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 
 ### 6.4 Custom Database Paths
 
@@ -324,6 +337,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kargva_db` | Path to KARGVA database FASTA file |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
+| `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -678,6 +692,10 @@ results/
     │       ├── {sample}.fna.gz
     │       ├── {sample}.gff.gz
     │       └── {sample}.score.gz
+    ├── eggnog/                                 # eggNOG-mapper v3 functional annotation
+    │   └── {sample}/                           # (if contig_level_functional=true; needs singularity/apptainer)
+    │       ├── {sample}.emapper.seed_orthologs
+    │       └── {sample}.emapper.annotations
     └── contigs/                                # MetaCerberus contig-level annotation
         └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
@@ -697,7 +715,8 @@ databases/                            # Database storage (configurable via --dat
 ├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
-└── gtdbtk/                           # GTDB-TK database
+├── gtdbtk/                           # GTDB-TK database
+└── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -722,6 +741,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
+| `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---

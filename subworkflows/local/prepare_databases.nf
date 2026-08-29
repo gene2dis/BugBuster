@@ -12,6 +12,7 @@ include { FORMAT_NT_BLAST_DB      } from '../../modules/local/format_db/main'
 include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
+include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
@@ -32,6 +33,7 @@ workflow PREPARE_DATABASES {
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
     ch_rgi_card_db      = channel.empty()
+    ch_eggnog_db        = channel.empty()
     ch_versions         = channel.empty()
 
     //
@@ -194,6 +196,18 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // eggNOG 7 data for contig-level functional annotation (eggNOG-mapper v3)
+    //
+    if ( params.contig_level_functional ) {
+        if ( params.custom_eggnog_db ) {
+            ch_eggnog_db = channel.fromPath(params.custom_eggnog_db, checkIfExists: true)
+        } else {
+            ch_eggnog_ref = channel.fromList(params.eggnog_ref_db[params.eggnog_db]["url"])
+            ch_eggnog_db = FORMAT_EGGNOG_DB(ch_eggnog_ref)
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( params.rgi_prediction ) {
@@ -228,5 +242,6 @@ workflow PREPARE_DATABASES {
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db
+    eggnog_db              = ch_eggnog_db
     versions               = ch_versions
 }

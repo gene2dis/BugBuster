@@ -243,6 +243,37 @@ Unable to find image 'container:tag' locally
 
 3. Use alternative registry if blocked
 
+### Functional annotation aborts under docker/podman
+
+**Error:**
+```
+--contig_level_functional requires a singularity or apptainer container engine ...
+```
+
+**Cause:** eggNOG-mapper v3 is in beta and its authors publish only an Apptainer
+image — there is no docker image or biocontainer yet. The pipeline rejects real
+runs of the functional annotation branch under docker/podman at launch instead
+of failing mid-run on a container pull.
+
+**Solution:** run with a singularity or apptainer profile:
+```bash
+nextflow run main.nf ... --contig_level_functional -profile apptainer
+```
+Nextflow uses one container engine per run, so this switches the whole run —
+not just the eggNOG steps — to singularity/apptainer. Every other tool runs
+from the same pinned images (automatically converted on first use), so results
+are identical; only the first-run conversion time differs. The docker-based
+cloud profiles (`aws`, `gcp`, `azure`) cannot be combined with
+`--contig_level_functional` during the beta. Stub runs (`-stub`) are
+unaffected. Docker and cloud support return once eggNOG-mapper v3.0.0 final is
+released on bioconda.
+
+> Related: the upstream eggNOG-mapper image ships without `procps`, which would
+> normally abort Nextflow tasks with `Command 'ps' required by nextflow to
+> collect task metrics cannot be found`. The pipeline works around this with a
+> delegating `ps` shim in `bin/` — do not remove `bin/ps` while the functional
+> branch uses the upstream image.
+
 ---
 
 ## Database Issues

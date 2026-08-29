@@ -95,7 +95,7 @@
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling; eggNOG-mapper et al. in later tasks). Requires an assembly.",
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "arg_bin_clustering": {
@@ -164,6 +164,18 @@
                     "default": "release_220",
                     "description": "GTDB-TK database release version.",
                     "fa_icon": "fas fa-database"
+                },
+                "eggnog_db": {
+                    "type": "string",
+                    "default": "emapper-3.0",
+                    "description": "Built-in eggNOG 7 data key for eggNOG-mapper v3 (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_eggnog_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom eggNOG 7 data directory in the emapper-3.0 layout: eggnog.db (plus .fieldpresence.bin and .taxids.bin caches), eggnog.taxa.db (plus .traverse.pkl), eggnog_proteins.dmnd, go-basic.obo.",
+                    "fa_icon": "fas fa-folder"
                 },
                 "custom_kraken_db": {
                     "type": "string",

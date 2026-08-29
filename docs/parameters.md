@@ -117,7 +117,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable the contig-level functional annotation branch. Currently runs shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`); annotation tools follow in later releases. Requires an assembly (`--assembly_mode assembly` or `coassembly`)
+- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`) followed by eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
 - **Example**: `--contig_level_functional true`
 
 ### `--arg_bin_clustering`
@@ -207,6 +207,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: GTDB-TK database release version
 - **Size**: 109 GB
 - **Example**: `--gtdbtk_db release_220`
+
+### `--eggnog_db`
+- **Type**: String
+- **Default**: `emapper-3.0`
+- **Description**: eggNOG 7 data selection for eggNOG-mapper v3 (contig-level functional annotation). The whole emapper 3.0.x series reuses this data directory
+- **Size**: 44 GB (uncompressed)
+- **Example**: `--eggnog_db emapper-3.0`
 
 ### `--databases_dir`
 - **Type**: String (directory path)
@@ -307,6 +314,11 @@ Override automatic downloads by providing custom database paths:
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
 - **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
+
+### `--custom_eggnog_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom eggNOG 7 data directory in the emapper-3.0 layout: `eggnog.db` (plus its `.fieldpresence.bin` and `.taxids.bin` caches), `eggnog.taxa.db` (plus `.traverse.pkl`), `eggnog_proteins.dmnd`, `go-basic.obo`. Must be eggNOG 7 data — eggNOG-mapper v3 rejects eggNOG 5 databases
+- **Example**: `--custom_eggnog_db /path/to/emapper-3.0/data`
 
 ---
 
