@@ -10,6 +10,7 @@
 
 # Internal docs
 internal_docs
+internal_docs/*
 
 # claude files
 .claude
