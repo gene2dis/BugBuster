@@ -12,6 +12,24 @@ next release is tagged.
 
 ### Added
 
+- **Contig-level functional annotation (`--contig_level_functional`)**
+  - Shared Pyrodigal gene calling on contigs (one pass feeds both DeepARG and
+    functional annotation), published to `07_functional_annotation/gene_calling/`
+  - Two-stage eggNOG-mapper v3 annotation (DIAMOND search + orthology-transfer
+    annotation) against the eggNOG 7 database (~44 GB, auto-downloaded;
+    `--eggnog_db` / `--custom_eggnog_db`), published to
+    `07_functional_annotation/eggnog/`
+  - Per-gene abundance quantification with featureCounts over the Pyrodigal
+    gene coordinates, with gene ids matching the annotated protein ids;
+    per-sample counts in both assembly modes (under co-assembly, dedicated
+    per-sample alignments against the co-assembly are added since the pooled
+    binning BAM cannot yield per-sample counts), published to
+    `07_functional_annotation/gene_abundance/`; multi-mapping policy via
+    `--featurecounts_multimap` (`primary`/`all`/`none`)
+  - Note: the branch requires a singularity/apptainer container engine while
+    eggNOG-mapper v3 is in beta (no docker image exists upstream); real runs
+    under docker/podman abort at launch with an explanatory error
+
 - **Provenance tracking (audit #27)**
   - `versions.yml` emitted by every live module (previously ~20 in-use modules
     emitted none) and, for the first time, aggregated: each run now writes a
@@ -37,6 +55,11 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (output layout)**: contig gene calling switched from the nf-core
+  Prodigal module to a shared Pyrodigal step; its outputs moved from
+  `05_arg_prediction/contig_level/prodigal/` to
+  `07_functional_annotation/gene_calling/` (same predictions, gzipped, now
+  produced once for both DeepARG and functional annotation)
 - Updated README.md with RGI feature description and usage examples
 - Updated docs/manual.md with RGI parameters, output structure, and usage examples
 - Updated docs/parameters.md with complete RGI parameter reference

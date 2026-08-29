@@ -1,0 +1,44 @@
+name: featurecounts_genes
+description: Per-gene read counts with featureCounts over Pyrodigal gene coordinates, after GFF-to-SAF conversion with FAA-matching gene ids (bin/gff2saf.sh)
+keywords:
+  - gene quantification
+  - featurecounts
+  - read counting
+  - metagenomics
+tools:
+  - subread:
+      description: High-performance read alignment, quantification and mutation discovery (featureCounts)
+      homepage: https://subread.sourceforge.net
+      documentation: https://subread.sourceforge.net/SubreadUsersGuide.pdf
+      doi: "10.1093/bioinformatics/btt656"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name; per-sample also under co-assembly)
+  - bam:
+      type: file
+      description: Coordinate-sorted reads-vs-contigs BAM (no index required; header-only BAMs from empty-contig samples accepted)
+      pattern: "*.bam"
+  - gff:
+      type: file
+      description: Gene coordinates GFF3 from the shared Pyrodigal gene-calling step (gzipped accepted)
+      pattern: "*.{gff,gff.gz}"
+
+output:
+  - counts:
+      type: file
+      description: featureCounts per-gene count table (column 6 "Length" retained for TPM)
+      pattern: "*.featureCounts.txt"
+  - summary:
+      type: file
+      description: featureCounts assignment summary (assigned vs unassigned fractions)
+      pattern: "*.featureCounts.txt.summary"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

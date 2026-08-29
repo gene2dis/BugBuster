@@ -117,7 +117,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`) followed by eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
+- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), and per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
 - **Example**: `--contig_level_functional true`
 
 ### `--arg_bin_clustering`
@@ -625,6 +625,14 @@ Override automatic downloads by providing custom database paths:
 - **Default**: `1e-09`
 - **Description**: Maximum E-value for MetaCerberus
 - **Example**: `--metacerberus_evalue 1e-10`
+
+### `--featurecounts_multimap`
+- **Type**: String
+- **Default**: `primary`
+- **Options**: `primary`, `all`, `none`
+- **Description**: Multi-mapping policy for featureCounts gene quantification (`--contig_level_functional` branch, published to `07_functional_annotation/gene_abundance/`): `primary` counts primary alignments only, `all` counts every reported alignment (featureCounts `-M`), `none` excludes multi-mapping reads entirely. Counting is read-level (each mate counted separately), not fragment-level
+- **Example**: `--featurecounts_multimap all`
+- **Note**: With the pipeline's Bowtie2 defaults (one reported alignment per read) the three settings coincide in practice; the parameter makes the counting policy explicit
 
 ---
 

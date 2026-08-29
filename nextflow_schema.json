@@ -95,7 +95,7 @@
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + featureCounts gene abundance). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "arg_bin_clustering": {
@@ -834,6 +834,21 @@
                 }
             }
         },
+        "functional_annotation_options": {
+            "title": "Functional annotation options",
+            "type": "object",
+            "fa_icon": "fas fa-sitemap",
+            "description": "Parameters for the contig-level functional annotation branch (used when --contig_level_functional).",
+            "properties": {
+                "featurecounts_multimap": {
+                    "type": "string",
+                    "default": "primary",
+                    "enum": ["primary", "all", "none"],
+                    "description": "featureCounts multi-mapping policy for gene quantification: 'primary' counts primary alignments only, 'all' counts every reported alignment (-M), 'none' excludes multi-mapping reads entirely.",
+                    "fa_icon": "fas fa-layer-group"
+                }
+            }
+        },
         "cloud_hpc_profile_options": {
             "title": "Cloud & HPC profile options",
             "type": "object",
@@ -1074,6 +1089,9 @@
         },
         {
             "$ref": "#/$defs/metacerberus_options"
+        },
+        {
+            "$ref": "#/$defs/functional_annotation_options"
         },
         {
             "$ref": "#/$defs/bowtie2_options"

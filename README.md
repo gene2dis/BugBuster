@@ -37,17 +37,18 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
 12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
 13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-14. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
-15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
-16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-17. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
-18. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
-19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
-20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-21. Bin reports.
-22. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Assembly modes: "coassembly", "assembly", "none"
+14. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
+15. If requested contig-level functional annotation with eggNOG-mapper and per-gene abundance quantification with featureCounts. [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`featureCounts`](https://subread.sourceforge.net)
+16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+19. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+22. Bin reports.
+23. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -333,8 +334,11 @@ results/
 │       └── clustering/         # MMseqs2 ARG clusters
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                # BlobTools plots
-└── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
-    └── contigs/{sample}/       # Per-sample contig annotation results
+└── 07_functional_annotation/   # Functional annotation
+    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional)
+    ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true)
+    ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true)
+    └── contigs/{sample}/       # MetaCerberus results (if contig_level_metacerberus=true)
 ```
 
 **Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).

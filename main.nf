@@ -363,17 +363,19 @@ workflow {
     //
     // SUBWORKFLOW: Assembly
     //
-    ch_contigs_meta = channel.empty()
-    ch_bam_meta     = channel.empty()
-    ch_refined_bins = channel.empty()
-    
+    ch_contigs_meta  = channel.empty()
+    ch_bam_meta      = channel.empty()
+    ch_counting_bam  = channel.empty()
+    ch_refined_bins  = channel.empty()
+
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
             ch_clean_reads
         )
-        
+
         ch_contigs_meta = ASSEMBLY.out.contigs_meta
         ch_bam_meta     = ASSEMBLY.out.bam_meta
+        ch_counting_bam = ASSEMBLY.out.counting_bam
         ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
 
         //
@@ -427,13 +429,16 @@ workflow {
     }
 
     //
-    // SUBWORKFLOW: Contig-level functional annotation (eggNOG-mapper)
+    // SUBWORKFLOW: Contig-level functional annotation
+    // (eggNOG-mapper + featureCounts gene quantification)
     //
     if ( params.contig_level_functional && params.assembly_mode != "none" ) {
         FUNCTIONAL_ANNOTATION(
             ch_contig_proteins,
             PREPARE_DATABASES.out.eggnog_db
-                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
+                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." },
+            ch_contig_genes_gff,
+            ch_counting_bam
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
     }

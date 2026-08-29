@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer) plus per-gene abundance quantification (featureCounts read counts over the predicted genes; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
 
 ### Pipeline Workflow
 
@@ -291,7 +291,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3); see engine note below |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance); see engine note below |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -696,10 +696,25 @@ results/
     │   └── {sample}/                           # (if contig_level_functional=true; needs singularity/apptainer)
     │       ├── {sample}.emapper.seed_orthologs
     │       └── {sample}.emapper.annotations
+    ├── gene_abundance/                         # featureCounts per-gene read counts
+    │   └── {sample}/                           # (if contig_level_functional=true; per sample in both assembly modes)
+    │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
+    │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
     └── contigs/                                # MetaCerberus contig-level annotation
         └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
 ```
+
+> **Gene identifiers and assembly mode:** in the gene abundance tables, `Geneid`
+> is `<contig>_<n>`, matching the protein ids in `gene_calling/` and the query
+> ids in the eggNOG annotations. Under `--assembly_mode coassembly` every
+> sample is counted against the same co-assembly gene set, so gene ids are
+> shared across samples and gene-level comparisons between samples within the
+> run are valid. Under `--assembly_mode assembly` each sample has its own
+> assembly and gene set: gene ids are sample-specific, and only function-level
+> results (not per-gene rows) may be compared across samples. Counts are
+> read-level (each mate counted separately), not fragment-level; the
+> multi-mapping policy is set by `--featurecounts_multimap`.
 
 ### Database Storage Directory
 
@@ -742,6 +757,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
+| `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---
