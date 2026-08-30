@@ -146,7 +146,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
-| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
 | **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
@@ -176,9 +176,9 @@ wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
 tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/
 
 # Download GTDB-TK (large download)
-wget -O /shared/databases/bugbuster/gtdbtk_r220.tar.gz \
-    https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
-tar -xzf /shared/databases/bugbuster/gtdbtk_r220.tar.gz -C /shared/databases/bugbuster/
+wget -O /shared/databases/bugbuster/gtdbtk_r232.tar.gz \
+    https://data.gtdb.ecogenomic.org/releases/release232/232.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r232_data.tar.gz
+tar -xzf /shared/databases/bugbuster/gtdbtk_r232.tar.gz -C /shared/databases/bugbuster/
 
 # Download the Bakta database v6.0 (full, 31.9 GB; use db-light.tar.xz for
 # the 1.3 GB light DB — note the light DB changes annotation results)
@@ -203,7 +203,7 @@ nextflow run main.nf \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_standard8 \
     --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
     -profile docker
 ```
@@ -345,7 +345,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
-| `--gtdbtk_db` | `release_220` | `release_220` | GTDB-TK database release |
+| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
@@ -360,7 +360,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release220/`); R220 and R226 data work with the pinned GTDB-Tk 2.5.2, R232+ does not (see `docs/parameters.md`) |
+| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
@@ -1052,7 +1052,7 @@ nextflow run main.nf \
     --custom_decontamination_index /shared/db/bowtie_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/db/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/db/release232 \
     -profile singularity
 ```
 
@@ -1112,7 +1112,7 @@ nextflow run main.nf \
     --databases_dir /shared/databases/bugbuster \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_gtdb220 \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --include_binning true \
     -profile singularity
 ```
@@ -1135,7 +1135,7 @@ params {
     // Pre-downloaded databases
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
-    custom_gtdbtk_db              = '/shared/db/gtdbtk_r220'
+    custom_gtdbtk_db              = '/shared/db/release232'
     custom_decontamination_index  = '/shared/db/bowtie_index'
 }
 

@@ -167,8 +167,8 @@
                 },
                 "gtdbtk_db": {
                     "type": "string",
-                    "default": "release_220",
-                    "description": "GTDB-TK database release version.",
+                    "default": "release_232",
+                    "description": "GTDB-TK database release version. The pinned GTDB-Tk 2.7.x accepts only GTDB R232 data (R220/R226 require GTDB-Tk <= 2.6.1).",
                     "fa_icon": "fas fa-database"
                 },
                 "eggnog_db": {

@@ -75,12 +75,12 @@ build_fixtures() {
         && tar -czf "${f}/checkm2_database.tar.gz" CheckM2_database CONTENTS.json )
 
     # GTDB-Tk data tarball (and an empty variant for the failure case)
-    mkdir -p "${staging}/gtdbtk/release220/markers"
+    mkdir -p "${staging}/gtdbtk/release232/markers"
     ( cd "${staging}/gtdbtk" \
-        && echo m > release220/markers/marker.txt \
-        && tar -czf "${f}/gtdbtk_r220_data.tar.gz" release220 )
-    mkdir -p "${staging}/gtdbtk_empty/release220"
-    ( cd "${staging}/gtdbtk_empty" && tar -czf "${f}/gtdbtk_empty.tar.gz" release220 )
+        && echo m > release232/markers/marker.txt \
+        && tar -czf "${f}/gtdbtk_r232_data.tar.gz" release232 )
+    mkdir -p "${staging}/gtdbtk_empty/release232"
+    ( cd "${staging}/gtdbtk_empty" && tar -czf "${f}/gtdbtk_empty.tar.gz" release232 )
 
     # Mock NCBI blast db repository: metadata JSON + 2 volumes + md5 files
     mkdir -p "${f}/blastdb" "${staging}/blast"
@@ -262,8 +262,8 @@ expect_fail "checkm2: tarball without dmnd fails" checkm2_db_reformat.sh "${BASE
 # gtdb-tk_db_reformat.sh
 #
 echo "--- gtdb-tk_db_reformat.sh ---"
-expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r220_data.tar.gz"
-check_file "gtdbtk: release files extracted" "release220/markers/marker.txt"
+expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r232_data.tar.gz"
+check_file "gtdbtk: release files extracted" "release232/markers/marker.txt"
 expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
 expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
 

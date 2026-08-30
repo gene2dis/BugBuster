@@ -445,6 +445,21 @@ MemoryError in GTDB-TK
    }
    ```
 
+### GTDB-TK rejects the reference data (wrong release)
+
+**Symptom:** `GTDB_TK_BATCH` fails at startup complaining about the reference
+data version or missing files under `GTDBTK_DATA_PATH`.
+
+**Cause:** the pipeline pins GTDB-Tk 2.7.2, which accepts **only GTDB R232**
+reference data. Older R220/R226 packages — including a `databases/gtdbtk/`
+directory cached by a previous pipeline version — require GTDB-Tk ≤ 2.6.1 and
+no longer work.
+
+**Solution:** delete the cached `<databases_dir>/gtdbtk/` directory and let the
+pipeline download the R232 package (~61 GB), or pass an R232 directory you
+already have with `--custom_gtdbtk_db /path/to/release232` (the directory that
+directly contains `markers/`, `skani/`, `taxonomy/`, ...).
+
 ---
 
 ## Decontamination Issues

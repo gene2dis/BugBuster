@@ -159,6 +159,8 @@ nextflow_pipeline {
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
             assert vtext.contains("megahit:")
             assert vtext.contains("metabat2:")
+            // Pins the GTDB-Tk container/stub version bump in lockstep
+            assert vtext.contains("gtdbtk: 2.7.2")
 
             // T7 off-path: binning with 2 binners but WITHOUT
             // --mag_level_functional must run no Bakta and publish no mags/

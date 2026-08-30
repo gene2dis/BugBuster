@@ -9,7 +9,7 @@
     Removes maxForks limitation for better parallelization.
     
     Input:
-        tuple val(meta_list), path(all_bins, stageAs: 'input_bins/*'), path(gtdbtk_db)
+        tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(gtdbtk_db)
     
     Output:
         gtdb_tk: tuple val(meta_list), path(gtdbtk_files) - per sample
@@ -24,8 +24,8 @@ process GTDB_TK_BATCH {
     label 'process_high_memory'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/gtdbtk:2.5.2--pyh1f0d9b5_0' :
-        'quay.io/biocontainers/gtdbtk:2.5.2--pyh1f0d9b5_0' }"
+        'https://depot.galaxyproject.org/singularity/gtdbtk:2.7.2--pyhdfd78af_1' :
+        'quay.io/biocontainers/gtdbtk:2.7.2--pyhdfd78af_1' }"
 
     input:
     tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(gtdbtk_db)
@@ -85,19 +85,20 @@ process GTDB_TK_BATCH {
         
         # Create empty reports for each sample
         for meta_id in ${meta_ids}; do
-            echo -e "user_genome\\tclassification\\tfastani_reference\\tfastani_reference_radius\\tfastani_taxonomy\\tfastani_ani\\tfastani_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > \${meta_id}_gtdbtk_bac120.tsv
-            echo -e "user_genome\\tclassification\\tfastani_reference\\tfastani_reference_radius\\tfastani_taxonomy\\tfastani_ani\\tfastani_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > \${meta_id}_gtdbtk_ar53.tsv
+            echo -e "user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > \${meta_id}_gtdbtk_bac120.tsv
+            echo -e "user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings" > \${meta_id}_gtdbtk_ar53.tsv
         done
     else
         echo "Found \$total_bins genome bins across all samples. Running GTDB-Tk classification..."
         
         export GTDBTK_DATA_PATH="${gtdbtk_db}"
-        
+
+        # GTDB-Tk 2.7 removed --skip_ani_screen/--mash_db: the ANI screen
+        # always runs, against the skani DB bundled in the R232 data package
         gtdbtk classify_wf \\
             --genome_dir combined_bins \\
             --out_dir gtdbtk_output \\
             --cpus ${task.cpus} \\
-            --skip_ani_screen \\
             --extension .fa \\
             --pplacer_cpus 1
         
@@ -169,14 +170,14 @@ process GTDB_TK_BATCH {
 			    for meta_id in meta_ids:
 			        if not os.path.exists(f"{meta_id}_gtdbtk_ar53.tsv"):
 			            with open(f"{meta_id}_gtdbtk_ar53.tsv", 'w') as f:
-			                f.write("user_genome\\tclassification\\tfastani_reference\\tfastani_reference_radius\\tfastani_taxonomy\\tfastani_ani\\tfastani_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings\\n")
+			                f.write("user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings\\n")
 			PYEOF
         fi
     fi
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        gtdbtk: \$(gtdbtk --version 2>&1 | sed 's/gtdbtk: version //')
+        gtdbtk: \$(gtdbtk --version 2>&1 | head -n 1 | sed 's/gtdbtk: version //; s/ Copyright.*//')
     END_VERSIONS
     """
     
@@ -196,7 +197,7 @@ EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        gtdbtk: 2.5.2
+        gtdbtk: 2.7.2
     END_VERSIONS
     """
 }

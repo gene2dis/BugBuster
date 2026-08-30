@@ -109,6 +109,17 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (GTDB-Tk databases)**: GTDB-Tk re-pinned 2.5.2 → 2.7.2 and the
+  reference-data registry moved from GTDB R220 to **R232** (~61 GB download,
+  pinned release URL; default `--gtdbtk_db release_232`). GTDB-Tk 2.7.x
+  accepts only R232 data, so a `databases/gtdbtk/` directory cached by earlier
+  pipeline versions (R220) no longer works — delete it to re-download, or pass
+  an R232 directory with `--custom_gtdbtk_db`. The upstream-removed
+  `--skip_ani_screen` flag was dropped from the `classify_wf` invocation (the
+  ANI pre-screen now always runs, against the skani DB bundled in the R232
+  package), and the module's synthetic empty-report headers were updated to
+  the 2.7 column schema (`fastani_*` → `closest_genome_*`;
+  `bin_tax_report.py` already handled both namings)
 - **Breaking (output layout)**: contig gene calling switched from the nf-core
   Prodigal module to a shared Pyrodigal step; its outputs moved from
   `05_arg_prediction/contig_level/prodigal/` to

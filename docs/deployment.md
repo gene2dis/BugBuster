@@ -271,7 +271,7 @@ For better performance, pre-download databases to shared storage:
 # Kraken2 Standard-8 (~7.5 GB)
 # Sourmash GTDB r220 (~17 GB)
 # CheckM2 (~2.9 GB)
-# GTDB-TK r220 (~109 GB)
+# GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.7.2)
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
 # Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
@@ -283,7 +283,7 @@ Then specify paths:
 nextflow run main.nf \
     --custom_kraken_db /shared/db/kraken2/standard-8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/db/gtdbtk/release220 \
+    --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
     --custom_eggnog_db /shared/db/eggnog/eggnog_db \
     --custom_dbcan_db /shared/db/dbcan/dbcan_db \
     --custom_bakta_db /shared/db/bakta/bakta_db \

@@ -143,7 +143,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
-| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3; requires the singularity/apptainer profile while v3 is in beta) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
 | **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |

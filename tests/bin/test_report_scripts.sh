@@ -193,19 +193,31 @@ check_grep "bin_quality: failure message names the empty input" "../bin_quality_
 # bin_tax_report.py (GTDB-Tk batch summary format)
 #
 echo "--- bin_tax_report.py ---"
+# GTDB-Tk >= 2.7 (the pinned 2.7.2) names the reference column
+# closest_genome_reference; the script's fallback also accepts the legacy
+# fastani_reference name (<= 2.6-era summaries). Both branches are pinned.
 BT_WORK="${WORK}/bin_tax_happy"
 mkdir -p "${BT_WORK}"
-printf 'user_genome\tclassification\tfastani_reference\nbin.1\td__Bacteria;p__Bacillota;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis\tGCF_000009045.1\n' \
+printf 'user_genome\tclassification\tclosest_genome_reference\nbin.1\td__Bacteria;p__Bacillota;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis\tGCF_000009045.1\n' \
     > "${BT_WORK}/sampleA_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BT_WORK}"
-expect_pass "bin_tax: real GTDB-Tk summary parsed" bin_tax_report.py
+expect_pass "bin_tax: real GTDB-Tk 2.7 summary parsed" bin_tax_report.py
 check_grep "bin_tax: MAG row with parsed ranks" "MAGs_tax_summary.csv" \
     "^sampleA,bin.1,GCF_000009045.1,Bacteria,Bacillota,Bacilli,Bacillales,Bacillaceae,Bacillus,Bacillus subtilis$"
 check_file "bin_tax: taxonomy plot created" "MAGs_tax_plot.png"
 
+BT_LEGACY="${WORK}/bin_tax_legacy"
+mkdir -p "${BT_LEGACY}"
+printf 'user_genome\tclassification\tfastani_reference\nbin.1\td__Bacteria;p__Bacillota;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis\tGCF_000009045.1\n' \
+    > "${BT_LEGACY}/sampleA_gtdbtk_bac120.tsv"
+NEXT_WORKDIR="${BT_LEGACY}"
+expect_pass "bin_tax: legacy fastani_reference column still parsed" bin_tax_report.py
+check_grep "bin_tax: legacy summary MAG row" "MAGs_tax_summary.csv" \
+    "^sampleA,bin.1,GCF_000009045.1,Bacteria,"
+
 BT_EMPTY="${WORK}/bin_tax_empty"
 mkdir -p "${BT_EMPTY}"
-printf 'user_genome\tclassification\tfastani_reference\n' > "${BT_EMPTY}/sampleA_gtdbtk_bac120.tsv"
+printf 'user_genome\tclassification\tclosest_genome_reference\n' > "${BT_EMPTY}/sampleA_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BT_EMPTY}"
 expect_fail "bin_tax: all-header-only input fails" bin_tax_report.py
 check_grep "bin_tax: failure message names the empty input" "../bin_tax_empty.log" "no bins were classified"
