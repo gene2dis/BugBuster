@@ -28,11 +28,23 @@ next release is tagged.
     `--featurecounts_multimap` (`primary`/`all`/`none`)
   - Study-level aggregation (`bin/aggregate_functions.py`) into canonical
     tables published to `07_functional_annotation/summary/`: per-gene
-    abundance with TPM, long-format gene annotations, per-ontology function
-    abundance (KO, COG, EC, Pfam, CAZy; intentional double-counting of
-    multi-term genes), wide TPM matrices per ontology, and a per-sample
-    annotated-fraction report; the eggNOG annotations parser is
+    abundance with TPM and copies per genome equivalent (CPGE), long-format
+    gene annotations, per-ontology function abundance (KO, COG, EC, Pfam,
+    CAZy; intentional double-counting of multi-term genes), wide TPM and
+    CPGE matrices per ontology, a per-sample annotated-fraction report and
+    an AGS summary (`ags_and_ge.tsv`); the eggNOG annotations parser is
     version-aware and fails loudly on layout drift
+  - MicrobeCensus average genome size estimation on the host-removed reads
+    (`--microbecensus`, on by default with the branch), published to
+    `07_functional_annotation/microbecensus/`, enabling the CPGE
+    normalization. Failure is non-fatal by design: affected samples fall
+    back to TPM-only with empty `cpge` fields and `status = unavailable` in
+    `ags_and_ge.tsv`. Both published biocontainers of the unmaintained
+    upstream tool are broken (Python-3 build: unreleased upstream str/bytes
+    fix; Python-2 build: missing libstdc++ for the bundled RAPsearch2); the
+    pipeline pins the Python-3 image and routes the call through the
+    `bin/run_microbe_census_py3fix.py` shim that patches the one broken
+    function
   - Note: the branch requires a singularity/apptainer container engine while
     eggNOG-mapper v3 is in beta (no docker image exists upstream); real runs
     under docker/podman abort at launch with an explanatory error

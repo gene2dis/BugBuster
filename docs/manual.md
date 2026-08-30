@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), per-gene abundance quantification (featureCounts) and study-level TPM tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
 
 ### Pipeline Workflow
 
@@ -291,7 +291,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance + TPM summary tables); see engine note below |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
+| `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (only with the functional branch; failure is non-fatal — affected samples fall back to TPM-only) |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -700,12 +701,18 @@ results/
     │   └── {sample}/                           # (if contig_level_functional=true; per sample in both assembly modes)
     │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
     │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
+    ├── microbecensus/                          # MicrobeCensus average genome size
+    │   └── {sample}/                           # (if contig_level_functional=true and microbecensus=true)
+    │       ├── {sample}.ags.tsv                # AGS, genome equivalents, total bases
+    │       └── {sample}.microbecensus.txt      # raw MicrobeCensus output (provenance)
     ├── summary/                                # study-level tables (if contig_level_functional=true)
     │   ├── gene_annotations.tsv                # long format: one row per gene per functional term
-    │   ├── gene_abundance.tsv                  # per-gene counts + TPM per sample (cpge empty for now)
-    │   ├── function_abundance.tsv              # per-ontology TPM (ko, cog, ec, pfam, cazy)
+    │   ├── gene_abundance.tsv                  # per-gene counts + TPM + CPGE per sample
+    │   ├── function_abundance.tsv              # per-ontology TPM and CPGE (ko, cog, ec, pfam, cazy)
     │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples)
-    │   └── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
+    │   ├── function_wide_{ontology}_cpge.tsv   # wide CPGE matrix per ontology (blank columns for samples without AGS)
+    │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
+    │   └── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
     └── contigs/                                # MetaCerberus contig-level annotation
         └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
@@ -737,8 +744,34 @@ results/
 > contributes its full abundance to each — this double-counting is
 > intentional, so ontology-level TPM totals can exceed 1e6. The `description`
 > column is empty for eggNOG terms (eggNOG-mapper v3 dropped the Description
-> field); the `cpge` / `abundance_cpge` columns stay empty until the
-> MicrobeCensus-based normalization lands.
+> field).
+
+> **Copies per genome equivalent (`cpge` / `abundance_cpge` columns and the
+> `function_wide_*_cpge.tsv` matrices):**
+>
+> ```
+> genome_equivalents = total_bases_sampled / average_genome_size_bp   (from MicrobeCensus)
+> CPGE_i = RPK_i / genome_equivalents
+> ```
+>
+> Approximate average copies of that gene per community member. Not
+> compositional. Use when the question is whether an average cell carries the
+> function, and for comparing across communities of different composition.
+> TPM and CPGE answer different questions: they are not interchangeable and
+> neither replaces the other — the most common error in this kind of analysis
+> is treating one as the other.
+>
+> The genome-equivalents estimate comes from MicrobeCensus run on the
+> host-removed reads (on by default with the branch; disable with
+> `--microbecensus false`). MicrobeCensus failure is deliberately **non-fatal**:
+> if it fails for a sample (reads shorter than 50 bp, too few marker-gene
+> hits in very small datasets, or an estimate rejected by the module's
+> 0.5–20 Mb plausibility check), the run continues and that sample's `cpge`
+> fields stay empty (TPM-only fallback). `summary/ags_and_ge.tsv` records the
+> per-sample estimates, with `status = unavailable` marking exactly the
+> samples that fell back. Note MicrobeCensus estimates need a few hundred
+> thousand reads to be accurate — on very small datasets the value is
+> mechanical, not meaningful.
 
 ### Database Storage Directory
 
@@ -782,7 +815,8 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
-| `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM, wide matrices per ontology, annotated fraction |
+| `07_functional_annotation/microbecensus/` | `contig_level_functional=true` and `microbecensus=true` | MicrobeCensus average genome size and genome equivalents per sample |
+| `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---

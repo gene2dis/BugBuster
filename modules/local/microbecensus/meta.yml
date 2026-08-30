@@ -1,0 +1,40 @@
+name: microbecensus
+description: Average genome size and genome equivalents from host-removed reads (MicrobeCensus), for copies-per-genome-equivalent normalization; failure is non-fatal by design
+keywords:
+  - average genome size
+  - genome equivalents
+  - normalization
+  - metagenomics
+tools:
+  - microbecensus:
+      description: Estimates average genome size and genome equivalents of a metagenome from single-copy marker gene abundance
+      homepage: https://github.com/snayfach/MicrobeCensus
+      documentation: https://github.com/snayfach/MicrobeCensus/blob/master/README.md
+      doi: "10.1186/s13059-015-0611-7"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads (R1/R2, optional singleton file; gzipped accepted; passed comma-joined, reads are treated independently)
+      pattern: "*.fastq.gz"
+
+output:
+  - ags:
+      type: file
+      description: Canonical AGS table (sample_id, average_genome_size_bp, genome_equivalents, total_bases), parsed and sanity-checked from the raw output
+      pattern: "*.ags.tsv"
+  - raw:
+      type: file
+      description: Raw MicrobeCensus key-value output (parameters and estimates), kept for provenance
+      pattern: "*.microbecensus.txt"
+  - versions:
+      type: file
+      description: Software versions (hardcoded 1.1.1 — the tool misreports 1.1.0 at the v1.1.1 release)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

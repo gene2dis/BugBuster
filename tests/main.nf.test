@@ -239,14 +239,18 @@ nextflow_pipeline {
             assert workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2_SAMTOOLS") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_SEARCH") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_ANNOTATE") }
-            // One counting task per sample, one study-level aggregation (T4)
+            // One counting task per sample, one study-level aggregation (T4),
+            // one MicrobeCensus per sample (T5, on by default with the branch)
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
 
             // Published to the documented layout (design doc Section 9.1)
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt").exists()
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt.summary").exists()
             assert path("${outputDir}/07_functional_annotation/summary/gene_abundance.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/microbecensus/test_sample1/test_sample1.ags.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
         }
     }
 
@@ -265,6 +269,10 @@ nextflow_pipeline {
                 assembly_mode           = "coassembly"
                 taxonomic_profiler      = "none"
                 contig_level_functional = true
+                // Off-switch wiring (T5): no MICROBECENSUS tasks, and the
+                // aggregation must still run on an empty ags list (the
+                // assembly-mode test above covers the on-path: 2 tasks)
+                microbecensus           = false
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
@@ -280,6 +288,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
+            assert !path("${outputDir}/07_functional_annotation/microbecensus").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
 
             // Gene calling keyed by the coassembly meta; counts keyed per sample
             assert path("${outputDir}/07_functional_annotation/gene_calling/coassembly/coassembly.faa.gz").exists()

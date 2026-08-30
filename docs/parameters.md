@@ -117,7 +117,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), and study-level aggregation into TPM tables per functional ontology (KO, COG, EC, Pfam, CAZy) with an annotated-fraction report (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
+- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
 - **Example**: `--contig_level_functional true`
 
 ### `--arg_bin_clustering`
@@ -633,6 +633,13 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Multi-mapping policy for featureCounts gene quantification (`--contig_level_functional` branch, published to `07_functional_annotation/gene_abundance/`): `primary` counts primary alignments only, `all` counts every reported alignment (featureCounts `-M`), `none` excludes multi-mapping reads entirely. Counting is read-level (each mate counted separately), not fragment-level
 - **Example**: `--featurecounts_multimap all`
 - **Note**: With the pipeline's Bowtie2 defaults (one reported alignment per read) the three settings coincide in practice; the parameter makes the counting policy explicit
+
+### `--microbecensus`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Run MicrobeCensus on the host-removed reads (`--contig_level_functional` branch, published to `07_functional_annotation/microbecensus/`) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM in the `07_functional_annotation/summary/` tables
+- **Example**: `--microbecensus false`
+- **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
 
 ---
 

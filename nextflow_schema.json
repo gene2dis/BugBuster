@@ -95,7 +95,7 @@
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + featureCounts gene abundance + study-level TPM summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "arg_bin_clustering": {
@@ -846,6 +846,12 @@
                     "enum": ["primary", "all", "none"],
                     "description": "featureCounts multi-mapping policy for gene quantification: 'primary' counts primary alignments only, 'all' counts every reported alignment (-M), 'none' excludes multi-mapping reads entirely.",
                     "fa_icon": "fas fa-layer-group"
+                },
+                "microbecensus": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run MicrobeCensus on host-removed reads to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM. Failure is non-fatal: affected samples fall back to TPM-only.",
+                    "fa_icon": "fas fa-balance-scale"
                 }
             }
         },

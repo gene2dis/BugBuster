@@ -38,7 +38,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
 13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
 14. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
-15. If requested contig-level functional annotation with eggNOG-mapper, per-gene abundance quantification with featureCounts, and study-level TPM tables per functional ontology (KO, COG, EC, Pfam, CAZy). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`featureCounts`](https://subread.sourceforge.net)
+15. If requested contig-level functional annotation with eggNOG-mapper, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
 16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
 17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
 18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
@@ -338,7 +338,8 @@ results/
     ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional)
     ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true)
     ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true)
-    ├── summary/                # Study-level TPM tables + annotated fraction (if contig_level_functional=true)
+    ├── microbecensus/{sample}/ # MicrobeCensus average genome size (if contig_level_functional=true and microbecensus=true)
+    ├── summary/                # Study-level TPM/CPGE tables + annotated fraction + AGS summary (if contig_level_functional=true)
     └── contigs/{sample}/       # MetaCerberus results (if contig_level_metacerberus=true)
 ```
 

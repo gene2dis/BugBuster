@@ -1,19 +1,26 @@
 #!/usr/bin/env python3
 """Aggregate gene counts, eggNOG annotations and gene coordinates into the
-canonical functional-annotation tables (design doc Sections 4.8, 5, 6.1;
-task T4 — contig branch, TPM only; CPGE is added by T5).
+canonical functional-annotation tables (design doc Sections 4.8, 5, 6;
+tasks T4 (TPM) and T5 (CPGE) — contig branch).
 
 Inputs per sample (per co-assembly for annotations/GFF under coassembly mode):
   - <id>.featureCounts.txt   gene counts (FEATURECOUNTS_GENES)
   - <id>.emapper.annotations eggNOG-mapper v3 annotations
   - <id>.gff[.gz]            Pyrodigal gene coordinates
+  - <id>.ags.tsv             MicrobeCensus AGS table (OPTIONAL, per sample:
+                             missing samples fall back to TPM-only with empty
+                             cpge fields — MicrobeCensus failure is non-fatal)
 
 Outputs (all TSV with header, deterministic ordering):
   - gene_annotations.tsv          Section 5.1 (long, one row per gene per term)
-  - gene_abundance.tsv            Section 5.2 (cpge empty until T5)
+  - gene_abundance.tsv            Section 5.2 (tpm + cpge)
   - function_abundance.tsv        Section 5.3 (source=contigs)
   - function_wide_<ont>_tpm.tsv   wide TPM matrix per ontology (ko, cog, ec, pfam, cazy)
+  - function_wide_<ont>_cpge.tsv  wide CPGE matrix per ontology (blank cells for
+                                  samples without AGS)
   - annotated_fraction.tsv        per-sample annotated fraction by count and abundance
+  - ags_and_ge.tsv                per-sample AGS/genome-equivalents summary with an
+                                  'unavailable' status row for AGS-less samples
 
 Version-aware parsing (design doc 4.2/4.6.1, binding): the eggNOG-mapper
 version is read from the EGGNOG_MAPPER_ANNOTATE versions.yml and must be a
@@ -63,7 +70,11 @@ ONTOLOGIES = [ontology for _, ontology, _, _ in ONTOLOGY_FIELDS]
 
 FEATURECOUNTS_HEADER_PREFIX = ['Geneid', 'Chr', 'Start', 'End', 'Strand', 'Length']
 
+AGS_COLUMNS = ['sample_id', 'average_genome_size_bp', 'genome_equivalents',
+               'total_bases']
+
 TPM_FORMAT = '{:.4f}'
+CPGE_FORMAT = '{:.6f}'
 FRACTION_FORMAT = '{:.4f}'
 
 
@@ -149,6 +160,42 @@ def parse_gff(path):
     else:
         genes['length_bp'] = pd.Series(dtype=int)
     return genes
+
+
+def parse_ags(path):
+    """MICROBECENSUS <id>.ags.tsv -> (sample, values dict).
+
+    Layout guard in the house style: exact header, exactly one data row, the
+    embedded sample_id must equal the filename-derived one, and every value
+    must be a positive number (the module already sanity-checked them; this
+    re-check catches hand-fed or mis-paired files). The dict keeps the raw
+    strings for output fidelity plus '<name>_float' parsed values.
+    """
+    sample = sample_id_from(path, ['.ags.tsv'])
+    with open_text(path) as handle:
+        lines = [line.rstrip('\n') for line in handle if line.strip()]
+    if not lines or lines[0].split('\t') != AGS_COLUMNS:
+        fail(f"{path}: unexpected ags.tsv header (expected {AGS_COLUMNS})")
+    if len(lines) != 2:
+        fail(f"{path}: expected exactly one data row, found {len(lines) - 1}")
+    fields = lines[1].split('\t')
+    if len(fields) != len(AGS_COLUMNS):
+        fail(f"{path}: data row has {len(fields)} fields, expected "
+             f"{len(AGS_COLUMNS)}")
+    if fields[0] != sample:
+        fail(f"{path}: embedded sample_id '{fields[0]}' does not match the "
+             f"filename-derived id '{sample}'")
+    values = {}
+    for name, raw in zip(AGS_COLUMNS[1:], fields[1:]):
+        try:
+            value = float(raw)
+        except ValueError:
+            value = None
+        if value is None or value <= 0:
+            fail(f"{path}: {name} must be a positive number, got '{raw}'")
+        values[name] = raw
+        values[name + '_float'] = value
+    return sample, values
 
 
 def parse_counts(path):
@@ -262,30 +309,47 @@ def explode_annotations(annotations):
                                        'evalue', 'score'])
 
 
-def compute_tpm(abundance):
-    """Section 6.1: RPK_i = count_i/(length_i/1000); TPM_i = RPK_i/sum(RPK)*1e6.
+def compute_rpk(abundance):
+    """RPK_i = count_i / (length_i / 1000), the shared numerator of 6.1/6.2."""
+    return abundance['count'] / (abundance['length_bp'] / 1000.0)
+
+
+def compute_tpm(abundance, rpk):
+    """Section 6.1: TPM_i = RPK_i / sum(RPK) * 1e6, per sample.
 
     A sample whose genes attracted zero reads gets tpm 0.0 for every gene
     (never NaN); its TPM column then sums to 0, not 1e6.
     """
-    rpk = abundance['count'] / (abundance['length_bp'] / 1000.0)
     totals = rpk.groupby(abundance['sample_id']).transform('sum')
     tpm = (rpk / totals * 1e6).where(totals > 0, 0.0)
     return tpm.fillna(0.0)
 
 
+def compute_cpge(abundance, rpk, ge_by_sample):
+    """Section 6.2: CPGE_i = RPK_i / genome_equivalents, per sample.
+
+    Samples without a MicrobeCensus genome-equivalents value map to NaN
+    (rendered as empty fields downstream — the TPM-only fallback).
+    """
+    genome_equivalents = abundance['sample_id'].map(ge_by_sample)
+    return rpk / genome_equivalents
+
+
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='Aggregate gene counts, eggNOG annotations and gene '
-                    'coordinates into functional abundance tables (TPM)',
+        description='Aggregate gene counts, eggNOG annotations, gene '
+                    'coordinates and MicrobeCensus AGS estimates into '
+                    'functional abundance tables (TPM and CPGE)',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Per-sample assembly mode (matching id sets across the three lists)
+  # Per-sample assembly mode (matching id sets across the three lists;
+  # --ags is optional and may cover only a subset of samples)
   aggregate_functions.py --assembly-mode assembly \\
       --counts s1.featureCounts.txt s2.featureCounts.txt \\
       --annotations s1.emapper.annotations s2.emapper.annotations \\
       --gffs s1.gff.gz s2.gff.gz \\
+      --ags s1.ags.tsv s2.ags.tsv \\
       --eggnog-versions-yml versions.yml --output-dir .
 
   # Co-assembly mode (one shared annotations file and GFF)
@@ -304,6 +368,10 @@ Examples:
     parser.add_argument('--gffs', required=True, nargs='+', type=Path,
                         help='Pyrodigal gene GFFs, plain or gzipped (per '
                              'sample, or one shared file under coassembly)')
+    parser.add_argument('--ags', nargs='*', type=Path, default=[],
+                        help='MicrobeCensus <id>.ags.tsv tables (optional; a '
+                             'subset of samples or none — missing samples fall '
+                             'back to TPM-only with empty cpge fields)')
     parser.add_argument('--eggnog-versions-yml', required=True, type=Path,
                         help='versions.yml from EGGNOG_MAPPER_ANNOTATE (source '
                              'of the pinned tool and database versions)')
@@ -318,7 +386,7 @@ Examples:
 def main():
     args = parse_arguments()
 
-    for path in [*args.counts, *args.annotations, *args.gffs,
+    for path in [*args.counts, *args.annotations, *args.gffs, *args.ags,
                  args.eggnog_versions_yml]:
         if not path.exists():
             fail(f"input file not found: {path}")
@@ -339,8 +407,25 @@ def main():
         sample_id_from(path, ['.gff.gz', '.gff']): parse_gff(path)
         for path in args.gffs
     }
+    ags_by_sample = {}
+    for path in args.ags:
+        sample, values = parse_ags(path)
+        if sample in ags_by_sample:
+            fail(f"duplicate --ags table for sample '{sample}'")
+        ags_by_sample[sample] = values
 
     sample_ids = sorted(counts_by_sample)
+
+    unknown_ags = sorted(set(ags_by_sample) - set(counts_by_sample))
+    if unknown_ags:
+        fail(f"--ags sample ids not present in --counts: {unknown_ags}")
+    ge_by_sample = {sample: values['genome_equivalents_float']
+                    for sample, values in ags_by_sample.items()}
+    ags_missing = sorted(set(sample_ids) - set(ags_by_sample))
+    if ags_missing:
+        print(f"Warning: no MicrobeCensus AGS for sample(s) "
+              f"{', '.join(ags_missing)} — cpge left empty (TPM-only "
+              f"fallback, design doc Section 4.7)", file=sys.stderr)
 
     # Join topology (design doc Section 3.5): per-sample gene sets under
     # 'assembly'; one shared co-assembly gene set under 'coassembly'
@@ -382,7 +467,7 @@ def main():
             fail(f"sample '{sample}': annotation query ids not present in the GFF: "
                  f"{sorted(stray)[:5]}")
 
-    # --- Section 5.2: gene abundance with TPM ---
+    # --- Section 5.2: gene abundance with TPM and CPGE ---
     abundance_parts = []
     for sample in sample_ids:
         part = counts_by_sample[sample].merge(
@@ -393,9 +478,17 @@ def main():
                  if abundance_parts else
                  pd.DataFrame(columns=['sample_id', 'gene_id', 'fc_length',
                                        'count', 'length_bp']))
-    abundance['tpm'] = compute_tpm(abundance) if not abundance.empty else []
+    if not abundance.empty:
+        rpk = compute_rpk(abundance)
+        abundance['tpm'] = compute_tpm(abundance, rpk)
+        abundance['cpge_num'] = compute_cpge(abundance, rpk, ge_by_sample)
+    else:
+        abundance['tpm'] = []
+        abundance['cpge_num'] = []
     abundance['assembly_mode'] = args.assembly_mode
-    abundance['cpge'] = ''  # T5 (MicrobeCensus) fills this in
+    # NaN cpge_num = sample without AGS -> empty field (TPM-only fallback)
+    abundance['cpge'] = abundance['cpge_num'].map(
+        lambda value: '' if pd.isna(value) else CPGE_FORMAT.format(value))
     abundance = abundance.sort_values(['sample_id', 'gene_id'],
                                       kind='mergesort', ignore_index=True)
 
@@ -446,33 +539,40 @@ def main():
                       'db_version']].to_csv(
         args.output_dir / 'gene_annotations.tsv', sep='\t', index=False)
 
-    # --- Section 5.3: function abundance (per-sample term explode x TPM) ---
+    # --- Section 5.3: function abundance (per-sample term explode x TPM/CPGE) ---
     term_parts = []
     for sample in sample_ids:
         exploded = explode_annotations(annotations_for[sample])
         if exploded.empty:
             continue
-        sample_tpm = abundance.loc[abundance['sample_id'] == sample,
-                                   ['gene_id', 'tpm']]
+        sample_abundance = abundance.loc[abundance['sample_id'] == sample,
+                                         ['gene_id', 'tpm', 'cpge_num']]
         part = exploded[['gene_id', 'ontology', 'accession']].merge(
-            sample_tpm, on='gene_id')
+            sample_abundance, on='gene_id')
         part.insert(0, 'sample_id', sample)
         term_parts.append(part)
     if term_parts:
         terms = pd.concat(term_parts, ignore_index=True)
         # Intentional double-counting (Section 4.8 step 5): a gene carrying
-        # several terms of one ontology contributes its full TPM to each
+        # several terms of one ontology contributes its full TPM/CPGE to each
         function_abundance = (
             terms.groupby(['sample_id', 'ontology', 'accession'],
-                          as_index=False)['tpm'].sum()
+                          as_index=False)[['tpm', 'cpge_num']].sum()
             .rename(columns={'tpm': 'abundance_tpm'}))
     else:
         function_abundance = pd.DataFrame(columns=['sample_id', 'ontology',
-                                                   'accession', 'abundance_tpm'])
+                                                   'accession', 'abundance_tpm',
+                                                   'cpge_num'])
     function_abundance['source'] = 'contigs'
     function_abundance['backend'] = 'eggnog-mapper'
     function_abundance['description'] = ''
-    function_abundance['abundance_cpge'] = ''   # T5
+    # groupby.sum() turns an all-NaN group into 0.0, so AGS availability (a
+    # per-sample fact) decides emptiness, not the summed value
+    function_abundance['abundance_cpge'] = [
+        CPGE_FORMAT.format(value) if sample in ge_by_sample else ''
+        for sample, value in zip(function_abundance['sample_id'],
+                                 function_abundance['cpge_num'])
+    ]
     function_abundance['abundance_native'] = ''  # read branch only
     function_abundance['native_unit'] = ''       # read branch only
     function_abundance = function_abundance.sort_values(
@@ -486,7 +586,9 @@ def main():
     out_53.to_csv(args.output_dir / 'function_abundance.tsv', sep='\t',
                   index=False)
 
-    # --- Wide matrices per ontology (every sample a column, missing -> 0) ---
+    # --- Wide matrices per ontology (every sample a column, missing -> 0;
+    #     CPGE cells are blank for samples without AGS) ---
+    ags_samples = [sample for sample in sample_ids if sample in ge_by_sample]
     for ontology in ONTOLOGIES:
         subset = function_abundance[function_abundance['ontology'] == ontology]
         wide = subset.pivot_table(index='accession', columns='sample_id',
@@ -498,6 +600,25 @@ def main():
         # pandas >= 2.1 and the pinned image ships 2.0
         wide.to_csv(args.output_dir / f'function_wide_{ontology}_tpm.tsv',
                     sep='\t', header=True, float_format='%.4f')
+
+        # CPGE mirror: same accession rows as the TPM matrix; AGS-less sample
+        # columns are all-blank (never 0.0 — absence of a value, not a zero)
+        cpge_subset = subset[subset['sample_id'].isin(ags_samples)]
+        wide_cpge = cpge_subset.pivot_table(index='accession',
+                                            columns='sample_id',
+                                            values='cpge_num', aggfunc='sum',
+                                            fill_value=0.0)
+        wide_cpge = wide_cpge.reindex(index=wide.index, columns=sample_ids)
+        if ags_samples:
+            wide_cpge[ags_samples] = wide_cpge[ags_samples].fillna(0.0)
+        wide_cpge.index.name = 'accession'
+        # Cell-wise formatting: pandas 2.0 (pinned image) drops float_format
+        # when na_rep is also given, and DataFrame.map needs >= 2.1
+        for column in wide_cpge.columns:
+            wide_cpge[column] = ['' if pd.isna(value) else CPGE_FORMAT.format(value)
+                                 for value in wide_cpge[column]]
+        wide_cpge.to_csv(args.output_dir / f'function_wide_{ontology}_cpge.tsv',
+                         sep='\t', header=True)
 
     # --- Annotated fraction per sample, by count and by abundance ---
     fraction_rows = []
@@ -539,12 +660,29 @@ def main():
                                          'fraction_by_abundance']).to_csv(
         args.output_dir / 'annotated_fraction.tsv', sep='\t', index=False)
 
+    # --- AGS / genome equivalents summary (Section 9.1 "MicrobeCensus AGS
+    #     table"); the 'unavailable' rows are the recorded warning that
+    #     Section 4.7's non-fatal-failure fallback asks for ---
+    ags_rows = []
+    for sample in sample_ids:
+        values = ags_by_sample.get(sample)
+        ags_rows.append({
+            'sample_id': sample,
+            'average_genome_size_bp': values['average_genome_size_bp'] if values else '',
+            'genome_equivalents': values['genome_equivalents'] if values else '',
+            'total_bases': values['total_bases'] if values else '',
+            'status': 'ok' if values else 'unavailable',
+        })
+    pd.DataFrame(ags_rows, columns=AGS_COLUMNS + ['status']).to_csv(
+        args.output_dir / 'ags_and_ge.tsv', sep='\t', index=False)
+
     annotated_any = sum(1 for row in fraction_rows
                         if row['ontology'] == 'any' and row['genes_annotated'])
     print(f"Aggregated {len(sample_ids)} sample(s), "
           f"{len(gene_abundance)} gene abundance rows, "
           f"{len(out_53)} function abundance rows "
-          f"({annotated_any}/{len(sample_ids)} samples with annotations)")
+          f"({annotated_any}/{len(sample_ids)} samples with annotations; "
+          f"{len(ags_samples)}/{len(sample_ids)} samples with CPGE)")
 
 
 if __name__ == '__main__':

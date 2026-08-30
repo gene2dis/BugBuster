@@ -3,10 +3,13 @@
     AGGREGATE_FUNCTIONS Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Study-level aggregation of the contig functional branch (design doc
-    Section 4.8, task T4): joins featureCounts gene counts, eggNOG-mapper v3
-    annotations and Pyrodigal gene coordinates into the canonical tables
-    (Sections 5.1-5.3), computes TPM (Section 6.1; CPGE arrives with T5), and
-    reports the annotated fraction per sample. All the logic lives in
+    Section 4.8, tasks T4+T5): joins featureCounts gene counts, eggNOG-mapper
+    v3 annotations and Pyrodigal gene coordinates into the canonical tables
+    (Sections 5.1-5.3), computes TPM (Section 6.1) and copies per genome
+    equivalent (Section 6.2, from the optional MicrobeCensus AGS tables -
+    samples without one fall back to TPM-only with an 'unavailable' row in
+    ags_and_ge.tsv), and reports the annotated fraction per sample. All the
+    logic lives in
     bin/aggregate_functions.py (independently tested by
     tests/bin/test_aggregate_functions.sh), including the version-aware
     eggNOG layout guard that fails loudly on schema drift (Section 4.2).
@@ -20,6 +23,8 @@
         counts: all samples' featureCounts tables
         annotations: eggNOG annotations (per sample, or one 'coassembly' file)
         gffs: Pyrodigal gene GFFs (per sample, or one 'coassembly' file)
+        ags: MicrobeCensus <id>.ags.tsv tables; possibly a subset of samples
+            or none at all (non-fatal failures, or --microbecensus false)
         eggnog_versions: versions.yml from EGGNOG_MAPPER_ANNOTATE (staged
             under a distinct name: this module writes its own versions.yml,
             and writing through a same-named input symlink would corrupt the
@@ -28,8 +33,8 @@
         assembly_mode: 'assembly' or 'coassembly' (join topology + 5.2 column)
 
     Output: gene_annotations.tsv, gene_abundance.tsv, function_abundance.tsv,
-        function_wide_<ontology>_tpm.tsv (ko, cog, ec, pfam, cazy),
-        annotated_fraction.tsv, versions.yml
+        function_wide_<ontology>_{tpm,cpge}.tsv (ko, cog, ec, pfam, cazy),
+        annotated_fraction.tsv, ags_and_ge.tsv, versions.yml
 ----------------------------------------------------------------------------------------
 */
 
@@ -45,6 +50,7 @@ process AGGREGATE_FUNCTIONS {
     path(counts, stageAs: 'counts/*')
     path(annotations, stageAs: 'annotations/*')
     path(gffs, stageAs: 'gffs/*')
+    path(ags, stageAs: 'ags/*')
     path(eggnog_versions, stageAs: 'eggnog_versions.yml')
     val(assembly_mode)
 
@@ -52,8 +58,9 @@ process AGGREGATE_FUNCTIONS {
     path("gene_annotations.tsv")   , emit: gene_annotations
     path("gene_abundance.tsv")     , emit: gene_abundance
     path("function_abundance.tsv") , emit: function_abundance
-    path("function_wide_*_tpm.tsv"), emit: function_wide
+    path("function_wide_*.tsv")    , emit: function_wide
     path("annotated_fraction.tsv") , emit: annotated_fraction
+    path("ags_and_ge.tsv")         , emit: ags_summary
     path("versions.yml")           , emit: versions
 
     when:
@@ -61,12 +68,14 @@ process AGGREGATE_FUNCTIONS {
 
     script:
     def args = task.ext.args ?: ''
+    def ags_arg = ags ? "--ags ${ags}" : ''
     """
     aggregate_functions.py \\
         --assembly-mode ${assembly_mode} \\
         --counts ${counts} \\
         --annotations ${annotations} \\
         --gffs ${gffs} \\
+        ${ags_arg} \\
         --eggnog-versions-yml ${eggnog_versions} \\
         --output-dir . \\
         ${args}
@@ -88,7 +97,13 @@ process AGGREGATE_FUNCTIONS {
     touch function_wide_ec_tpm.tsv
     touch function_wide_pfam_tpm.tsv
     touch function_wide_cazy_tpm.tsv
+    touch function_wide_ko_cpge.tsv
+    touch function_wide_cog_cpge.tsv
+    touch function_wide_ec_cpge.tsv
+    touch function_wide_pfam_cpge.tsv
+    touch function_wide_cazy_cpge.tsv
     touch annotated_fraction.tsv
+    touch ags_and_ge.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

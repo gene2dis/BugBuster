@@ -301,6 +301,46 @@ check by editing the annotations file.
 
 ---
 
+### MICROBECENSUS task fails / `cpge` columns are empty / `ags_and_ge.tsv` says `unavailable`
+
+**Symptom:** the run completes, but a `MICROBECENSUS` task shows as failed
+(ignored) in the log, and in `07_functional_annotation/summary/` the affected
+sample has empty `cpge` fields, a blank column in the
+`function_wide_*_cpge.tsv` matrices, and `status = unavailable` in
+`ags_and_ge.tsv`.
+
+**Cause:** this is the designed behavior, not a crash. MicrobeCensus failure
+is deliberately non-fatal: the sample falls back to TPM-only normalization and
+the run continues. The common reasons it fails:
+
+1. **Reads shorter than 50 bp** — MicrobeCensus has no model below 50 bp and
+   exits with `Cannot compute AGS using reads shorter than 50 bp`.
+2. **Too few marker-gene hits** — very small datasets (subsampled tests,
+   shallow runs) exit with `No hits to marker proteins - cannot estimate
+   genome size`. Estimates need a few hundred thousand reads to be
+   meaningful.
+3. **Implausible estimate rejected** — the module refuses an average genome
+   size outside 0.5–20 Mb (the upstream tool can occasionally emit silent
+   garbage estimates; see MicrobeCensus issue #36).
+
+The exact reason is in the failed task's `.command.log` under the work
+directory printed in the Nextflow log.
+
+**Solution:** nothing to fix for the run itself — TPM tables are complete and
+valid. If you need CPGE for that sample, address the cause (deeper
+sequencing, reads ≥ 50 bp) and re-run; `--microbecensus false` turns the step
+off entirely.
+
+**Note:** MicrobeCensus is invoked through `bin/run_microbe_census_py3fix.py`.
+Both published biocontainers of the unmaintained upstream tool are broken
+(the Python-3 image lacks an unreleased upstream str/bytes fix — upstream
+issue #32 — and the Python-2 image cannot load its bundled RAPsearch2
+binary); the shim patches the one broken function in the pinned Python-3
+image and delegates everything else to the stock tool. Do not remove the shim
+while the pin is `microbecensus:1.1.1--pyhca03a8a_2`.
+
+---
+
 ## Database Issues
 
 ### Database download failed

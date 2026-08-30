@@ -15,6 +15,10 @@
 #   - sampleA.featureCounts.txt    counts 30/10 over the two genes
 #   - sampleB.featureCounts.txt    counts 0/50 (keeps a count-0 gene)
 #   - sampleZ.featureCounts.txt    all-zero counts (zero-total-TPM sample)
+#   - sampleA.ags.tsv              MICROBECENSUS ags table (T5: GE = 2.0 gives
+#     hand-checkable CPGE — RPK 100 and 33.33 over the 300 bp genes -> cpge
+#     50 and 16.666667). sampleB/sampleZ deliberately have NO ags fixture:
+#     they exercise the TPM-only fallback ('unavailable' in ags_and_ge.tsv)
 #   - eggnog_versions.yml          versions.yml shape from EGGNOG_MAPPER_ANNOTATE
 #
 # Gene ids reuse tests/data/gff/test_contig1_genes.gff.gz (contig_1_1 at
@@ -70,6 +74,11 @@ cat > "${OUT_DIR}/sampleZ.featureCounts.txt" <<'EOF'
 Geneid	Chr	Start	End	Strand	Length	sampleZ_all_reads.bam
 contig_1_1	contig_1	1	300	+	300	0
 contig_1_2	contig_1	601	900	-	300	0
+EOF
+
+cat > "${OUT_DIR}/sampleA.ags.tsv" <<'EOF'
+sample_id	average_genome_size_bp	genome_equivalents	total_bases
+sampleA	3000000	2.0	6000000
 EOF
 
 cat > "${OUT_DIR}/eggnog_versions.yml" <<'EOF'

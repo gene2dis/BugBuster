@@ -64,6 +64,7 @@ def printHelp() {
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
       --contig_level_functional     Enable contig-level functional annotation; needs singularity/apptainer (default: ${params.contig_level_functional})
+      --microbecensus               Estimate average genome size for CPGE normalization (functional branch; default: ${params.microbecensus})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -111,6 +112,7 @@ include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotati
 
 	// FUNCTIONAL ANNOTATION
 include { METACERBERUS_CONTIGS } from './modules/local/metacerberus/main'
+include { MICROBECENSUS        } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { NT_BLASTN        } from './modules/local/nt_blastn/main'
@@ -259,6 +261,7 @@ workflow {
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
+    log.info "  MicrobeCensus        : ${params.microbecensus}"
     log.info ""
 
     //
@@ -429,6 +432,26 @@ workflow {
     }
 
     //
+    // MODULE: MicrobeCensus average genome size on host-removed reads
+    // (design doc Section 4.7). Sits outside the branch subworkflows because
+    // both the contig and (future, T8) read branches consume its output.
+    // Failure is non-fatal (errorStrategy in config/modules.config): a failed
+    // sample emits nothing here and falls back to TPM-only in aggregation.
+    //
+    // The only default-true feature toggle: disabling requires an explicit
+    // "--microbecensus false", which Nextflow delivers as the STRING "false"
+    // (truthy in Groovy) — normalize before gating. nf-schema has already
+    // rejected any value that is not a boolean or "true"/"false".
+    //
+    def run_microbecensus = params.microbecensus.toString().toBoolean()
+    ch_ags = channel.empty()
+    if ( run_microbecensus && params.contig_level_functional && params.assembly_mode != "none" ) {
+        MICROBECENSUS(ch_clean_reads)
+        ch_ags = MICROBECENSUS.out.ags
+        ch_versions = ch_versions.mix(MICROBECENSUS.out.versions.first())
+    }
+
+    //
     // SUBWORKFLOW: Contig-level functional annotation
     // (eggNOG-mapper + featureCounts gene quantification)
     //
@@ -438,7 +461,8 @@ workflow {
             PREPARE_DATABASES.out.eggnog_db
                 .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." },
             ch_contig_genes_gff,
-            ch_counting_bam
+            ch_counting_bam,
+            ch_ags
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
     }

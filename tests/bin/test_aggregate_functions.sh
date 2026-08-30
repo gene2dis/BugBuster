@@ -1,7 +1,7 @@
 #!/bin/bash
 #
-# Direct tests for bin/aggregate_functions.py (functional annotation T4,
-# design doc Sections 4.8, 5, 6.1, 10.2). Asserts on the committed fixtures
+# Direct tests for bin/aggregate_functions.py (functional annotation T4+T5,
+# design doc Sections 4.8, 5, 6, 10.2). Asserts on the committed fixtures
 # in tests/data/functional/ (regenerate with make_functional_fixtures.sh):
 #   - assembly mode: TPM sums to 1e6 per sample; every predicted gene appears
 #     in gene_abundance including count-0 genes; a gene with two KOs
@@ -9,14 +9,20 @@
 #     multi-letter COG splits per character; '-' fields yield no rows;
 #     unannotated genes are absent from 5.1 but present in 5.2; annotated
 #     fractions by count and abundance are exact
+#   - CPGE (T5): hand-checked cpge = RPK/GE values for the sample with an
+#     ags table; empty cpge fields, blank wide-matrix columns and an
+#     'unavailable' ags_and_ge.tsv row for samples without one (the TPM-only
+#     fallback); running without --ags at all still succeeds
 #   - coassembly mode: one shared annotations/GFF, per-sample counts;
 #     5.1 sample_id is 'coassembly'; zero-total sample gets tpm 0 and an
-#     empty fraction_by_abundance
+#     empty fraction_by_abundance; per-sample ags joins as under assembly
 #   - empty gene set: header-only inputs aggregate without crashing
 #   - the version-aware layout guard fails loudly (10.2 mandates testing
 #     this deliberately): renamed / 21-column / 23-column headers, unknown
 #     or missing emapper version, a disagreeing '## emapper-' line, and
 #     mis-paired gene id sets all exit non-zero
+#   - the ags guard fails loudly on a wrong header, an unknown sample id, a
+#     non-positive genome_equivalents, and a filename/embedded-id mismatch
 #
 # The script runs inside the same pinned image the module uses.
 # Requirements: docker (present on GitHub ubuntu-latest runners).
@@ -117,13 +123,16 @@ seed_assembly_inputs() {
     sed 's/sampleA/sampleB/g' "${FIXTURES}/sampleA.emapper.annotations" > "${dir}/sampleB.emapper.annotations"
     cp "${GFF_FIXTURE}" "${dir}/sampleA.gff.gz"
     cp "${GFF_FIXTURE}" "${dir}/sampleB.gff.gz"
+    cp "${FIXTURES}/sampleA.ags.tsv" "${dir}/"
     cp "${FIXTURES}/eggnog_versions.yml" "${dir}/"
 }
 
+# sampleB has no ags table on purpose: it exercises the TPM-only fallback
 ASSEMBLY_ARGS=(--assembly-mode assembly
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt
     --annotations sampleA.emapper.annotations sampleB.emapper.annotations
     --gffs sampleA.gff.gz sampleB.gff.gz
+    --ags sampleA.ags.tsv
     --eggnog-versions-yml eggnog_versions.yml --output-dir .)
 
 #
@@ -134,8 +143,11 @@ seed_assembly_inputs "${D}"
 NEXT_WORKDIR="${D}" expect_pass "assembly mode aggregates two samples" "${ASSEMBLY_ARGS[@]}"
 
 for f in gene_annotations.tsv gene_abundance.tsv function_abundance.tsv \
-         annotated_fraction.tsv function_wide_ko_tpm.tsv function_wide_cog_tpm.tsv \
-         function_wide_ec_tpm.tsv function_wide_pfam_tpm.tsv function_wide_cazy_tpm.tsv; do
+         annotated_fraction.tsv ags_and_ge.tsv \
+         function_wide_ko_tpm.tsv function_wide_cog_tpm.tsv \
+         function_wide_ec_tpm.tsv function_wide_pfam_tpm.tsv function_wide_cazy_tpm.tsv \
+         function_wide_ko_cpge.tsv function_wide_cog_cpge.tsv \
+         function_wide_ec_cpge.tsv function_wide_pfam_cpge.tsv function_wide_cazy_cpge.tsv; do
     check "output ${f} exists" "[ -s '${D}/${f}' ]"
 done
 
@@ -175,6 +187,39 @@ check "tool and DB versions in gene_annotations" \
 check "partial flag carried from the GFF" \
     "grep -qP 'contig_1_1\tcontig_1\t1\t300\t\\+\t300\t10\t' '${D}/gene_annotations.tsv'"
 
+# --- CPGE (T5, Section 6.2): hand-checked against the fixture GE of 2.0 ---
+# RPK = count/(300/1000): 30 -> 100, 10 -> 33.333; cpge = RPK/2.0
+check "sampleA cpge exact (50.000000 and 16.666667)" \
+    "grep -qP 'sampleA\tcontig_1_1\tassembly\t30\t300\t750000.0000\t50.000000\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleA\tcontig_1_2\tassembly\t10\t300\t250000.0000\t16.666667\$' '${D}/gene_abundance.tsv'"
+
+# No ags table for sampleB -> empty cpge fields (TPM-only fallback), and TPM untouched
+check "sampleB cpge empty, tpm unchanged" \
+    "grep -qP 'sampleB\tcontig_1_1\tassembly\t0\t300\t0.0000\t\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleB\tcontig_1_2\tassembly\t50\t300\t1000000.0000\t\$' '${D}/gene_abundance.tsv'"
+
+# 5.3: the 2-KO gene double-counts its full CPGE into each KO
+check "abundance_cpge 50.000000 for both sampleA KOs, empty for sampleB rows" \
+    "grep -qP 'sampleA\tcontigs\teggnog-mapper\tko\tK00001\t\t750000.0000\t50.000000\t' '${D}/function_abundance.tsv' && grep -qP 'sampleA\tcontigs\teggnog-mapper\tko\tK00002\t\t750000.0000\t50.000000\t' '${D}/function_abundance.tsv' && grep -qP 'sampleB\tcontigs\teggnog-mapper\tko\tK00001\t\t0.0000\t\t' '${D}/function_abundance.tsv'"
+
+# ags_and_ge.tsv: ok row with the fixture values, 'unavailable' warning row
+check "ags_and_ge.tsv has sampleA ok and sampleB unavailable rows" \
+    "grep -qP 'sampleA\t3000000\t2.0\t6000000\tok\$' '${D}/ags_and_ge.tsv' && grep -qP 'sampleB\t\t\t\tunavailable\$' '${D}/ags_and_ge.tsv'"
+
+# Wide CPGE matrix: value column for sampleA, blank (not 0) column for sampleB
+check "wide cpge matrix: sampleA values, sampleB blank" \
+    "grep -qP '^K00001\t50.000000\t\$' '${D}/function_wide_ko_cpge.tsv' && head -1 '${D}/function_wide_ko_cpge.tsv' | grep -qP 'accession\tsampleA\tsampleB'"
+
+# Backwards compatibility: no --ags at all still succeeds, all cpge empty
+D="${WORK}/assembly_noags"
+seed_assembly_inputs "${D}"
+NEXT_WORKDIR="${D}" expect_pass "running without --ags succeeds (all-samples fallback)" \
+    --assembly-mode assembly \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt \
+    --annotations sampleA.emapper.annotations sampleB.emapper.annotations \
+    --gffs sampleA.gff.gz sampleB.gff.gz \
+    --eggnog-versions-yml eggnog_versions.yml --output-dir .
+check "no --ags: every ags_and_ge row unavailable, all cpge empty" \
+    "[ \$(tail -n +2 '${D}/ags_and_ge.tsv' | grep -cP '\tunavailable\$') -eq 2 ] && [ -z \"\$(cut -f7 '${D}/gene_abundance.tsv' | tail -n +2 | tr -d '[:space:]')\" ]"
+
 #
 # 2. Coassembly mode (incl. zero-total sample)
 #
@@ -184,12 +229,14 @@ cp "${FIXTURES}/sampleA.featureCounts.txt" "${FIXTURES}/sampleB.featureCounts.tx
    "${FIXTURES}/sampleZ.featureCounts.txt" "${D}/"
 sed 's/sampleA/coassembly/g' "${FIXTURES}/sampleA.emapper.annotations" > "${D}/coassembly.emapper.annotations"
 cp "${GFF_FIXTURE}" "${D}/coassembly.gff.gz"
+cp "${FIXTURES}/sampleA.ags.tsv" "${D}/"
 cp "${FIXTURES}/eggnog_versions.yml" "${D}/"
 NEXT_WORKDIR="${D}" expect_pass "coassembly mode: shared gene set, per-sample counts" \
     --assembly-mode coassembly \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
     --annotations coassembly.emapper.annotations \
     --gffs coassembly.gff.gz \
+    --ags sampleA.ags.tsv \
     --eggnog-versions-yml eggnog_versions.yml --output-dir .
 
 check "5.1 sample_id is 'coassembly' only" \
@@ -198,6 +245,8 @@ check "wide matrix has all three sample columns" \
     "head -1 '${D}/function_wide_ko_tpm.tsv' | grep -qP 'accession\tsampleA\tsampleB\tsampleZ'"
 check "zero-total sampleZ: tpm 0 rows, empty fraction_by_abundance" \
     "grep -qP 'sampleZ\tcontig_1_1\tcoassembly\t0\t300\t0.0000\t' '${D}/gene_abundance.tsv' && grep -qP 'sampleZ\tany\t2\t1\t0.5000\t\$' '${D}/annotated_fraction.tsv'"
+check "coassembly: per-sample cpge (sampleA 50.000000, sampleB/Z empty)" \
+    "grep -qP 'sampleA\tcontig_1_1\tcoassembly\t30\t300\t750000.0000\t50.000000\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleB\tcontig_1_2\tcoassembly\t50\t300\t1000000.0000\t\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleZ\t\t\t\tunavailable\$' '${D}/ags_and_ge.tsv'"
 
 #
 # 3. Empty gene set (empty-contig sample shape)
@@ -216,7 +265,7 @@ NEXT_WORKDIR="${D}" expect_pass "empty gene set aggregates without crashing" \
     --gffs sampleE.gff.gz --eggnog-versions-yml eggnog_versions.yml --output-dir .
 
 check "empty sample: zero abundance rows, summary row with empty fractions" \
-    "[ \$(tail -n +2 '${D}/gene_abundance.tsv' | wc -l) -eq 0 ] && grep -qP 'sampleE\tany\t0\t0\t\t\$' '${D}/annotated_fraction.tsv'"
+    "[ \$(tail -n +2 '${D}/gene_abundance.tsv' | wc -l) -eq 0 ] && grep -qP 'sampleE\tany\t0\t0\t\t\$' '${D}/annotated_fraction.tsv' && grep -qP 'sampleE\t\t\t\tunavailable\$' '${D}/ags_and_ge.tsv'"
 
 #
 # 4. Version-aware layout guard: deliberate loud failures (acceptance 10.2)
@@ -267,6 +316,27 @@ NEXT_WORKDIR="${D}" expect_fail "counts/GFF gene id mismatch fails" "${NEG_ARGS[
 D="${WORK}/neg_length_mismatch"; seed_negative "${D}"
 sed -i 's/contig_1_1\tcontig_1\t1\t300\t+\t300\t30/contig_1_1\tcontig_1\t1\t300\t+\t299\t30/' "${D}/sampleA.featureCounts.txt"
 NEXT_WORKDIR="${D}" expect_fail "featureCounts Length vs GFF length mismatch fails" "${NEG_ARGS[@]}"
+
+#
+# 5. AGS guard: deliberate loud failures (T5)
+#
+D="${WORK}/neg_ags_header"; seed_negative "${D}"
+printf 'sample\tags\tge\ttb\nsampleA\t3000000\t2.0\t6000000\n' > "${D}/sampleA.ags.tsv"
+NEXT_WORKDIR="${D}" expect_fail "wrong ags.tsv header fails" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
+check_grep "  ...naming the expected header" "../neg_ags_header.log" "unexpected ags.tsv header"
+
+D="${WORK}/neg_ags_unknown"; seed_negative "${D}"
+sed 's/^sampleA\t/sampleQ\t/' "${FIXTURES}/sampleA.ags.tsv" > "${D}/sampleQ.ags.tsv"
+NEXT_WORKDIR="${D}" expect_fail "ags table for a sample not in --counts fails" "${NEG_ARGS[@]}" --ags sampleQ.ags.tsv
+
+D="${WORK}/neg_ags_zero_ge"; seed_negative "${D}"
+sed 's/\t2.0\t/\t0\t/' "${FIXTURES}/sampleA.ags.tsv" > "${D}/sampleA.ags.tsv"
+NEXT_WORKDIR="${D}" expect_fail "non-positive genome_equivalents fails" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
+check_grep "  ...naming the offending field" "../neg_ags_zero_ge.log" "genome_equivalents must be a positive number"
+
+D="${WORK}/neg_ags_id_mismatch"; seed_negative "${D}"
+cp "${FIXTURES}/sampleA.ags.tsv" "${D}/sampleM.ags.tsv"
+NEXT_WORKDIR="${D}" expect_fail "ags filename/embedded sample_id mismatch fails" "${NEG_ARGS[@]}" --ags sampleM.ags.tsv
 
 #
 # Summary

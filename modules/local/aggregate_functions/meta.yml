@@ -1,9 +1,10 @@
 name: aggregate_functions
-description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations and gene coordinates into functional abundance tables with TPM (bin/aggregate_functions.py)
+description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations, gene coordinates and MicrobeCensus AGS estimates into functional abundance tables with TPM and CPGE (bin/aggregate_functions.py)
 keywords:
   - functional annotation
   - aggregation
   - tpm
+  - cpge
   - metagenomics
 tools:
   - pandas:
@@ -25,6 +26,10 @@ input:
       type: file
       description: Pyrodigal gene GFFs (gzipped accepted) - one per sample under assembly mode, a single coassembly file under coassembly mode
       pattern: "*.{gff,gff.gz}"
+  - ags:
+      type: file
+      description: MicrobeCensus <sample>.ags.tsv tables (optional - may cover a subset of samples or be absent entirely; missing samples fall back to TPM-only with empty cpge fields)
+      pattern: "*.ags.tsv"
   - eggnog_versions:
       type: file
       description: versions.yml from EGGNOG_MAPPER_ANNOTATE, source of the pinned eggnog-mapper and eggnog_db versions for the version-aware layout guard and the provenance columns
@@ -40,7 +45,7 @@ output:
       pattern: "gene_annotations.tsv"
   - gene_abundance:
       type: file
-      description: Per-gene abundance with TPM (Section 5.2; cpge empty until T5)
+      description: Per-gene abundance with TPM and CPGE (Section 5.2; cpge empty for samples without a MicrobeCensus AGS estimate)
       pattern: "gene_abundance.tsv"
   - function_abundance:
       type: file
@@ -48,12 +53,16 @@ output:
       pattern: "function_abundance.tsv"
   - function_wide:
       type: file
-      description: Wide TPM matrix per ontology (rows accessions, columns samples)
-      pattern: "function_wide_*_tpm.tsv"
+      description: Wide TPM and CPGE matrices per ontology (rows accessions, columns samples; CPGE cells blank for samples without AGS)
+      pattern: "function_wide_*.tsv"
   - annotated_fraction:
       type: file
       description: Per-sample annotated fraction by gene count and by TPM abundance, overall and per ontology
       pattern: "annotated_fraction.tsv"
+  - ags_summary:
+      type: file
+      description: Per-sample MicrobeCensus AGS/genome-equivalents summary with status ok/unavailable (the recorded warning for the TPM-only fallback)
+      pattern: "ags_and_ge.tsv"
   - versions:
       type: file
       description: Software versions
