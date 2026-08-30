@@ -274,6 +274,31 @@ released on bioconda.
 > delegating `ps` shim in `bin/` — do not remove `bin/ps` while the functional
 > branch uses the upstream image.
 
+### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
+
+**Error:**
+```
+Error: ...emapper.annotations: annotations column header does not match the verified emapper-3.0.0-beta6 layout ...
+Error: eggnog-mapper version '<X>' is not among the layouts this parser was verified against ...
+```
+
+**Cause:** this is a deliberate guard, not a bug. eggNOG-mapper v3 is a beta and
+its output schema can change between releases, so the functional aggregation
+step (`bin/aggregate_functions.py`) only parses annotations from eggNOG-mapper
+versions whose column layout it was explicitly verified against, and checks the
+file's column header against that layout. Silently misparsing a shifted column
+into the wrong ontology would corrupt every downstream table, which is exactly
+what this refuses to do.
+
+**Solution:** this error appears when the pinned eggNOG-mapper version and the
+aggregation script get out of sync (for example after re-pinning the eggNOG
+modules to a newer release without updating the parser). Re-verify the new
+version's column layout on real output, then update `KNOWN_EMAPPER_VERSIONS`
+and, if the columns changed, `EXPECTED_ANNOTATION_COLUMNS` in
+`bin/aggregate_functions.py` — and extend
+`tests/bin/test_aggregate_functions.sh` for the new layout. Do not bypass the
+check by editing the annotations file.
+
 ---
 
 ## Database Issues

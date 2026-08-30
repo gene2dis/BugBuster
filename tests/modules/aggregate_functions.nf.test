@@ -1,0 +1,118 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    AGGREGATE_FUNCTIONS Module Test
+
+    Study-level functional aggregation (design doc Section 4.8, task T4).
+    The full aggregation logic — TPM math, intentional double-counting,
+    version-aware layout guard, edge cases — is covered directly by
+    tests/bin/test_aggregate_functions.sh; these tests verify the module
+    wrapper: staging (incl. the eggnog_versions.yml rename), the script
+    invocation, and the declared outputs, in both assembly-mode shapes.
+
+    Fixtures: tests/data/functional/ (see tests/bin/make_functional_fixtures.sh)
+    — a format-faithful eggNOG-mapper v3.0.0-beta6 annotations file plus
+    featureCounts tables and per-name GFF copies.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test AGGREGATE_FUNCTIONS Process"
+    script "../../modules/local/aggregate_functions/main.nf"
+    process "AGGREGATE_FUNCTIONS"
+
+    test("aggregates one sample under assembly mode") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/functional/sampleA.featureCounts.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/functional/sampleA.emapper.annotations", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/functional/sampleA.gff.gz", checkIfExists: true) ]
+                input[3] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[4] = "assembly"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Every predicted gene appears (2 genes), TPM sums to 1e6 (10.2)
+            def abundance = path(process.out.gene_abundance.get(0)).readLines()
+            assert abundance.size() == 3
+            def tpm_sum = abundance.drop(1).sum { row -> row.split('\t')[5].toDouble() }
+            assert Math.abs(tpm_sum - 1e6) < 0.1
+
+            // The 2-KO gene appears once per KO at full abundance
+            def functions = path(process.out.function_abundance.get(0)).text
+            assert functions.contains('ko\tK00001\t\t750000.0000')
+            assert functions.contains('ko\tK00002\t\t750000.0000')
+
+            // All five wide matrices emitted; provenance versions present
+            assert process.out.function_wide.get(0).size() == 5
+            assert path(process.out.gene_annotations.get(0)).text.contains('3.0.0-beta6\t7.0.0')
+            assert path(process.out.versions.get(0)).text.contains('pandas:')
+        }
+    }
+
+    test("aggregates per-sample counts against a shared co-assembly gene set") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/functional/sampleA.featureCounts.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/functional/sampleB.featureCounts.txt", checkIfExists: true)
+                ]
+                input[1] = [ file("${projectDir}/tests/data/functional/coassembly.emapper.annotations", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/functional/coassembly.gff.gz", checkIfExists: true) ]
+                input[3] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[4] = "coassembly"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Per-sample abundance over the shared gene set (2 genes x 2 samples)
+            def abundance = path(process.out.gene_abundance.get(0)).readLines()
+            assert abundance.size() == 5
+            assert abundance.drop(1).every { row -> row.split('\t')[2] == 'coassembly' }
+
+            // 5.1 keyed by the coassembly unit, not per sample (design doc 4.8 record)
+            def annotation_samples = path(process.out.gene_annotations.get(0)).readLines()
+                .drop(1).collect { row -> row.split('\t')[0] }.unique()
+            assert annotation_samples == ['coassembly']
+
+            // Wide matrices carry one column per sample
+            def wide_ko = process.out.function_wide.get(0).find { f -> f.contains('function_wide_ko') }
+            assert path(wide_ko).readLines()[0] == 'accession\tsampleA\tsampleB'
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/functional/sampleA.featureCounts.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/functional/sampleA.emapper.annotations", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/functional/sampleA.gff.gz", checkIfExists: true) ]
+                input[3] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[4] = "assembly"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.gene_annotations.size() == 1
+            assert process.out.gene_abundance.size() == 1
+            assert process.out.function_abundance.size() == 1
+            assert process.out.function_wide.get(0).size() == 5
+            assert process.out.annotated_fraction.size() == 1
+            assert process.out.versions.size() == 1
+        }
+    }
+}

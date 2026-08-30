@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer) plus per-gene abundance quantification (featureCounts read counts over the predicted genes; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), per-gene abundance quantification (featureCounts) and study-level TPM tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
 
 ### Pipeline Workflow
 
@@ -291,7 +291,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance); see engine note below |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance + TPM summary tables); see engine note below |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -700,6 +700,12 @@ results/
     │   └── {sample}/                           # (if contig_level_functional=true; per sample in both assembly modes)
     │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
     │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
+    ├── summary/                                # study-level tables (if contig_level_functional=true)
+    │   ├── gene_annotations.tsv                # long format: one row per gene per functional term
+    │   ├── gene_abundance.tsv                  # per-gene counts + TPM per sample (cpge empty for now)
+    │   ├── function_abundance.tsv              # per-ontology TPM (ko, cog, ec, pfam, cazy)
+    │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples)
+    │   └── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
     └── contigs/                                # MetaCerberus contig-level annotation
         └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
@@ -715,6 +721,24 @@ results/
 > results (not per-gene rows) may be compared across samples. Counts are
 > read-level (each mate counted separately), not fragment-level; the
 > multi-mapping policy is set by `--featurecounts_multimap`.
+
+> **TPM normalization (`summary/` tables):**
+>
+> ```
+> RPK_i = count_i / (length_i / 1000)
+> TPM_i = RPK_i / (sum over all j of RPK_j) * 1e6
+> ```
+>
+> The share of the sample's functional pool attributable to that gene.
+> Compositional. Use for within-sample composition and for compositionally
+> aware differential testing. TPM sums to 1e6 per sample; a sample whose genes
+> attracted no reads at all has TPM 0 for every gene instead. In
+> `function_abundance.tsv`, a gene carrying two terms of the same ontology
+> contributes its full abundance to each — this double-counting is
+> intentional, so ontology-level TPM totals can exceed 1e6. The `description`
+> column is empty for eggNOG terms (eggNOG-mapper v3 dropped the Description
+> field); the `cpge` / `abundance_cpge` columns stay empty until the
+> MicrobeCensus-based normalization lands.
 
 ### Database Storage Directory
 
@@ -758,6 +782,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
+| `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM, wide matrices per ontology, annotated fraction |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---

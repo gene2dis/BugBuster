@@ -121,6 +121,14 @@ jobs:
         run: |
           tests/bin/test_report_scripts.sh
 
+      - name: Run GFF-to-SAF converter tests (design doc T3)
+        run: |
+          tests/bin/test_gff2saf.sh
+
+      - name: Run functional aggregation script tests (design doc T4)
+        run: |
+          tests/bin/test_aggregate_functions.sh
+
       - name: Run bin-directory recognition regression tests (audit #6)
         run: |
           tests/bin/test_identify_bin_dir.sh

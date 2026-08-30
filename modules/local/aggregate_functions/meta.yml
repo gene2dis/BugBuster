@@ -1,0 +1,63 @@
+name: aggregate_functions
+description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations and gene coordinates into functional abundance tables with TPM (bin/aggregate_functions.py)
+keywords:
+  - functional annotation
+  - aggregation
+  - tpm
+  - metagenomics
+tools:
+  - pandas:
+      description: Python data analysis library used by the aggregation script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - counts:
+      type: file
+      description: featureCounts per-gene tables, one per sample (filename <sample>.featureCounts.txt carries the sample id, which equals meta.id via the ext.prefix convention)
+      pattern: "*.featureCounts.txt"
+  - annotations:
+      type: file
+      description: eggNOG-mapper v3 annotations - one per sample under assembly mode, a single coassembly file under coassembly mode
+      pattern: "*.emapper.annotations"
+  - gffs:
+      type: file
+      description: Pyrodigal gene GFFs (gzipped accepted) - one per sample under assembly mode, a single coassembly file under coassembly mode
+      pattern: "*.{gff,gff.gz}"
+  - eggnog_versions:
+      type: file
+      description: versions.yml from EGGNOG_MAPPER_ANNOTATE, source of the pinned eggnog-mapper and eggnog_db versions for the version-aware layout guard and the provenance columns
+      pattern: "versions.yml"
+  - assembly_mode:
+      type: string
+      description: "'assembly' or 'coassembly' - drives the join topology and the gene_abundance assembly_mode column"
+
+output:
+  - gene_annotations:
+      type: file
+      description: Long-format gene annotation table (design doc Section 5.1, one row per gene per term)
+      pattern: "gene_annotations.tsv"
+  - gene_abundance:
+      type: file
+      description: Per-gene abundance with TPM (Section 5.2; cpge empty until T5)
+      pattern: "gene_abundance.tsv"
+  - function_abundance:
+      type: file
+      description: Per-ontology function abundance (Section 5.3, intentional double-counting of multi-term genes)
+      pattern: "function_abundance.tsv"
+  - function_wide:
+      type: file
+      description: Wide TPM matrix per ontology (rows accessions, columns samples)
+      pattern: "function_wide_*_tpm.tsv"
+  - annotated_fraction:
+      type: file
+      description: Per-sample annotated fraction by gene count and by TPM abundance, overall and per ontology
+      pattern: "annotated_fraction.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

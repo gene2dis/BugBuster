@@ -239,12 +239,14 @@ nextflow_pipeline {
             assert workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2_SAMTOOLS") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_SEARCH") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_ANNOTATE") }
-            // One counting task per sample
+            // One counting task per sample, one study-level aggregation (T4)
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
 
             // Published to the documented layout (design doc Section 9.1)
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt").exists()
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt.summary").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/gene_abundance.tsv").exists()
         }
     }
 
@@ -277,6 +279,7 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_PER_SAMPLE") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
 
             // Gene calling keyed by the coassembly meta; counts keyed per sample
             assert path("${outputDir}/07_functional_annotation/gene_calling/coassembly/coassembly.faa.gz").exists()

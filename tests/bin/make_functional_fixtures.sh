@@ -1,0 +1,89 @@
+#!/bin/bash
+#
+# Generate the committed fixtures used by tests/bin/test_aggregate_functions.sh
+# and tests/modules/aggregate_functions.nf.test (functional annotation T4:
+# AGGREGATE_FUNCTIONS over featureCounts + eggNOG-mapper v3 output).
+#
+# Creates, under tests/data/functional/:
+#   - sampleA.emapper.annotations  format-faithful eggNOG-mapper v3.0.0-beta6
+#     file: variable-length leading '##' block (ctime / version / argv /
+#     applied-filters / confidence legend), the exact 22-column '#query'
+#     header, one annotated gene (contig_1_1: two KEGG_ko terms, multi-letter
+#     COG 'EG', a CAZy family, a PFAM, '-' placeholders, 13-char positional
+#     confidence code) with contig_1_2 deliberately absent (unannotated), and
+#     the 3 trailing '##' summary lines
+#   - sampleA.featureCounts.txt    counts 30/10 over the two genes
+#   - sampleB.featureCounts.txt    counts 0/50 (keeps a count-0 gene)
+#   - sampleZ.featureCounts.txt    all-zero counts (zero-total-TPM sample)
+#   - eggnog_versions.yml          versions.yml shape from EGGNOG_MAPPER_ANNOTATE
+#
+# Gene ids reuse tests/data/gff/test_contig1_genes.gff.gz (contig_1_1 at
+# 1-300 +, contig_1_2 at 601-900 -, both 300 bp); the test harnesses copy that
+# GFF to per-sample/coassembly names at runtime.
+#
+# The v3 layout here mirrors the verbatim header of the real 2026-08-29
+# acceptance output (design doc Section 4.2). Do not "simplify" the comment
+# block: its variable length is part of what the parser must tolerate.
+#
+set -euo pipefail
+
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+OUT_DIR="${SCRIPT_DIR}/../data/functional"
+mkdir -p "${OUT_DIR}"
+OUT_DIR="$( cd "${OUT_DIR}" && pwd )"
+
+cat > "${OUT_DIR}/sampleA.emapper.annotations" <<'EOF'
+## Sat Aug 29 07:21:06 2026
+## emapper-3.0.0-beta6
+## /usr/local/bin/emapper.py -m no_search --annotate_hits_table sampleA.emapper.seed_orthologs --cpu 8 --data_dir data --output sampleA
+##
+## applied filters:
+##   annot_evalue=0.001
+##   annot_score=null
+##   tax_scope=auto
+## annotation_confidence: one char per annotation field
+## confidence codes: h=high m=medium l=low -=not annotated
+## confidence field order: Preferred_name GOs EC KEGG_ko KEGG_Pathway KEGG_Module KEGG_Reaction KEGG_rclass BRITE KEGG_TC CAZy BiGG_Reaction PFAMs
+#query	seed_ortholog	evalue	score	eggNOG_OGs	tax_ceiling	farthest_donor_lineage	COG_category	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs	annotation_confidence
+contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	EG	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam	h--h------h-h
+## 1 queries scanned
+## Total time (seconds): 1.0
+## Rate: 1.00 q/s
+EOF
+
+cat > "${OUT_DIR}/sampleA.featureCounts.txt" <<'EOF'
+# Program:featureCounts v2.1.1; Command:"featureCounts" "-F" "SAF" "-a" "sampleA_genes.saf" "-T" "2" "-p" "--primary" "-o" "sampleA.featureCounts.txt" "sampleA_all_reads.bam"
+Geneid	Chr	Start	End	Strand	Length	sampleA_all_reads.bam
+contig_1_1	contig_1	1	300	+	300	30
+contig_1_2	contig_1	601	900	-	300	10
+EOF
+
+cat > "${OUT_DIR}/sampleB.featureCounts.txt" <<'EOF'
+# Program:featureCounts v2.1.1; Command:"featureCounts" "-F" "SAF" "-a" "sampleB_genes.saf" "-T" "2" "-p" "--primary" "-o" "sampleB.featureCounts.txt" "sampleB_all_reads.bam"
+Geneid	Chr	Start	End	Strand	Length	sampleB_all_reads.bam
+contig_1_1	contig_1	1	300	+	300	0
+contig_1_2	contig_1	601	900	-	300	50
+EOF
+
+cat > "${OUT_DIR}/sampleZ.featureCounts.txt" <<'EOF'
+# Program:featureCounts v2.1.1; Command:"featureCounts" "-F" "SAF" "-a" "sampleZ_genes.saf" "-T" "2" "-p" "--primary" "-o" "sampleZ.featureCounts.txt" "sampleZ_all_reads.bam"
+Geneid	Chr	Start	End	Strand	Length	sampleZ_all_reads.bam
+contig_1_1	contig_1	1	300	+	300	0
+contig_1_2	contig_1	601	900	-	300	0
+EOF
+
+cat > "${OUT_DIR}/eggnog_versions.yml" <<'EOF'
+"FUNCTIONAL_ANNOTATION:EGGNOG_MAPPER_ANNOTATE":
+    eggnog-mapper: 3.0.0-beta6
+    eggnog_db: 7.0.0
+EOF
+
+# Per-name copies for tests/modules/aggregate_functions.nf.test: the script
+# derives sample ids from filenames, so the GFF must be <id>.gff.gz and the
+# coassembly shape needs 'coassembly'-named inputs
+cp "${SCRIPT_DIR}/../data/gff/test_contig1_genes.gff.gz" "${OUT_DIR}/sampleA.gff.gz"
+cp "${SCRIPT_DIR}/../data/gff/test_contig1_genes.gff.gz" "${OUT_DIR}/coassembly.gff.gz"
+sed 's/sampleA/coassembly/g' "${OUT_DIR}/sampleA.emapper.annotations" \
+    > "${OUT_DIR}/coassembly.emapper.annotations"
+
+echo "Fixtures written under ${OUT_DIR}"

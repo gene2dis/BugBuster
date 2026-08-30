@@ -26,6 +26,13 @@ next release is tagged.
     binning BAM cannot yield per-sample counts), published to
     `07_functional_annotation/gene_abundance/`; multi-mapping policy via
     `--featurecounts_multimap` (`primary`/`all`/`none`)
+  - Study-level aggregation (`bin/aggregate_functions.py`) into canonical
+    tables published to `07_functional_annotation/summary/`: per-gene
+    abundance with TPM, long-format gene annotations, per-ontology function
+    abundance (KO, COG, EC, Pfam, CAZy; intentional double-counting of
+    multi-term genes), wide TPM matrices per ontology, and a per-sample
+    annotated-fraction report; the eggNOG annotations parser is
+    version-aware and fails loudly on layout drift
   - Note: the branch requires a singularity/apptainer container engine while
     eggNOG-mapper v3 is in beta (no docker image exists upstream); real runs
     under docker/podman abort at launch with an explanatory error
