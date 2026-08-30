@@ -159,6 +159,11 @@ nextflow_pipeline {
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
             assert vtext.contains("megahit:")
             assert vtext.contains("metabat2:")
+
+            // T7 off-path: binning with 2 binners but WITHOUT
+            // --mag_level_functional must run no Bakta and publish no mags/
+            assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA") } == 0
+            assert !path("${outputDir}/07_functional_annotation/mags").exists()
         }
     }
 
@@ -544,6 +549,102 @@ nextflow_pipeline {
             assert workflow.failed
             def console_out = (workflow.stdout + workflow.stderr).join('\n')
             assert console_out.contains("metabat_maxP")
+        }
+    }
+
+    test("Stub run wires the MAG functional annotation branch") {
+        // T7: --mag_level_functional alone (contig branch unset) must run
+        // Bakta once per refined bin and nothing of the contig branch —
+        // pins the branch independence (design doc Section 7) and the
+        // contig-off emit plumbing in functional_annotation.nf.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control      = true
+                assembly_mode        = "assembly"
+                include_binning      = true
+                binners              = "semibin,metabat2"
+                mag_level_functional = true
+                taxonomic_profiler   = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+
+            // Per-bin fan-out: 2 samples x 2 MetaWRAP stub bins = 4 tasks
+            assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA_BAKTA") } == 4
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_BAKTA_DB") } == 1
+
+            // Contig branch fully off: none of its processes or databases run
+            assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("EGGNOG_MAPPER_SEARCH") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("EGGNOG_MAPPER_ANNOTATE") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RUN_DBCAN") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0
+            assert !path("${outputDir}/07_functional_annotation/summary").exists()
+
+            // Per-bin outputs under mags/<sample>/ with the <sample>_<bin>
+            // prefix (Section 9.1 layout + the modules.config ext.prefix)
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_bin.1.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_bin.2.gff3").exists()
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample2/test_sample2_bin.1.gff3").exists()
+
+            // Provenance: the pinned container version reaches the aggregate
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("bakta: 1.12.1")
+        }
+    }
+
+    test("Rejects mag_level_functional without include_binning") {
+        // T7: Bakta only annotates refined bins, so the toggle is
+        // contradictory without binning (same fail-fast policy as audit #15)
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                assembly_mode        = "assembly"
+                mag_level_functional = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--mag_level_functional requires --include_binning")
+        }
+    }
+
+    test("Rejects mag_level_functional with a single binner") {
+        // T7 owner decision (2026-08-30): the only bin quality filter is
+        // MetaWRAP refinement (-c/-x), which runs only with >= 2 binners;
+        // Bakta must never see unfiltered single-binner output
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                assembly_mode        = "assembly"
+                include_binning      = true
+                binners              = "semibin"
+                mag_level_functional = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--mag_level_functional requires at least two --binners")
         }
     }
 

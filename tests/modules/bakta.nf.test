@@ -1,0 +1,65 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BAKTA_BAKTA Module Test
+
+    Per-bin MAG annotation with Bakta (design doc Section 4.5, task T7;
+    nf-core module patched for versions.yml — bakta-bakta.diff).
+
+    A real annotation run needs the Bakta database (full 31.9 GB / light
+    1.3 GB download), which is not CI-feasible; the Section 10.2 acceptance
+    checks (GFF3/GBFF/FAA/TSV per bin, only quality-filtered bins annotated)
+    are a manual run against the real database. What IS testable here is the
+    stub contract (CI runs -stub): every declared output for one fanned-out
+    bin element, the config-side ext.prefix scheme (<sample>_<bin>.*, which
+    keeps files of different bins apart inside mags/<sample>/), and the
+    versions.yml capture — 'bakta: 1.12.1' also pins the modules.config
+    container override (the module's own wave image ships 1.12.0).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BAKTA_BAKTA Process"
+    script "../../modules/nf-core/bakta/bakta/main.nf"
+    process "BAKTA_BAKTA"
+
+    test("stub emits all declared outputs with the per-bin prefix") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest', bin: 'bin.1' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true)
+                input[2] = []
+                input[3] = []
+                input[4] = []
+                input[5] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.gff.size() == 1
+            assert process.out.gff.get(0).get(1).endsWith('stubtest_bin.1.gff3')
+            assert process.out.gbff.size() == 1
+            assert process.out.faa.size() == 1
+            assert process.out.fna.size() == 1
+            assert process.out.ffn.size() == 1
+            assert process.out.tsv.size() == 1
+            assert process.out.tsv.get(0).get(1).endsWith('stubtest_bin.1.tsv')
+            assert process.out.txt.size() == 1
+            assert process.out.embl.size() == 1
+            assert process.out.json.size() == 1
+            assert process.out.hypotheticals_tsv.size() == 1
+            assert process.out.hypotheticals_faa.size() == 1
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('bakta: 1.12.1')
+            assert versions.contains('bakta_db: stub')
+        }
+    }
+}

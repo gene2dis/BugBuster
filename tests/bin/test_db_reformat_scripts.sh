@@ -19,17 +19,21 @@ REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
 # Use the exact images pinned in the modules so the test cannot drift from them
 DOWNLOAD_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# FORMAT_BAKTA_DB uses its own wget+xz image (the shared wget image has no xz)
+DOWNLOAD_XZ_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget_xz:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | grep -v '^oras://' | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${DOWNLOAD_XZ_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
 
 echo "=== DB reformat script test suite ==="
-echo "Download image: ${DOWNLOAD_IMG}"
-echo "Report image:   ${REPORT_IMG}"
+echo "Download image:    ${DOWNLOAD_IMG}"
+echo "Download+xz image: ${DOWNLOAD_XZ_IMG}"
+echo "Report image:      ${REPORT_IMG}"
 echo ""
 
 TMP_DIR=$(mktemp -d)
@@ -125,8 +129,33 @@ build_fixtures() {
     cp -r "${f}/dbcandb" "${f}/dbcandb_empty"
     : > "${f}/dbcandb_empty/CAZy.dmnd"
 
-    # A corrupt (truncated) gzip tarball
+    # Mock Bakta DB tarballs (.tar.xz, extracted with --strip-components=1):
+    # full (db/) and light (db-light/) flavors, a wrong-schema variant, and
+    # one whose bundled AMRFinderPlus DB is missing (truncated download)
+    mkdir -p "${staging}/bakta_full/db/amrfinderplus-db"
+    ( cd "${staging}/bakta_full" \
+        && printf '{"date": "2025-02-24", "major": 6, "minor": 0, "type": "full"}\n' > db/version.json \
+        && echo a > db/amrfinderplus-db/AMR.LIB && echo b > db/bakta.db \
+        && tar -cJf "${f}/bakta_db_full.tar.xz" db )
+    mkdir -p "${staging}/bakta_light/db-light/amrfinderplus-db"
+    ( cd "${staging}/bakta_light" \
+        && printf '{"date": "2025-02-24", "major": 6, "minor": 0, "type": "light"}\n' > db-light/version.json \
+        && echo a > db-light/amrfinderplus-db/AMR.LIB && echo b > db-light/bakta.db \
+        && tar -cJf "${f}/bakta_db_light.tar.xz" db-light )
+    mkdir -p "${staging}/bakta_v5/db/amrfinderplus-db"
+    ( cd "${staging}/bakta_v5" \
+        && printf '{"date": "2023-02-20", "major": 5, "minor": 1, "type": "full"}\n' > db/version.json \
+        && echo a > db/amrfinderplus-db/AMR.LIB && echo b > db/bakta.db \
+        && tar -cJf "${f}/bakta_db_v5.tar.xz" db )
+    mkdir -p "${staging}/bakta_noamr/db"
+    ( cd "${staging}/bakta_noamr" \
+        && printf '{"date": "2025-02-24", "major": 6, "minor": 0, "type": "full"}\n' > db/version.json \
+        && echo b > db/bakta.db \
+        && tar -cJf "${f}/bakta_db_noamr.tar.xz" db )
+
+    # A corrupt (truncated) gzip tarball, and an xz twin for the Bakta script
     head -c 100 /dev/urandom > "${f}/corrupt.tar.gz"
+    head -c 100 /dev/urandom > "${f}/corrupt.tar.xz"
 }
 build_fixtures
 
@@ -150,12 +179,13 @@ FAIL=0
 
 run_script() {
     # run_script <workdir> <script-name> [args...] — inside the download image
+    # (or RUN_IMG when set, for scripts pinned to a different downloader)
     local workdir="$1" script="$2"
     shift 2
     docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp \
         -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
         -v "${workdir}:/dbwork" -w /dbwork \
-        "${DOWNLOAD_IMG}" bash "/pipeline_bin/${script}" "$@"
+        "${RUN_IMG:-${DOWNLOAD_IMG}}" bash "/pipeline_bin/${script}" "$@"
 }
 
 expect_pass() {
@@ -273,6 +303,36 @@ check_file "dbcan: substrate mapping in dbcan_db" "dbcan_db/fam-substrate-mappin
 check_file "dbcan: DB_VERSION provenance file written" "dbcan_db/DB_VERSION"
 expect_fail "dbcan: empty CAZy.dmnd fails" dbcan_db_reformat.sh "${BASE_URL}/dbcandb_empty"
 expect_fail "dbcan: missing files fail" dbcan_db_reformat.sh "${BASE_URL}/no_such_dir"
+
+#
+# bakta_db_reformat.sh (runs in the wget+xz image FORMAT_BAKTA_DB pins)
+#
+echo "--- bakta_db_reformat.sh ---"
+RUN_IMG="${DOWNLOAD_XZ_IMG}"
+expect_pass "bakta: valid full tarball" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
+check_file "bakta: version.json extracted (top dir stripped)" "bakta_db/version.json"
+check_file "bakta: bundled amrfinderplus-db present" "bakta_db/amrfinderplus-db/AMR.LIB"
+check_file "bakta: DB_VERSION provenance file written" "bakta_db/DB_VERSION"
+if grep -q '^db-full ' "${LAST_WORKDIR}/bakta_db/DB_VERSION" 2>/dev/null; then
+    echo "✓ bakta: DB_VERSION records the full flavor"
+    PASS=$((PASS + 1))
+else
+    echo "✗ bakta: DB_VERSION does not record the full flavor"
+    FAIL=$((FAIL + 1))
+fi
+expect_pass "bakta: valid light tarball (db-light/ top dir)" bakta_db_reformat.sh "${BASE_URL}/bakta_db_light.tar.xz"
+if grep -q '^db-light ' "${LAST_WORKDIR}/bakta_db/DB_VERSION" 2>/dev/null; then
+    echo "✓ bakta: DB_VERSION records the light flavor"
+    PASS=$((PASS + 1))
+else
+    echo "✗ bakta: DB_VERSION does not record the light flavor"
+    FAIL=$((FAIL + 1))
+fi
+expect_fail "bakta: schema-5 version.json fails" bakta_db_reformat.sh "${BASE_URL}/bakta_db_v5.tar.xz"
+expect_fail "bakta: missing amrfinderplus-db fails" bakta_db_reformat.sh "${BASE_URL}/bakta_db_noamr.tar.xz"
+expect_fail "bakta: corrupt tarball fails" bakta_db_reformat.sh "${BASE_URL}/corrupt.tar.xz"
+expect_fail "bakta: 404 URL fails" bakta_db_reformat.sh "${BASE_URL}/no_such_file.tar.xz"
+RUN_IMG=""
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

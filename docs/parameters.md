@@ -120,6 +120,12 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), run_dbcan v5 CAZy annotation of the same proteins (on by default, `--functional_cazy`; published to `07_functional_annotation/dbcan/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — plus the dbCAN CAZy calls as a separate backend) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) and the dbCAN database (~7.4 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
 - **Example**: `--contig_level_functional true`
 
+### `--mag_level_functional`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Enable MAG-level functional annotation: Bakta annotates every refined bin, one task per bin, publishing GFF3, GBFF, FAA, FNA, TSV and a summary per bin to `07_functional_annotation/mags/<sample>/` (files named `<sample>_<bin>.*`). Requires `--include_binning` **and at least two `--binners`** — MetaWRAP refinement and its completeness/contamination quality filter only run with ≥2 binners, and only quality-filtered bins are annotated (both requirements are validated at launch). Downloads the Bakta database on first use (`--bakta_db`: full 31.9 GB or light 1.3 GB download). Bins are expected to be bacterial; the pipeline does not detect or exclude archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before interpreting annotations of non-bacterial bins. Independent of `--contig_level_functional`, and runs on any container engine (docker included)
+- **Example**: `--mag_level_functional true --include_binning --binners semibin,metabat2`
+
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`
@@ -222,6 +228,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: 7.4 GB (uncompressed)
 - **Example**: `--dbcan_db db_v5-2-9_5-5-2026`
 
+### `--bakta_db`
+- **Type**: String
+- **Default**: `v6.0-full`
+- **Options**: `v6.0-full`, `v6.0-light`
+- **Description**: Bakta database flavor for MAG-level functional annotation (`--mag_level_functional`). Both are the pinned Zenodo v6.0 release (schema 6, required by Bakta 1.12.x). The light database has reduced annotation sources and **changes annotation results**: selecting it is always an explicit user choice and is recorded in provenance (the `bakta_db` entry in `pipeline_info/software_versions.yml`); no profile (including `low_disk`) ever switches it automatically
+- **Size**: full 31.9 GB download / light 1.3 GB download
+- **Example**: `--bakta_db v6.0-light`
+
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
@@ -281,8 +295,8 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_gtdbtk_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom GTDB-TK database directory
-- **Example**: `--custom_gtdbtk_db /path/to/gtdbtk_r220`
+- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `fastani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release220/`), not its parent. The pipeline pins GTDB-Tk 2.5.2, which per the upstream compatibility table accepts GTDB **R220** (the pipeline's default download) and **R226**; R232 and newer require GTDB-Tk ≥ 2.7 and will not work
+- **Example**: `--custom_gtdbtk_db /path/to/release220`
 
 ### `--custom_deeparg_db`
 - **Type**: String (directory path)
@@ -331,6 +345,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to custom eggNOG 7 data directory in the emapper-3.0 layout: `eggnog.db` (plus its `.fieldpresence.bin` and `.taxids.bin` caches), `eggnog.taxa.db` (plus `.traverse.pkl`), `eggnog_proteins.dmnd`, `go-basic.obo`. Must be eggNOG 7 data — eggNOG-mapper v3 rejects eggNOG 5 databases
 - **Example**: `--custom_eggnog_db /path/to/emapper-3.0/data`
+
+### `--custom_bakta_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom Bakta database directory in the schema 6 layout (the content of an extracted `db.tar.xz`/`db-light.tar.xz`: `version.json`, `amrfinderplus-db/`, and the Bakta annotation databases). Must be schema 6 — Bakta 1.12.x rejects older schemas. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded database version is `custom`
+- **Example**: `--custom_bakta_db /path/to/bakta_db`
 
 ---
 

@@ -91,11 +91,13 @@ This automatically enables:
 
 > **Note — databases are unaffected**: reference databases live at
 > `--databases_dir` (default `<output>/../databases`), outside the work dir,
-> and `low_disk` does nothing about them. The functional annotation branch in
-> particular adds large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB) —
-> and pairs badly with `low_disk`, since its long eggNOG runs are exactly
+> and `low_disk` does nothing about them. The functional annotation branches in
+> particular add large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB,
+> Bakta full ~31.9 GB / light ~1.3 GB download) —
+> and pair badly with `low_disk`, since the long eggNOG runs are exactly
 > where `-resume` matters most (the pipeline warns about this combination at
-> launch).
+> launch). The Bakta light database is never selected automatically:
+> `--bakta_db v6.0-light` is always an explicit choice, recorded in provenance.
 
 To publish clean reads without the cleanup trade-off, use `--store_clean_reads` on its own:
 

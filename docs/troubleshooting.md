@@ -266,7 +266,9 @@ are identical; only the first-run conversion time differs. The docker-based
 cloud profiles (`aws`, `gcp`, `azure`) cannot be combined with
 `--contig_level_functional` during the beta. Stub runs (`-stub`) are
 unaffected. Docker and cloud support return once eggNOG-mapper v3.0.0 final is
-released on bioconda.
+released on bioconda. This guard applies only to the contig branch
+(`--contig_level_functional`): the MAG branch (`--mag_level_functional`,
+Bakta) uses a normal biocontainer and runs on any engine.
 
 > Related: the upstream eggNOG-mapper image ships without `procps`, which would
 > normally abort Nextflow tasks with `Command 'ps' required by nextflow to
@@ -307,6 +309,50 @@ needed, `DBCAN_OVERVIEW_COLUMNS` in `bin/aggregate_functions.py`, plus the
 harness tests.
 
 ---
+
+### `--mag_level_functional` rejected at launch
+
+**Error:**
+```
+--mag_level_functional requires --include_binning (Bakta annotates the refined bins)
+--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners ...
+```
+
+**Cause:** deliberate validation, not a bug. Bakta annotates the refined bins,
+so binning must be enabled — and the pipeline's only bin quality filter is
+MetaWRAP refinement (`-c`/`-x`, defaults 50/10), which only runs when at least
+two binners are selected. With a single binner the bins channel carries raw,
+unfiltered binner output, and the MAG branch refuses to annotate unfiltered
+bins.
+
+**Solution:** enable binning with two or more binners:
+```bash
+nextflow run main.nf ... --include_binning --binners semibin,metabat2 --mag_level_functional
+```
+Note that Bakta annotates every MetaWRAP-refined bin; it does not further
+filter on CheckM2 scores, and it does not detect or exclude
+archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before
+interpreting annotations of non-bacterial bins.
+
+### FORMAT_BAKTA_DB fails: schema major / amrfinderplus-db errors
+
+**Error:**
+```
+ERROR: bakta_db/version.json reports schema major '<X>', expected 6 (required by Bakta 1.12.x)
+ERROR: bakta_db/amrfinderplus-db missing or empty after extraction (corrupt or truncated download?)
+```
+
+**Cause:** the Bakta database download is hard-verified after extraction.
+Bakta 1.12.x only accepts database schema 6 (the pinned Zenodo v6.0 release),
+and the release tarball bundles its AMRFinderPlus database — a missing or
+empty `amrfinderplus-db/` means a corrupt or truncated download, which must
+fail rather than be silently "repaired".
+
+**Solution:** for the schema error, check that `--custom_bakta_db` points at
+an extracted v6.0 (schema 6) database, not an older release. For the
+amrfinderplus-db error, delete the partial `databases/bakta/` directory and
+re-run — the download resumes from the pinned Zenodo URL. The same checks
+apply to a custom database directory.
 
 ### MICROBECENSUS task fails / `cpge` columns are empty / `ags_and_ge.tsv` says `unavailable`
 

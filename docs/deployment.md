@@ -274,6 +274,7 @@ For better performance, pre-download databases to shared storage:
 # GTDB-TK r220 (~109 GB)
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
+# Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
 ```
 
 Then specify paths:
@@ -285,6 +286,7 @@ nextflow run main.nf \
     --custom_gtdbtk_db /shared/db/gtdbtk/release220 \
     --custom_eggnog_db /shared/db/eggnog/eggnog_db \
     --custom_dbcan_db /shared/db/dbcan/dbcan_db \
+    --custom_bakta_db /shared/db/bakta/bakta_db \
     ...
 ```
 
@@ -293,7 +295,8 @@ nextflow run main.nf \
 > engine while eggNOG-mapper v3 is in beta, so it cannot run under the
 > docker-based `aws`, `gcp`, and `azure` profiles for now (SLURM with the
 > `apptainer`/`singularity` profile works). See the engine note in
-> [`manual.md`](manual.md).
+> [`manual.md`](manual.md). The MAG branch (`--mag_level_functional`, Bakta)
+> is unaffected: it uses a normal biocontainer and runs on any engine.
 
 ---
 

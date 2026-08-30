@@ -46,9 +46,10 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
 21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 22. Bin reports.
-23. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-25. Assembly modes: "coassembly", "assembly", "none"
+23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only MetaWRAP quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
+24. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
+25. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+26. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -145,6 +146,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3; requires the singularity/apptainer profile while v3 is in beta) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
+| **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |
 
 ### Database Sources
 
@@ -343,6 +345,7 @@ results/
     ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true)
     ├── microbecensus/{sample}/ # MicrobeCensus average genome size (if contig_level_functional=true and microbecensus=true)
     ├── summary/                # Study-level TPM/CPGE tables + annotated fraction + AGS summary (if contig_level_functional=true)
+    ├── mags/{sample}/          # Bakta per-bin MAG annotation (if mag_level_functional=true; needs binning with >= 2 binners)
     └── contigs/{sample}/       # MetaCerberus results (if contig_level_metacerberus=true)
 ```
 

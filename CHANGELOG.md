@@ -12,6 +12,23 @@ next release is tagged.
 
 ### Added
 
+- **MAG-level functional annotation (`--mag_level_functional`)**
+  - Bakta 1.12.1 annotation of every MetaWRAP-refined bin, one task per bin
+    (nf-core `bakta/bakta` module, patched to emit `versions.yml`; per-bin
+    fan-out of the refined-bins directory), published to
+    `07_functional_annotation/mags/<sample>/` as `<sample>_<bin>.{gff3,gbff,faa,fna,tsv,txt,hypotheticals.tsv,hypotheticals.faa}`
+  - Requires `--include_binning` and at least two `--binners` (validated at
+    launch): the MetaWRAP completeness/contamination filter only runs with
+    ≥2 binners, and only quality-filtered bins are annotated. Bins are
+    expected to be bacterial; the pipeline does not exclude
+    archaeal/eukaryotic/viral bins (documented)
+  - Bakta database v6.0 (schema 6) auto-downloaded from the pinned Zenodo
+    release: `--bakta_db v6.0-full` (default, 31.9 GB download) or
+    `v6.0-light` (1.3 GB; explicit choice, recorded in provenance via the
+    `bakta_db` versions entry) / `--custom_bakta_db`
+  - Independent of `--contig_level_functional` and runs on any container
+    engine (docker included) — the singularity/apptainer requirement applies
+    only to the contig branch
 - **Contig-level functional annotation (`--contig_level_functional`)**
   - Shared Pyrodigal gene calling on contigs (one pass feeds both DeepARG and
     functional annotation), published to `07_functional_annotation/gene_calling/`

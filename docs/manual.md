@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins)
 
 ### Pipeline Workflow
 
@@ -52,6 +52,8 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
                       Quality (CheckM2)
                               ↓
                       Taxonomy (GTDB-TK)
+                              ↓
+                      MAG Annotation (Bakta, optional)
 ```
 
 ---
@@ -145,6 +147,10 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
 | **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` |
+| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
+| **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
+| **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
+| **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
 
 ### Manual Database Download
 
@@ -174,6 +180,12 @@ wget -O /shared/databases/bugbuster/gtdbtk_r220.tar.gz \
     https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
 tar -xzf /shared/databases/bugbuster/gtdbtk_r220.tar.gz -C /shared/databases/bugbuster/
 
+# Download the Bakta database v6.0 (full, 31.9 GB; use db-light.tar.xz for
+# the 1.3 GB light DB — note the light DB changes annotation results)
+wget -P /shared/databases/bugbuster/bakta/ \
+    https://zenodo.org/record/14916843/files/db.tar.xz
+tar -xJf /shared/databases/bugbuster/bakta/db.tar.xz -C /shared/databases/bugbuster/bakta/
+
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
 # combined phiX + host Bowtie2 index from FASTA on first use
 wget -P /shared/databases/bugbuster/ \
@@ -192,6 +204,7 @@ nextflow run main.nf \
     --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --custom_bakta_db /shared/databases/bugbuster/bakta/db \
     -profile docker
 ```
 
@@ -295,6 +308,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (only with the functional branch; failure is non-fatal — affected samples fall back to TPM-only) |
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
 | `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
+| `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -310,6 +324,18 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > this flag are unaffected on every engine. Docker/cloud support returns when
 > eggNOG-mapper v3.0.0 final is released on bioconda.
 
+> **Note for `--mag_level_functional`:** Bakta annotates the refined bins, one task
+> per bin, publishing per-bin GFF3/GBFF/FAA/FNA/TSV/summary files under
+> `07_functional_annotation/mags/<sample>/`. It requires `--include_binning` **and at
+> least two `--binners`**: MetaWRAP refinement and its completeness/contamination
+> quality filter (defaults 50/10) only run when ≥2 binners are selected, and only
+> quality-filtered bins are annotated. Bins are expected to be **bacterial** — Bakta
+> is a bacterial annotator, and the pipeline does not detect or exclude
+> archaeal/eukaryotic/viral bins; interpret annotations of such bins with caution
+> (check the GTDB-Tk bin taxonomy report). This branch is independent of
+> `--contig_level_functional` and, unlike it, runs on any container engine
+> (docker included).
+
 ### 6.3 Database Selection Options
 
 | Parameter | Default | Options | Description |
@@ -322,6 +348,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--gtdbtk_db` | `release_220` | `release_220` | GTDB-TK database release |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
+| `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
 
 ### 6.4 Custom Database Paths
 
@@ -333,7 +360,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gtdbtk_db` | Path to GTDB-TK database directory |
+| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release220/`); R220 and R226 data work with the pinned GTDB-Tk 2.5.2, R232+ does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
@@ -343,6 +370,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 | `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
 | `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
+| `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -723,6 +751,15 @@ results/
     │   ├── function_wide_{ontology}_cpge.tsv   # wide CPGE matrix per ontology (blank columns for samples without AGS)
     │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
     │   └── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
+    ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
+    │   └── {sample}/                           # (if mag_level_functional=true; requires binning with >= 2 binners)
+    │       ├── {sample}_{bin}.gff3             # annotation in GFF3
+    │       ├── {sample}_{bin}.gbff             # annotation in GenBank flat file
+    │       ├── {sample}_{bin}.faa              # protein sequences
+    │       ├── {sample}_{bin}.fna              # replicon/contig sequences
+    │       ├── {sample}_{bin}.tsv              # per-feature annotation table
+    │       ├── {sample}_{bin}.txt              # per-bin annotation summary
+    │       └── {sample}_{bin}.hypotheticals.tsv  # hypothetical-protein table (+ .hypotheticals.faa)
     └── contigs/                                # MetaCerberus contig-level annotation
         └── {sample}/                           # (if contig_level_metacerberus=true)
             └── {sample}_annotation_results/
@@ -850,6 +887,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
 | `07_functional_annotation/microbecensus/` | `contig_level_functional=true` and `microbecensus=true` | MicrobeCensus average genome size and genome equivalents per sample |
 | `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
+| `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin) |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---

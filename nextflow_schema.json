@@ -98,6 +98,12 @@
                     "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + run_dbcan v5 CAZy annotation + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
                     "fa_icon": "fas fa-sitemap"
                 },
+                "mag_level_functional": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable MAG-level functional annotation: Bakta annotation of every refined bin (per-bin GFF3/GBFF/FAA/FNA/TSV). Requires --include_binning and at least two --binners, so that only MetaWRAP quality-filtered bins are annotated. Bins are expected to be bacterial.",
+                    "fa_icon": "fas fa-sitemap"
+                },
                 "arg_bin_clustering": {
                     "type": "boolean",
                     "default": false,
@@ -187,6 +193,18 @@
                     "type": "string",
                     "format": "directory-path",
                     "description": "Path to custom dbCAN database directory in the run_dbcan v5 layout: CAZy.dmnd, dbCAN.hmm, dbCAN-sub.hmm, fam-substrate-mapping.tsv.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "bakta_db": {
+                    "type": "string",
+                    "default": "v6.0-full",
+                    "description": "Built-in Bakta database key: v6.0-full (default) or v6.0-light (see config/databases.config). The light database changes annotation results; selecting it is recorded in provenance and never done automatically.",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_bakta_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom Bakta database directory (schema 6 layout: version.json, amrfinderplus-db/, and the Bakta annotation databases).",
                     "fa_icon": "fas fa-folder"
                 },
                 "custom_kraken_db": {

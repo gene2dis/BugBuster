@@ -218,6 +218,34 @@ process FORMAT_DBCAN_DB {
         """
 }
 
+process FORMAT_BAKTA_DB {
+    tag "format_bakta_db"
+    // Not the shared wget image: the Bakta DB ships as .tar.xz and that image
+    // has no xz. Same Seqera Containers source, wget + xz pinned together.
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget_xz:34f842268416751e' :
+        'community.wave.seqera.io/library/wget_xz:0b990a2ba500ab9f' }"
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("bakta_db")
+
+    script:
+        """
+        ${params.bakta_ref_db[params.bakta_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        mkdir -p bakta_db/amrfinderplus-db
+        touch bakta_db/version.json bakta_db/DB_VERSION
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

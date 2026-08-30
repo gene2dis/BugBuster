@@ -14,6 +14,7 @@ include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
+include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
@@ -36,6 +37,7 @@ workflow PREPARE_DATABASES {
     ch_rgi_card_db      = channel.empty()
     ch_eggnog_db        = channel.empty()
     ch_dbcan_db         = channel.empty()
+    ch_bakta_db         = channel.empty()
     ch_versions         = channel.empty()
 
     //
@@ -225,6 +227,21 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // Bakta database for MAG-level functional annotation (design doc
+    // Section 4.5). Full vs light is the user's explicit --bakta_db choice,
+    // recorded in provenance via the DB_VERSION file; low_disk never
+    // switches it (Q10)
+    //
+    if ( params.mag_level_functional ) {
+        if ( params.custom_bakta_db ) {
+            ch_bakta_db = channel.fromPath(params.custom_bakta_db, checkIfExists: true)
+        } else {
+            ch_bakta_ref = channel.fromList(params.bakta_ref_db[params.bakta_db]["url"])
+            ch_bakta_db = FORMAT_BAKTA_DB(ch_bakta_ref)
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( params.rgi_prediction ) {
@@ -261,5 +278,6 @@ workflow PREPARE_DATABASES {
     rgi_card_db            = ch_rgi_card_db
     eggnog_db              = ch_eggnog_db
     dbcan_db               = ch_dbcan_db
+    bakta_db               = ch_bakta_db
     versions               = ch_versions
 }

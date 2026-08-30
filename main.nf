@@ -67,6 +67,7 @@ def printHelp() {
       --microbecensus               Estimate average genome size for CPGE normalization (functional branch; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
       --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
+      --mag_level_functional        Bakta annotation of refined bins; needs --include_binning and >= 2 --binners (default: ${params.mag_level_functional})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -227,6 +228,12 @@ workflow {
     if (params.arg_bin_clustering && !params.include_binning) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
+    if (params.mag_level_functional && !params.include_binning) {
+        error("--mag_level_functional requires --include_binning (Bakta annotates the refined bins)")
+    }
+    if (params.mag_level_functional && binners_list.size() < 2) {
+        error("--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
+    }
     if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
         error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
     }
@@ -235,7 +242,9 @@ workflow {
     // bioconda/biocontainer/docker image), so the functional branch can only
     // execute under singularity/apptainer for now (design doc Section 2, Q11).
     // Stub runs are exempt: the module stubs run without a container, keeping
-    // CI and nf-test green under the docker profile.
+    // CI and nf-test green under the docker profile. Deliberately keyed on
+    // contig_level_functional only: Bakta ships a normal biocontainer, so a
+    // MAG-only run (--mag_level_functional) stays docker-compatible.
     if (params.contig_level_functional && !workflow.stubRun
             && !(workflow.containerEngine in ['singularity', 'apptainer'])) {
         error("--contig_level_functional requires a singularity or apptainer container engine: eggNOG-mapper v3 (beta) ships only an Apptainer image, no docker image exists yet. Use -profile singularity or -profile apptainer for this branch (docker support returns when eggNOG-mapper v3.0.0 final is released on bioconda)")
@@ -245,8 +254,8 @@ workflow {
     // pairing with the long functional annotation runs and their large
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
-    if (workflow.profile.tokenize(',').contains('low_disk') && params.contig_level_functional) {
-        log.warn "--contig_level_functional under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB) are stored at --databases_dir regardless of this profile"
+    if (workflow.profile.tokenize(',').contains('low_disk') && (params.contig_level_functional || params.mag_level_functional)) {
+        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -263,6 +272,7 @@ workflow {
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
+    log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
     log.info "  MicrobeCensus        : ${params.microbecensus}"
     log.info "  dbCAN CAZy           : ${params.functional_cazy}"
     log.info ""
@@ -455,27 +465,38 @@ workflow {
     }
 
     //
-    // SUBWORKFLOW: Contig-level functional annotation
-    // (eggNOG-mapper + run_dbcan CAZy + featureCounts gene quantification)
+    // SUBWORKFLOW: Functional annotation — contig branch (eggNOG-mapper +
+    // run_dbcan CAZy + featureCounts gene quantification) and/or MAG branch
+    // (Bakta on refined bins). The branches are independent; each DB channel
+    // is only demanded (.ifEmpty error) when its branch is on
     //
-    if ( params.contig_level_functional && params.assembly_mode != "none" ) {
+    if ( (params.contig_level_functional || params.mag_level_functional) && params.assembly_mode != "none" ) {
         // functional_cazy defaults to true: normalize the CLI-String form
         // before gating (same Q13 handling as params.microbecensus above).
         // With the toggle off the dbCAN DB channel is legitimately empty and
         // the subworkflow never consumes it
-        def run_functional_cazy = params.functional_cazy.toString().toBoolean()
+        def run_functional_cazy = params.contig_level_functional && params.functional_cazy.toString().toBoolean()
         ch_dbcan_db = run_functional_cazy
             ? PREPARE_DATABASES.out.dbcan_db
                 .ifEmpty { error "ERROR: dbCAN database is empty. Ensure params.functional_cazy is enabled and a valid dbCAN database is configured." }
             : channel.empty()
+        ch_eggnog_db = params.contig_level_functional
+            ? PREPARE_DATABASES.out.eggnog_db
+                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
+            : channel.empty()
+        ch_bakta_db = params.mag_level_functional
+            ? PREPARE_DATABASES.out.bakta_db
+                .ifEmpty { error "ERROR: Bakta database is empty. Ensure params.mag_level_functional is enabled and a valid Bakta database is configured." }
+            : channel.empty()
         FUNCTIONAL_ANNOTATION(
             ch_contig_proteins,
-            PREPARE_DATABASES.out.eggnog_db
-                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." },
+            ch_eggnog_db,
             ch_dbcan_db,
             ch_contig_genes_gff,
             ch_counting_bam,
-            ch_ags
+            ch_ags,
+            ch_refined_bins,
+            ch_bakta_db
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
     }

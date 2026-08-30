@@ -5,6 +5,14 @@
         "https://github.com/nf-core/modules.git": {
             "modules": {
                 "nf-core": {
+                    "bakta/bakta": {
+                        "branch": "master",
+                        "git_sha": "2080397432fcb0d079121dbacf22ce42ef175cec",
+                        "installed_by": [
+                            "modules"
+                        ],
+                        "patch": "modules/nf-core/bakta/bakta/bakta-bakta.diff"
+                    },
                     "bracken/bracken": {
                         "branch": "master",
                         "git_sha": "41dfa3f7c0ffabb96a6a813fe321c6d1cc5b6e46",

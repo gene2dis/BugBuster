@@ -49,6 +49,7 @@ flowchart TD
     CleanReads -->|"if contig_level_functional<br/>& microbecensus (default)"| MicrobeCensus[MICROBECENSUS<br/>Avg Genome Size / GE]
     Pyrodigal -->|if contig_level_functional| Functional["FUNCTIONAL_ANNOTATION SUBWORKFLOW<br/>eggNOG-mapper v3 (search + annotate)<br/>+ RUN_DBCAN CAZy (if functional_cazy, default)<br/>+ FEATURECOUNTS_GENES → AGGREGATE_FUNCTIONS<br/>(TPM + CPGE tables)"]
     MicrobeCensus --> Functional
+    RefinedBins -->|"if mag_level_functional<br/>(needs >= 2 binners)"| Bakta[BAKTA_BAKTA<br/>MAG annotation, per bin]
 
     %% MetaCerberus Branch
     Contigs -->|if assembly_mode==assembly<br/>& contig_level_metacerberus| MetaCerberus[METACERBERUS_CONTIGS<br/>Functional Annotation]
@@ -67,6 +68,7 @@ flowchart TD
     Clustering --> End
     MetaCerberus --> End
     Functional --> End
+    Bakta --> End
     RefinedBins --> End
 
     %% Styling
@@ -120,13 +122,14 @@ flowchart TD
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
+    Magdb{mag_level_functional?} -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `bakta_db`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 
@@ -341,7 +344,7 @@ flowchart LR
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
-- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, METACERBERUS
+- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), METACERBERUS
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
 - **Reporting**: custom report generators
 
@@ -358,7 +361,7 @@ flowchart LR
 | `TAXONOMY` | Taxonomic profiling with Kraken2 or Sourmash |
 | `ASSEMBLY` | Metagenome assembly (per-sample or co-assembly) |
 | `BINNING` | Unified binning workflow (mode-agnostic) |
-| `FUNCTIONAL_ANNOTATION` | Contig functional annotation: eggNOG-mapper v3, run_dbcan CAZy, featureCounts gene abundance, study-level TPM/CPGE aggregation |
+| `FUNCTIONAL_ANNOTATION` | Functional annotation, two independent branches: contig (eggNOG-mapper v3, run_dbcan CAZy, featureCounts gene abundance, study-level TPM/CPGE aggregation) and MAG (Bakta per refined bin) |
 
 ### Quality Control (QC Subworkflow)
 | Module | Description |
@@ -427,6 +430,7 @@ flowchart LR
 | `FEATURECOUNTS_GENES` | always in the branch | Per-gene read counts over the Pyrodigal gene coordinates (per sample in both assembly modes) |
 | `MICROBECENSUS` | if `microbecensus` (default; runs outside the subworkflow, on clean reads) | Average genome size / genome equivalents for CPGE; failure is non-fatal |
 | `AGGREGATE_FUNCTIONS` | always in the branch | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology (eggNOG and dbCAN CAZy kept separate), annotated fraction, AGS summary |
+| `BAKTA_BAKTA` | if `mag_level_functional` (independent of the contig branch; needs binning with ≥2 binners) | Bakta annotation of every MetaWRAP-refined bin, one task per bin, published to `mags/<sample>/` |
 
 ---
 
@@ -444,7 +448,8 @@ results/
 ├── 06_contig_taxonomy/          # BlobTools contig taxonomy plots
 └── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
                                  # gene abundance, MicrobeCensus, TPM/CPGE
-                                 # summary tables (and MetaCerberus contigs/)
+                                 # summary tables, Bakta MAG annotations
+                                 # (mags/) and MetaCerberus contigs/
 ```
 
 ---
