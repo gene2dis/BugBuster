@@ -117,7 +117,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
+- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), run_dbcan v5 CAZy annotation of the same proteins (on by default, `--functional_cazy`; published to `07_functional_annotation/dbcan/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — plus the dbCAN CAZy calls as a separate backend) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) and the dbCAN database (~7.4 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`), and a singularity/apptainer container engine — eggNOG-mapper v3 is in beta and ships only an Apptainer image, so this branch aborts at launch under docker/podman. Note that Nextflow uses one engine per run: enabling this flag runs the whole pipeline under singularity/apptainer (same images, identical results), and it cannot be combined with the docker-based cloud profiles (`aws`, `gcp`, `azure`) during the beta
 - **Example**: `--contig_level_functional true`
 
 ### `--arg_bin_clustering`
@@ -214,6 +214,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: eggNOG 7 data selection for eggNOG-mapper v3 (contig-level functional annotation). The whole emapper 3.0.x series reuses this data directory
 - **Size**: 44 GB (uncompressed)
 - **Example**: `--eggnog_db emapper-3.0`
+
+### `--dbcan_db`
+- **Type**: String
+- **Default**: `db_v5-2-9_5-5-2026`
+- **Description**: dbCAN database release selection for run_dbcan v5 CAZy annotation (`--contig_level_functional` branch with `--functional_cazy`, the default). Downloads the four protein-mode CAZyme files (`CAZy.dmnd`, `dbCAN.hmm`, `dbCAN-sub.hmm`, `fam-substrate-mapping.tsv`) from the pinned dbCAN S3 release
+- **Size**: 7.4 GB (uncompressed)
+- **Example**: `--dbcan_db db_v5-2-9_5-5-2026`
 
 ### `--databases_dir`
 - **Type**: String (directory path)
@@ -314,6 +321,11 @@ Override automatic downloads by providing custom database paths:
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
 - **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
+
+### `--custom_dbcan_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom dbCAN database directory in the run_dbcan v5 layout: `CAZy.dmnd`, `dbCAN.hmm`, `dbCAN-sub.hmm` (hyphen — the tool's expected filename), `fam-substrate-mapping.tsv`. An optional `DB_VERSION` file (one line, the release string) feeds provenance; without it the recorded database version is `custom`
+- **Example**: `--custom_dbcan_db /path/to/dbcan_db`
 
 ### `--custom_eggnog_db`
 - **Type**: String (directory path)
@@ -640,6 +652,21 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Run MicrobeCensus on the host-removed reads (`--contig_level_functional` branch, published to `07_functional_annotation/microbecensus/`) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM in the `07_functional_annotation/summary/` tables
 - **Example**: `--microbecensus false`
 - **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
+
+### `--functional_cazy`
+- **Type**: Boolean
+- **Default**: `true`
+- **Options**: `true`, `false`
+- **Description**: Run run_dbcan v5 CAZy annotation on the predicted proteins (`--contig_level_functional` branch, published to `07_functional_annotation/dbcan/`): DIAMOND vs CAZy plus pyHMMER vs the dbCAN and dbCAN-sub HMM databases, consolidated into a per-gene `overview.tsv` with the per-tool calls retained, and dbCAN-sub substrate predictions in `dbCANsub_hmm_results.tsv`. The calls feed the summary tables as `db = dbcan` / `backend = run_dbcan` rows alongside the eggNOG-derived CAZy calls, plus dedicated `function_wide_cazy_dbcan_{tpm,cpge}.tsv` matrices (the two CAZy backends are never merged into one matrix — a gene called by both would double-count). Downloads the dbCAN database (~7.4 GB, `--dbcan_db`) on first use
+- **Example**: `--functional_cazy false`
+- **Note**: With `--functional_cazy false` the summary tables are eggNOG-only: the `cazy_dbcan` wide matrices are still written but header-only, and the `cazy_dbcan` rows in `annotated_fraction.tsv` read zero
+
+### `--dbcan_consensus`
+- **Type**: String
+- **Default**: `recommended`
+- **Options**: `recommended`, `any`
+- **Description**: Which dbCAN calls feed the summary tables: `recommended` uses the tool's `Recommend Results` column (calls supported by at least 2 of DIAMOND / dbCAN HMM / dbCAN-sub — the dbCAN authors' guidance), `any` uses the union of the per-tool calls. The published `overview.tsv` always retains all per-tool columns regardless of this setting
+- **Example**: `--dbcan_consensus any`
 
 ---
 

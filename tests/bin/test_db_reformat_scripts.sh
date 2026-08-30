@@ -113,6 +113,18 @@ build_fixtures() {
     cp -r "${f}/eggnogdb" "${f}/eggnogdb_empty"
     : > "${f}/eggnogdb_empty/eggnog.db"
 
+    # Mock dbCAN release repository: the four CAZyme-annotation files the
+    # reformat script fetches (note the remote dbCAN_sub.hmm underscore name)
+    mkdir -p "${f}/dbcandb"
+    for dbf in CAZy.dmnd dbCAN.hmm dbCAN_sub.hmm fam-substrate-mapping.tsv; do
+        echo d > "${f}/dbcandb/${dbf}"
+    done
+
+    # Same dbCAN repo but with an empty CAZy.dmnd (uncompressed files, so
+    # zero length is the detectable download corruption)
+    cp -r "${f}/dbcandb" "${f}/dbcandb_empty"
+    : > "${f}/dbcandb_empty/CAZy.dmnd"
+
     # A corrupt (truncated) gzip tarball
     head -c 100 /dev/urandom > "${f}/corrupt.tar.gz"
 }
@@ -248,6 +260,19 @@ check_file "eggnog: diamond db in eggnog_db" "eggnog_db/eggnog_proteins.dmnd"
 check_file "eggnog: go-basic.obo in eggnog_db" "eggnog_db/go-basic.obo"
 expect_fail "eggnog: empty eggnog.db fails" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb_empty"
 expect_fail "eggnog: missing files fail" eggnog_db_reformat.sh "${BASE_URL}/no_such_dir"
+
+#
+# dbcan_db_reformat.sh
+#
+echo "--- dbcan_db_reformat.sh ---"
+expect_pass "dbcan: valid data files" dbcan_db_reformat.sh "${BASE_URL}/dbcandb"
+check_file "dbcan: CAZy.dmnd in dbcan_db" "dbcan_db/CAZy.dmnd"
+check_file "dbcan: dbCAN.hmm in dbcan_db" "dbcan_db/dbCAN.hmm"
+check_file "dbcan: dbCAN_sub.hmm saved as dbCAN-sub.hmm" "dbcan_db/dbCAN-sub.hmm"
+check_file "dbcan: substrate mapping in dbcan_db" "dbcan_db/fam-substrate-mapping.tsv"
+check_file "dbcan: DB_VERSION provenance file written" "dbcan_db/DB_VERSION"
+expect_fail "dbcan: empty CAZy.dmnd fails" dbcan_db_reformat.sh "${BASE_URL}/dbcandb_empty"
+expect_fail "dbcan: missing files fail" dbcan_db_reformat.sh "${BASE_URL}/no_such_dir"
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

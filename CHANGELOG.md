@@ -45,9 +45,27 @@ next release is tagged.
     pipeline pins the Python-3 image and routes the call through the
     `bin/run_microbe_census_py3fix.py` shim that patches the one broken
     function
+  - run_dbcan v5 CAZy annotation of the predicted proteins
+    (`--functional_cazy`, on by default with the branch): protein-mode
+    `CAZyme_annotation` (DIAMOND vs CAZy + pyHMMER vs dbCAN/dbCAN-sub HMMs)
+    against the pinned dbCAN database release (~7.4 GB, auto-downloaded;
+    `--dbcan_db` / `--custom_dbcan_db`), published to
+    `07_functional_annotation/dbcan/` with the per-tool overview columns and
+    the dbCAN-sub substrate predictions retained. The calls feed the summary
+    tables as `db = dbcan` / `backend = run_dbcan` rows alongside the
+    eggNOG-derived CAZy calls — reported separately, never merged — plus
+    dedicated `function_wide_cazy_dbcan_{tpm,cpge}.tsv` matrices and
+    `cazy_dbcan` annotated-fraction rows; the consensus policy is a
+    documented parameter (`--dbcan_consensus`: `recommended` = calls
+    supported by >= 2 tools, `any` = per-tool union), and the overview
+    parser is version-aware like the eggNOG one
   - Note: the branch requires a singularity/apptainer container engine while
     eggNOG-mapper v3 is in beta (no docker image exists upstream); real runs
     under docker/podman abort at launch with an explanatory error
+  - `docs/WORKFLOW_DIAGRAM.md` refreshed to cover the functional annotation
+    branch (shared Pyrodigal gene calling, eggNOG/dbCAN database preparation,
+    per-sample co-assembly counting alignments, the FUNCTIONAL_ANNOTATION
+    subworkflow and its parameters)
 
 - **Provenance tracking (audit #27)**
   - `versions.yml` emitted by every live module (previously ~20 in-use modules

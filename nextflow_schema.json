@@ -95,7 +95,7 @@
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + run_dbcan v5 CAZy annotation + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "arg_bin_clustering": {
@@ -175,6 +175,18 @@
                     "type": "string",
                     "format": "directory-path",
                     "description": "Path to custom eggNOG 7 data directory in the emapper-3.0 layout: eggnog.db (plus .fieldpresence.bin and .taxids.bin caches), eggnog.taxa.db (plus .traverse.pkl), eggnog_proteins.dmnd, go-basic.obo.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "dbcan_db": {
+                    "type": "string",
+                    "default": "db_v5-2-9_5-5-2026",
+                    "description": "Built-in dbCAN database release key for run_dbcan v5 (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_dbcan_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom dbCAN database directory in the run_dbcan v5 layout: CAZy.dmnd, dbCAN.hmm, dbCAN-sub.hmm, fam-substrate-mapping.tsv.",
                     "fa_icon": "fas fa-folder"
                 },
                 "custom_kraken_db": {
@@ -852,6 +864,19 @@
                     "default": true,
                     "description": "Run MicrobeCensus on host-removed reads to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM. Failure is non-fatal: affected samples fall back to TPM-only.",
                     "fa_icon": "fas fa-balance-scale"
+                },
+                "functional_cazy": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run run_dbcan CAZy annotation on the predicted proteins when the contig functional branch is enabled. Adds db=dbcan rows to the gene/function tables and dedicated function_wide_cazy_dbcan_* matrices alongside the eggNOG-derived CAZy calls.",
+                    "fa_icon": "fas fa-cubes"
+                },
+                "dbcan_consensus": {
+                    "type": "string",
+                    "default": "recommended",
+                    "enum": ["recommended", "any"],
+                    "description": "Which dbCAN calls feed aggregation: 'recommended' uses the tool's Recommend Results column (calls supported by at least 2 of DIAMOND/dbCAN HMM/dbCAN-sub), 'any' uses the union of the per-tool calls.",
+                    "fa_icon": "fas fa-check-double"
                 }
             }
         },

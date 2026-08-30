@@ -13,6 +13,7 @@ include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
+include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
@@ -34,6 +35,7 @@ workflow PREPARE_DATABASES {
     ch_checkm2_db       = channel.empty()
     ch_rgi_card_db      = channel.empty()
     ch_eggnog_db        = channel.empty()
+    ch_dbcan_db         = channel.empty()
     ch_versions         = channel.empty()
 
     //
@@ -208,6 +210,21 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // dbCAN database for contig-level CAZy annotation (run_dbcan v5)
+    // params.functional_cazy defaults to true, so an explicit CLI
+    // `--functional_cazy false` arrives as the truthy String "false" —
+    // normalize before gating (same Q13 handling as params.microbecensus)
+    //
+    if ( params.contig_level_functional && params.functional_cazy.toString().toBoolean() ) {
+        if ( params.custom_dbcan_db ) {
+            ch_dbcan_db = channel.fromPath(params.custom_dbcan_db, checkIfExists: true)
+        } else {
+            ch_dbcan_ref = channel.fromList(params.dbcan_ref_db[params.dbcan_db]["url"])
+            ch_dbcan_db = FORMAT_DBCAN_DB(ch_dbcan_ref)
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( params.rgi_prediction ) {
@@ -243,5 +260,6 @@ workflow PREPARE_DATABASES {
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db
     eggnog_db              = ch_eggnog_db
+    dbcan_db               = ch_dbcan_db
     versions               = ch_versions
 }

@@ -89,6 +89,14 @@ This automatically enables:
 
 > **Note**: Work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a pipeline parameter — there is no `--flag` for it. Use `-profile low_disk`, or add `cleanup = true` to a custom config passed with `-c`.
 
+> **Note — databases are unaffected**: reference databases live at
+> `--databases_dir` (default `<output>/../databases`), outside the work dir,
+> and `low_disk` does nothing about them. The functional annotation branch in
+> particular adds large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB) —
+> and pairs badly with `low_disk`, since its long eggNOG runs are exactly
+> where `-resume` matters most (the pipeline warns about this combination at
+> launch).
+
 To publish clean reads without the cleanup trade-off, use `--store_clean_reads` on its own:
 
 ```bash

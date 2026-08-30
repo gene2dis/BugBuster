@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus
 
 ### Pipeline Workflow
 
@@ -291,8 +291,10 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
 | `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (only with the functional branch; failure is non-fatal — affected samples fall back to TPM-only) |
+| `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
+| `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -319,6 +321,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
 | `--gtdbtk_db` | `release_220` | `release_220` | GTDB-TK database release |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
+| `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 
 ### 6.4 Custom Database Paths
 
@@ -339,6 +342,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 | `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
+| `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -697,6 +701,12 @@ results/
     │   └── {sample}/                           # (if contig_level_functional=true; needs singularity/apptainer)
     │       ├── {sample}.emapper.seed_orthologs
     │       └── {sample}.emapper.annotations
+    ├── dbcan/                                  # run_dbcan v5 CAZy annotation
+    │   └── {sample}/                           # (if contig_level_functional=true and functional_cazy=true)
+    │       ├── {sample}.overview.tsv           # per-gene CAZy calls with per-tool columns retained
+    │       ├── {sample}.dbCANsub_hmm_results.tsv  # dbCAN-sub results incl. substrate predictions
+    │       ├── {sample}.dbCAN_hmm_results.tsv  # raw dbCAN HMM results (provenance)
+    │       └── {sample}.diamond.out            # raw DIAMOND-vs-CAZy results (provenance)
     ├── gene_abundance/                         # featureCounts per-gene read counts
     │   └── {sample}/                           # (if contig_level_functional=true; per sample in both assembly modes)
     │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
@@ -708,8 +718,8 @@ results/
     ├── summary/                                # study-level tables (if contig_level_functional=true)
     │   ├── gene_annotations.tsv                # long format: one row per gene per functional term
     │   ├── gene_abundance.tsv                  # per-gene counts + TPM + CPGE per sample
-    │   ├── function_abundance.tsv              # per-ontology TPM and CPGE (ko, cog, ec, pfam, cazy)
-    │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples)
+    │   ├── function_abundance.tsv              # per-ontology TPM and CPGE (ko, cog, ec, pfam, cazy; backend column separates eggnog-mapper and run_dbcan rows)
+    │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples; ko/cog/ec/pfam/cazy from eggNOG, cazy_dbcan from run_dbcan)
     │   ├── function_wide_{ontology}_cpge.tsv   # wide CPGE matrix per ontology (blank columns for samples without AGS)
     │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
     │   └── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
@@ -745,6 +755,27 @@ results/
 > intentional, so ontology-level TPM totals can exceed 1e6. The `description`
 > column is empty for eggNOG terms (eggNOG-mapper v3 dropped the Description
 > field).
+
+> **Two CAZy backends (`--functional_cazy`, on by default):** CAZy calls come
+> from both eggNOG-mapper (coarse, orthology-transferred) and run_dbcan v5
+> (dedicated CAZyme annotation with family/subfamily resolution). They are
+> reported **separately, never merged**: in the long tables the `db`
+> (`eggnog_cazy` vs `dbcan`) and `backend` (`eggnog-mapper` vs `run_dbcan`)
+> columns distinguish them, and the wide matrices are split into
+> `function_wide_cazy_*` (eggNOG) and `function_wide_cazy_dbcan_*`
+> (run_dbcan) — a merged matrix would double-count genes called by both
+> tools. For CAZy-focused analyses prefer the dbCAN matrices. Which dbCAN
+> calls feed the tables is set by `--dbcan_consensus` (`recommended` =
+> supported by ≥2 of DIAMOND / dbCAN HMM / dbCAN-sub, the default; `any` =
+> per-tool union); the published `overview.tsv` always retains the per-tool
+> columns. In `annotated_fraction.tsv` the `cazy` rows count a CAZy call
+> from either backend and the `cazy_dbcan` rows count run_dbcan alone. With
+> `--functional_cazy false` the `cazy_dbcan` outputs are still written but
+> empty. dbCAN rows carry no per-call e-value/score (the overview has no
+> single per-call value), and their `description` column is empty. dbCAN
+> accessions are kept exactly as the tool emits them: plain families
+> (`GH13`), CAZy subfamilies (`GH5_4`), and dbCAN-sub subfamily cluster ids
+> (`GH78_e118`) all occur.
 
 > **Copies per genome equivalent (`cpge` / `abundance_cpge` columns and the
 > `function_wide_*_cpge.tsv` matrices):**
@@ -788,7 +819,8 @@ databases/                            # Database storage (configurable via --dat
 ├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
 ├── gtdbtk/                           # GTDB-TK database
-└── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
+├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
+└── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -814,6 +846,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
+| `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
 | `07_functional_annotation/microbecensus/` | `contig_level_functional=true` and `microbecensus=true` | MicrobeCensus average genome size and genome equivalents per sample |
 | `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |

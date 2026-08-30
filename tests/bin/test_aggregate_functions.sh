@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Direct tests for bin/aggregate_functions.py (functional annotation T4+T5,
-# design doc Sections 4.8, 5, 6, 10.2). Asserts on the committed fixtures
-# in tests/data/functional/ (regenerate with make_functional_fixtures.sh):
+# Direct tests for bin/aggregate_functions.py (functional annotation
+# T4+T5+T6, design doc Sections 4.3, 4.8, 5, 6, 10.2). Asserts on the
+# committed fixtures in tests/data/functional/ (regenerate with
+# make_functional_fixtures.sh):
 #   - assembly mode: TPM sums to 1e6 per sample; every predicted gene appears
 #     in gene_abundance including count-0 genes; a gene with two KOs
 #     contributes its full abundance to each (intentional double-counting);
@@ -23,6 +24,15 @@
 #     mis-paired gene id sets all exit non-zero
 #   - the ags guard fails loudly on a wrong header, an unknown sample id, a
 #     non-positive genome_equivalents, and a filename/embedded-id mismatch
+#   - dbCAN (T6): db=dbcan rows with per-row run_dbcan provenance in 5.1,
+#     backend=run_dbcan rows in 5.3 mirroring the gene's TPM/CPGE, the
+#     'recommended' vs 'any' consensus policies, separate cazy vs cazy_dbcan
+#     wide matrices (never merged), cazy fraction counting either backend
+#     plus a cazy_dbcan row; without --dbcan the cazy_dbcan outputs are
+#     header-only/zero. The dbCAN guard fails loudly on a corrupt overview
+#     header, a bad row, an unknown run_dbcan version, --dbcan without its
+#     versions.yml, a stray gene id, a mismatched sample set, and a
+#     duplicate overview
 #
 # The script runs inside the same pinned image the module uses.
 # Requirements: docker (present on GitHub ubuntu-latest runners).
@@ -146,10 +156,16 @@ for f in gene_annotations.tsv gene_abundance.tsv function_abundance.tsv \
          annotated_fraction.tsv ags_and_ge.tsv \
          function_wide_ko_tpm.tsv function_wide_cog_tpm.tsv \
          function_wide_ec_tpm.tsv function_wide_pfam_tpm.tsv function_wide_cazy_tpm.tsv \
+         function_wide_cazy_dbcan_tpm.tsv \
          function_wide_ko_cpge.tsv function_wide_cog_cpge.tsv \
-         function_wide_ec_cpge.tsv function_wide_pfam_cpge.tsv function_wide_cazy_cpge.tsv; do
+         function_wide_ec_cpge.tsv function_wide_pfam_cpge.tsv function_wide_cazy_cpge.tsv \
+         function_wide_cazy_dbcan_cpge.tsv; do
     check "output ${f} exists" "[ -s '${D}/${f}' ]"
 done
+
+# No --dbcan in this run: the cazy_dbcan outputs are deterministic but empty
+check "no --dbcan: cazy_dbcan matrices header-only, cazy_dbcan fraction 0" \
+    "[ \$(wc -l < '${D}/function_wide_cazy_dbcan_tpm.tsv') -eq 1 ] && grep -qP 'sampleA\tcazy_dbcan\t2\t0\t0.0000\t0.0000' '${D}/annotated_fraction.tsv'"
 
 # Acceptance 10.2: TPM sums to 1e6 per sample (both samples have reads)
 check "TPM sums to 1e6 for both samples" \
@@ -337,6 +353,124 @@ check_grep "  ...naming the offending field" "../neg_ags_zero_ge.log" "genome_eq
 D="${WORK}/neg_ags_id_mismatch"; seed_negative "${D}"
 cp "${FIXTURES}/sampleA.ags.tsv" "${D}/sampleM.ags.tsv"
 NEXT_WORKDIR="${D}" expect_fail "ags filename/embedded sample_id mismatch fails" "${NEG_ARGS[@]}" --ags sampleM.ags.tsv
+
+#
+# 6. dbCAN CAZy branch (T6): happy paths
+#
+seed_dbcan_inputs() {
+    # seed_assembly_inputs plus per-sample dbCAN overviews and versions.yml
+    local dir="$1"
+    seed_assembly_inputs "${dir}"
+    cp "${FIXTURES}/sampleA.overview.tsv" "${dir}/"
+    cp "${FIXTURES}/sampleA.overview.tsv" "${dir}/sampleB.overview.tsv"
+    cp "${FIXTURES}/dbcan_versions.yml" "${dir}/"
+}
+DBCAN_ARGS=("${ASSEMBLY_ARGS[@]}"
+    --dbcan sampleA.overview.tsv sampleB.overview.tsv
+    --dbcan-versions-yml dbcan_versions.yml)
+
+D="${WORK}/dbcan_assembly"
+seed_dbcan_inputs "${D}"
+NEXT_WORKDIR="${D}" expect_pass "assembly mode with dbCAN overviews" "${DBCAN_ARGS[@]}"
+
+# 5.1: db=dbcan rows with per-row run_dbcan provenance; empty evalue/score
+check "dbcan 5.1 row with run_dbcan provenance (GH5_4 on contig_1_1)" \
+    "grep -qP 'sampleA\tcontig_1_1\tcontig_1\t1\t300\t\\+\t300\t10\tdbcan\tGH5_4\t\t\t\trun_dbcan\t5.2.9\tdb_v5-2-9_5-5-2026\$' '${D}/gene_annotations.tsv'"
+check "eggNOG rows keep their own provenance next to dbcan rows" \
+    "grep -qP '\teggnog_cazy\tGT2\t.*\teggnog-mapper\t3.0.0-beta6\t7.0.0\$' '${D}/gene_annotations.tsv'"
+
+# Consensus 'recommended' (default): the tool's >=2-tools column {GH5_4, CBM6};
+# the hmm-only GH5 call must NOT appear
+check "recommended consensus: GH5_4 and CBM6 in, hmm-only GH5 out" \
+    "grep -qP '\tdbcan\tCBM6\t' '${D}/gene_annotations.tsv' && ! grep -qP '\tdbcan\tGH5\t' '${D}/gene_annotations.tsv'"
+
+# 5.3: backend=run_dbcan rows mirror the gene's TPM/CPGE; eggNOG cazy intact
+check "dbcan 5.3 row carries the gene's TPM and CPGE" \
+    "grep -qP 'sampleA\tcontigs\trun_dbcan\tcazy\tGH5_4\t\t750000.0000\t50.000000\t' '${D}/function_abundance.tsv' && grep -qP 'sampleA\tcontigs\teggnog-mapper\tcazy\tGT2\t' '${D}/function_abundance.tsv'"
+
+# Owner decision (4.3): separate wide matrices, never merged
+check "cazy and cazy_dbcan wide matrices stay separate" \
+    "grep -qP '^GH5_4\t' '${D}/function_wide_cazy_dbcan_tpm.tsv' && ! grep -q 'GT2' '${D}/function_wide_cazy_dbcan_tpm.tsv' && grep -qP '^GT2\t' '${D}/function_wide_cazy_tpm.tsv' && ! grep -q 'GH5_4' '${D}/function_wide_cazy_tpm.tsv'"
+check "cazy_dbcan cpge matrix: sampleA value, AGS-less sampleB blank" \
+    "grep -qP '^GH5_4\t50.000000\t\$' '${D}/function_wide_cazy_dbcan_cpge.tsv'"
+
+# Fractions: 'cazy' counts either backend, 'cazy_dbcan' counts run_dbcan alone
+check "cazy and cazy_dbcan fractions for sampleA (1/2 genes, 0.75 by TPM)" \
+    "grep -qP 'sampleA\tcazy\t2\t1\t0.5000\t0.7500' '${D}/annotated_fraction.tsv' && grep -qP 'sampleA\tcazy_dbcan\t2\t1\t0.5000\t0.7500' '${D}/annotated_fraction.tsv'"
+
+# Consensus 'any': union of the per-tool columns, so GH5 appears
+D="${WORK}/dbcan_any"
+seed_dbcan_inputs "${D}"
+NEXT_WORKDIR="${D}" expect_pass "'any' consensus takes the per-tool union" \
+    "${DBCAN_ARGS[@]}" --dbcan-consensus any
+check "any: range-stripped hmm-only GH5 row present" \
+    "grep -qP '\tdbcan\tGH5\t' '${D}/gene_annotations.tsv' && grep -qP '\tdbcan\tGH5_4\t' '${D}/gene_annotations.tsv'"
+
+# Coassembly: one shared overview, per-sample 5.3 rows
+D="${WORK}/dbcan_coassembly"
+mkdir -p "${D}"
+cp "${FIXTURES}/sampleA.featureCounts.txt" "${FIXTURES}/sampleB.featureCounts.txt" "${D}/"
+cp "${FIXTURES}/coassembly.emapper.annotations" "${D}/"
+cp "${GFF_FIXTURE}" "${D}/coassembly.gff.gz"
+cp "${FIXTURES}/coassembly.overview.tsv" "${D}/"
+cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/dbcan_versions.yml" "${D}/"
+NEXT_WORKDIR="${D}" expect_pass "coassembly mode with one shared dbCAN overview" \
+    --assembly-mode coassembly \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt \
+    --annotations coassembly.emapper.annotations \
+    --gffs coassembly.gff.gz \
+    --dbcan coassembly.overview.tsv \
+    --dbcan-versions-yml dbcan_versions.yml \
+    --eggnog-versions-yml eggnog_versions.yml --output-dir .
+check "coassembly: dbcan 5.1 keyed 'coassembly', per-sample 5.3 rows" \
+    "grep -qP 'coassembly\tcontig_1_1\tcontig_1\t1\t300\t\\+\t300\t10\tdbcan\tGH5_4\t' '${D}/gene_annotations.tsv' && grep -qP 'sampleA\tcontigs\trun_dbcan\tcazy\tGH5_4\t' '${D}/function_abundance.tsv' && grep -qP 'sampleB\tcontigs\trun_dbcan\tcazy\tGH5_4\t' '${D}/function_abundance.tsv'"
+
+#
+# 7. dbCAN guard: deliberate loud failures (acceptance 10.2)
+#
+seed_dbcan_negative() {
+    # seed_negative plus a single-sample overview and versions.yml to mutate
+    local dir="$1"
+    seed_negative "${dir}"
+    cp "${FIXTURES}/sampleA.overview.tsv" "${dir}/"
+    cp "${FIXTURES}/dbcan_versions.yml" "${dir}/"
+}
+DBCAN_NEG_ARGS=("${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv
+    --dbcan-versions-yml dbcan_versions.yml)
+
+D="${WORK}/neg_dbcan_header"; seed_dbcan_negative "${D}"
+sed -i 's/^Gene ID\t/GeneID\t/' "${D}/sampleA.overview.tsv"
+NEXT_WORKDIR="${D}" expect_fail "corrupt overview header fails" "${DBCAN_NEG_ARGS[@]}"
+check_grep "  ...with a layout-drift message" "../neg_dbcan_header.log" "does not match the verified"
+
+D="${WORK}/neg_dbcan_row"; seed_dbcan_negative "${D}"
+printf 'contig_1_1\tGH1\tbad\n' >> "${D}/sampleA.overview.tsv"
+NEXT_WORKDIR="${D}" expect_fail "overview row with the wrong field count fails" "${DBCAN_NEG_ARGS[@]}"
+
+D="${WORK}/neg_dbcan_version"; seed_dbcan_negative "${D}"
+sed -i 's/run_dbcan: 5.2.9/run_dbcan: 9.9.9/' "${D}/dbcan_versions.yml"
+NEXT_WORKDIR="${D}" expect_fail "unverified run_dbcan version fails" "${DBCAN_NEG_ARGS[@]}"
+check_grep "  ...naming the known-layout set" "../neg_dbcan_version.log" "not among the layouts"
+
+D="${WORK}/neg_dbcan_noversions"; seed_dbcan_negative "${D}"
+NEXT_WORKDIR="${D}" expect_fail "--dbcan without --dbcan-versions-yml fails" \
+    "${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv
+check_grep "  ...naming the missing input" "../neg_dbcan_noversions.log" "without --dbcan-versions-yml"
+
+D="${WORK}/neg_dbcan_stray"; seed_dbcan_negative "${D}"
+printf 'contig_1_99\t-\tGH1(1-50)\t-\t-\t1\tGH1\t-\n' >> "${D}/sampleA.overview.tsv"
+NEXT_WORKDIR="${D}" expect_fail "dbCAN gene id not in the GFF fails" "${DBCAN_NEG_ARGS[@]}"
+check_grep "  ...naming the stray id" "../neg_dbcan_stray.log" "dbCAN gene ids not present"
+
+D="${WORK}/neg_dbcan_sample"; seed_dbcan_negative "${D}"
+mv "${D}/sampleA.overview.tsv" "${D}/sampleQ.overview.tsv"
+NEXT_WORKDIR="${D}" expect_fail "dbCAN sample set not matching --counts fails" \
+    "${NEG_ARGS[@]}" --dbcan sampleQ.overview.tsv --dbcan-versions-yml dbcan_versions.yml
+
+D="${WORK}/neg_dbcan_duplicate"; seed_dbcan_negative "${D}"
+NEXT_WORKDIR="${D}" expect_fail "duplicate overview for one sample fails" \
+    "${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv sampleA.overview.tsv \
+    --dbcan-versions-yml dbcan_versions.yml
 
 #
 # Summary

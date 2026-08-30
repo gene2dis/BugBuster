@@ -191,6 +191,33 @@ process FORMAT_EGGNOG_DB {
         """
 }
 
+process FORMAT_DBCAN_DB {
+    tag "format_dbcan_db"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("dbcan_db")
+
+    script:
+        """
+        ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        mkdir dbcan_db
+        touch dbcan_db/CAZy.dmnd dbcan_db/dbCAN.hmm dbcan_db/dbCAN-sub.hmm \\
+            dbcan_db/fam-substrate-mapping.tsv dbcan_db/DB_VERSION
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

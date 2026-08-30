@@ -2,17 +2,19 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     AGGREGATE_FUNCTIONS Module Test
 
-    Study-level functional aggregation (design doc Section 4.8, tasks T4+T5).
-    The full aggregation logic — TPM/CPGE math, intentional double-counting,
-    version-aware layout guard, AGS guard, edge cases — is covered directly by
+    Study-level functional aggregation (design doc Section 4.8, tasks
+    T4+T5+T6). The full aggregation logic — TPM/CPGE math, intentional
+    double-counting, version-aware layout guards (eggNOG and dbCAN), AGS
+    guard, consensus policies, edge cases — is covered directly by
     tests/bin/test_aggregate_functions.sh; these tests verify the module
-    wrapper: staging (incl. the eggnog_versions.yml rename and the optional
-    ags list), the script invocation, and the declared outputs, in both
-    assembly-mode shapes.
+    wrapper: staging (incl. the eggnog_versions.yml/dbcan_versions.yml
+    renames and the optional ags/dbcan lists), the script invocation, and
+    the declared outputs, in both assembly-mode shapes.
 
     Fixtures: tests/data/functional/ (see tests/bin/make_functional_fixtures.sh)
     — a format-faithful eggNOG-mapper v3.0.0-beta6 annotations file plus
-    featureCounts tables, a MICROBECENSUS ags table and per-name GFF copies.
+    featureCounts tables, a run_dbcan v5 overview, a MICROBECENSUS ags table
+    and per-name GFF copies.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -30,8 +32,11 @@ nextflow_process {
                 input[1] = [ file("${projectDir}/tests/data/functional/sampleA.emapper.annotations", checkIfExists: true) ]
                 input[2] = [ file("${projectDir}/tests/data/functional/sampleA.gff.gz", checkIfExists: true) ]
                 input[3] = [ file("${projectDir}/tests/data/functional/sampleA.ags.tsv", checkIfExists: true) ]
-                input[4] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
-                input[5] = "assembly"
+                input[4] = [ file("${projectDir}/tests/data/functional/sampleA.overview.tsv", checkIfExists: true) ]
+                input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/functional/dbcan_versions.yml", checkIfExists: true)
+                input[7] = "assembly"
+                input[8] = "recommended"
                 """
             }
         }
@@ -54,10 +59,17 @@ nextflow_process {
             assert functions.contains('ko\tK00001\t\t750000.0000\t50.000000')
             assert functions.contains('ko\tK00002\t\t750000.0000\t50.000000')
 
-            // All ten wide matrices (tpm + cpge); AGS summary; provenance versions
-            assert process.out.function_wide.get(0).size() == 10
+            // dbCAN (T6): backend=run_dbcan rows next to the eggNOG cazy call
+            assert functions.contains('run_dbcan\tcazy\tGH5_4')
+            assert functions.contains('eggnog-mapper\tcazy\tGT2')
+
+            // All twelve wide matrices (tpm + cpge, incl. cazy_dbcan);
+            // AGS summary; per-backend provenance versions
+            assert process.out.function_wide.get(0).size() == 12
+            assert process.out.function_wide.get(0).any { f -> f.contains('function_wide_cazy_dbcan_tpm') }
             assert path(process.out.ags_summary.get(0)).text.contains('sampleA\t3000000\t2.0\t6000000\tok')
             assert path(process.out.gene_annotations.get(0)).text.contains('3.0.0-beta6\t7.0.0')
+            assert path(process.out.gene_annotations.get(0)).text.contains('run_dbcan\t5.2.9\tdb_v5-2-9_5-5-2026')
             assert path(process.out.versions.get(0)).text.contains('pandas:')
         }
     }
@@ -73,8 +85,11 @@ nextflow_process {
                 input[1] = [ file("${projectDir}/tests/data/functional/coassembly.emapper.annotations", checkIfExists: true) ]
                 input[2] = [ file("${projectDir}/tests/data/functional/coassembly.gff.gz", checkIfExists: true) ]
                 input[3] = [ file("${projectDir}/tests/data/functional/sampleA.ags.tsv", checkIfExists: true) ]
-                input[4] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
-                input[5] = "coassembly"
+                input[4] = [ file("${projectDir}/tests/data/functional/coassembly.overview.tsv", checkIfExists: true) ]
+                input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[6] = file("${projectDir}/tests/data/functional/dbcan_versions.yml", checkIfExists: true)
+                input[7] = "coassembly"
+                input[8] = "recommended"
                 """
             }
         }
@@ -92,10 +107,13 @@ nextflow_process {
             assert abundance.any { row -> row.startsWith('sampleB\tcontig_1_2') && row.endsWith('\t') }
             assert path(process.out.ags_summary.get(0)).text.contains('sampleB\t\t\t\tunavailable')
 
-            // 5.1 keyed by the coassembly unit, not per sample (design doc 4.8 record)
-            def annotation_samples = path(process.out.gene_annotations.get(0)).readLines()
+            // 5.1 keyed by the coassembly unit, not per sample (design doc 4.8
+            // record) — dbCAN rows included
+            def annotation_lines = path(process.out.gene_annotations.get(0)).readLines()
+            def annotation_samples = annotation_lines
                 .drop(1).collect { row -> row.split('\t')[0] }.unique()
             assert annotation_samples == ['coassembly']
+            assert annotation_lines.any { row -> row.contains('\tdbcan\tGH5_4\t') }
 
             // Wide matrices carry one column per sample
             def wide_ko = process.out.function_wide.get(0).find { f -> f.contains('function_wide_ko_tpm') }
@@ -113,8 +131,11 @@ nextflow_process {
                 input[1] = [ file("${projectDir}/tests/data/functional/sampleA.emapper.annotations", checkIfExists: true) ]
                 input[2] = [ file("${projectDir}/tests/data/functional/sampleA.gff.gz", checkIfExists: true) ]
                 input[3] = []
-                input[4] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
-                input[5] = "assembly"
+                input[4] = []
+                input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
+                input[6] = []
+                input[7] = "assembly"
+                input[8] = "recommended"
                 """
             }
         }
@@ -124,7 +145,7 @@ nextflow_process {
             assert process.out.gene_annotations.size() == 1
             assert process.out.gene_abundance.size() == 1
             assert process.out.function_abundance.size() == 1
-            assert process.out.function_wide.get(0).size() == 10
+            assert process.out.function_wide.get(0).size() == 12
             assert process.out.annotated_fraction.size() == 1
             assert process.out.ags_summary.size() == 1
             assert process.out.versions.size() == 1

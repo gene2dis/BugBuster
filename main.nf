@@ -65,6 +65,8 @@ def printHelp() {
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
       --contig_level_functional     Enable contig-level functional annotation; needs singularity/apptainer (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (functional branch; default: ${params.microbecensus})
+      --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
+      --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -244,7 +246,7 @@ workflow {
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
     if (workflow.profile.tokenize(',').contains('low_disk') && params.contig_level_functional) {
-        log.warn "--contig_level_functional under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7, ~44 GB) are stored at --databases_dir regardless of this profile"
+        log.warn "--contig_level_functional under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -262,6 +264,7 @@ workflow {
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MicrobeCensus        : ${params.microbecensus}"
+    log.info "  dbCAN CAZy           : ${params.functional_cazy}"
     log.info ""
 
     //
@@ -453,13 +456,23 @@ workflow {
 
     //
     // SUBWORKFLOW: Contig-level functional annotation
-    // (eggNOG-mapper + featureCounts gene quantification)
+    // (eggNOG-mapper + run_dbcan CAZy + featureCounts gene quantification)
     //
     if ( params.contig_level_functional && params.assembly_mode != "none" ) {
+        // functional_cazy defaults to true: normalize the CLI-String form
+        // before gating (same Q13 handling as params.microbecensus above).
+        // With the toggle off the dbCAN DB channel is legitimately empty and
+        // the subworkflow never consumes it
+        def run_functional_cazy = params.functional_cazy.toString().toBoolean()
+        ch_dbcan_db = run_functional_cazy
+            ? PREPARE_DATABASES.out.dbcan_db
+                .ifEmpty { error "ERROR: dbCAN database is empty. Ensure params.functional_cazy is enabled and a valid dbCAN database is configured." }
+            : channel.empty()
         FUNCTIONAL_ANNOTATION(
             ch_contig_proteins,
             PREPARE_DATABASES.out.eggnog_db
                 .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." },
+            ch_dbcan_db,
             ch_contig_genes_gff,
             ch_counting_bam,
             ch_ags

@@ -299,6 +299,13 @@ and, if the columns changed, `EXPECTED_ANNOTATION_COLUMNS` in
 `tests/bin/test_aggregate_functions.sh` for the new layout. Do not bypass the
 check by editing the annotations file.
 
+The same guard exists for the run_dbcan overview (`overview column header does
+not match the verified run_dbcan v5 layout ...` / `run_dbcan version '<X>' is
+not among the layouts ...`): after re-pinning the `RUN_DBCAN` module, re-verify
+the overview columns on real output and update `KNOWN_DBCAN_VERSIONS` and, if
+needed, `DBCAN_OVERVIEW_COLUMNS` in `bin/aggregate_functions.py`, plus the
+harness tests.
+
 ---
 
 ### MICROBECENSUS task fails / `cpge` columns are empty / `ags_and_ge.tsv` says `unavailable`

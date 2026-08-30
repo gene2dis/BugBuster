@@ -244,6 +244,10 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
+            // dbCAN CAZy branch (T6, on by default with the branch): one
+            // RUN_DBCAN per sample plus its database download
+            assert workflow.trace.tasks().count { task -> task.name.contains("RUN_DBCAN") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 1
 
             // Published to the documented layout (design doc Section 9.1)
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt").exists()
@@ -251,6 +255,7 @@ nextflow_pipeline {
             assert path("${outputDir}/07_functional_annotation/summary/gene_abundance.tsv").exists()
             assert path("${outputDir}/07_functional_annotation/microbecensus/test_sample1/test_sample1.ags.tsv").exists()
             assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/dbcan/test_sample1/test_sample1.overview.tsv").exists()
         }
     }
 
@@ -273,6 +278,11 @@ nextflow_pipeline {
                 // aggregation must still run on an empty ags list (the
                 // assembly-mode test above covers the on-path: 2 tasks)
                 microbecensus           = false
+                // Off-switch wiring (T6, Q13 discipline for a default-true
+                // toggle): no RUN_DBCAN tasks and no dbCAN database download;
+                // the aggregation must still run on an empty dbcan list (the
+                // assembly-mode test above covers the on-path)
+                functional_cazy         = false
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
@@ -289,7 +299,10 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RUN_DBCAN") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0
             assert !path("${outputDir}/07_functional_annotation/microbecensus").exists()
+            assert !path("${outputDir}/07_functional_annotation/dbcan").exists()
             assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
 
             // Gene calling keyed by the coassembly meta; counts keyed per sample

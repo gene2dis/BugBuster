@@ -1,5 +1,5 @@
 name: aggregate_functions
-description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations, gene coordinates and MicrobeCensus AGS estimates into functional abundance tables with TPM and CPGE (bin/aggregate_functions.py)
+description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations, run_dbcan v5 CAZy calls, gene coordinates and MicrobeCensus AGS estimates into functional abundance tables with TPM and CPGE (bin/aggregate_functions.py)
 keywords:
   - functional annotation
   - aggregation
@@ -30,13 +30,24 @@ input:
       type: file
       description: MicrobeCensus <sample>.ags.tsv tables (optional - may cover a subset of samples or be absent entirely; missing samples fall back to TPM-only with empty cpge fields)
       pattern: "*.ags.tsv"
+  - dbcan:
+      type: file
+      description: run_dbcan <sample>.overview.tsv files (optional as a set - absent entirely when --functional_cazy false; per sample under assembly mode, a single coassembly file under coassembly mode)
+      pattern: "*.overview.tsv"
   - eggnog_versions:
       type: file
       description: versions.yml from EGGNOG_MAPPER_ANNOTATE, source of the pinned eggnog-mapper and eggnog_db versions for the version-aware layout guard and the provenance columns
       pattern: "versions.yml"
+  - dbcan_versions:
+      type: file
+      description: versions.yml from RUN_DBCAN, source of the pinned run_dbcan and dbcan_db versions (absent exactly when dbcan is absent)
+      pattern: "versions.yml"
   - assembly_mode:
       type: string
       description: "'assembly' or 'coassembly' - drives the join topology and the gene_abundance assembly_mode column"
+  - dbcan_consensus:
+      type: string
+      description: "'recommended' (the tool's >=2-tools Recommend Results column) or 'any' (union of the per-tool calls) - which dbCAN calls feed aggregation"
 
 output:
   - gene_annotations:
@@ -53,7 +64,7 @@ output:
       pattern: "function_abundance.tsv"
   - function_wide:
       type: file
-      description: Wide TPM and CPGE matrices per ontology (rows accessions, columns samples; CPGE cells blank for samples without AGS)
+      description: Wide TPM and CPGE matrices per ontology (rows accessions, columns samples; CPGE cells blank for samples without AGS; ko/cog/ec/pfam/cazy are eggNOG-derived, cazy_dbcan is run_dbcan-derived and header-only when dbcan input is absent)
       pattern: "function_wide_*.tsv"
   - annotated_fraction:
       type: file

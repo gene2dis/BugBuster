@@ -181,6 +181,7 @@ taxonomic_profiler: "sourmash"
 read_arg_prediction: false
 rgi_prediction: false
 contig_tax_and_arg: false
+contig_level_functional: false
 include_binning: false
 ```
 

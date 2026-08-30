@@ -3,16 +3,17 @@
     AGGREGATE_FUNCTIONS Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Study-level aggregation of the contig functional branch (design doc
-    Section 4.8, tasks T4+T5): joins featureCounts gene counts, eggNOG-mapper
-    v3 annotations and Pyrodigal gene coordinates into the canonical tables
-    (Sections 5.1-5.3), computes TPM (Section 6.1) and copies per genome
-    equivalent (Section 6.2, from the optional MicrobeCensus AGS tables -
-    samples without one fall back to TPM-only with an 'unavailable' row in
-    ags_and_ge.tsv), and reports the annotated fraction per sample. All the
-    logic lives in
+    Section 4.8, tasks T4+T5+T6): joins featureCounts gene counts,
+    eggNOG-mapper v3 annotations, run_dbcan v5 CAZy calls and Pyrodigal gene
+    coordinates into the canonical tables (Sections 5.1-5.3), computes TPM
+    (Section 6.1) and copies per genome equivalent (Section 6.2, from the
+    optional MicrobeCensus AGS tables - samples without one fall back to
+    TPM-only with an 'unavailable' row in ags_and_ge.tsv), and reports the
+    annotated fraction per sample. All the logic lives in
     bin/aggregate_functions.py (independently tested by
     tests/bin/test_aggregate_functions.sh), including the version-aware
-    eggNOG layout guard that fails loudly on schema drift (Section 4.2).
+    eggNOG and dbCAN layout guards that fail loudly on schema drift
+    (Sections 4.2/4.3).
 
     Sample identity is derived from input filenames (<id>.featureCounts.txt
     etc.), which equal meta.id because every upstream module names outputs
@@ -25,15 +26,24 @@
         gffs: Pyrodigal gene GFFs (per sample, or one 'coassembly' file)
         ags: MicrobeCensus <id>.ags.tsv tables; possibly a subset of samples
             or none at all (non-fatal failures, or --microbecensus false)
+        dbcan: run_dbcan <id>.overview.tsv files; the whole set is absent
+            when --functional_cazy false (per sample, or one 'coassembly'
+            file, when present)
         eggnog_versions: versions.yml from EGGNOG_MAPPER_ANNOTATE (staged
             under a distinct name: this module writes its own versions.yml,
             and writing through a same-named input symlink would corrupt the
             upstream work directory - same hazard as TAXONOMY_REPORT's
             input_reads_report.csv)
+        dbcan_versions: versions.yml from RUN_DBCAN (same distinct-name
+            staging; absent exactly when dbcan is absent)
         assembly_mode: 'assembly' or 'coassembly' (join topology + 5.2 column)
+        dbcan_consensus: 'recommended' or 'any' (which dbCAN calls feed
+            aggregation, design doc Section 4.3 consensus policy)
 
     Output: gene_annotations.tsv, gene_abundance.tsv, function_abundance.tsv,
-        function_wide_<ontology>_{tpm,cpge}.tsv (ko, cog, ec, pfam, cazy),
+        function_wide_<ontology>_{tpm,cpge}.tsv (ko, cog, ec, pfam, cazy from
+        eggNOG plus cazy_dbcan from run_dbcan - header-only when dbcan is
+        absent, keeping the file set deterministic),
         annotated_fraction.tsv, ags_and_ge.tsv, versions.yml
 ----------------------------------------------------------------------------------------
 */
@@ -51,8 +61,11 @@ process AGGREGATE_FUNCTIONS {
     path(annotations, stageAs: 'annotations/*')
     path(gffs, stageAs: 'gffs/*')
     path(ags, stageAs: 'ags/*')
+    path(dbcan, stageAs: 'dbcan/*')
     path(eggnog_versions, stageAs: 'eggnog_versions.yml')
+    path(dbcan_versions, stageAs: 'dbcan_versions.yml')
     val(assembly_mode)
+    val(dbcan_consensus)
 
     output:
     path("gene_annotations.tsv")   , emit: gene_annotations
@@ -69,6 +82,8 @@ process AGGREGATE_FUNCTIONS {
     script:
     def args = task.ext.args ?: ''
     def ags_arg = ags ? "--ags ${ags}" : ''
+    def dbcan_arg = dbcan ? "--dbcan ${dbcan}" : ''
+    def dbcan_versions_arg = dbcan_versions ? "--dbcan-versions-yml ${dbcan_versions}" : ''
     """
     aggregate_functions.py \\
         --assembly-mode ${assembly_mode} \\
@@ -76,6 +91,9 @@ process AGGREGATE_FUNCTIONS {
         --annotations ${annotations} \\
         --gffs ${gffs} \\
         ${ags_arg} \\
+        ${dbcan_arg} \\
+        ${dbcan_versions_arg} \\
+        --dbcan-consensus ${dbcan_consensus} \\
         --eggnog-versions-yml ${eggnog_versions} \\
         --output-dir . \\
         ${args}
@@ -97,11 +115,13 @@ process AGGREGATE_FUNCTIONS {
     touch function_wide_ec_tpm.tsv
     touch function_wide_pfam_tpm.tsv
     touch function_wide_cazy_tpm.tsv
+    touch function_wide_cazy_dbcan_tpm.tsv
     touch function_wide_ko_cpge.tsv
     touch function_wide_cog_cpge.tsv
     touch function_wide_ec_cpge.tsv
     touch function_wide_pfam_cpge.tsv
     touch function_wide_cazy_cpge.tsv
+    touch function_wide_cazy_dbcan_cpge.tsv
     touch annotated_fraction.tsv
     touch ags_and_ge.tsv
 

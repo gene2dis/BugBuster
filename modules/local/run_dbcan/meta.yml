@@ -1,0 +1,52 @@
+name: run_dbcan
+description: CAZy family annotation of predicted proteins with run_dbcan v5 (protein-mode CAZyme_annotation; DIAMOND + dbCAN HMM + dbCAN-sub), retaining per-tool columns in the consolidated overview
+keywords:
+  - CAZymes
+  - carbohydrate-active enzymes
+  - functional annotation
+  - metagenomics
+tools:
+  - run_dbcan:
+      description: Standalone version of the dbCAN CAZyme annotation tool (v5 series)
+      homepage: https://github.com/bcb-unl/run_dbcan
+      documentation: https://run-dbcan.readthedocs.io/
+      doi: "10.1093/nar/gkad328"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - proteins:
+      type: file
+      description: Predicted protein sequences from gene calling (gzipped accepted; decompressed with gzip -cdf)
+      pattern: "*.{faa,faa.gz}"
+  - dbcan_db:
+      type: directory
+      description: dbCAN database directory in the run_dbcan v5 layout (CAZy.dmnd, dbCAN.hmm, dbCAN-sub.hmm, fam-substrate-mapping.tsv; optional DB_VERSION provenance file written by bin/dbcan_db_reformat.sh)
+      pattern: "dbcan_db"
+
+output:
+  - overview:
+      type: file
+      description: Consolidated per-gene CAZyme calls with per-tool columns retained (Gene ID, EC#, dbCAN_hmm, dbCAN_sub, DIAMOND, #ofTools, Recommend Results, Substrate); header-only for empty gene sets
+      pattern: "*.overview.tsv"
+  - substrates:
+      type: file
+      description: dbCAN-sub pyHMMER results including the protein-level Substrate column (the v5 protein-mode substrate prediction output)
+      pattern: "*.dbCANsub_hmm_results.tsv"
+  - hmm_raw:
+      type: file
+      description: dbCAN HMM pyHMMER results, kept for provenance
+      pattern: "*.dbCAN_hmm_results.tsv"
+  - diamond_raw:
+      type: file
+      description: DIAMOND search results against the CAZy database, kept for provenance
+      pattern: "*.diamond.out"
+  - versions:
+      type: file
+      description: Software versions (live run_dbcan version plus the database release from DB_VERSION, or 'custom')
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

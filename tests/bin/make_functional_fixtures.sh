@@ -19,7 +19,16 @@
 #     hand-checkable CPGE — RPK 100 and 33.33 over the 300 bp genes -> cpge
 #     50 and 16.666667). sampleB/sampleZ deliberately have NO ags fixture:
 #     they exercise the TPM-only fallback ('unavailable' in ags_and_ge.tsv)
+#   - sampleA.overview.tsv         run_dbcan v5 overview (T6), 8-column
+#     layout verified on real 5.2.9 output (incl. the Substrate column the
+#     tool's own OVERVIEW_COLUMNS constant omits): contig_1_1 carries calls
+#     that exercise the term parsing — '(start-end)' range stripping, '+',
+#     ';' and '|' separators (Recommend Results joins with '|' on real
+#     output) — with the 'recommended' set {GH5_4, CBM6} deliberately
+#     different from the 'any' union {GH5, GH5_4, CBM6} and from eggNOG's
+#     CAZy call (GT2); contig_1_2 absent (no CAZyme call)
 #   - eggnog_versions.yml          versions.yml shape from EGGNOG_MAPPER_ANNOTATE
+#   - dbcan_versions.yml           versions.yml shape from RUN_DBCAN
 #
 # Gene ids reuse tests/data/gff/test_contig1_genes.gff.gz (contig_1_1 at
 # 1-300 +, contig_1_2 at 601-900 -, both 300 bp); the test harnesses copy that
@@ -87,6 +96,17 @@ cat > "${OUT_DIR}/eggnog_versions.yml" <<'EOF'
     eggnog_db: 7.0.0
 EOF
 
+cat > "${OUT_DIR}/sampleA.overview.tsv" <<'EOF'
+Gene ID	EC#	dbCAN_hmm	dbCAN_sub	DIAMOND	#ofTools	Recommend Results	Substrate
+contig_1_1	3.2.1.4:2|-	GH5(1-95)+CBM6(100-140)	GH5_4(1-95)	GH5;CBM6	3	GH5_4|CBM6	xylan
+EOF
+
+cat > "${OUT_DIR}/dbcan_versions.yml" <<'EOF'
+"FUNCTIONAL_ANNOTATION:RUN_DBCAN":
+    run_dbcan: 5.2.9
+    dbcan_db: db_v5-2-9_5-5-2026
+EOF
+
 # Per-name copies for tests/modules/aggregate_functions.nf.test: the script
 # derives sample ids from filenames, so the GFF must be <id>.gff.gz and the
 # coassembly shape needs 'coassembly'-named inputs
@@ -94,5 +114,10 @@ cp "${SCRIPT_DIR}/../data/gff/test_contig1_genes.gff.gz" "${OUT_DIR}/sampleA.gff
 cp "${SCRIPT_DIR}/../data/gff/test_contig1_genes.gff.gz" "${OUT_DIR}/coassembly.gff.gz"
 sed 's/sampleA/coassembly/g' "${OUT_DIR}/sampleA.emapper.annotations" \
     > "${OUT_DIR}/coassembly.emapper.annotations"
+cp "${OUT_DIR}/sampleA.overview.tsv" "${OUT_DIR}/coassembly.overview.tsv"
+
+# Zero-sequence protein FASTA (empty-contig sample shape) for the RUN_DBCAN
+# empty-gene-set short-circuit test (-n: no timestamp, deterministic bytes)
+gzip -n < /dev/null > "${OUT_DIR}/empty.faa.gz"
 
 echo "Fixtures written under ${OUT_DIR}"

@@ -1,36 +1,51 @@
 #!/usr/bin/env python3
-"""Aggregate gene counts, eggNOG annotations and gene coordinates into the
-canonical functional-annotation tables (design doc Sections 4.8, 5, 6;
-tasks T4 (TPM) and T5 (CPGE) — contig branch).
+"""Aggregate gene counts, eggNOG annotations, dbCAN CAZy calls and gene
+coordinates into the canonical functional-annotation tables (design doc
+Sections 4.8, 5, 6; tasks T4 (TPM), T5 (CPGE) and T6 (dbCAN) — contig branch).
 
-Inputs per sample (per co-assembly for annotations/GFF under coassembly mode):
+Inputs per sample (per co-assembly for annotations/GFF/dbCAN under coassembly
+mode):
   - <id>.featureCounts.txt   gene counts (FEATURECOUNTS_GENES)
   - <id>.emapper.annotations eggNOG-mapper v3 annotations
   - <id>.gff[.gz]            Pyrodigal gene coordinates
+  - <id>.overview.tsv        run_dbcan v5 overview (OPTIONAL as a set: absent
+                             entirely when --functional_cazy false)
   - <id>.ags.tsv             MicrobeCensus AGS table (OPTIONAL, per sample:
                              missing samples fall back to TPM-only with empty
                              cpge fields — MicrobeCensus failure is non-fatal)
 
 Outputs (all TSV with header, deterministic ordering):
-  - gene_annotations.tsv          Section 5.1 (long, one row per gene per term)
+  - gene_annotations.tsv          Section 5.1 (long, one row per gene per term;
+                                  db=eggnog_* and db=dbcan rows, per-row tool
+                                  provenance)
   - gene_abundance.tsv            Section 5.2 (tpm + cpge)
-  - function_abundance.tsv        Section 5.3 (source=contigs)
-  - function_wide_<ont>_tpm.tsv   wide TPM matrix per ontology (ko, cog, ec, pfam, cazy)
+  - function_abundance.tsv        Section 5.3 (source=contigs; backend
+                                  distinguishes eggnog-mapper from run_dbcan)
+  - function_wide_<ont>_tpm.tsv   wide TPM matrix per ontology (ko, cog, ec,
+                                  pfam, cazy — eggNOG-derived) plus cazy_dbcan
+                                  (run_dbcan-derived; the two CAZy backends are
+                                  never merged into one matrix)
   - function_wide_<ont>_cpge.tsv  wide CPGE matrix per ontology (blank cells for
                                   samples without AGS)
-  - annotated_fraction.tsv        per-sample annotated fraction by count and abundance
+  - annotated_fraction.tsv        per-sample annotated fraction by count and
+                                  abundance ('cazy' counts either backend;
+                                  'cazy_dbcan' counts run_dbcan alone)
   - ags_and_ge.tsv                per-sample AGS/genome-equivalents summary with an
                                   'unavailable' status row for AGS-less samples
 
-Version-aware parsing (design doc 4.2/4.6.1, binding): the eggNOG-mapper
-version is read from the EGGNOG_MAPPER_ANNOTATE versions.yml and must be a
-version whose output layout this parser was verified against; the annotations
-column header must match that layout exactly. Any mismatch is a hard error —
+Version-aware parsing (design doc 4.2/4.6.1, binding): the eggNOG-mapper and
+run_dbcan versions are read from their modules' versions.yml files and must be
+versions whose output layouts this parser was verified against; the column
+headers must match those layouts exactly. Any mismatch is a hard error —
 silent misparsing is the failure mode this guards against.
 
 Term splitting (Section 4.8 step 4, corrected 2026-08-29): KEGG_ko, EC, PFAMs
 and CAZy are comma-joined; COG_category is an undelimited letter string and
-splits per character. A gene carrying several terms of one ontology
+splits per character. dbCAN overview calls are '+'-joined with optional
+'(start-end)' domain ranges (stripped); the --dbcan-consensus policy picks the
+'Recommend Results' column ('recommended', calls supported by >= 2 tools) or
+the union of the per-tool columns ('any'). dbCAN feeds the cazy ontology only
+(eggNOG remains the EC source). A gene carrying several terms of one ontology
 contributes its full abundance to each (intentional double-counting).
 """
 
@@ -67,6 +82,30 @@ ONTOLOGY_FIELDS = [
 ]
 
 ONTOLOGIES = [ontology for _, ontology, _, _ in ONTOLOGY_FIELDS]
+
+# run_dbcan versions whose overview layout this parser is verified against
+# (design doc Section 4.3 interface record). Extend only after re-verifying
+# the column list on real output of the new version.
+KNOWN_DBCAN_VERSIONS = {'5.2.9'}
+
+# The exact run_dbcan v5 overview.tsv header, verified on real 5.2.9 output
+# (2026-08-30). Note: the tool's OVERVIEW_COLUMNS constant lists only the
+# first 7 — the real file appends a 'Substrate' column (dbCAN-sub substrate
+# mapping). Substrate is retained in the published file but not parsed here.
+DBCAN_OVERVIEW_COLUMNS = ('Gene ID', 'EC#', 'dbCAN_hmm', 'dbCAN_sub',
+                          'DIAMOND', '#ofTools', 'Recommend Results',
+                          'Substrate')
+
+# Trailing '(start-end)' domain-range suffix on dbCAN calls (e.g. GH5(100-300))
+DBCAN_RANGE_RE = re.compile(r'\(\d+-\d+\)$')
+
+# Wide-matrix specs: (file label, backend filter, ontology filter). The two
+# CAZy backends get separate matrices, never one merged matrix (a gene called
+# by both tools would double-count; owner decision, design doc Section 4.3).
+WIDE_MATRIX_SPECS = (
+    [(ontology, 'eggnog-mapper', ontology) for ontology in ONTOLOGIES]
+    + [('cazy_dbcan', 'run_dbcan', 'cazy')]
+)
 
 FEATURECOUNTS_HEADER_PREFIX = ['Geneid', 'Chr', 'Start', 'End', 'Strand', 'Length']
 
@@ -114,6 +153,123 @@ def parse_versions_yml(path):
              f"version and extend KNOWN_EMAPPER_VERSIONS before aggregating.")
     db_version = db_match.group(1) if db_match else 'unknown'
     return tool_version, db_version
+
+
+def parse_dbcan_versions_yml(path):
+    """Extract run_dbcan and dbcan_db versions; enforce the known-layout set."""
+    text = Path(path).read_text()
+    tool_match = re.search(r'^\s*run_dbcan:\s*(\S+)\s*$', text, re.MULTILINE)
+    db_match = re.search(r'^\s*dbcan_db:\s*(\S+)\s*$', text, re.MULTILINE)
+    if not tool_match:
+        fail(f"no 'run_dbcan:' version found in {path} — cannot verify the "
+             f"overview layout (design doc 4.3 requires version-aware parsing)")
+    tool_version = tool_match.group(1)
+    if tool_version == 'unknown' or tool_version not in KNOWN_DBCAN_VERSIONS:
+        fail(f"run_dbcan version '{tool_version}' is not among the layouts this "
+             f"parser was verified against ({sorted(KNOWN_DBCAN_VERSIONS)}). "
+             f"Re-verify the overview column layout on real output of that "
+             f"version and extend KNOWN_DBCAN_VERSIONS before aggregating.")
+    db_version = db_match.group(1) if db_match else 'unknown'
+    return tool_version, db_version
+
+
+def parse_dbcan_overview(path):
+    """run_dbcan v5 <id>.overview.tsv -> one row per gene with raw call columns.
+
+    Layout guard in the house style: the header must match the verified
+    8-column v5 layout exactly, every data row must have 8 fields, and gene
+    ids must be unique (the tool emits one row per gene). Header-only files
+    (empty gene sets, RUN_DBCAN short-circuit) are valid.
+    """
+    header = None
+    rows = []
+    with open_text(path) as handle:
+        for line_no, line in enumerate(handle, 1):
+            line = line.rstrip('\n')
+            if not line:
+                continue
+            fields = line.split('\t')
+            if header is None:
+                if tuple(fields) != DBCAN_OVERVIEW_COLUMNS:
+                    fail(f"{path}: overview column header does not match the "
+                         f"verified run_dbcan v5 layout "
+                         f"({len(DBCAN_OVERVIEW_COLUMNS)} columns). Got "
+                         f"{len(fields)} columns: {fields[:8]} — refusing to "
+                         f"guess (design doc 4.3: fail loudly on layout drift)")
+                header = fields
+                continue
+            if len(fields) != len(DBCAN_OVERVIEW_COLUMNS):
+                fail(f"{path}: line {line_no} has {len(fields)} fields, expected "
+                     f"{len(DBCAN_OVERVIEW_COLUMNS)}")
+            record = dict(zip(DBCAN_OVERVIEW_COLUMNS, fields))
+            rows.append({
+                'gene_id': record['Gene ID'],
+                'dbCAN_hmm': record['dbCAN_hmm'],
+                'dbCAN_sub': record['dbCAN_sub'],
+                'DIAMOND': record['DIAMOND'],
+                'recommend': record['Recommend Results'],
+            })
+    if header is None:
+        fail(f"{path}: no header line found — not a run_dbcan v5 overview file")
+    overview = pd.DataFrame(rows, columns=['gene_id', 'dbCAN_hmm', 'dbCAN_sub',
+                                           'DIAMOND', 'recommend'])
+    duplicates = overview['gene_id'][overview['gene_id'].duplicated()]
+    if not duplicates.empty:
+        fail(f"{path}: duplicate gene ids in overview: "
+             f"{sorted(duplicates.unique())[:5]}")
+    return overview
+
+
+def split_dbcan_terms(value):
+    """One dbCAN overview call field -> CAZy accessions.
+
+    Separators verified on real 5.2.9 output: hmm/sub/DIAMOND columns join
+    domains with '+', 'Recommend Results' joins calls with '|', and ';' also
+    occurs as a sub-separator — split on all three. hmm/sub calls carry
+    '(start-end)' domain ranges, stripped here. '-' means no call.
+    Subfamily ids (GH5_4) and dbCAN-sub cluster ids (GH78_e118) are kept as
+    emitted.
+    """
+    if value in ('', '-'):
+        return []
+    terms = []
+    for chunk in re.split(r'[+;|]', value):
+        term = DBCAN_RANGE_RE.sub('', chunk.strip())
+        if term and term != '-':
+            terms.append(term)
+    return terms
+
+
+def explode_dbcan(overview, consensus):
+    """Long form: one row per gene per dbCAN CAZy accession, per the consensus
+    policy ('recommended' = the tool's >=2-tools column; 'any' = union of the
+    per-tool columns). Same column shape as explode_annotations; evalue/score
+    stay empty (the overview carries no single per-call value; Section 5.1
+    allows empty).
+    """
+    rows = []
+    for record in overview.itertuples(index=False):
+        if consensus == 'recommended':
+            accessions = split_dbcan_terms(record.recommend)
+        else:
+            accessions = []
+            for value in (record.dbCAN_hmm, record.dbCAN_sub, record.DIAMOND):
+                accessions.extend(split_dbcan_terms(value))
+        seen = set()
+        for accession in accessions:
+            if accession in seen:
+                continue
+            seen.add(accession)
+            rows.append({
+                'gene_id': record.gene_id,
+                'db': 'dbcan',
+                'ontology': 'cazy',
+                'accession': accession,
+                'evalue': '',
+                'score': '',
+            })
+    return pd.DataFrame(rows, columns=['gene_id', 'db', 'ontology', 'accession',
+                                       'evalue', 'score'])
 
 
 def parse_gff(path):
@@ -344,19 +500,24 @@ def parse_arguments():
         epilog="""
 Examples:
   # Per-sample assembly mode (matching id sets across the three lists;
-  # --ags is optional and may cover only a subset of samples)
+  # --ags is optional and may cover only a subset of samples; --dbcan is
+  # optional as a whole set and requires --dbcan-versions-yml when given)
   aggregate_functions.py --assembly-mode assembly \\
       --counts s1.featureCounts.txt s2.featureCounts.txt \\
       --annotations s1.emapper.annotations s2.emapper.annotations \\
       --gffs s1.gff.gz s2.gff.gz \\
       --ags s1.ags.tsv s2.ags.tsv \\
+      --dbcan s1.overview.tsv s2.overview.tsv \\
+      --dbcan-versions-yml dbcan_versions.yml \\
       --eggnog-versions-yml versions.yml --output-dir .
 
-  # Co-assembly mode (one shared annotations file and GFF)
+  # Co-assembly mode (one shared annotations file, GFF and dbCAN overview)
   aggregate_functions.py --assembly-mode coassembly \\
       --counts s1.featureCounts.txt s2.featureCounts.txt \\
       --annotations coassembly.emapper.annotations \\
       --gffs coassembly.gff.gz \\
+      --dbcan coassembly.overview.tsv \\
+      --dbcan-versions-yml dbcan_versions.yml \\
       --eggnog-versions-yml versions.yml --output-dir .
         """
     )
@@ -372,6 +533,21 @@ Examples:
                         help='MicrobeCensus <id>.ags.tsv tables (optional; a '
                              'subset of samples or none — missing samples fall '
                              'back to TPM-only with empty cpge fields)')
+    parser.add_argument('--dbcan', nargs='*', type=Path, default=[],
+                        help='run_dbcan <id>.overview.tsv files (optional as a '
+                             'set: absent entirely when --functional_cazy '
+                             'false; when given, per sample under assembly '
+                             'mode or exactly one shared file under '
+                             'coassembly)')
+    parser.add_argument('--dbcan-versions-yml', type=Path, default=None,
+                        help='versions.yml from RUN_DBCAN (required when '
+                             '--dbcan is given)')
+    parser.add_argument('--dbcan-consensus', choices=['recommended', 'any'],
+                        default='recommended',
+                        help="Which dbCAN calls feed aggregation: "
+                             "'recommended' uses the tool's Recommend Results "
+                             "column (>= 2 tools), 'any' the union of the "
+                             "per-tool columns")
     parser.add_argument('--eggnog-versions-yml', required=True, type=Path,
                         help='versions.yml from EGGNOG_MAPPER_ANNOTATE (source '
                              'of the pinned tool and database versions)')
@@ -387,12 +563,22 @@ def main():
     args = parse_arguments()
 
     for path in [*args.counts, *args.annotations, *args.gffs, *args.ags,
-                 args.eggnog_versions_yml]:
+                 *args.dbcan, args.eggnog_versions_yml,
+                 *([args.dbcan_versions_yml] if args.dbcan_versions_yml else [])]:
         if not path.exists():
             fail(f"input file not found: {path}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     tool_version, db_version = parse_versions_yml(args.eggnog_versions_yml)
+
+    if args.dbcan and not args.dbcan_versions_yml:
+        fail("--dbcan given without --dbcan-versions-yml — the overview layout "
+             "cannot be version-verified (design doc 4.3)")
+    if args.dbcan_versions_yml:
+        dbcan_tool_version, dbcan_db_version = \
+            parse_dbcan_versions_yml(args.dbcan_versions_yml)
+    else:
+        dbcan_tool_version, dbcan_db_version = None, None
 
     counts_by_sample = {
         sample_id_from(path, ['.featureCounts.txt']): parse_counts(path)
@@ -407,6 +593,12 @@ def main():
         sample_id_from(path, ['.gff.gz', '.gff']): parse_gff(path)
         for path in args.gffs
     }
+    dbcan_by_id = {}
+    for path in args.dbcan:
+        unit = sample_id_from(path, ['.overview.tsv'])
+        if unit in dbcan_by_id:
+            fail(f"duplicate --dbcan overview for '{unit}'")
+        dbcan_by_id[unit] = parse_dbcan_overview(path)
     ags_by_sample = {}
     for path in args.ags:
         sample, values = parse_ags(path)
@@ -428,23 +620,50 @@ def main():
               f"fallback, design doc Section 4.7)", file=sys.stderr)
 
     # Join topology (design doc Section 3.5): per-sample gene sets under
-    # 'assembly'; one shared co-assembly gene set under 'coassembly'
+    # 'assembly'; one shared co-assembly gene set under 'coassembly'. dbCAN
+    # overviews follow the annotations shape (the tool runs on the same
+    # proteins), but the whole set is optional (--functional_cazy false)
     if args.assembly_mode == 'assembly':
         for label, keys in [('annotations', annotations_by_id),
                             ('GFFs', gffs_by_id)]:
             if set(keys) != set(counts_by_sample):
                 fail(f"sample ids of --counts {sorted(counts_by_sample)} and "
                      f"--{label.lower()} {sorted(keys)} do not match")
+        if dbcan_by_id and set(dbcan_by_id) != set(counts_by_sample):
+            fail(f"sample ids of --counts {sorted(counts_by_sample)} and "
+                 f"--dbcan {sorted(dbcan_by_id)} do not match")
         gff_for = dict(gffs_by_id)
         annotations_for = dict(annotations_by_id)
     else:
         if len(annotations_by_id) != 1 or len(gffs_by_id) != 1:
             fail(f"coassembly mode expects exactly one annotations file and one "
                  f"GFF, got {len(annotations_by_id)} and {len(gffs_by_id)}")
+        if len(dbcan_by_id) > 1:
+            fail(f"coassembly mode expects at most one dbCAN overview, got "
+                 f"{len(dbcan_by_id)}")
         shared_gff = next(iter(gffs_by_id.values()))
         shared_annotations = next(iter(annotations_by_id.values()))
         gff_for = {sample: shared_gff for sample in sample_ids}
         annotations_for = {sample: shared_annotations for sample in sample_ids}
+
+    # dbCAN exploded frames, per annotations unit and fanned out per sample
+    # (empty frame = no dbCAN input for that sample)
+    empty_exploded = pd.DataFrame(columns=['gene_id', 'db', 'ontology',
+                                           'accession', 'evalue', 'score'])
+    dbcan_exploded_by_id = {
+        unit: explode_dbcan(table, args.dbcan_consensus)
+        for unit, table in dbcan_by_id.items()
+    }
+    if args.assembly_mode == 'assembly':
+        dbcan_exploded_for = {
+            sample: dbcan_exploded_by_id.get(sample, empty_exploded)
+            for sample in sample_ids
+        }
+    else:
+        shared_dbcan_exploded = (next(iter(dbcan_exploded_by_id.values()))
+                                 if dbcan_exploded_by_id else empty_exploded)
+        dbcan_exploded_for = {sample: shared_dbcan_exploded
+                              for sample in sample_ids}
 
     # Cross-checks: mis-paired inputs must fail, not silently misjoin
     for sample in sample_ids:
@@ -466,6 +685,10 @@ def main():
         if stray:
             fail(f"sample '{sample}': annotation query ids not present in the GFF: "
                  f"{sorted(stray)[:5]}")
+        stray_dbcan = set(dbcan_exploded_for[sample]['gene_id']) - gff_ids
+        if stray_dbcan:
+            fail(f"sample '{sample}': dbCAN gene ids not present in the GFF: "
+                 f"{sorted(stray_dbcan)[:5]}")
 
     # --- Section 5.2: gene abundance with TPM and CPGE ---
     abundance_parts = []
@@ -498,26 +721,34 @@ def main():
     gene_abundance.to_csv(args.output_dir / 'gene_abundance.tsv', sep='\t',
                           index=False)
 
-    # --- Section 5.1: gene annotations (long, per annotations unit) ---
+    # --- Section 5.1: gene annotations (long, per annotations unit; eggNOG
+    #     and dbCAN parts carry their own per-row tool provenance) ---
     exploded_by_id = {
         unit: explode_annotations(table)
         for unit, table in annotations_by_id.items()
     }
     annotation_parts = []
-    for unit in sorted(exploded_by_id):
-        exploded = exploded_by_id[unit]
-        if exploded.empty:
-            continue
+    for unit in sorted(set(exploded_by_id) | set(dbcan_exploded_by_id)):
         # Under coassembly the single annotations unit pairs with the single
         # shared GFF whatever either file is named; under assembly the ids match
         genes = next(iter(gffs_by_id.values())) \
             if args.assembly_mode == 'coassembly' else gff_for[unit]
-        part = exploded.merge(
-            genes[['gene_id', 'contig_id', 'start', 'end', 'strand', 'partial',
-                   'length_bp']],
-            on='gene_id')
-        part.insert(0, 'sample_id', unit)
-        annotation_parts.append(part)
+        for exploded, tool, part_tool_version, part_db_version in [
+                (exploded_by_id.get(unit), 'eggnog-mapper',
+                 tool_version, db_version),
+                (dbcan_exploded_by_id.get(unit), 'run_dbcan',
+                 dbcan_tool_version, dbcan_db_version)]:
+            if exploded is None or exploded.empty:
+                continue
+            part = exploded.merge(
+                genes[['gene_id', 'contig_id', 'start', 'end', 'strand',
+                       'partial', 'length_bp']],
+                on='gene_id')
+            part.insert(0, 'sample_id', unit)
+            part['tool'] = tool
+            part['tool_version'] = part_tool_version
+            part['db_version'] = part_db_version
+            annotation_parts.append(part)
     if annotation_parts:
         gene_annotations = pd.concat(annotation_parts, ignore_index=True)
     else:
@@ -525,11 +756,9 @@ def main():
                                                  'ontology', 'accession', 'evalue',
                                                  'score', 'contig_id', 'start',
                                                  'end', 'strand', 'partial',
-                                                 'length_bp'])
+                                                 'length_bp', 'tool',
+                                                 'tool_version', 'db_version'])
     gene_annotations['description'] = ''  # v3 dropped Description (design doc 4.8 record)
-    gene_annotations['tool'] = 'eggnog-mapper'
-    gene_annotations['tool_version'] = tool_version
-    gene_annotations['db_version'] = db_version
     gene_annotations = gene_annotations.sort_values(
         ['sample_id', 'gene_id', 'db', 'accession'], kind='mergesort',
         ignore_index=True)
@@ -539,32 +768,35 @@ def main():
                       'db_version']].to_csv(
         args.output_dir / 'gene_annotations.tsv', sep='\t', index=False)
 
-    # --- Section 5.3: function abundance (per-sample term explode x TPM/CPGE) ---
+    # --- Section 5.3: function abundance (per-sample term explode x TPM/CPGE;
+    #     the backend column separates eggnog-mapper from run_dbcan rows) ---
     term_parts = []
     for sample in sample_ids:
-        exploded = explode_annotations(annotations_for[sample])
-        if exploded.empty:
-            continue
         sample_abundance = abundance.loc[abundance['sample_id'] == sample,
                                          ['gene_id', 'tpm', 'cpge_num']]
-        part = exploded[['gene_id', 'ontology', 'accession']].merge(
-            sample_abundance, on='gene_id')
-        part.insert(0, 'sample_id', sample)
-        term_parts.append(part)
+        for exploded, backend in [
+                (explode_annotations(annotations_for[sample]), 'eggnog-mapper'),
+                (dbcan_exploded_for[sample], 'run_dbcan')]:
+            if exploded.empty:
+                continue
+            part = exploded[['gene_id', 'ontology', 'accession']].merge(
+                sample_abundance, on='gene_id')
+            part.insert(0, 'sample_id', sample)
+            part['backend'] = backend
+            term_parts.append(part)
     if term_parts:
         terms = pd.concat(term_parts, ignore_index=True)
         # Intentional double-counting (Section 4.8 step 5): a gene carrying
         # several terms of one ontology contributes its full TPM/CPGE to each
         function_abundance = (
-            terms.groupby(['sample_id', 'ontology', 'accession'],
+            terms.groupby(['sample_id', 'backend', 'ontology', 'accession'],
                           as_index=False)[['tpm', 'cpge_num']].sum()
             .rename(columns={'tpm': 'abundance_tpm'}))
     else:
-        function_abundance = pd.DataFrame(columns=['sample_id', 'ontology',
-                                                   'accession', 'abundance_tpm',
-                                                   'cpge_num'])
+        function_abundance = pd.DataFrame(columns=['sample_id', 'backend',
+                                                   'ontology', 'accession',
+                                                   'abundance_tpm', 'cpge_num'])
     function_abundance['source'] = 'contigs'
-    function_abundance['backend'] = 'eggnog-mapper'
     function_abundance['description'] = ''
     # groupby.sum() turns an all-NaN group into 0.0, so AGS availability (a
     # per-sample fact) decides emptiness, not the summed value
@@ -576,7 +808,7 @@ def main():
     function_abundance['abundance_native'] = ''  # read branch only
     function_abundance['native_unit'] = ''       # read branch only
     function_abundance = function_abundance.sort_values(
-        ['sample_id', 'ontology', 'accession'], kind='mergesort',
+        ['sample_id', 'ontology', 'backend', 'accession'], kind='mergesort',
         ignore_index=True)
     out_53 = function_abundance[['sample_id', 'source', 'backend', 'ontology',
                                  'accession', 'description', 'abundance_tpm',
@@ -586,11 +818,17 @@ def main():
     out_53.to_csv(args.output_dir / 'function_abundance.tsv', sep='\t',
                   index=False)
 
-    # --- Wide matrices per ontology (every sample a column, missing -> 0;
-    #     CPGE cells are blank for samples without AGS) ---
+    # --- Wide matrices per ontology/backend (every sample a column, missing
+    #     -> 0; CPGE cells are blank for samples without AGS). The cazy_dbcan
+    #     matrices carry the run_dbcan calls; the plain cazy ones stay
+    #     eggNOG-derived — never merged (design doc 4.3). With --dbcan absent
+    #     the cazy_dbcan matrices are emitted header-only, keeping the output
+    #     file set deterministic ---
     ags_samples = [sample for sample in sample_ids if sample in ge_by_sample]
-    for ontology in ONTOLOGIES:
-        subset = function_abundance[function_abundance['ontology'] == ontology]
+    for label, backend, ontology in WIDE_MATRIX_SPECS:
+        subset = function_abundance[
+            (function_abundance['ontology'] == ontology)
+            & (function_abundance['backend'] == backend)]
         wide = subset.pivot_table(index='accession', columns='sample_id',
                                   values='abundance_tpm', aggfunc='sum',
                                   fill_value=0.0)
@@ -598,7 +836,7 @@ def main():
         wide.index.name = 'accession'
         # float_format instead of per-cell mapping: DataFrame.map needs
         # pandas >= 2.1 and the pinned image ships 2.0
-        wide.to_csv(args.output_dir / f'function_wide_{ontology}_tpm.tsv',
+        wide.to_csv(args.output_dir / f'function_wide_{label}_tpm.tsv',
                     sep='\t', header=True, float_format='%.4f')
 
         # CPGE mirror: same accession rows as the TPM matrix; AGS-less sample
@@ -617,7 +855,7 @@ def main():
         for column in wide_cpge.columns:
             wide_cpge[column] = ['' if pd.isna(value) else CPGE_FORMAT.format(value)
                                  for value in wide_cpge[column]]
-        wide_cpge.to_csv(args.output_dir / f'function_wide_{ontology}_cpge.tsv',
+        wide_cpge.to_csv(args.output_dir / f'function_wide_{label}_cpge.tsv',
                          sep='\t', header=True)
 
     # --- Annotated fraction per sample, by count and by abundance ---
@@ -626,12 +864,18 @@ def main():
         sample_genes = abundance[abundance['sample_id'] == sample]
         genes_total = len(sample_genes)
         tpm_total = sample_genes['tpm'].sum()
-        exploded = explode_annotations(annotations_for[sample])
-        for ontology in ['any'] + ONTOLOGIES:
+        exploded_dbcan = dbcan_exploded_for[sample]
+        exploded = pd.concat([explode_annotations(annotations_for[sample]),
+                              exploded_dbcan], ignore_index=True)
+        # 'cazy' counts a CAZy call from either backend; 'cazy_dbcan' counts
+        # run_dbcan alone (always present, 0 when --dbcan is absent)
+        for ontology in ['any'] + ONTOLOGIES + ['cazy_dbcan']:
             if exploded.empty:
                 annotated_ids = set()
             elif ontology == 'any':
                 annotated_ids = set(exploded['gene_id'])
+            elif ontology == 'cazy_dbcan':
+                annotated_ids = set(exploded_dbcan['gene_id'])
             else:
                 annotated_ids = set(
                     exploded.loc[exploded['ontology'] == ontology, 'gene_id'])
@@ -678,10 +922,14 @@ def main():
 
     annotated_any = sum(1 for row in fraction_rows
                         if row['ontology'] == 'any' and row['genes_annotated'])
+    dbcan_rows = int((function_abundance['backend'] == 'run_dbcan').sum())
+    dbcan_note = (f"{dbcan_rows} dbCAN CAZy rows" if args.dbcan
+                  else "dbCAN input absent")
     print(f"Aggregated {len(sample_ids)} sample(s), "
           f"{len(gene_abundance)} gene abundance rows, "
           f"{len(out_53)} function abundance rows "
           f"({annotated_any}/{len(sample_ids)} samples with annotations; "
+          f"{dbcan_note}; "
           f"{len(ags_samples)}/{len(sample_ids)} samples with CPGE)")
 
 
