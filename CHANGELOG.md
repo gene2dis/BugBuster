@@ -25,7 +25,11 @@ next release is tagged.
   - Bakta database v6.0 (schema 6) auto-downloaded from the pinned Zenodo
     release: `--bakta_db v6.0-full` (default, 31.9 GB download) or
     `v6.0-light` (1.3 GB; explicit choice, recorded in provenance via the
-    `bakta_db` versions entry) / `--custom_bakta_db`
+    `bakta_db` versions entry) / `--custom_bakta_db`. Provisioning refreshes
+    the bundled AMRFinderPlus database with `amrfinder_update` (~300 MB; the
+    official tarball's copy is too old for the AMRFinderPlus in the pinned
+    bakta container and would fail every annotation at the AMR expert step —
+    custom databases need the same one-time refresh, see troubleshooting)
   - Independent of `--contig_level_functional` and runs on any container
     engine (docker included) — the singularity/apptainer requirement applies
     only to the contig branch

@@ -19,21 +19,23 @@ REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
 # Use the exact images pinned in the modules so the test cannot drift from them
 DOWNLOAD_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
-# FORMAT_BAKTA_DB uses its own wget+xz image (the shared wget image has no xz)
-DOWNLOAD_XZ_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget_xz:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
-    | tr -d "'" | grep -v '^oras://' | head -1)
+# FORMAT_BAKTA_DB runs in the pinned bakta container (it needs
+# amrfinder_update; the real binary is shadowed by a mock in these tests so
+# no NCBI download happens - see MOCK_BIN below)
+BAKTA_IMG=$(grep -o "'quay.io/biocontainers/bakta:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${DOWNLOAD_XZ_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
 
 echo "=== DB reformat script test suite ==="
-echo "Download image:    ${DOWNLOAD_IMG}"
-echo "Download+xz image: ${DOWNLOAD_XZ_IMG}"
-echo "Report image:      ${REPORT_IMG}"
+echo "Download image: ${DOWNLOAD_IMG}"
+echo "Bakta image:    ${BAKTA_IMG}"
+echo "Report image:   ${REPORT_IMG}"
 echo ""
 
 TMP_DIR=$(mktemp -d)
@@ -179,10 +181,22 @@ FAIL=0
 
 run_script() {
     # run_script <workdir> <script-name> [args...] — inside the download image
-    # (or RUN_IMG when set, for scripts pinned to a different downloader)
+    # (or RUN_IMG when set, for scripts pinned to a different container).
+    # When MOCK_BIN is set, each executable in it is bind-mounted OVER the
+    # container's real /usr/local/bin/<name> (used to stub out
+    # amrfinder_update's NCBI download in the bakta tests; a PATH override
+    # does not survive the biocontainer entrypoint's PATH rewriting).
     local workdir="$1" script="$2"
     shift 2
+    local mock_args=()
+    if [ -n "${MOCK_BIN:-}" ]; then
+        local mock_file
+        for mock_file in "${MOCK_BIN}"/*; do
+            mock_args+=(-v "${mock_file}:/usr/local/bin/$(basename "${mock_file}"):ro")
+        done
+    fi
     docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp \
+        "${mock_args[@]}" \
         -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
         -v "${workdir}:/dbwork" -w /dbwork \
         "${RUN_IMG:-${DOWNLOAD_IMG}}" bash "/pipeline_bin/${script}" "$@"
@@ -305,10 +319,34 @@ expect_fail "dbcan: empty CAZy.dmnd fails" dbcan_db_reformat.sh "${BASE_URL}/dbc
 expect_fail "dbcan: missing files fail" dbcan_db_reformat.sh "${BASE_URL}/no_such_dir"
 
 #
-# bakta_db_reformat.sh (runs in the wget+xz image FORMAT_BAKTA_DB pins)
+# bakta_db_reformat.sh (runs in the bakta image FORMAT_BAKTA_DB pins; the
+# real amrfinder_update is shadowed by a mock so the test never hits NCBI,
+# while the script's update invocation and post-update verification still run)
 #
 echo "--- bakta_db_reformat.sh ---"
-RUN_IMG="${DOWNLOAD_XZ_IMG}"
+RUN_IMG="${BAKTA_IMG}"
+MOCK_OK="${TMP_DIR}/mock_ok"
+MOCK_FAIL="${TMP_DIR}/mock_fail"
+mkdir -p "${MOCK_OK}" "${MOCK_FAIL}"
+cat > "${MOCK_OK}/amrfinder_update" <<'EOF'
+#!/bin/bash
+# Mock: emulate a successful AMRFinderPlus DB refresh without the NCBI download
+db=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --database) db="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+[ -n "$db" ] || { echo "mock amrfinder_update: no --database" >&2; exit 2; }
+mkdir -p "$db/2099-01-01.1"
+echo "2099-01-01.1" > "$db/2099-01-01.1/version.txt"
+ln -sfn 2099-01-01.1 "$db/latest"
+EOF
+printf '#!/bin/bash\necho "mock amrfinder_update: simulated download failure" >&2\nexit 1\n' > "${MOCK_FAIL}/amrfinder_update"
+chmod +x "${MOCK_OK}/amrfinder_update" "${MOCK_FAIL}/amrfinder_update"
+
+MOCK_BIN="${MOCK_OK}"
 expect_pass "bakta: valid full tarball" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
 check_file "bakta: version.json extracted (top dir stripped)" "bakta_db/version.json"
 check_file "bakta: bundled amrfinderplus-db present" "bakta_db/amrfinderplus-db/AMR.LIB"
@@ -320,6 +358,15 @@ else
     echo "✗ bakta: DB_VERSION does not record the full flavor"
     FAIL=$((FAIL + 1))
 fi
+if grep -q 'amrfinderplus-db 2099-01-01.1' "${LAST_WORKDIR}/bakta_db/DB_VERSION" 2>/dev/null \
+    && [ "$(wc -l < "${LAST_WORKDIR}/bakta_db/DB_VERSION")" -eq 1 ]; then
+    echo "✓ bakta: DB_VERSION records the refreshed AMRFinderPlus version on one line"
+    PASS=$((PASS + 1))
+else
+    echo "✗ bakta: DB_VERSION missing the AMRFinderPlus version or not single-line"
+    FAIL=$((FAIL + 1))
+fi
+check_file "bakta: refreshed amrfinderplus-db latest present" "bakta_db/amrfinderplus-db/latest/version.txt"
 expect_pass "bakta: valid light tarball (db-light/ top dir)" bakta_db_reformat.sh "${BASE_URL}/bakta_db_light.tar.xz"
 if grep -q '^db-light ' "${LAST_WORKDIR}/bakta_db/DB_VERSION" 2>/dev/null; then
     echo "✓ bakta: DB_VERSION records the light flavor"
@@ -332,6 +379,9 @@ expect_fail "bakta: schema-5 version.json fails" bakta_db_reformat.sh "${BASE_UR
 expect_fail "bakta: missing amrfinderplus-db fails" bakta_db_reformat.sh "${BASE_URL}/bakta_db_noamr.tar.xz"
 expect_fail "bakta: corrupt tarball fails" bakta_db_reformat.sh "${BASE_URL}/corrupt.tar.xz"
 expect_fail "bakta: 404 URL fails" bakta_db_reformat.sh "${BASE_URL}/no_such_file.tar.xz"
+MOCK_BIN="${MOCK_FAIL}"
+expect_fail "bakta: amrfinder_update failure fails the provisioning" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
+MOCK_BIN=""
 RUN_IMG=""
 
 #

@@ -354,6 +354,35 @@ amrfinderplus-db error, delete the partial `databases/bakta/` directory and
 re-run — the download resumes from the pinned Zenodo URL. The same checks
 apply to a custom database directory.
 
+### BAKTA_BAKTA fails mid-annotation with "amrfinder error! error code: 1"
+
+**Error (after ~10 minutes of successful annotation, at the AMR expert step):**
+```
+Exception: amrfinder error! error code: 1. Please, try 'amrfinder_update --force_update --database .../amrfinderplus-db' ...
+```
+and the per-bin `<sample>_<bin>.log` shows
+`Software requires database version at least <date>` when amrfinder is run by hand.
+
+**Cause:** the official Bakta DB v6.0 tarball bundles a 2024-era AMRFinderPlus
+database, but the AMRFinderPlus **program** inside the pinned bakta container
+is newer and refuses databases older than its minimum. This bites
+`--custom_bakta_db` directories extracted straight from the official tarball.
+The pipeline's own download path (`FORMAT_BAKTA_DB`) refreshes the
+AMRFinderPlus component during provisioning, so auto-downloaded databases are
+not affected.
+
+**Solution:** refresh the AMRFinderPlus component inside your custom database
+once (~300 MB from NCBI; adds a new dated subdirectory and repoints the
+`latest` symlink — the rest of the database is untouched):
+```bash
+docker run --rm -u $(id -u):$(id -g) \
+    -v /path/to/bakta_db/amrfinderplus-db:/amrdb \
+    quay.io/biocontainers/bakta:1.12.1--pyhdfd78af_0 \
+    amrfinder_update --force_update --database /amrdb
+```
+Then re-run with `-resume` (the Bakta tasks re-run because their database
+input changed; everything upstream stays cached).
+
 ### MICROBECENSUS task fails / `cpge` columns are empty / `ags_and_ge.tsv` says `unavailable`
 
 **Symptom:** the run completes, but a `MICROBECENSUS` task shows as failed

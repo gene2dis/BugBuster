@@ -348,7 +348,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_bakta_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom Bakta database directory in the schema 6 layout (the content of an extracted `db.tar.xz`/`db-light.tar.xz`: `version.json`, `amrfinderplus-db/`, and the Bakta annotation databases). Must be schema 6 — Bakta 1.12.x rejects older schemas. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded database version is `custom`
+- **Description**: Path to custom Bakta database directory in the schema 6 layout (the content of an extracted `db.tar.xz`/`db-light.tar.xz`: `version.json`, `amrfinderplus-db/`, and the Bakta annotation databases). Must be schema 6 — Bakta 1.12.x rejects older schemas. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded database version is `custom`. **Note:** the official v6.0 tarball bundles an AMRFinderPlus database too old for the AMRFinderPlus in the pinned bakta container — refresh it once with `amrfinder_update --force_update --database <db>/amrfinderplus-db` (run inside the bakta container; see `docs/troubleshooting.md`), otherwise every annotation fails at the AMR expert step. The pipeline's auto-download path does this refresh automatically
 - **Example**: `--custom_bakta_db /path/to/bakta_db`
 
 ---

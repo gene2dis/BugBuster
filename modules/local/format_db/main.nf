@@ -220,11 +220,16 @@ process FORMAT_DBCAN_DB {
 
 process FORMAT_BAKTA_DB {
     tag "format_bakta_db"
-    // Not the shared wget image: the Bakta DB ships as .tar.xz and that image
-    // has no xz. Same Seqera Containers source, wget + xz pinned together.
+    // Runs in the SAME pinned bakta container the BAKTA_BAKTA module uses
+    // (not the shared wget image): provisioning must run amrfinder_update —
+    // the official DB tarball bundles an AMRFinderPlus DB too old for the
+    // container's AMRFinderPlus binary (T7 acceptance finding, 2026-10-06) —
+    // and using the identical image guarantees the refreshed DB matches the
+    // binary that will consume it. wget/tar/xz verified present in the image
+    // (busybox tar; -xJf --strip-components extraction verified live).
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget_xz:34f842268416751e' :
-        'community.wave.seqera.io/library/wget_xz:0b990a2ba500ab9f' }"
+        'https://depot.galaxyproject.org/singularity/bakta:1.12.1--pyhdfd78af_0' :
+        'quay.io/biocontainers/bakta:1.12.1--pyhdfd78af_0' }"
 
     label 'process_download_extensive'
 
