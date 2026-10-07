@@ -12,6 +12,32 @@ next release is tagged.
 
 ### Added
 
+- **Read-level functional profiling (`--read_level_functional woltka`)**
+  - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
+    with `--assembly_mode none`) and of the contig/MAG branches; one backend
+    per run, validated at launch
+  - Woltka 0.1.7 backend: Bowtie2 alignment of the host-removed reads against
+    the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit
+    settings (`WOLTKA_ALIGN`, trimmed SAM), Woltka ORF classification
+    (`WOLTKA_CLASSIFY`; mates counted separately, multi-hit reads divided 1/k,
+    or left unassigned with `--woltka_uniq`), and per-ORF composition to KO,
+    EC, COG, Pfam and MetaCyc pathway read counts — each ORF counted once per
+    distinct term (Woltka's own `collapse` was found to inflate counts through
+    duplicate map entries and chained maps, so it is not used)
+  - Study-level `AGGREGATE_READ_FUNCTIONS` writes `read_function_abundance.tsv`
+    (same schema as the contig branch, `source = reads`, native unit = reads,
+    copies per genome equivalent from MicrobeCensus), wide
+    `read_function_wide_<ontology>_{native,cpge}.tsv` matrices,
+    `read_annotated_fraction.tsv` and `read_sample_summary.tsv` to
+    `07_functional_annotation/summary/`; per-sample tables to
+    `07_functional_annotation/reads/woltka/<sample>/`. Reported separately
+    from, never merged with, the assembly-based tables
+  - WoLr2 subset (~94 GB: Bowtie2 index + ORF coordinates + KEGG / MetaCyc /
+    Pfam maps) auto-downloaded from the official host with md5 verification
+    (`--woltka_db wolr2`), or a local mirror via `--custom_woltka_db`; the
+    alignment needs ≥ 68 GB RAM
+  - MicrobeCensus now also runs for the read branch (once per sample when both
+    branches are on)
 - **MAG-level functional annotation (`--mag_level_functional`)**
   - Bakta 1.12.1 annotation of every MetaWRAP-refined bin, one task per bin
     (nf-core `bakta/bakta` module, patched to emit `versions.yml`; per-bin

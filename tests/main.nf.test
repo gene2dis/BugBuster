@@ -234,6 +234,11 @@ nextflow_pipeline {
                 assembly_mode           = "assembly"
                 taxonomic_profiler      = "none"
                 contig_level_functional = true
+                // Read branch alongside (T8a): pins coexistence with the
+                // contig branch, the shared MicrobeCensus, and the
+                // --custom_woltka_db path (committed WoLr2-layout fixture)
+                read_level_functional   = "woltka"
+                custom_woltka_db        = "${projectDir}/tests/data/woltka/db"
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
@@ -265,6 +270,14 @@ nextflow_pipeline {
             assert path("${outputDir}/07_functional_annotation/microbecensus/test_sample1/test_sample1.ags.tsv").exists()
             assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
             assert path("${outputDir}/07_functional_annotation/dbcan/test_sample1/test_sample1.overview.tsv").exists()
+
+            // Read branch (T8a) next to the contig branch: MicrobeCensus is
+            // shared (still 2 tasks, not 4), the custom DB skips the download,
+            // and the read tables are separate files from the contig ones
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_CLASSIFY") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_WOLTKA_DB") } == 0
+            assert path("${outputDir}/07_functional_annotation/summary/function_abundance.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/read_function_abundance.tsv").exists()
         }
     }
 
@@ -313,6 +326,9 @@ nextflow_pipeline {
             assert !path("${outputDir}/07_functional_annotation/microbecensus").exists()
             assert !path("${outputDir}/07_functional_annotation/dbcan").exists()
             assert path("${outputDir}/07_functional_annotation/summary/ags_and_ge.tsv").exists()
+            // Read branch off by default (T8a)
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA") } == 0
+            assert !path("${outputDir}/07_functional_annotation/reads").exists()
 
             // Gene calling keyed by the coassembly meta; counts keyed per sample
             assert path("${outputDir}/07_functional_annotation/gene_calling/coassembly/coassembly.faa.gz").exists()
@@ -556,6 +572,78 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the read-level functional branch without an assembly") {
+        // T8a (design doc Sections 3.4, 4.6.2): the read branch must run
+        // with --assembly_mode none and nothing of the contig/MAG branches.
+        // Woltka ships normal biocontainers, so no engine guard applies.
+        // No --custom_woltka_db here: pins the FORMAT_WOLTKA_DB provisioning
+        // path (the assembly-mode functional test pins the custom path).
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "woltka"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_WOLTKA_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_ALIGN") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_CLASSIFY") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_READ_FUNCTIONS") } == 1
+            // MicrobeCensus gate widened to the read branch (Section 4.7)
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
+            // Nothing of the assembly or the contig/MAG branches
+            assert workflow.trace.tasks().count { task -> task.name.contains("MEGAHIT") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("EGGNOG_MAPPER") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 0
+
+            // Section 9.1 layout: per-sample reads/woltka/<id>/, study-level
+            // read_* tables in summary/ (no contig-branch tables)
+            assert path("${outputDir}/07_functional_annotation/reads/woltka/test_sample1/test_sample1.woltka_functions.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/reads/woltka/test_sample2/test_sample2.bowtie2.log").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/read_function_abundance.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/read_function_wide_ko_native.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/summary/read_sample_summary.tsv").exists()
+            assert !path("${outputDir}/07_functional_annotation/summary/function_abundance.tsv").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("woltka: 0.1.7")
+        }
+    }
+
+    test("Rejects an unknown read_level_functional backend") {
+        // Design doc Section 7: unknown backends are rejected at launch, not
+        // at runtime (message-agnostic: the schema enum fires first)
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                read_level_functional = "humann_typo"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("read_level_functional")
+        }
+    }
+
     test("Stub run wires the MAG functional annotation branch") {
         // T7: --mag_level_functional alone (contig branch unset) must run
         // Bakta once per refined bin and nothing of the contig branch —
@@ -597,6 +685,7 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 0
             assert !path("${outputDir}/07_functional_annotation/summary").exists()
 

@@ -32,12 +32,13 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins)
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent, reported separately from the contig branch; needs no assembly)
 
 ### Pipeline Workflow
 
 ```
 Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
+                                            ├──→ Read-level functions (Woltka/WoLr2, optional)
                                             ↓
                                       Assembly (MEGAHIT)
                                             ↓
@@ -152,6 +153,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's COG ids to COG functional categories | `contig_level_functional=true` |
 | **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
 | **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
+| **Web of Life WoLr2** | ~94 GB (Bowtie2 index 93.6 GB + coordinates/maps ~0.6 GB) | Read-level functional profiling (Woltka); alignment needs ≥ 68 GB RAM | `read_level_functional='woltka'` |
 
 ### Manual Database Download
 
@@ -187,6 +189,24 @@ wget -P /shared/databases/bugbuster/bakta/ \
     https://zenodo.org/record/14916843/files/db.tar.xz
 tar -xJf /shared/databases/bugbuster/bakta/db.tar.xz -C /shared/databases/bugbuster/bakta/
 
+# Download the Web of Life (WoLr2) subset the Woltka read-level backend uses
+# (~94 GB), keeping the FTP layout so the directory works as --custom_woltka_db.
+# The .md5 files are checksums of the UNCOMPRESSED content.
+BASE=https://ftp.microbio.me/pub/wol2
+DEST=/shared/databases/bugbuster/wol2
+get() { mkdir -p "$DEST/$(dirname "$1")"; wget -c --tries=10 -nv -O "$DEST/$1" "$BASE/$1"; }
+for f in WoLr2.1.bt2l WoLr2.2.bt2l WoLr2.3.bt2l WoLr2.4.bt2l WoLr2.rev.1.bt2l WoLr2.rev.2.bt2l; do
+    get databases/bowtie2/$f; done
+for f in coords.txt length.map; do get proteins/$f.xz; get proteins/$f.md5; done
+for f in orf-to-ko.map.xz orf-to-ko.map.md5 ko-to-ec.map ko-to-cog.map ko_name.txt; do get function/kegg/$f; done
+for f in orf-to-protein.map.xz orf-to-protein.map.md5 protein-to-enzrxn.map enzrxn-to-reaction.map \
+         reaction-to-pathway.map reaction-to-ec.map pathway_name.txt; do get function/metacyc/$f; done
+for f in orf-to-pfam.map.xz orf-to-pfam.map.md5 pfam_name.txt; do get function/pfam/$f; done
+for x in proteins/coords.txt proteins/length.map function/kegg/orf-to-ko.map \
+         function/metacyc/orf-to-protein.map function/pfam/orf-to-pfam.map; do
+    [ "$(xz -dc $DEST/$x.xz | md5sum | cut -d' ' -f1)" = "$(cut -d' ' -f1 $DEST/$x.md5)" ] \
+        && echo "OK  $x" || echo "BAD $x"; done
+
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
 # combined phiX + host Bowtie2 index from FASTA on first use
 wget -P /shared/databases/bugbuster/ \
@@ -206,6 +226,7 @@ nextflow run main.nf \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
+    --custom_woltka_db /shared/databases/bugbuster/wol2 \
     --custom_cog_db /shared/databases/bugbuster/cog/cog-24.def.tab \
     -profile docker
 ```
@@ -311,6 +332,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
 | `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
 | `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
+| `--read_level_functional` | `none` | `woltka`, `none` | Read-level functional profiling backend (needs no assembly; see the note below) |
+| `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -338,6 +361,27 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > `--contig_level_functional` and, unlike it, runs on any container engine
 > (docker included).
 
+> **Note for `--read_level_functional woltka`:** host-removed reads are aligned with
+> Bowtie2 to the Web of Life release 2 (WoLr2, 15,953 genomes) using the SHOGUN
+> multi-hit settings (`-k 16`, the WoL/Qiita standard), and Woltka assigns each read
+> to the WoLr2 ORF it overlaps (≥ 80 % of the read inside the ORF). Mates are counted
+> as separate reads, and a read whose reported alignments (up to 16 within the
+> score threshold) hit k ORFs contributes 1/k to each
+> (`--woltka_uniq` leaves such reads unassigned instead). ORF counts are then
+> summarized to KO, EC (via KO), COG ortholog groups (via KO; e.g. `COG0604` — not
+> the single-letter COG categories of the contig branch), Pfam and MetaCyc pathways
+> from the WoLr2 maps. **A read contributes its full weight once to each distinct
+> term its ORF carries** (an ORF with two KOs counts toward both; the same intentional
+> double counting as the contig branch). The branch runs on any container engine,
+> needs no assembly (it also works with `--assembly_mode none`), and its tables are
+> reported **separately** (`read_*` files). Woltka identifies reads by name, so input
+> reads must have unique names (normal for sequencer output; some simulated test
+> datasets reuse names, and Woltka then counts same-named reads once). Read-level
+> profiling recovers the unassembled fraction but over-predicts, so it is never
+> merged with the assembly-based tables. The WoLr2 database is ~94 GB and
+> alignment needs **≥ 68 GB RAM** per task; pre-download it once and pass
+> `--custom_woltka_db` (Section 3, Manual Database Download).
+
 ### 6.3 Database Selection Options
 
 | Parameter | Default | Options | Description |
@@ -351,6 +395,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
+| `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
 | `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
@@ -374,6 +419,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
 | `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
 | `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
+| `--custom_woltka_db` | Path to a local WoLr2 mirror in the FTP layout (see `docs/parameters.md`) |
 | `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
 ### 6.5 FastP Quality Filtering Options
@@ -744,7 +790,7 @@ results/
     │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
     │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
     ├── microbecensus/                          # MicrobeCensus average genome size
-    │   └── {sample}/                           # (if contig_level_functional=true and microbecensus=true)
+    │   └── {sample}/                           # (if microbecensus=true and contig_level_functional=true or read_level_functional != none)
     │       ├── {sample}.ags.tsv                # AGS, genome equivalents, total bases
     │       └── {sample}.microbecensus.txt      # raw MicrobeCensus output (provenance)
     ├── summary/                                # study-level tables (if contig_level_functional=true)
@@ -754,7 +800,19 @@ results/
     │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples; ko/cog/ec/pfam/cazy from eggNOG, cazy_dbcan from run_dbcan)
     │   ├── function_wide_{ontology}_cpge.tsv   # wide CPGE matrix per ontology (blank columns for samples without AGS)
     │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
-    │   └── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
+    │   ├── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
+    │   ├── read_function_abundance.tsv         # read branch (if read_level_functional != none): same schema, source=reads
+    │   ├── read_function_wide_{ontology}_native.tsv  # wide read-count matrix (ko, ec, cog, pfam, metacyc)
+    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (blank columns for samples without AGS)
+    │   ├── read_annotated_fraction.tsv         # share of ORF-assigned reads carrying a term, per ontology
+    │   └── read_sample_summary.tsv             # reads assigned / ambiguous, AGS, CPGE status, tool + DB version
+    ├── reads/                                  # read-level functional profiling, one backend per run
+    │   └── woltka/{sample}/                    # (if read_level_functional=woltka; needs no assembly)
+    │       ├── {sample}.bowtie2.log            # alignment summary against WoLr2
+    │       ├── {sample}.woltka_orf.tsv         # Woltka per-ORF read counts
+    │       ├── {sample}.woltka_functions.tsv   # per-function read counts and RPK
+    │       ├── {sample}.woltka_summary.tsv     # reads assigned / annotated per ontology
+    │       └── {sample}.woltka_unassigned.tsv  # reads left unassigned by --woltka_uniq
     ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
     │   └── {sample}/                           # (if mag_level_functional=true; requires binning with >= 2 binners)
     │       ├── {sample}_{bin}.gff3             # annotation in GFF3
@@ -854,6 +912,26 @@ results/
 > thousand reads to be accurate — on very small datasets the value is
 > mechanical, not meaningful.
 
+> **Read-level tables (`read_*` files, `--read_level_functional`):** the read
+> branch uses the same long schema as `function_abundance.tsv` with
+> `source = reads` and `backend` naming the tool, but is written to its own
+> files and never merged with the contig branch. `abundance_native` is the
+> backend's own unit — for Woltka, reads assigned (mates counted separately;
+> fractional when a read is divided 1/k across its hit ORFs) with
+> `native_unit = reads`. `abundance_tpm` is empty (TPM is contig-branch only).
+> `abundance_cpge` uses the same definition as above, with RPK computed over the
+> WoLr2 reference ORF lengths: `CPGE = (reads / (ORF length / 1000)) /
+> genome_equivalents`, blank when MicrobeCensus is unavailable for the sample
+> (`read_sample_summary.tsv` then shows `cpge_status = unavailable`). Read-branch
+> and contig-branch values are **not directly comparable**: they count different
+> things (reads hitting reference genomes vs reads mapped back to the sample's own
+> assembled genes), and read-level profiling recovers the unassembled fraction
+> but over-predicts, while the assembly-based branch is more precise. Woltka COG
+> accessions are ortholog
+> groups (`COG0604`), not the single-letter categories of the contig branch;
+> Pfam accessions keep their version suffix as in WoLr2 (`PF00004.32`); MetaCyc
+> accessions are pathways (`PWY-5101`); EC numbers are derived via KO.
+
 ### Database Storage Directory
 
 By default, databases are stored separately from results at `<output_dir>/../databases/`:
@@ -871,7 +949,9 @@ databases/                            # Database storage (configurable via --dat
 ├── gtdbtk/                           # GTDB-TK database
 ├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
 ├── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
-└── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
+├── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
+├── bakta/                            # Bakta database v6.0 (full 31.9 GB / light 1.3 GB download)
+└── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -899,9 +979,11 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
 | `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
-| `07_functional_annotation/microbecensus/` | `contig_level_functional=true` and `microbecensus=true` | MicrobeCensus average genome size and genome equivalents per sample |
+| `07_functional_annotation/microbecensus/` | `microbecensus=true` and (`contig_level_functional=true` or `read_level_functional != 'none'`) | MicrobeCensus average genome size and genome equivalents per sample |
 | `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
 | `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin) |
+| `07_functional_annotation/reads/woltka/` | `read_level_functional='woltka'` | Woltka read-level ORF and function tables per sample (no assembly needed) |
+| `07_functional_annotation/summary/read_*.tsv` | `read_level_functional != 'none'` | Study-level read-branch tables (same schema, `source=reads`), reported separately from the contig branch |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---

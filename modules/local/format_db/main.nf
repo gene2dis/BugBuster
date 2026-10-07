@@ -276,6 +276,39 @@ process FORMAT_COG_DB {
         """
 }
 
+process FORMAT_WOLTKA_DB {
+    tag "format_woltka_db"
+    // Runs in the pinned woltka container the WOLTKA_CLASSIFY module uses
+    // (not the shared wget image): the md5 files published with WoLr2 cover
+    // the UNCOMPRESSED content, so verification needs xz, which the wget
+    // image lacks (T7 finding). wget here is busybox (no --tries), hence the
+    // retry loop inside bin/woltka_db_reformat.sh
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
+        'https://depot.galaxyproject.org/singularity/woltka:0.1.7--pyhdfd78af_0' :
+        'quay.io/biocontainers/woltka:0.1.7--pyhdfd78af_0' }"
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("woltka_db")
+
+    script:
+        """
+        ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        mkdir -p woltka_db/databases/bowtie2 woltka_db/proteins \
+            woltka_db/function/kegg woltka_db/function/metacyc woltka_db/function/pfam
+        touch woltka_db/databases/bowtie2/WoLr2.rev.1.bt2l woltka_db/proteins/coords.txt.xz \
+            woltka_db/DB_VERSION
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

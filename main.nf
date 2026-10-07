@@ -68,6 +68,8 @@ def printHelp() {
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
       --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
       --mag_level_functional        Bakta annotation of refined bins; needs --include_binning and >= 2 --binners (default: ${params.mag_level_functional})
+      --read_level_functional       Read-level functional profiling backend: 'woltka', 'none' (default: ${params.read_level_functional})
+      --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -110,6 +112,7 @@ include { TAXONOMY           } from './subworkflows/local/taxonomy'
 include { ASSEMBLY           } from './subworkflows/local/assembly'
 include { BINNING            } from './subworkflows/local/binning'
 include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotation'
+include { READ_FUNCTIONAL    } from './subworkflows/local/read_functional'
 
 // Modules for functionality not covered by subworkflows
 
@@ -234,6 +237,13 @@ workflow {
     if (params.mag_level_functional && binners_list.size() < 2) {
         error("--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
     }
+    // Read-level functional backend (design doc Section 7: unknown values
+    // are rejected at launch). The schema enum already enforces this; kept
+    // here so the accepted set lives next to the other launch validations
+    def valid_read_functional = ['woltka', 'none']
+    if (!(params.read_level_functional in valid_read_functional)) {
+        error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
+    }
     if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
         error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
     }
@@ -254,8 +264,8 @@ workflow {
     // pairing with the long functional annotation runs and their large
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
-    if (workflow.profile.tokenize(',').contains('low_disk') && (params.contig_level_functional || params.mag_level_functional)) {
-        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB) are stored at --databases_dir regardless of this profile"
+    if (workflow.profile.tokenize(',').contains('low_disk') && (params.contig_level_functional || params.mag_level_functional || params.read_level_functional != 'none')) {
+        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -273,6 +283,7 @@ workflow {
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
+    log.info "  Read functional      : ${params.read_level_functional}"
     log.info "  MicrobeCensus        : ${params.microbecensus}"
     log.info "  dbCAN CAZy           : ${params.functional_cazy}"
     log.info ""
@@ -447,7 +458,8 @@ workflow {
     //
     // MODULE: MicrobeCensus average genome size on host-removed reads
     // (design doc Section 4.7). Sits outside the branch subworkflows because
-    // both the contig and (future, T8) read branches consume its output.
+    // both the contig and the read branch (T8) consume its output; the read
+    // branch needs no assembly.
     // Failure is non-fatal (errorStrategy in config/modules.config): a failed
     // sample emits nothing here and falls back to TPM-only in aggregation.
     //
@@ -458,7 +470,9 @@ workflow {
     //
     def run_microbecensus = params.microbecensus.toString().toBoolean()
     ch_ags = channel.empty()
-    if ( run_microbecensus && params.contig_level_functional && params.assembly_mode != "none" ) {
+    def run_contig_functional = params.contig_level_functional && params.assembly_mode != "none"
+    def run_read_functional   = params.read_level_functional != "none"
+    if ( run_microbecensus && (run_contig_functional || run_read_functional) ) {
         MICROBECENSUS(ch_clean_reads)
         ch_ags = MICROBECENSUS.out.ags
         ch_versions = ch_versions.mix(MICROBECENSUS.out.versions.first())
@@ -504,6 +518,21 @@ workflow {
             ch_cog_def
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
+    }
+
+    //
+    // SUBWORKFLOW: Read-level functional profiling (design doc Section 4.6),
+    // one backend per run, independent of assembly; its read_* tables are
+    // reported separately from the contig branch's
+    //
+    if ( run_read_functional ) {
+        READ_FUNCTIONAL(
+            ch_clean_reads,
+            PREPARE_DATABASES.out.woltka_db
+                .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." },
+            ch_ags
+        )
+        ch_versions = ch_versions.mix(READ_FUNCTIONAL.out.versions)
     }
 
     //

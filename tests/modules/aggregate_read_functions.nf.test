@@ -1,0 +1,94 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    AGGREGATE_READ_FUNCTIONS Module Test
+
+    Study-level read-branch aggregation (design doc Sections 4.6, 5.3;
+    task T8a). The aggregation logic and its guards are covered directly by
+    tests/bin/test_aggregate_read_functions.sh; these tests verify the module
+    wrapper: staging (incl. the backend_versions.yml rename and the optional
+    ags list), the script invocation and the declared outputs.
+
+    Fixtures: tests/data/woltka/wtest.woltka_*.tsv, woltka_versions.yml and
+    wtest.ags.tsv (GE 2.0), made by tests/bin/make_woltka_fixtures.sh.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test AGGREGATE_READ_FUNCTIONS Process"
+    script "../../modules/local/aggregate_read_functions/main.nf"
+    process "AGGREGATE_READ_FUNCTIONS"
+
+    test("aggregates a Woltka sample with AGS into the 5.3 schema") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = [ file("${projectDir}/tests/data/woltka/wtest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines()
+            assert rows[0] == 'sample_id\tsource\tbackend\tontology\taccession\tdescription\tabundance_tpm\tabundance_cpge\tabundance_native\tnative_unit'
+            // K00003: 8 reads over a 1.2 kb ORF -> RPK 6.666667, / GE 2.0
+            assert rows.contains('wtest\treads\twoltka\tko\tK00003\tfixture enzyme three\t\t3.333333\t8.000000\treads')
+            assert process.out.function_wide.get(0).size() == 10
+            assert path(process.out.annotated_fraction.get(0)).text.contains('wtest\twoltka\tany\t20.000000\t18.000000\t0.9000')
+            assert path(process.out.sample_summary.get(0)).text.contains('\tok')
+            assert path(process.out.versions.get(0)).text.contains('pandas:')
+        }
+    }
+
+    test("no AGS: CPGE blank, status unavailable") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.function_abundance.get(0)).readLines().drop(1).every { row -> row.split('\t', -1)[7] == '' }
+            assert path(process.out.sample_summary.get(0)).text.contains('unavailable')
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 10
+            assert process.out.function_abundance.size() == 1
+            assert process.out.annotated_fraction.size() == 1
+            assert process.out.sample_summary.size() == 1
+        }
+    }
+}

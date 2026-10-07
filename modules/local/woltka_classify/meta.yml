@@ -1,0 +1,53 @@
+name: woltka_classify
+description: Woltka ORF-level classification of Web of Life alignments, then per-ORF de-duplicated composition of KO / EC / COG / Pfam / MetaCyc-pathway read counts and RPK (bin/woltka_function_profile.py)
+keywords:
+  - functional profiling
+  - read-level
+  - woltka
+  - web of life
+  - metagenomics
+tools:
+  - woltka:
+      description: Web of Life Toolkit App, a classifier for shotgun metagenomic alignments
+      homepage: https://github.com/qiyunzhu/woltka
+      documentation: https://github.com/qiyunzhu/woltka/tree/master/doc
+      doi: "10.1128/msystems.00167-22"
+      licence: ["BSD-3-Clause"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - sam:
+      type: file
+      description: Trimmed, gzipped SAM from WOLTKA_ALIGN (may hold no records)
+      pattern: "*.wol.sam.gz"
+  - wol_db:
+      type: directory
+      description: WoLr2 database in the FTP layout (proteins/coords.txt.xz, proteins/length.map.xz, function/{kegg,metacyc,pfam}/ maps; optional DB_VERSION provenance file written by bin/woltka_db_reformat.sh)
+      pattern: "*"
+
+output:
+  - orf_profile:
+      type: file
+      description: Woltka ORF-level read counts (TSV; fractional under the default 1/k multi-hit division; an 'Unassigned' row with --woltka_uniq)
+      pattern: "*.woltka_orf.tsv"
+  - functions:
+      type: file
+      description: Per-function read counts and RPK (sample_id, ontology, accession, description, count, rpk) for ko, ec, cog, pfam and metacyc; each ORF contributes once per distinct term
+      pattern: "*.woltka_functions.tsv"
+  - summary:
+      type: file
+      description: Reads assigned to ORFs and reads carrying a term, overall ('any') and per ontology
+      pattern: "*.woltka_summary.tsv"
+  - unassigned:
+      type: file
+      description: Reads left unassigned by --woltka_uniq ambiguity (0 by default)
+      pattern: "*.woltka_unassigned.tsv"
+  - versions:
+      type: file
+      description: Software versions (live woltka version plus the database release from DB_VERSION, or 'custom (<index name>)')
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

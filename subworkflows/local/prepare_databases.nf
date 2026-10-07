@@ -15,6 +15,7 @@ include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
+include { FORMAT_WOLTKA_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_COG_DB           } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
@@ -39,6 +40,7 @@ workflow PREPARE_DATABASES {
     ch_eggnog_db        = channel.empty()
     ch_dbcan_db         = channel.empty()
     ch_bakta_db         = channel.empty()
+    ch_woltka_db        = channel.empty()
     ch_cog_def          = channel.empty()
     ch_versions         = channel.empty()
 
@@ -257,6 +259,20 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // Web of Life (WoLr2) for the Woltka read-level functional backend
+    // (design doc Section 4.6.2). ~94 GB; a pre-downloaded mirror of the FTP
+    // layout is passed with --custom_woltka_db
+    //
+    if ( params.read_level_functional == 'woltka' ) {
+        if ( params.custom_woltka_db ) {
+            ch_woltka_db = channel.fromPath(params.custom_woltka_db, checkIfExists: true)
+        } else {
+            ch_woltka_ref = channel.fromList(params.woltka_ref_db[params.woltka_db]["url"])
+            ch_woltka_db = FORMAT_WOLTKA_DB(ch_woltka_ref)
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( params.rgi_prediction ) {
@@ -294,6 +310,7 @@ workflow PREPARE_DATABASES {
     eggnog_db              = ch_eggnog_db
     dbcan_db               = ch_dbcan_db
     bakta_db               = ch_bakta_db
+    woltka_db              = ch_woltka_db
     cog_def                = ch_cog_def
     versions               = ch_versions
 }

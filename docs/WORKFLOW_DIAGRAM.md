@@ -46,7 +46,9 @@ flowchart TD
     ARGContigReport --> ARGBlobplot[ARG_BLOBPLOT]
 
     %% Functional Annotation Branch
-    CleanReads -->|"if contig_level_functional<br/>& microbecensus (default)"| MicrobeCensus[MICROBECENSUS<br/>Avg Genome Size / GE]
+    CleanReads -->|"if (contig_level_functional or read_level_functional)<br/>& microbecensus (default)"| MicrobeCensus[MICROBECENSUS<br/>Avg Genome Size / GE]
+    CleanReads -->|"if read_level_functional = woltka<br/>(no assembly needed)"| ReadFunctional["READ_FUNCTIONAL SUBWORKFLOW<br/>WOLTKA_ALIGN (Bowtie2 vs WoLr2)<br/>→ WOLTKA_CLASSIFY<br/>→ AGGREGATE_READ_FUNCTIONS<br/>(read_* tables, reported separately)"]
+    MicrobeCensus --> ReadFunctional
     Pyrodigal -->|if contig_level_functional| Functional["FUNCTIONAL_ANNOTATION SUBWORKFLOW<br/>eggNOG-mapper v3 (search + annotate)<br/>+ RUN_DBCAN CAZy (if functional_cazy, default)<br/>+ FEATURECOUNTS_GENES → AGGREGATE_FUNCTIONS<br/>(TPM + CPGE tables)"]
     MicrobeCensus --> Functional
     RefinedBins -->|"if mag_level_functional<br/>(needs >= 2 binners)"| Bakta[BAKTA_BAKTA<br/>MAG annotation, per bin]
@@ -68,6 +70,7 @@ flowchart TD
     Clustering --> End
     MetaCerberus --> End
     Functional --> End
+    ReadFunctional --> End
     Bakta --> End
     RefinedBins --> End
 
@@ -124,13 +127,14 @@ flowchart TD
     Funcdb -->|Yes| CogDB[FORMAT_COG_DB]
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
     Magdb{mag_level_functional?} -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
+    Readfuncdb{"read_level_functional<br/>= woltka?"} -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 
@@ -300,6 +304,8 @@ flowchart TD
 | `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
 | `dbcan_consensus` | `'recommended'` | Which dbCAN calls feed aggregation: 'recommended' (≥2 tools) or 'any' |
 | `microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (non-fatal on failure) |
+| `read_level_functional` | `'none'` | Read-level functional profiling backend: 'woltka', 'none' (no assembly needed) |
+| `woltka_uniq` | `false` | Woltka: leave multi-hit reads unassigned instead of dividing them 1/k |
 | `featurecounts_multimap` | `'primary'` | featureCounts multi-mapping policy: 'primary', 'all', 'none' |
 | `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
@@ -345,7 +351,7 @@ flowchart LR
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
-- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), METACERBERUS
+- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / AGGREGATE_READ_FUNCTIONS (read level), METACERBERUS
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
 - **Reporting**: custom report generators
 
@@ -363,6 +369,7 @@ flowchart LR
 | `ASSEMBLY` | Metagenome assembly (per-sample or co-assembly) |
 | `BINNING` | Unified binning workflow (mode-agnostic) |
 | `FUNCTIONAL_ANNOTATION` | Functional annotation, two independent branches: contig (eggNOG-mapper v3, run_dbcan CAZy, featureCounts gene abundance, study-level TPM/CPGE aggregation) and MAG (Bakta per refined bin) |
+| `READ_FUNCTIONAL` | Optional read-level functional profiling, one backend per run (Woltka vs WoLr2); independent of assembly, tables reported separately |
 
 ### Quality Control (QC Subworkflow)
 | Module | Description |
@@ -433,6 +440,13 @@ flowchart LR
 | `AGGREGATE_FUNCTIONS` | always in the branch | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology (eggNOG and dbCAN CAZy kept separate), annotated fraction, AGS summary |
 | `BAKTA_BAKTA` | if `mag_level_functional` (independent of the contig branch; needs binning with ≥2 binners) | Bakta annotation of every MetaWRAP-refined bin, one task per bin, published to `mags/<sample>/` |
 
+### Read-level Functional Profiling (READ_FUNCTIONAL Subworkflow)
+| Module | Condition | Description |
+|--------|-----------|-------------|
+| `WOLTKA_ALIGN` | if `read_level_functional = woltka` | Bowtie2 (SHOGUN multi-hit settings) of the clean reads against the WoLr2 genomes; trimmed SAM (≥ 68 GB RAM) |
+| `WOLTKA_CLASSIFY` | if `read_level_functional = woltka` | Woltka ORF classification, then per-ORF de-duplicated KO / EC / COG / Pfam / MetaCyc read counts and RPK |
+| `AGGREGATE_READ_FUNCTIONS` | if `read_level_functional != none` | Study-level `read_*` tables (same schema, `source=reads`; native read counts + CPGE), never merged with the contig branch |
+
 ---
 
 ## Output Structure
@@ -450,7 +464,9 @@ results/
 └── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
                                  # gene abundance, MicrobeCensus, TPM/CPGE
                                  # summary tables, Bakta MAG annotations
-                                 # (mags/) and MetaCerberus contigs/
+                                 # (mags/), read-level Woltka tables
+                                 # (reads/ + summary/read_*) and
+                                 # MetaCerberus contigs/
 ```
 
 ---

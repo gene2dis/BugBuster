@@ -275,6 +275,7 @@ For better performance, pre-download databases to shared storage:
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
 # Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
+# Web of Life WoLr2 subset (~94 GB, read-level Woltka branch; recipe in manual.md)
 ```
 
 Then specify paths:
@@ -287,6 +288,7 @@ nextflow run main.nf \
     --custom_eggnog_db /shared/db/eggnog/eggnog_db \
     --custom_dbcan_db /shared/db/dbcan/dbcan_db \
     --custom_bakta_db /shared/db/bakta/bakta_db \
+    --custom_woltka_db /shared/db/wol2 \
     ...
 ```
 
@@ -296,7 +298,10 @@ nextflow run main.nf \
 > docker-based `aws`, `gcp`, and `azure` profiles for now (SLURM with the
 > `apptainer`/`singularity` profile works). See the engine note in
 > [`manual.md`](manual.md). The MAG branch (`--mag_level_functional`, Bakta)
-> is unaffected: it uses a normal biocontainer and runs on any engine.
+> is unaffected: it uses a normal biocontainer and runs on any engine, and so
+> is the read-level branch (`--read_level_functional woltka`) — but note its
+> Bowtie2 alignment against WoLr2 needs ≥ 68 GB RAM per task, so size the
+> cloud instance type / queue accordingly.
 
 ---
 

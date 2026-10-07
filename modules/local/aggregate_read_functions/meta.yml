@@ -1,0 +1,64 @@
+name: aggregate_read_functions
+description: Study-level aggregation of the read-level functional branch into the canonical function abundance schema (source=reads), with wide matrices, annotated fractions and a per-sample summary; reported separately from the contig branch
+keywords:
+  - functional profiling
+  - read-level
+  - aggregation
+  - normalization
+  - metagenomics
+tools:
+  - pandas:
+      description: Python data analysis library (runs bin/aggregate_read_functions.py)
+      homepage: https://pandas.pydata.org/
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - functions:
+      type: file
+      description: All samples' per-function tables from WOLTKA_CLASSIFY
+      pattern: "*.woltka_functions.tsv"
+  - summaries:
+      type: file
+      description: All samples' assigned/annotated read summaries
+      pattern: "*.woltka_summary.tsv"
+  - unassigned:
+      type: file
+      description: All samples' unassigned-read tables
+      pattern: "*.woltka_unassigned.tsv"
+  - ags:
+      type: file
+      description: MicrobeCensus AGS tables (optional; samples without one get blank CPGE)
+      pattern: "*.ags.tsv"
+  - backend_versions:
+      type: file
+      description: WOLTKA_CLASSIFY versions.yml, read by the version-aware layout guard
+      pattern: "*.yml"
+  - backend:
+      type: string
+      description: Read-level backend name ('woltka')
+
+output:
+  - function_abundance:
+      type: file
+      description: Section 5.3 table with source=reads (abundance_native = read counts, abundance_cpge = RPK / genome equivalents, abundance_tpm empty)
+      pattern: "read_function_abundance.tsv"
+  - function_wide:
+      type: file
+      description: Wide matrices per ontology (ko, ec, cog, pfam, metacyc), native read counts and CPGE
+      pattern: "read_function_wide_*.tsv"
+  - annotated_fraction:
+      type: file
+      description: Per sample, the share of ORF-assigned reads carrying a term, overall and per ontology
+      pattern: "read_annotated_fraction.tsv"
+  - sample_summary:
+      type: file
+      description: Per sample, backend/tool/database versions, reads assigned, reads unassigned by ambiguity, AGS/GE and the CPGE status (ok/unavailable)
+      pattern: "read_sample_summary.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -24,10 +24,14 @@ DOWNLOAD_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/wget:[^']*'" "${R
 # no NCBI download happens - see MOCK_BIN below)
 BAKTA_IMG=$(grep -o "'quay.io/biocontainers/bakta:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
     | tr -d "'" | head -1)
+# FORMAT_WOLTKA_DB runs in the pinned woltka container (it needs xz for the
+# md5-of-uncompressed checks; its wget is busybox)
+WOLTKA_IMG=$(grep -o "'quay.io/biocontainers/woltka:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
@@ -35,6 +39,7 @@ fi
 echo "=== DB reformat script test suite ==="
 echo "Download image: ${DOWNLOAD_IMG}"
 echo "Bakta image:    ${BAKTA_IMG}"
+echo "Woltka image:   ${WOLTKA_IMG}"
 echo "Report image:   ${REPORT_IMG}"
 echo ""
 
@@ -163,6 +168,14 @@ build_fixtures() {
 }
 build_fixtures
 
+# Woltka WoLr2-layout fixtures, copied from the committed read-branch fixture
+# (tests/data/woltka/db, made by tests/bin/make_woltka_fixtures.sh)
+build_wol_fixture() {
+    local dest="${FIXTURES}/$1"
+    mkdir -p "${dest}"
+    cp -r "${REPO_DIR}/tests/data/woltka/db/databases" "${REPO_DIR}/tests/data/woltka/db/proteins" \
+        "${REPO_DIR}/tests/data/woltka/db/function" "${dest}/"
+}
 # NCBI COG definitions table fixtures (cog-24.def.tab layout + the release's
 # checksums.md5 next to it), plus a bad-md5 and a wrong-layout variant
 for v in cog cog_badmd5 cog_badlayout; do mkdir -p "${FIXTURES}/${v}"; done
@@ -173,6 +186,14 @@ for v in cog cog_badlayout; do
     (cd "${FIXTURES}/${v}" && md5sum cog-24.def.tab > checksums.md5)
 done
 echo "00000000000000000000000000000000  cog-24.def.tab" > "${FIXTURES}/cog_badmd5/checksums.md5"
+
+build_wol_fixture wol2
+build_wol_fixture wol2_badmd5
+echo "00000000000000000000000000000000" > "${FIXTURES}/wol2_badmd5/proteins/coords.txt.md5"
+build_wol_fixture wol2_emptyindex
+: > "${FIXTURES}/wol2_emptyindex/databases/bowtie2/WoLr2.3.bt2l"
+build_wol_fixture wol2_missing
+rm "${FIXTURES}/wol2_missing/function/metacyc/pathway_name.txt"
 
 #
 # Local HTTP server for the fixtures
@@ -209,6 +230,7 @@ run_script() {
         done
     fi
     docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp \
+        -e WOLTKA_DB_RETRIES=1 -e WOLTKA_DB_RETRY_WAIT=0 \
         "${mock_args[@]}" \
         -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
         -v "${workdir}:/dbwork" -w /dbwork \
@@ -411,6 +433,32 @@ fi
 expect_fail "cog: md5 mismatch fails" cog_db_reformat.sh "${BASE_URL}/cog_badmd5/cog-24.def.tab"
 expect_fail "cog: non-COG layout fails" cog_db_reformat.sh "${BASE_URL}/cog_badlayout/cog-24.def.tab"
 expect_fail "cog: 404 URL fails" cog_db_reformat.sh "${BASE_URL}/no_such_dir/cog-24.def.tab"
+
+#
+# woltka_db_reformat.sh (runs in the woltka image FORMAT_WOLTKA_DB pins)
+#
+echo "--- woltka_db_reformat.sh ---"
+RUN_IMG="${WOLTKA_IMG}"
+expect_pass "woltka: valid WoLr2-layout files" woltka_db_reformat.sh "${BASE_URL}/wol2"
+check_file "woltka: Bowtie2 index in the WoLr2 layout" "woltka_db/databases/bowtie2/WoLr2.rev.1.bt2l"
+check_file "woltka: ORF coordinates" "woltka_db/proteins/coords.txt.xz"
+check_file "woltka: ORF lengths" "woltka_db/proteins/length.map.xz"
+check_file "woltka: KEGG ORF map" "woltka_db/function/kegg/orf-to-ko.map.xz"
+check_file "woltka: KEGG KO-to-EC map" "woltka_db/function/kegg/ko-to-ec.map"
+check_file "woltka: MetaCyc reaction-to-pathway map" "woltka_db/function/metacyc/reaction-to-pathway.map"
+check_file "woltka: Pfam ORF map" "woltka_db/function/pfam/orf-to-pfam.map.xz"
+if grep -q '^WoLr2 (' "${LAST_WORKDIR}/woltka_db/DB_VERSION" 2>/dev/null; then
+    echo "✓ woltka: DB_VERSION records the WoLr2 release"
+    PASS=$((PASS + 1))
+else
+    echo "✗ woltka: DB_VERSION missing or does not record the release"
+    FAIL=$((FAIL + 1))
+fi
+expect_fail "woltka: md5 mismatch (uncompressed content) fails" woltka_db_reformat.sh "${BASE_URL}/wol2_badmd5"
+expect_fail "woltka: empty index file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_emptyindex"
+expect_fail "woltka: missing map file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_missing"
+expect_fail "woltka: 404 base URL fails" woltka_db_reformat.sh "${BASE_URL}/no_such_dir"
+RUN_IMG=""
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

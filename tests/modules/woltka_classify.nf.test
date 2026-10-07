@@ -1,0 +1,124 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    WOLTKA_CLASSIFY Module Test
+
+    Woltka ORF classification + per-ORF function composition (design doc
+    Section 4.6.2, task T8a), on the REAL pinned woltka container with the
+    committed fixture alignment and WoLr2-layout database (tests/data/woltka/,
+    made by tests/bin/make_woltka_fixtures.sh). The term-set arithmetic is
+    covered in depth by tests/bin/test_aggregate_read_functions.sh; these
+    tests pin the module wrapper: classify flags, outputs, provenance, the
+    --woltka_uniq ext.args mapping, and the empty-alignment short-circuit.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test WOLTKA_CLASSIFY Process"
+    script "../../modules/local/woltka_classify/main.nf"
+    process "WOLTKA_CLASSIFY"
+
+    test("classifies the fixture alignment and composes function tables") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'wtest' ],
+                    file("${projectDir}/tests/data/woltka/wtest.wol.sam.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def orf = path(process.out.orf_profile.get(0).get(1)).readLines()
+            // mates counted separately (4 pairs -> 8); ambiguous pairs 1/k
+            assert orf.contains('G000000001_2\t8.0')
+            assert orf.contains('G000000001_1\t3.0')
+            assert orf.contains('G000000002_1\t3.0')
+            def functions = path(process.out.functions.get(0).get(1)).text
+            // de-duplicated term sets: EC once per ORF, pathway once per ORF
+            assert functions.contains('wtest\tec\t1.1.1.1\t\t6\t')
+            assert functions.contains('wtest\tmetacyc\tPWY-1\tfixture pathway one\t7\t')
+            assert path(process.out.summary.get(0).get(1)).text.contains('wtest\tany\t20\t18\t0.900000')
+            assert path(process.out.unassigned.get(0).get(1)).readLines()[1] == 'wtest\t0'
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('woltka: 0.1.7')
+            assert versions.contains('wol_db: WoLr2 test fixture')
+        }
+    }
+
+    test("--woltka_uniq leaves ambiguous reads unassigned") {
+        when {
+            params {
+                woltka_uniq = true
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'wuniq' ],
+                    file("${projectDir}/tests/data/woltka/wtest.wol.sam.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.unassigned.get(0).get(1)).readLines()[1] == 'wuniq\t6'
+            assert !path(process.out.functions.get(0).get(1)).text.contains('K00001')
+        }
+    }
+
+    test("an alignment file without records short-circuits to empty tables") {
+        when {
+            process {
+                """
+                def empty_sam = file("\${workDir}/empty.wol.sam.gz")
+                def gz = new java.util.zip.GZIPOutputStream(new FileOutputStream(empty_sam.toFile()))
+                gz.close()
+                input[0] = [
+                    [ id: 'emptytest' ],
+                    empty_sam,
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.orf_profile.get(0).get(1)).readLines() == ['#FeatureID\temptytest']
+            assert path(process.out.functions.get(0).get(1)).readLines().size() == 1
+            assert path(process.out.summary.get(0).get(1)).readLines().size() == 7
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/woltka/wtest.wol.sam.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.functions.get(0).get(1).endsWith('stubtest.woltka_functions.tsv')
+            assert process.out.orf_profile.size() == 1
+            assert process.out.summary.size() == 1
+            assert process.out.unassigned.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('woltka: 0.1.7')
+        }
+    }
+}

@@ -104,6 +104,13 @@
                     "description": "Enable MAG-level functional annotation: Bakta annotation of every refined bin (per-bin GFF3/GBFF/FAA/FNA/TSV). Requires --include_binning and at least two --binners, so that only MetaWRAP quality-filtered bins are annotated. Bins are expected to be bacterial.",
                     "fa_icon": "fas fa-sitemap"
                 },
+                "read_level_functional": {
+                    "type": "string",
+                    "default": "none",
+                    "enum": ["woltka", "none"],
+                    "description": "Read-level functional profiling backend (optional branch; needs no assembly). 'woltka': Bowtie2 against the Web of Life (WoLr2) genomes, then Woltka ORF classification, aggregated to KO/EC/COG/Pfam/MetaCyc pathway read counts and copies per genome equivalent in separate read_* tables (never merged with the contig branch). The WoLr2 alignment needs >= 68 GB RAM.",
+                    "fa_icon": "fas fa-sitemap"
+                },
                 "arg_bin_clustering": {
                     "type": "boolean",
                     "default": false,
@@ -218,6 +225,18 @@
                     "format": "file-path",
                     "description": "Path to a local NCBI COG definitions table (cog-24.def.tab layout: COG id, category letters, ...); skips the download. Must cover the COG ids of the eggNOG database in use.",
                     "fa_icon": "fas fa-file"
+                },
+                "woltka_db": {
+                    "type": "string",
+                    "default": "wolr2",
+                    "description": "Built-in Web of Life database key for the Woltka read-level backend: wolr2 (see config/databases.config; ~94 GB download).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_woltka_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local WoLr2 mirror in the FTP layout (databases/bowtie2/WoLr2.*.bt2l, proteins/coords.txt.xz and length.map.xz, function/{kegg,metacyc,pfam}/ maps); skips the download.",
+                    "fa_icon": "fas fa-folder"
                 },
                 "custom_kraken_db": {
                     "type": "string",
@@ -907,6 +926,12 @@
                     "enum": ["recommended", "any"],
                     "description": "Which dbCAN calls feed aggregation: 'recommended' uses the tool's Recommend Results column (calls supported by at least 2 of DIAMOND/dbCAN HMM/dbCAN-sub), 'any' uses the union of the per-tool calls.",
                     "fa_icon": "fas fa-check-double"
+                },
+                "woltka_uniq": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Woltka backend multi-mapping policy. Default (false): a read whose reported alignments (up to 16 within the score threshold) overlap k ORFs is divided 1/k to each (reads are aligned with the SHOGUN multi-hit Bowtie2 settings). true: such ambiguous reads are left unassigned (woltka --uniq) and reported in read_sample_summary.tsv.",
+                    "fa_icon": "fas fa-layer-group"
                 }
             }
         },

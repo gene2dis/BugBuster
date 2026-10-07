@@ -419,7 +419,11 @@ directory printed in the Nextflow log.
 **Solution:** nothing to fix for the run itself — TPM tables are complete and
 valid. If you need CPGE for that sample, address the cause (deeper
 sequencing, reads ≥ 50 bp) and re-run; `--microbecensus false` turns the step
-off entirely.
+off entirely. The read-level branch (`--read_level_functional`) shares the same
+MicrobeCensus output: there the affected sample has an empty
+`abundance_cpge` in `read_function_abundance.tsv` and
+`cpge_status = unavailable` in `read_sample_summary.tsv`, while its native read
+counts are complete.
 
 **Note:** MicrobeCensus is invoked through `bin/run_microbe_census_py3fix.py`.
 Both published biocontainers of the unmaintained upstream tool are broken
@@ -428,6 +432,43 @@ issue #32 — and the Python-2 image cannot load its bundled RAPsearch2
 binary); the shim patches the one broken function in the pinned Python-3
 image and delegates everything else to the stock tool. Do not remove the shim
 while the pin is `microbecensus:1.1.1--pyhca03a8a_2`.
+
+### WOLTKA_ALIGN runs out of memory / is killed
+
+**Symptom:** `WOLTKA_ALIGN` fails with exit status 137/140 or a Bowtie2
+"Out of memory" message while loading the index.
+
+**Cause:** the Web of Life (WoLr2) Bowtie2 index is 93.6 GB on disk and needs
+**at least 68 GB RAM** to load. The task requests up to 256 GB (labels
+`process_high` + `process_high_memory`) but is capped by `--max_memory`.
+
+**Solution:** run on a node with ≥ 68 GB available and set `--max_memory`
+accordingly (e.g. `--max_memory 96.GB`). There is no smaller WoLr2 index for
+this backend.
+
+### AGGREGATE_READ_FUNCTIONS / WOLTKA_CLASSIFY fail with a layout or database message
+
+**Errors:**
+```
+woltka version '<X>' is not among the versions this parser was verified against ...
+... unexpected Woltka profile header ...
+<N> profile ORF(s) have no entry in proteins/length.map.xz ...
+Woltka database file missing: .../function/...
+```
+
+**Cause:** deliberate guards (design: silent misparsing is the failure mode
+prevented). The first two mean the Woltka version or its output layout is not
+the one the read-branch scripts were verified against (pinned: woltka 0.1.7) —
+re-verify on real output before extending `KNOWN_WOLTKA_VERSIONS` in
+`bin/aggregate_read_functions.py`, plus `tests/bin/test_aggregate_read_functions.sh`.
+The last two mean `--custom_woltka_db` is incomplete or mixes releases: the
+Bowtie2 index and `proteins/`/`function/` files must all come from the same
+WoLr2 release, in the FTP layout.
+
+**Solution:** for database errors, complete the mirror with the file list in
+`docs/parameters.md` (`--custom_woltka_db`) or the download recipe in
+`docs/manual.md`, and check the md5 files (`xz -dc <file>.xz | md5sum` against
+`<file>.md5` — WoLr2 checksums cover the uncompressed content).
 
 ---
 

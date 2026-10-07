@@ -1,0 +1,2 @@
+PWY-1	fixture pathway one
+PWY-2	fixture pathway two (<i>E. coli</i>)

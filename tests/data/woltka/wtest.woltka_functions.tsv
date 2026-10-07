@@ -1,0 +1,15 @@
+sample_id	ontology	accession	description	count	rpk
+wtest	ko	K00001	E1.1.1.1, adh; alcohol dehydrogenase [EC:1.1.1.1]	6	4.61538461538
+wtest	ko	K00002	fixture enzyme two	3	2.30769230769
+wtest	ko	K00003	fixture enzyme three	8	6.66666666667
+wtest	ec	1.1.1.1		6	4.61538461538
+wtest	ec	2.7.7.7		3	2.30769230769
+wtest	ec	3.1.1.1		8	6.66666666667
+wtest	cog	COG0001		14	11.2820512821
+wtest	cog	COG0002		3	2.30769230769
+wtest	cog	COG0003		8	6.66666666667
+wtest	pfam	PF00001.1	7tm_1	11	8.97435897436
+wtest	pfam	PF00002.1	7tm_2	3	2.30769230769
+wtest	pfam	PF00003.1	7tm_3	4	2.66666666667
+wtest	metacyc	PWY-1	fixture pathway one	7	4.97435897436
+wtest	metacyc	PWY-2	fixture pathway two (<i>E. coli</i>)	7	4.97435897436

@@ -126,6 +126,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable MAG-level functional annotation: Bakta annotates every refined bin, one task per bin, publishing GFF3, GBFF, FAA, FNA, TSV and a summary per bin to `07_functional_annotation/mags/<sample>/` (files named `<sample>_<bin>.*`). Requires `--include_binning` **and at least two `--binners`** — MetaWRAP refinement and its completeness/contamination quality filter only run with ≥2 binners, and only quality-filtered bins are annotated (both requirements are validated at launch). Downloads the Bakta database on first use (`--bakta_db`: full 31.9 GB or light 1.3 GB download). Bins are expected to be bacterial; the pipeline does not detect or exclude archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before interpreting annotations of non-bacterial bins. Independent of `--contig_level_functional`, and runs on any container engine (docker included)
 - **Example**: `--mag_level_functional true --include_binning --binners semibin,metabat2`
 
+### `--read_level_functional`
+- **Type**: String
+- **Default**: `none`
+- **Options**: `woltka`, `none`
+- **Description**: Optional read-level functional profiling of the host-removed reads, one backend per run (validated at launch). `woltka`: Bowtie2 alignment against the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit settings, Woltka ORF classification (a read is assigned to an ORF when ≥ 80 % of it lies inside; mates count separately; a read whose reported alignments — up to 16 within the score threshold — hit k ORFs counts 1/k toward each unless `--woltka_uniq`), then per-function read counts and RPK for KO, EC (via KO), COG ortholog groups (via KO), Pfam and MetaCyc pathways — each read counted once toward each distinct term of its ORF. Per-sample tables go to `07_functional_annotation/reads/woltka/<sample>/`; study-level `read_function_abundance.tsv` (same schema as the contig branch, `source = reads`, native unit = reads, plus CPGE from MicrobeCensus), `read_function_wide_<ontology>_{native,cpge}.tsv`, `read_annotated_fraction.tsv` and `read_sample_summary.tsv` go to `07_functional_annotation/summary/`. Reported **separately** from the assembly-based tables, never merged (read-level profiling recovers the unassembled fraction but over-predicts). Needs no assembly (works with `--assembly_mode none`) and runs on any container engine. Downloads the WoLr2 subset (~94 GB, `--woltka_db`) on first use unless `--custom_woltka_db` is given; the alignment needs **≥ 68 GB RAM** per task (the WoLr2 index requirement)
+- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`
+
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`
@@ -243,6 +250,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: NCBI COG definitions table for the contig functional branch (`--contig_level_functional`). eggNOG-mapper v3 / eggNOG 7 reports most genes' `COG_category` as a COG ortholog id (e.g. `COG1629`) rather than a functional category; the pipeline maps each id to its COG functional-category letters with this table (a COG with several categories contributes to each). Downloaded from `https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab` and verified against the release's `checksums.md5`; it covers every COG id of the eggNOG 7 database
 - **Size**: ~410 KB
 - **Example**: `--cog_db cog-24`
+
+### `--woltka_db`
+- **Type**: String
+- **Default**: `wolr2`
+- **Options**: `wolr2`
+- **Description**: Web of Life release for the Woltka read-level backend (`--read_level_functional woltka`). Downloads, from the official public host (`https://ftp.microbio.me/pub/wol2`), only the files the backend reads, in the FTP layout: the Bowtie2 index (`databases/bowtie2/WoLr2.*.bt2l`, 93.6 GB), ORF coordinates and lengths (`proteins/`), and the KEGG / MetaCyc / Pfam function maps (`function/`). The published md5 checksums are verified; the pipeline bundles none of this data
+- **Size**: ~94 GB
+- **Example**: `--woltka_db wolr2`
 
 ### `--databases_dir`
 - **Type**: String (directory path)
@@ -363,6 +378,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (file path)
 - **Description**: Path to a local NCBI COG definitions table in the `cog-24.def.tab` layout (tab-separated, no header: COG id, functional-category letters, name, ...). It must cover every COG id the eggNOG database reports — an id missing from the table stops the aggregation with an error naming it
 - **Example**: `--custom_cog_db /shared/databases/cog/cog-24.def.tab`
+
+### `--custom_woltka_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local Web of Life release 2 mirror in the FTP layout of `https://ftp.microbio.me/pub/wol2` — at least `databases/bowtie2/WoLr2.{1,2,3,4,rev.1,rev.2}.bt2l`, `proteins/coords.txt.xz`, `proteins/length.map.xz`, `function/kegg/{orf-to-ko.map.xz,ko-to-ec.map,ko-to-cog.map,ko_name.txt}`, `function/metacyc/{orf-to-protein.map.xz,protein-to-enzrxn.map,enzrxn-to-reaction.map,reaction-to-pathway.map,pathway_name.txt}` and `function/pfam/{orf-to-pfam.map.xz,pfam_name.txt}` (a download recipe is in `docs/manual.md`, Manual Database Download). The index and the coordinate/map files must come from the same release. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<index name>)`
+- **Example**: `--custom_woltka_db /shared/databases/wol2`
 
 ---
 
@@ -681,7 +701,7 @@ Override automatic downloads by providing custom database paths:
 ### `--microbecensus`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Run MicrobeCensus on the host-removed reads (`--contig_level_functional` branch, published to `07_functional_annotation/microbecensus/`) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM in the `07_functional_annotation/summary/` tables
+- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches
 - **Example**: `--microbecensus false`
 - **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
 
@@ -699,6 +719,13 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `recommended`, `any`
 - **Description**: Which dbCAN calls feed the summary tables: `recommended` uses the tool's `Recommend Results` column (calls supported by at least 2 of DIAMOND / dbCAN HMM / dbCAN-sub — the dbCAN authors' guidance), `any` uses the union of the per-tool calls. The published `overview.tsv` always retains all per-tool columns regardless of this setting
 - **Example**: `--dbcan_consensus any`
+
+### `--woltka_uniq`
+- **Type**: Boolean
+- **Default**: `false`
+- **Options**: `true`, `false`
+- **Description**: Multi-mapping policy of the Woltka read-level backend. Reads are aligned to WoLr2 with the SHOGUN multi-hit Bowtie2 settings (`--very-sensitive -k 16 --np 1 --mp 1,1 --rdg 0,1 --rfg 0,1 --score-min L,0,-0.05`, the WoL/Qiita standard). By default Woltka divides a read whose reported alignments (up to 16 within the score threshold) overlap k ORFs 1/k to each, so the read totals stay equal to the number of reads assigned. With `true` such ambiguous reads are left unassigned instead (Woltka `--uniq`); how many is reported per sample in `read_sample_summary.tsv` (`reads_unassigned_ambiguous`)
+- **Example**: `--woltka_uniq true`
 
 ---
 
