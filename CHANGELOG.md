@@ -171,6 +171,12 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **Contig-branch Pfam terms were fragmented by domain coordinates**: eggNOG-mapper
+  v3 writes `PFAMs` values as `<pfam_name>_<start>_<end>`, and the aggregation kept
+  each string as the accession, so one Pfam family appeared as many terms (and a gene
+  with a repeated domain counted toward several). `summary/` tables now carry the
+  plain Pfam name, counted once per gene; an unexpected PFAMs format fails loudly
+  (format verified on all 73.9 M pfam values of the eggNOG 7 database)
 - Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
   decontamination DB and `--local` scoring, database download containers and
   script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,

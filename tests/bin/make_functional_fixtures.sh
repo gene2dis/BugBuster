@@ -9,7 +9,9 @@
 #     file: variable-length leading '##' block (ctime / version / argv /
 #     applied-filters / confidence legend), the exact 22-column '#query'
 #     header, one annotated gene (contig_1_1: two KEGG_ko terms, multi-letter
-#     COG 'EG', a CAZy family, a PFAM, '-' placeholders, 13-char positional
+#     COG 'EG', a CAZy family, PFAMs in the real v3 '<name>_<start>_<end>'
+#     form (MockPfam twice - a repeated domain must count once - and
+#     Mock_dom_2, a name ending in digits; design doc Q15), '-' placeholders, 13-char positional
 #     confidence code) with contig_1_2 deliberately absent (unannotated), and
 #     the 3 trailing '##' summary lines
 #   - sampleA.featureCounts.txt    counts 30/10 over the two genes
@@ -58,7 +60,7 @@ cat > "${OUT_DIR}/sampleA.emapper.annotations" <<'EOF'
 ## confidence codes: h=high m=medium l=low -=not annotated
 ## confidence field order: Preferred_name GOs EC KEGG_ko KEGG_Pathway KEGG_Module KEGG_Reaction KEGG_rclass BRITE KEGG_TC CAZy BiGG_Reaction PFAMs
 #query	seed_ortholog	evalue	score	eggNOG_OGs	tax_ceiling	farthest_donor_lineage	COG_category	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs	annotation_confidence
-contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	EG	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam	h--h------h-h
+contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	EG	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60	h--h------h-h
 ## 1 queries scanned
 ## Total time (seconds): 1.0
 ## Rate: 1.00 q/s

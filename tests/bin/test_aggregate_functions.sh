@@ -24,6 +24,8 @@
 #     mis-paired gene id sets all exit non-zero
 #   - the ags guard fails loudly on a wrong header, an unknown sample id, a
 #     non-positive genome_equivalents, and a filename/embedded-id mismatch
+#   - Pfam (Q15): '<name>_<start>_<end>' values stripped to the name, a
+#     repeated domain counted once per gene; a suffix-less value fails
 #   - dbCAN (T6): db=dbcan rows with per-row run_dbcan provenance in 5.1,
 #     backend=run_dbcan rows in 5.3 mirroring the gene's TPM/CPGE, the
 #     'recommended' vs 'any' consensus policies, separate cazy vs cazy_dbcan
@@ -183,6 +185,14 @@ check "2-KO gene double-counts at full TPM (K00001 and K00002 both 750000)" \
 check "COG 'EG' yields separate E and G rows" \
     "grep -qP 'sampleA\tcontigs\teggnog-mapper\tcog\tE\t' '${D}/function_abundance.tsv' && grep -qP 'sampleA\tcontigs\teggnog-mapper\tcog\tG\t' '${D}/function_abundance.tsv' && ! grep -qP '\tcog\tEG\t' '${D}/function_abundance.tsv'"
 
+# Q15 (2026-10-07): v3 PFAMs values are '<name>_<start>_<end>'; the
+# coordinates are stripped and a repeated domain counts once per gene
+# (fixture: MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60)
+check "pfam: coordinate suffix stripped, repeated domain counted once at full TPM" \
+    "[ \$(grep -cP 'sampleA\tcontigs\teggnog-mapper\tpfam\tMockPfam\t\t750000.0000' '${D}/function_abundance.tsv') -eq 1 ] && [ \$(grep -cP '^sampleA\tcontig_1_1\t.*\teggnog_pfam\tMockPfam\t' '${D}/gene_annotations.tsv') -eq 1 ]"
+check "pfam: name ending in digits kept whole (Mock_dom_2), no coordinate leftovers" \
+    "grep -qP '\tpfam\tMock_dom_2\t' '${D}/function_abundance.tsv' && ! grep -qP '\tpfam\t[^\t]*_[0-9]+_[0-9]+\t' '${D}/function_abundance.tsv' && [ \$(wc -l < '${D}/function_wide_pfam_tpm.tsv') -eq 3 ]"
+
 # '-' placeholder fields yield no rows (fixture EC is '-')
 check "'-' EC field produces no ec rows" \
     "! grep -qP '\tec\t' '${D}/function_abundance.tsv' && [ \$(wc -l < '${D}/function_wide_ec_tpm.tsv') -eq 1 ]"
@@ -320,6 +330,11 @@ check_grep "  ...naming the known-layout set" "../neg_unknown_version.log" "not 
 D="${WORK}/neg_missing_version"; seed_negative "${D}"
 grep -v 'eggnog-mapper:' "${FIXTURES}/eggnog_versions.yml" > "${D}/eggnog_versions.yml"
 NEXT_WORKDIR="${D}" expect_fail "missing emapper version in versions.yml fails" "${NEG_ARGS[@]}"
+
+D="${WORK}/neg_pfam_no_coords"; seed_negative "${D}"
+sed -i 's/MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60/MockPfam/' "${D}/sampleA.emapper.annotations"
+NEXT_WORKDIR="${D}" expect_fail "PFAMs value without the v3 coordinate suffix fails (Q15)" "${NEG_ARGS[@]}"
+check_grep "  ...naming the offending PFAMs value" "../neg_pfam_no_coords.log" "PFAMs value .MockPfam. is not"
 
 D="${WORK}/neg_header_disagrees"; seed_negative "${D}"
 sed -i 's/^## emapper-3.0.0-beta6$/## emapper-2.1.15/' "${D}/sampleA.emapper.annotations"

@@ -41,7 +41,9 @@ silent misparsing is the failure mode this guards against.
 
 Term splitting (Section 4.8 step 4, corrected 2026-08-29): KEGG_ko, EC, PFAMs
 and CAZy are comma-joined; COG_category is an undelimited letter string and
-splits per character. dbCAN overview calls are '+'-joined with optional
+splits per character. PFAMs values carry '_<start>_<end>' domain coordinates
+in v3, stripped to the Pfam name (design doc Q15, 2026-10-07); terms are
+de-duplicated per gene. dbCAN overview calls are '+'-joined with optional
 '(start-end)' domain ranges (stripped); the --dbcan-consensus policy picks the
 'Recommend Results' column ('recommended', calls supported by >= 2 tools) or
 the union of the per-tool columns ('any'). dbCAN feeds the cazy ontology only
@@ -77,7 +79,7 @@ ONTOLOGY_FIELDS = [
     ('KEGG_ko', 'ko', 'eggnog_ko', 'comma'),
     ('COG_category', 'cog', 'eggnog_cog', 'chars'),
     ('EC', 'ec', 'eggnog_ec', 'comma'),
-    ('PFAMs', 'pfam', 'eggnog_pfam', 'comma'),
+    ('PFAMs', 'pfam', 'eggnog_pfam', 'pfam'),
     ('CAZy', 'cazy', 'eggnog_cazy', 'comma'),
 ]
 
@@ -98,6 +100,17 @@ DBCAN_OVERVIEW_COLUMNS = ('Gene ID', 'EC#', 'dbCAN_hmm', 'dbCAN_sub',
 
 # Trailing '(start-end)' domain-range suffix on dbCAN calls (e.g. GH5(100-300))
 DBCAN_RANGE_RE = re.compile(r'\(\d+-\d+\)$')
+
+# eggNOG-mapper v3 PFAMs values are '<pfam_name>_<start>_<end>' (domain
+# coordinates appended; one value per domain hit, so a repeated domain appears
+# once per copy). Verified 2026-10-07 on all 73.9 M pfam values of the eggNOG 7
+# database (eggnog.db prots.pfam, which emapper passes through verbatim): every
+# value matches, start <= end. The coordinates are always the LAST two fields,
+# so names that themselves end in digits (AAA_12, Phage_holin_2_4) are safe.
+# Design doc Q15: keeping the raw strings fragmented the pfam ontology by
+# coordinates.
+PFAM_DOMAIN_RE = re.compile(r'^(.+)_(\d+)_(\d+)$')
+
 
 # Wide-matrix specs: (file label, backend filter, ontology filter). The two
 # CAZy backends get separate matrices, never one merged matrix (a gene called
@@ -439,12 +452,29 @@ def parse_annotations(path, tool_version):
 
 
 def split_terms(value, mode):
-    """Split one annotation field into terms ('-' and empty mean unannotated)."""
+    """Split one annotation field into distinct terms ('-' and empty mean
+    unannotated). Terms are de-duplicated per gene (order kept): a gene
+    carrying a term contributes its abundance to it once (Section 4.8 step 5)
+    - this matters for 'pfam', where a repeated domain yields one value per
+    copy."""
     if value in ('', '-'):
         return []
     if mode == 'chars':
-        return [ch for ch in value if ch not in ('-', ' ')]
-    return [term for term in value.split(',') if term and term != '-']
+        terms = [ch for ch in value if ch not in ('-', ' ')]
+    else:
+        terms = [term for term in value.split(',') if term and term != '-']
+    if mode == 'pfam':
+        names = []
+        for term in terms:
+            match = PFAM_DOMAIN_RE.match(term)
+            if not match:
+                fail(f"PFAMs value '{term}' is not '<pfam_name>_<start>_<end>', "
+                     f"the eggNOG-mapper v3 layout this parser was verified "
+                     f"against (design doc Q15) - re-verify the PFAMs format "
+                     f"before aggregating")
+            names.append(match.group(1))
+        terms = names
+    return list(dict.fromkeys(terms))
 
 
 def explode_annotations(annotations):

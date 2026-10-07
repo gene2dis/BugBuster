@@ -791,7 +791,10 @@ results/
 > contributes its full abundance to each — this double-counting is
 > intentional, so ontology-level TPM totals can exceed 1e6. The `description`
 > column is empty for eggNOG terms (eggNOG-mapper v3 dropped the Description
-> field).
+> field). Pfam terms are Pfam family names (e.g. `BPD_transp_1`): eggNOG-mapper
+> v3 reports one value per domain hit with its coordinates appended
+> (`BPD_transp_1_210_403`), which the aggregation strips, so a gene with a
+> repeated domain counts once toward that family.
 
 > **Two CAZy backends (`--functional_cazy`, on by default):** CAZy calls come
 > from both eggNOG-mapper (coarse, orthology-transferred) and run_dbcan v5
