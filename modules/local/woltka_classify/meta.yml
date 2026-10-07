@@ -26,6 +26,10 @@ input:
       type: directory
       description: WoLr2 database in the FTP layout (proteins/coords.txt.xz, proteins/length.map.xz, function/{kegg,metacyc,pfam}/ maps; optional DB_VERSION provenance file written by bin/woltka_db_reformat.sh)
       pattern: "*"
+  - cog_def:
+      type: file
+      description: NCBI COG definitions table (cog-24.def.tab layout) mapping the WoLr2 ko-to-cog COG ids to COG functional-category letters (the contig branch's table; design doc Q14)
+      pattern: "*"
 
 output:
   - orf_profile:
@@ -34,7 +38,7 @@ output:
       pattern: "*.woltka_orf.tsv"
   - functions:
       type: file
-      description: Per-function read counts and RPK (sample_id, ontology, accession, description, count, rpk) for ko, ec, cog, pfam and metacyc; each ORF contributes once per distinct term
+      description: Per-function read counts and RPK (sample_id, ontology, accession, description, count, rpk) for ko, ec, cog (COG category letters), pfam (Pfam names; description = versioned accession) and metacyc; each ORF contributes once per distinct term
       pattern: "*.woltka_functions.tsv"
   - summary:
       type: file
@@ -46,7 +50,7 @@ output:
       pattern: "*.woltka_unassigned.tsv"
   - versions:
       type: file
-      description: Software versions (live woltka version plus the database release from DB_VERSION, or 'custom (<index name>)')
+      description: Software versions (live woltka version plus the database release from DB_VERSION, or 'custom (<index name>)', plus the COG definitions table name)
       pattern: "versions.yml"
 
 authors:

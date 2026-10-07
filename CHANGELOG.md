@@ -21,7 +21,7 @@ next release is tagged.
     settings (`WOLTKA_ALIGN`, trimmed SAM), Woltka ORF classification
     (`WOLTKA_CLASSIFY`; mates counted separately, multi-hit reads divided 1/k,
     or left unassigned with `--woltka_uniq`), and per-ORF composition to KO,
-    EC, COG, Pfam and MetaCyc pathway read counts — each ORF counted once per
+    EC, COG-category, Pfam and MetaCyc pathway read counts — each ORF counted once per
     distinct term (Woltka's own `collapse` was found to inflate counts through
     duplicate map entries and chained maps, so it is not used)
   - Study-level `AGGREGATE_READ_FUNCTIONS` writes `read_function_abundance.tsv`
@@ -240,6 +240,16 @@ startup instead of being silently ignored. Update existing command lines and
   NCBI's COG definitions table (`cog-24.def.tab`, ~410 KB, auto-downloaded with
   md5 verification; `--cog_db` / `--custom_cog_db`); an unknown id or other form
   fails loudly
+- **Read- and contig-branch `cog` / `pfam` vocabularies differed**: Woltka `cog`
+  rows were COG ortholog ids and `pfam` rows versioned Pfam accessions, while the
+  contig branch reports COG functional categories and Pfam names. The Woltka
+  backend now maps its COG ids to categories with the same `cog-24.def.tab`
+  (downloaded for `--read_level_functional woltka` too; letters counted once per
+  ORF) and reports Pfam families by name, with the versioned accession in
+  `description`. This also drops five malformed COG strings of the WoLr2
+  `ko-to-cog` map (e.g. `COG:1140`) that were reported verbatim as accessions;
+  they and four ids absent from COG 2024 are skipped with a warning, and any
+  other unmapped id fails loudly
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
 - Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host

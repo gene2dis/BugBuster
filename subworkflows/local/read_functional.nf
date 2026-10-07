@@ -13,7 +13,9 @@
     Backends:
       woltka (T8a, Section 4.6.2): WOLTKA_ALIGN (Bowtie2 vs WoLr2, SHOGUN
         multi-hit) -> WOLTKA_CLASSIFY (woltka classify + per-ORF term-set
-        composition to ko/ec/cog/pfam/metacyc) -> AGGREGATE_READ_FUNCTIONS
+        composition to ko/ec/cog/pfam/metacyc; cog = COG category letters
+        via the NCBI COG table, pfam = Pfam names - the contig branch's
+        vocabularies, design doc Q14) -> AGGREGATE_READ_FUNCTIONS
         (canonical Section 5.3 schema, source=reads)
       superfocus (T8b, Section 4.6.3): SUPERFOCUS (SUPER-FOCUS 1.8, DIAMOND
         or MMseqs2 vs the DB_90 SEED cluster database, per-level composition
@@ -37,6 +39,7 @@ workflow READ_FUNCTIONAL {
     ch_reads     // channel: [ meta, [ R1, R2(, Singleton) ] ] host-removed reads
     ch_read_db   // channel: the selected backend's db dir (woltka: WoLr2 FTP layout; superfocus: database root)
     ch_ags       // channel: [ meta, ags.tsv ] MicrobeCensus AGS tables; may be empty or miss samples
+    ch_cog_def   // channel: NCBI COG definitions table (cog-24.def.tab); woltka backend only, empty otherwise
 
     main:
     ch_versions = channel.empty()
@@ -48,7 +51,7 @@ workflow READ_FUNCTIONAL {
 
     if ( params.read_level_functional == 'woltka' ) {
         WOLTKA_ALIGN(ch_reads.combine(ch_read_db))
-        WOLTKA_CLASSIFY(WOLTKA_ALIGN.out.sam.combine(ch_read_db))
+        WOLTKA_CLASSIFY(WOLTKA_ALIGN.out.sam.combine(ch_read_db).combine(ch_cog_def))
 
         AGGREGATE_READ_FUNCTIONS(
             WOLTKA_CLASSIFY.out.functions.map { _meta, f -> f }.collect(sort: true),

@@ -219,9 +219,10 @@ workflow PREPARE_DATABASES {
 
     //
     // NCBI COG definitions table: maps the COG ids eggNOG 7 writes into
-    // COG_category to COG functional-category letters (design doc Q16)
+    // COG_category (design doc Q16) and the WoLr2 ko-to-cog COG ids of the
+    // Woltka read backend (Q14) to COG functional-category letters
     //
-    if ( params.contig_level_functional ) {
+    if ( params.contig_level_functional || params.read_level_functional == 'woltka' ) {
         if ( params.custom_cog_db ) {
             ch_cog_def = channel.fromPath(params.custom_cog_db, checkIfExists: true)
         } else {

@@ -260,7 +260,8 @@ nextflow_pipeline {
             // RUN_DBCAN per sample plus its database download
             assert workflow.trace.tasks().count { task -> task.name.contains("RUN_DBCAN") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 1
-            // COG definitions table for the COG-id -> category mapping (Q16)
+            // COG definitions table for the COG-id -> category mapping (Q16),
+            // ONE task shared by the contig branch and the woltka backend (Q14)
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 1
 
             // Published to the documented layout (design doc Section 9.1)
@@ -610,7 +611,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA") } == 0
-            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 0
+            // ...except the COG definitions table, which the woltka backend
+            // also needs to map COG ids to categories (design doc Q14)
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 1
 
             // Section 9.1 layout: per-sample reads/woltka/<id>/, study-level
             // read_* tables in summary/ (no contig-branch tables)
@@ -623,6 +626,7 @@ nextflow_pipeline {
 
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
             assert vtext.contains("woltka: 0.1.7")
+            assert vtext.contains("cog_def: cog-24.def.tab")
         }
     }
 

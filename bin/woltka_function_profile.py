@@ -19,15 +19,24 @@ built here, de-duplicated, and its count/RPK is added once per term.
 Ontologies (WoLr2 maps; Q5 record in Section 4.6.2):
   ko       function/kegg/orf-to-ko.map.xz
   ec       KO-derived: union of function/kegg/ko-to-ec.map over the ORF's KOs
-  cog      KO-derived: union of function/kegg/ko-to-cog.map (COG ortholog
-           group ids, e.g. COG0604 - NOT the single-letter functional
-           categories the contig branch's eggNOG COG_category carries)
-  pfam     function/pfam/orf-to-pfam.map.xz (versioned accessions, as emitted)
+  cog      KO-derived: the ORF's COG ortholog ids (function/kegg/ko-to-cog.map)
+           mapped to COG functional-category letters with NCBI's COG
+           definitions table (--cog-def, cog-24.def.tab) - the same vocabulary
+           as the contig branch (design doc Q14, owner option d; Q16)
+  pfam     function/pfam/orf-to-pfam.map.xz, reported as Pfam NAMES via
+           pfam_name.txt - the contig branch's vocabulary (eggNOG writes
+           names); the versioned accession goes in the description (Q14)
   metacyc  pathways: orf-to-protein.map.xz -> protein-to-enzrxn.map ->
            enzrxn-to-reaction.map -> reaction-to-pathway.map
 
-Descriptions come from ko_name.txt / pfam_name.txt / pathway_name.txt; ec
-and cog have no name file in the release and stay empty.
+Descriptions come from ko_name.txt / pathway_name.txt; pfam rows carry the
+versioned Pfam accession instead; ec and cog stay empty (no name file).
+
+COG letters are de-duplicated per ORF AFTER mapping, so an ORF whose KOs
+reach two COGs of category E counts once toward E (Section 4.8 step 5).
+Every id in ko-to-cog must be in the --cog-def table or in
+WOLR2_UNMAPPABLE_COGS (known defects of the pinned WoLr2 release, skipped
+with a warning); anything else fails loudly, whatever the sample contains.
 
 Abundances per ORF: count = Woltka's (possibly fractional, 1/k-divided)
 read count; rpk = count / (length_bp / 1000) with length_bp from
@@ -47,11 +56,12 @@ Outputs:
 
 Usage:
   woltka_function_profile.py --profile orf.tsv --db <wol_db_dir>
-      --sample-id S1 --prefix S1
+      --cog-def cog-24.def.tab --sample-id S1 --prefix S1
 """
 
 import argparse
 import lzma
+import re
 import sys
 from pathlib import Path
 
@@ -77,6 +87,30 @@ REACTION_TO_PATHWAY = 'function/metacyc/reaction-to-pathway.map'
 PATHWAY_NAMES = 'function/metacyc/pathway_name.txt'
 
 UNASSIGNED = 'Unassigned'
+
+# NCBI COG definitions table (same table and validation as the contig
+# branch's parse_cog_def in bin/aggregate_functions.py, which cannot be
+# imported here: it needs pandas, which the woltka image lacks)
+COG_ID_RE = re.compile(r'^COG\d+$')
+COG_LETTERS_RE = re.compile(r'^[A-Z]+$')
+
+# WoLr2 ko-to-cog ids that cog-24.def.tab cannot map (all 3,311 distinct ids
+# checked 2026-10-07; design doc Q14, owner: enumerated skip-list). Skipped
+# with a warning; the KO's other COGs still count. Any OTHER unmappable id
+# fails loudly (a different WoL release or COG table needs re-checking).
+WOLR2_UNMAPPABLE_COGS = frozenset([
+    # malformed upstream (KO in brackets)
+    'COG00028',   # K24393 (its other COG, COG4032, maps)
+    'COG:1140',   # K24714
+    ':COG1216',   # K25205
+    'COG:5013',   # K24713
+    'OG3395',     # K23247
+    # well-formed but absent from NCBI COG2024
+    'COG3632',    # K01571
+    'COG3699',    # K07280
+    'COG3849',    # K06931
+    'COG5273',    # K20032
+])
 
 
 def die(msg):
@@ -162,6 +196,59 @@ def read_names(path):
     return out
 
 
+def parse_cog_def(path):
+    """COG id -> category letters from an NCBI COG definitions table
+    (cog-24.def.tab layout, no header). Latin-1 tolerant; whitespace around
+    the category is stripped (cog-24 has 'O ' for COG6144)."""
+    mapping = {}
+    with open(path, encoding='latin-1') as fh:
+        for lineno, line in enumerate(fh, start=1):
+            fields = line.rstrip('\n').split('\t')
+            if len(fields) < 2:
+                die(f"{path}:{lineno}: expected the NCBI COG definitions layout "
+                    f"(COG id <TAB> category letters <TAB> ...)")
+            cog_id, letters = fields[0].strip(), fields[1].strip()
+            if not COG_ID_RE.match(cog_id) or not COG_LETTERS_RE.match(letters):
+                die(f"{path}:{lineno}: malformed COG definition ({cog_id!r}, {letters!r})")
+            mapping[cog_id] = letters
+    if not mapping:
+        die(f"{path}: empty COG definitions table")
+    return mapping
+
+
+def cog_letters_map(ko_cog, cog_def, cog_def_path):
+    """{KO: set(category letters)} plus {KO: set(skipped ids)}. Every COG id
+    of the map must be in the table or the enumerated skip-list."""
+    letters, skipped = {}, {}
+    for ko, cogs in ko_cog.items():
+        for cog in cogs:
+            if cog in cog_def:
+                letters.setdefault(ko, set()).update(cog_def[cog])
+            elif cog in WOLR2_UNMAPPABLE_COGS:
+                skipped.setdefault(ko, set()).add(cog)
+            else:
+                die(f"COG id {cog!r} ({ko} in {KO_TO_COG}) is not in the COG "
+                    f"definitions table {cog_def_path} and is not a known WoLr2 "
+                    f"defect; the WoL release and the COG table must be re-checked "
+                    f"together (design doc Q14)")
+    return letters, skipped
+
+
+def pfam_name_map(path):
+    """Versioned Pfam accession -> name. Names must be unique, otherwise
+    reporting by name would merge distinct families."""
+    names = read_names(path)
+    seen = {}
+    for acc, name in names.items():
+        if not name:
+            die(f"{path}: Pfam accession {acc} has an empty name")
+        if name in seen:
+            die(f"{path}: Pfam name {name!r} is shared by {seen[name]} and {acc}; "
+                f"pfam rows are reported by name (design doc Q14)")
+        seen[name] = acc
+    return names
+
+
 def expand(sources, mapping):
     out = set()
     for s in sources:
@@ -180,6 +267,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__.split('\n\n')[0])
     ap.add_argument('--profile', required=True, help='woltka classify TSV profile (ORF level)')
     ap.add_argument('--db', required=True, help='WoLr2-layout database directory')
+    ap.add_argument('--cog-def', required=True,
+                    help='NCBI COG definitions table (cog-24.def.tab): COG id -> category letters')
     ap.add_argument('--sample-id', required=True)
     ap.add_argument('--prefix', required=True)
     args = ap.parse_args()
@@ -207,28 +296,48 @@ def main():
     orf_ko = stream_orf_map(require(args.db, ORF_TO_KO), orfs)
     ko_ec = read_map(require(args.db, KO_TO_EC))
     ko_cog = read_map(require(args.db, KO_TO_COG))
+    ko_cog_letters, ko_cog_skipped = cog_letters_map(ko_cog, parse_cog_def(args.cog_def),
+                                                     args.cog_def)
     orf_pfam = stream_orf_map(require(args.db, ORF_TO_PFAM), orfs)
     orf_protein = stream_orf_map(require(args.db, ORF_TO_PROTEIN), orfs)
     protein_enzrxn = read_map(require(args.db, PROTEIN_TO_ENZRXN))
     enzrxn_reaction = read_map(require(args.db, ENZRXN_TO_REACTION))
     reaction_pathway = read_map(require(args.db, REACTION_TO_PATHWAY))
 
+    pfam_names = pfam_name_map(require(args.db, PFAM_NAMES))
     names = {
         'ko': read_names(require(args.db, KO_NAMES)),
-        'pfam': read_names(require(args.db, PFAM_NAMES)),
         'metacyc': read_names(require(args.db, PATHWAY_NAMES)),
     }
+    # pfam rows: accession = name, description = versioned accession (Q14).
+    # Names are unique (checked above), so the reverse lookup is exact
+    names['pfam'] = {name: acc for acc, name in pfam_names.items()}
 
     term_sets = {ont: {} for ont in ONTOLOGIES}
+    skipped_ids, skipped_orfs = set(), 0
     for orf in orfs:
         kos = orf_ko.get(orf, set())
+        accessions = orf_pfam.get(orf, set())
+        unnamed = sorted(a for a in accessions if a not in pfam_names)
+        if unnamed:
+            die(f"Pfam accession {unnamed[0]} (ORF {orf}) has no entry in {PFAM_NAMES}")
+        skipped = expand(kos, ko_cog_skipped)
+        if skipped:
+            skipped_ids |= skipped
+            skipped_orfs += 1
         pathways = expand(expand(expand(orf_protein.get(orf, set()), protein_enzrxn),
                                  enzrxn_reaction), reaction_pathway)
         term_sets['ko'][orf] = kos
         term_sets['ec'][orf] = expand(kos, ko_ec)
-        term_sets['cog'][orf] = expand(kos, ko_cog)
-        term_sets['pfam'][orf] = orf_pfam.get(orf, set())
+        term_sets['cog'][orf] = expand(kos, ko_cog_letters)
+        term_sets['pfam'][orf] = {pfam_names[a] for a in accessions}
         term_sets['metacyc'][orf] = pathways
+
+    if skipped_ids:
+        print(f"WARNING: {args.sample_id}: {skipped_orfs} ORF(s) carry KOs whose "
+              f"ko-to-cog entries cannot be mapped to COG categories and were "
+              f"skipped (known WoLr2 defects: {', '.join(sorted(skipped_ids))}); "
+              f"their other COGs still count", file=sys.stderr)
 
     total = sum(counts.values())
     function_rows = []

@@ -309,6 +309,17 @@ eggNOG-mapper output format changed — re-verify before extending the parser.
 (`--cog_db` / `--custom_cog_db`) is older than the eggNOG database's COG ids:
 use a COG release that covers them (the default `cog-24` covers all of eggNOG 7).
 
+The Woltka read backend has the matching guard in `WOLTKA_CLASSIFY`:
+`COG id '<X>' (<KO> in function/kegg/ko-to-cog.map) is not in the COG definitions
+table ... and is not a known WoLr2 defect` means the WoL database and the COG
+table do not match — the default `cog-24` covers every WoLr2 COG id except nine
+known defects of that release, which are skipped with a `WARNING: ... known WoLr2
+defects` line in the task log (expected, not an error). A different WoL release or
+COG table must be re-checked together before extending the skip-list
+(`WOLR2_UNMAPPABLE_COGS` in `bin/woltka_function_profile.py`). `Pfam accession
+<X> ... has no entry in function/pfam/pfam_name.txt` and `Pfam name <X> is shared
+by ...` mean the WoL Pfam maps are incomplete or from a mismatched release.
+
 The same guard exists for the run_dbcan overview (`overview column header does
 not match the verified run_dbcan v5 layout ...` / `run_dbcan version '<X>' is
 not among the layouts ...`): after re-pinning the `RUN_DBCAN` module, re-verify

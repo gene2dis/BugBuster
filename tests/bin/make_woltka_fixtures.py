@@ -33,6 +33,12 @@ inflates both, verified 2026-10-07 on 0.1.7):
   - KEGG: G000000001_1 -> K00001 + K00002, both -> EC 1.1.1.1 (EC once/gene)
   - MetaCyc: G000000001_1 -> P1 + P2; P1 -> E1 + E2 -> both R1; P2 -> E3 -> R2;
     R1 -> PWY-1; R2 -> PWY-1 + PWY-2 (PWY-1 must count once per gene)
+  - COG (design doc Q14): ids are mapped to category letters with
+    tests/data/woltka/cog.def.tab (NCBI cog-24.def.tab layout, not part of
+    WoLr2): COG0001 -> EH, COG0002 -> 'C ' (trailing space, as cog-24's
+    COG6144), COG0003 -> E. G000000001_2 (K00003 -> COG0001 + COG0003)
+    reaches E twice and must count it once; K00002 also carries the
+    skip-listed WoLr2 defect COG:1140 (skipped with a warning)
 
 Reads (exact 100-mers, Q40, ~300 bp inserts, proper FR pairs):
   sample  'wtest': 4 pairs inside G000000001_2 (unique), 3 pairs inside the
@@ -135,7 +141,7 @@ def main():
                "K00003\t3.1.1.1\n")
     write_text(kegg / "ko-to-cog.map",
                "K00001\tCOG0001\n"
-               "K00002\tCOG0002\n"
+               "K00002\tCOG0002\tCOG:1140\n"
                "K00003\tCOG0001\tCOG0003\n")
     write_text(kegg / "ko_name.txt",
                "K00001\tE1.1.1.1, adh; alcohol dehydrogenase [EC:1.1.1.1]\n"
@@ -170,6 +176,11 @@ def main():
                "PF00001.1\t7tm_1\n"
                "PF00002.1\t7tm_2\n"
                "PF00003.1\t7tm_3\n")
+
+    write_text(OUT / "cog.def.tab",
+               "COG0001\tEH\tFixture COG one\tfixA\t\t\t\n"
+               "COG0002\tC \tFixture COG two\tfixB\t\t\t\n"
+               "COG0003\tE\tFixture COG three\tfixC\t\t\t\n")
 
     write_text(DB / "DB_VERSION", "WoLr2 test fixture (tests/bin/make_woltka_fixtures.py)\n")
 

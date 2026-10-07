@@ -505,7 +505,7 @@ workflow {
             : channel.empty()
         ch_cog_def = params.contig_level_functional
             ? PREPARE_DATABASES.out.cog_def
-                .ifEmpty { error "ERROR: COG definitions table is empty. Ensure params.contig_level_functional is enabled and a valid COG table is configured (--custom_cog_db)." }
+                .ifEmpty { error "ERROR: COG definitions table is empty. --contig_level_functional (and --read_level_functional woltka) need a valid COG table (--cog_db, or --custom_cog_db)." }
             : channel.empty()
         ch_bakta_db = params.mag_level_functional
             ? PREPARE_DATABASES.out.bakta_db
@@ -537,10 +537,17 @@ workflow {
                 .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." } :
             PREPARE_DATABASES.out.superfocus_db
                 .ifEmpty { error "ERROR: SUPER-FOCUS database is empty. Ensure --read_level_functional superfocus is set and a valid SUPER-FOCUS database root is configured (--custom_superfocus_db, the directory containing db/)." }
+        // the woltka backend maps WoLr2 COG ids to categories with the
+        // contig branch's NCBI COG table (design doc Q14)
+        def ch_read_cog_def = params.read_level_functional == 'woltka' ?
+            PREPARE_DATABASES.out.cog_def
+                .ifEmpty { error "ERROR: COG definitions table is empty. --read_level_functional woltka needs a valid COG table (--cog_db, or --custom_cog_db)." } :
+            channel.empty()
         READ_FUNCTIONAL(
             ch_clean_reads,
             ch_read_db,
-            ch_ags
+            ch_ags,
+            ch_read_cog_def
         )
         ch_versions = ch_versions.mix(READ_FUNCTIONAL.out.versions)
     }

@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Regenerate the committed Woltka read-branch fixture (design doc T8a):
-# tests/data/woltka/{db,reads,wtest.wol.sam.gz,wtest.woltka_*.tsv,
+# tests/data/woltka/{db,reads,cog.def.tab,wtest.wol.sam.gz,wtest.woltka_*.tsv,
 # woltka_versions.yml}. The sequences, coordinates and maps come from
 # make_woltka_fixtures.py (deterministic); this wrapper then builds the
 # Bowtie2 index in the pipeline's pinned bowtie2 container with
@@ -49,6 +49,6 @@ docker run --rm -u "$(id -u):$(id -g)" -v "${FIX}:/f" -v "${REPO}/bin:/b:ro" -w 
     woltka classify --input /f/wtest.wol.sam.gz --coords /f/db/proteins/coords.txt.xz \
         --no-demux --digits 6 --unassigned --to-tsv --output /tmp/orf.tsv > /dev/null
     cd /f && python3 /b/woltka_function_profile.py --profile /tmp/orf.tsv --db /f/db \
-        --sample-id wtest --prefix wtest'
-printf '"WOLTKA_CLASSIFY":\n    woltka: 0.1.7\n    wol_db: WoLr2 test fixture (tests/bin/make_woltka_fixtures.py)\n' \
+        --cog-def /f/cog.def.tab --sample-id wtest --prefix wtest'
+printf '"WOLTKA_CLASSIFY":\n    woltka: 0.1.7\n    wol_db: WoLr2 test fixture (tests/bin/make_woltka_fixtures.py)\n    cog_def: cog.def.tab\n' \
     > "${FIX}/woltka_versions.yml"

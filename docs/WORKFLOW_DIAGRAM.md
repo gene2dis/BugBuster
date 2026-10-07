@@ -131,6 +131,7 @@ flowchart TD
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
     Magdb -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
     Readfuncdb -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
+    Readfuncdb -->|"Yes (shared with the contig branch)"| CogDB
     Sfdb -->|Yes| SuperfocusDB[FORMAT_SUPERFOCUS_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
@@ -449,7 +450,7 @@ flowchart LR
 | Module | Condition | Description |
 |--------|-----------|-------------|
 | `WOLTKA_ALIGN` | if `read_level_functional = woltka` | Bowtie2 (SHOGUN multi-hit settings) of the clean reads against the WoLr2 genomes; trimmed SAM (≥ 68 GB RAM) |
-| `WOLTKA_CLASSIFY` | if `read_level_functional = woltka` | Woltka ORF classification, then per-ORF de-duplicated KO / EC / COG / Pfam / MetaCyc read counts and RPK |
+| `WOLTKA_CLASSIFY` | if `read_level_functional = woltka` | Woltka ORF classification, then per-ORF de-duplicated KO / EC / COG-category / Pfam-name / MetaCyc read counts and RPK (COG and Pfam in the contig branch's vocabularies, via the NCBI COG table) |
 | `SUPERFOCUS` | if `read_level_functional = superfocus` | SUPER-FOCUS 1.8 (DIAMOND or MMseqs2, `superfocus_aligner`) of the concatenated clean reads against DB_90, then SEED level 1-3 read counts summed from the function-level counts |
 | `AGGREGATE_READ_FUNCTIONS` | if `read_level_functional != none` | Study-level `read_*` tables (same schema, `source=reads`; native read counts + CPGE for woltka, native read counts only for superfocus), never merged with the contig branch |
 

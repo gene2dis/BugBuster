@@ -15,11 +15,18 @@
 #       KOs mapping to one EC count the ORF once, a MetaCyc pathway reached
 #       through several enzrxn/reaction paths counts the ORF once
 #     - RPK = count / (length / 1000), names attached, annotated fractions
+#     - Q14 vocabularies: COG ids -> category letters via the COG table
+#       (tests/data/woltka/cog.def.tab), de-duplicated per ORF AFTER mapping
+#       (an ORF reaching E through two COGs counts once); the skip-listed
+#       WoLr2 defect COG:1140 is skipped with a warning; pfam rows carry the
+#       Pfam NAME with the versioned accession as description
 #     - --uniq: ambiguous mates move to the unassigned table
 #     - header-only (empty-alignment) profile -> header-only functions,
 #       zero summary rows with empty fractions
 #     - guards fail loudly: a demultiplexed (3-column) profile, a profile ORF
-#       missing from length.map, a missing database file
+#       missing from length.map, a missing database file, a COG id neither
+#       in the table nor skip-listed, no --cog-def, a malformed COG table, a
+#       Pfam accession without a name, a Pfam name shared by two accessions
 #   bin/aggregate_read_functions.py  (pandas image, AGGREGATE_READ_FUNCTIONS)
 #     - Section 5.3 schema with source=reads, backend=woltka, empty
 #       abundance_tpm, abundance_native = read counts, native_unit=reads
@@ -122,7 +129,7 @@ expect_err() {
 value() { awk -F'\t' -v c="$3" "$2 { print \$c }" "$1"; }
 
 CLASSIFY='woltka classify --input /fix/wtest.wol.sam.gz --coords /fix/db/proteins/coords.txt.xz --no-demux --digits 6 --unassigned --to-tsv'
-PROFILE='python3 /pipeline_bin/woltka_function_profile.py --db /fix/db'
+PROFILE='python3 /pipeline_bin/woltka_function_profile.py --db /fix/db --cog-def /fix/cog.def.tab'
 
 #
 # woltka_function_profile.py
@@ -143,16 +150,26 @@ check "K00001 = 6 reads (two ORFs), named from ko_name.txt" \
     "[ \"\$(value ${F} '\$2==\"ko\" && \$3==\"K00001\"' 5)\" = '6' ] && grep -q 'alcohol dehydrogenase' ${F}"
 check "EC 1.1.1.1 counts the 2-KO ORF once (6, not woltka-collapse's 9)" \
     "[ \"\$(value ${F} '\$2==\"ec\" && \$3==\"1.1.1.1\"' 5)\" = '6' ]"
-check "repeated Pfam domain counts once (PF00002.1 = 3, not 9)" \
-    "[ \"\$(value ${F} '\$2==\"pfam\" && \$3==\"PF00002.1\"' 5)\" = '3' ]"
+check "repeated Pfam domain counts once (7tm_2 = 3, not 9)" \
+    "[ \"\$(value ${F} '\$2==\"pfam\" && \$3==\"7tm_2\"' 5)\" = '3' ]"
+check "pfam rows: Pfam name as accession, versioned accession as description" \
+    "[ \"\$(value ${F} '\$2==\"pfam\"' 3 | tr '\n' ' ')\" = '7tm_1 7tm_2 7tm_3 ' ] && [ \"\$(value ${F} '\$2==\"pfam\" && \$3==\"7tm_1\"' 4)\" = 'PF00001.1' ]"
 check "multi-path MetaCyc pathway counts each ORF once (PWY-1 = 7, not 10)" \
     "[ \"\$(value ${F} '\$2==\"metacyc\" && \$3==\"PWY-1\"' 5)\" = '7' ]"
-check "COG ids via ko-to-cog (COG0001 = 14)" \
-    "[ \"\$(value ${F} '\$2==\"cog\" && \$3==\"COG0001\"' 5)\" = '14' ]"
+check "cog rows are category letters only (C E H)" \
+    "[ \"\$(value ${F} '\$2==\"cog\"' 3 | tr '\n' ' ')\" = 'C E H ' ]"
+check "COG letters de-duplicated per ORF after mapping (E = 14, not 22)" \
+    "[ \"\$(value ${F} '\$2==\"cog\" && \$3==\"E\"' 5)\" = '14' ] && [ \"\$(value ${F} '\$2==\"cog\" && \$3==\"H\"' 5)\" = '14' ]"
+check "COG category whitespace stripped ('C ' -> C = 3)" \
+    "[ \"\$(value ${F} '\$2==\"cog\" && \$3==\"C\"' 5)\" = '3' ]"
+check "skip-listed WoLr2 COG defect: warned, never an accession" \
+    "grep -q 'known WoLr2 defects: COG:1140' ${D}/run.log && ! grep -q 'COG' ${F}"
 check "RPK = count / kb (K00003: 8 reads / 1.2 kb = 6.6667)" \
     "value ${F} '\$2==\"ko\" && \$3==\"K00003\"' 6 | grep -q '^6\.66666666'"
 check "ec and cog carry no description" \
     "[ -z \"\$(value ${F} '\$2==\"ec\" || \$2==\"cog\"' 4 | tr -d '\n')\" ]"
+check "matches the committed fixture output" \
+    "cmp -s ${F} ${FIX}/wtest.woltka_functions.tsv && cmp -s ${SUM} ${FIX}/wtest.woltka_summary.tsv"
 check "summary: any 18/20 annotated (G000000001_3 unannotated)" \
     "[ \"\$(value ${SUM} '\$2==\"any\"' 3)\" = '20' ] && [ \"\$(value ${SUM} '\$2==\"any\"' 5)\" = '0.900000' ]"
 check "summary: metacyc 7/20" \
@@ -185,7 +202,17 @@ expect_err "guard: demultiplexed 3-column profile fails" "${N}/demux.log" "unexp
 expect_err "guard: profile ORF missing from length.map fails" "${N}/orf.log" "have no entry in proteins/length.map.xz" \
     in_woltka "${N}" "${PROFILE} --profile unknown_orf.tsv --sample-id z --prefix z"
 expect_err "guard: missing database file fails" "${N}/db.log" "Woltka database file missing" \
-    in_woltka "${N}" "mkdir -p partial && cp -r /fix/db/proteins partial/ && python3 /pipeline_bin/woltka_function_profile.py --db partial --profile orf.tsv --sample-id w --prefix w"
+    in_woltka "${N}" "mkdir -p partial && cp -r /fix/db/proteins partial/ && python3 /pipeline_bin/woltka_function_profile.py --db partial --cog-def /fix/cog.def.tab --profile orf.tsv --sample-id w --prefix w"
+expect_err "guard: COG id neither in the table nor skip-listed fails" "${N}/cog.log" "is not a known WoLr2" \
+    in_woltka "${N}" "rm -rf badcog && cp -r /fix/db badcog && printf 'K09999\tCOG9999\n' >> badcog/function/kegg/ko-to-cog.map && python3 /pipeline_bin/woltka_function_profile.py --db badcog --cog-def /fix/cog.def.tab --profile orf.tsv --sample-id w --prefix w"
+expect_err "guard: --cog-def is required" "${N}/nocog.log" "the following arguments are required: --cog-def" \
+    in_woltka "${N}" "python3 /pipeline_bin/woltka_function_profile.py --db /fix/db --profile orf.tsv --sample-id w --prefix w"
+expect_err "guard: malformed COG table fails" "${N}/badtab.log" "malformed COG definition" \
+    in_woltka "${N}" "printf 'COG0001\t1\tbad\n' > bad.def.tab && python3 /pipeline_bin/woltka_function_profile.py --db /fix/db --cog-def bad.def.tab --profile orf.tsv --sample-id w --prefix w"
+expect_err "guard: Pfam accession without a name fails" "${N}/pfname.log" "has no entry in function/pfam/pfam_name.txt" \
+    in_woltka "${N}" "rm -rf nopfam && cp -r /fix/db nopfam && grep -v PF00003.1 /fix/db/function/pfam/pfam_name.txt > nopfam/function/pfam/pfam_name.txt && python3 /pipeline_bin/woltka_function_profile.py --db nopfam --cog-def /fix/cog.def.tab --profile orf.tsv --sample-id w --prefix w"
+expect_err "guard: Pfam name shared by two accessions fails" "${N}/pfdup.log" "is shared by" \
+    in_woltka "${N}" "rm -rf duppfam && cp -r /fix/db duppfam && sed 's/7tm_3/7tm_2/' /fix/db/function/pfam/pfam_name.txt > duppfam/function/pfam/pfam_name.txt && python3 /pipeline_bin/woltka_function_profile.py --db duppfam --cog-def /fix/cog.def.tab --profile orf.tsv --sample-id w --prefix w"
 
 #
 # aggregate_read_functions.py

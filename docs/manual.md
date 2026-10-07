@@ -150,7 +150,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
-| **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's COG ids to COG functional categories | `contig_level_functional=true` |
+| **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` |
 | **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
 | **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
 | **Web of Life WoLr2** | ~94 GB (Bowtie2 index 93.6 GB + coordinates/maps ~0.6 GB) | Read-level functional profiling (Woltka); alignment needs ≥ 68 GB RAM | `read_level_functional='woltka'` |
@@ -386,9 +386,9 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > as separate reads, and a read whose reported alignments (up to 16 within the
 > score threshold) hit k ORFs contributes 1/k to each
 > (`--woltka_uniq` leaves such reads unassigned instead). ORF counts are then
-> summarized to KO, EC (via KO), COG ortholog groups (via KO; e.g. `COG0604` — not
-> the single-letter COG categories of the contig branch), Pfam and MetaCyc pathways
-> from the WoLr2 maps. **A read contributes its full weight once to each distinct
+> summarized to KO, EC (via KO), COG functional categories (via KO), Pfam families
+> and MetaCyc pathways from the WoLr2 maps, using the contig branch's COG and Pfam
+> vocabularies (details below). **A read contributes its full weight once to each distinct
 > term its ORF carries** (an ORF with two KOs counts toward both; the same intentional
 > double counting as the contig branch). The branch runs on any container engine,
 > needs no assembly (it also works with `--assembly_mode none`), and its tables are
@@ -440,7 +440,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
 | `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
 | `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
-| `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's COG ids to COG functional categories |
+| `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
 
@@ -977,11 +977,19 @@ results/
 > and contig-branch values are **not directly comparable**: they count different
 > things (reads hitting reference genomes vs reads mapped back to the sample's own
 > assembled genes), and read-level profiling recovers the unassembled fraction
-> but over-predicts, while the assembly-based branch is more precise. Woltka COG
-> accessions are ortholog
-> groups (`COG0604`), not the single-letter categories of the contig branch;
-> Pfam accessions keep their version suffix as in WoLr2 (`PF00004.32`); MetaCyc
-> accessions are pathways (`PWY-5101`); EC numbers are derived via KO.
+> but over-predicts, while the assembly-based branch is more precise. The accession
+> vocabularies do match the contig branch's, so the same term can be looked up in
+> both: Woltka COG accessions are COG functional-category letters (the WoLr2 KO →
+> COG ortholog ids are mapped with the same NCBI `cog-24.def.tab` table, which is
+> downloaded for `--read_level_functional woltka` too; a COG with several categories
+> contributes to each, and a read counts once per category even when its ORF
+> reaches that category through several COGs). Nine WoLr2 `ko-to-cog` entries
+> cannot be mapped (five malformed ids in the release, e.g. `COG:1140`, and four
+> ids absent from COG 2024, e.g. `COG3632`); they are skipped with a warning in the
+> task log, and the KO's other COGs still count. Pfam accessions are Pfam family
+> names (`AAA`), with the versioned WoLr2 accession (`PF00004.32`) in
+> `description`. MetaCyc accessions are pathways (`PWY-5101`); EC numbers are
+> derived via KO.
 >
 > For SUPER-FOCUS, `abundance_native` is reads with an accepted SEED hit (mates
 > counted separately; each read contributes 1 in total, fractional when divided

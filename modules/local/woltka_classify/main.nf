@@ -7,7 +7,11 @@
     alignments to WoLr2 ORFs by coordinate overlap (>= 80 % of the read
     inside the ORF, Woltka default), then bin/woltka_function_profile.py
     turns the ORF profile into per-function read counts and RPK for the
-    ko / ec / cog / pfam / metacyc ontologies.
+    ko / ec / cog / pfam / metacyc ontologies. COG ortholog ids are mapped
+    to COG functional-category letters with the NCBI COG definitions table
+    (cog_def, the contig branch's cog-24.def.tab) and Pfam accessions are
+    reported by name, so both ontologies share the contig branch's
+    vocabulary (design doc Q14).
 
     Fixed classify flags, each verified on woltka 0.1.7 (2026-10-07):
       --no-demux    single-file input is otherwise demultiplexed on the
@@ -28,11 +32,12 @@
     sample) short-circuits to a header-only profile: woltka classify raises
     "Alignment file is empty or unreadable" on it (verified live).
 
-    versions.yml records the live woltka version and the database release
-    from the DB_VERSION file bin/woltka_db_reformat.sh writes; a custom
-    mirror without one records 'custom (<index basename>)'.
+    versions.yml records the live woltka version, the database release
+    from the DB_VERSION file bin/woltka_db_reformat.sh writes (a custom
+    mirror without one records 'custom (<index basename>)') and the COG
+    definitions table name.
 
-    Input:  tuple val(meta), path(sam), path(wol_db)
+    Input:  tuple val(meta), path(sam), path(wol_db), path(cog_def)
     Output: tuple val(meta), path("*.woltka_orf.tsv"), emit: orf_profile
             tuple val(meta), path("*.woltka_functions.tsv"), emit: functions
             tuple val(meta), path("*.woltka_summary.tsv"), emit: summary
@@ -50,7 +55,7 @@ process WOLTKA_CLASSIFY {
         'quay.io/biocontainers/woltka:0.1.7--pyhdfd78af_0' }"
 
     input:
-    tuple val(meta), path(sam), path(wol_db)
+    tuple val(meta), path(sam), path(wol_db), path(cog_def)
 
     output:
     tuple val(meta), path("*.woltka_orf.tsv")       , emit: orf_profile
@@ -84,6 +89,7 @@ process WOLTKA_CLASSIFY {
     woltka_function_profile.py \\
         --profile ${prefix}.woltka_orf.tsv \\
         --db ${wol_db} \\
+        --cog-def ${cog_def} \\
         --sample-id ${meta.id} \\
         --prefix ${prefix}
 
@@ -99,6 +105,7 @@ process WOLTKA_CLASSIFY {
     "${task.process}":
         woltka: \$(woltka --version 2>&1 | sed 's/.*version //')
         wol_db: \${wol_db_version}
+        cog_def: ${cog_def.name}
     END_VERSIONS
     """
 
@@ -114,6 +121,7 @@ process WOLTKA_CLASSIFY {
     "${task.process}":
         woltka: 0.1.7
         wol_db: stub
+        cog_def: ${cog_def.name}
     END_VERSIONS
     """
 }

@@ -149,7 +149,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3; requires the singularity/apptainer profile while v3 is in beta) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
 | **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |
-| **NCBI COG 2024 definitions** | 410 KB | Maps eggNOG's COG ids to COG functional categories | `contig_level_functional=true` | `--custom_cog_db` |
+| **NCBI COG 2024 definitions** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` | `--custom_cog_db` |
 | **Web of Life WoLr2** | ~94 GB | Read-level functional profiling with Woltka (alignment needs ≥ 68 GB RAM) | `read_level_functional='woltka'` | `--custom_woltka_db` |
 | **SUPER-FOCUS DB_90** | ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download, selected aligner only | Read-level SEED subsystem profiling with SUPER-FOCUS | `read_level_functional='superfocus'` | `--custom_superfocus_db` |
 
