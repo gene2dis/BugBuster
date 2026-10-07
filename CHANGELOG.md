@@ -197,6 +197,13 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **Functional aggregation steps re-ran on `-resume`**: `AGGREGATE_FUNCTIONS` and
+  `AGGREGATE_READ_FUNCTIONS` received their study-level inputs in task-completion order
+  (plain `collect()`, and the version-guard `versions.yml` taken with `.first()`), so
+  their task hash could change between otherwise identical runs. Inputs are now collected
+  sorted and the `versions.yml` is chosen deterministically; resumed runs are fully cached
+  (outputs unchanged — the aggregation is input-order independent). Existing runs re-run
+  these two cheap tasks once on their next `-resume`.
 - **Contig-branch Pfam terms were fragmented by domain coordinates**: eggNOG-mapper
   v3 writes `PFAMs` values as `<pfam_name>_<start>_<end>`, and the aggregation kept
   each string as the accession, so one Pfam family appeared as many terms (and a gene

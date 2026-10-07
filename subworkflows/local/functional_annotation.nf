@@ -77,8 +77,8 @@ workflow FUNCTIONAL_ANNOTATION {
             RUN_DBCAN(ch_proteins.combine(ch_dbcan_db))
             ch_dbcan_overview   = RUN_DBCAN.out.overview
             ch_dbcan_substrates = RUN_DBCAN.out.substrates
-            ch_dbcan_overviews_agg = RUN_DBCAN.out.overview.map { _meta, overview -> overview }.collect()
-            ch_dbcan_versions_agg  = RUN_DBCAN.out.versions.first()
+            ch_dbcan_overviews_agg = RUN_DBCAN.out.overview.map { _meta, overview -> overview }.collect(sort: true)
+            ch_dbcan_versions_agg  = RUN_DBCAN.out.versions.collect(sort: true).map { vs -> vs[0] }
             ch_dbcan_module_versions = RUN_DBCAN.out.versions.first()
         } else {
             ch_dbcan_overview   = channel.empty()
@@ -106,14 +106,18 @@ workflow FUNCTIONAL_ANNOTATION {
         // channel legitimately emits nothing when MicrobeCensus is off or every
         // sample's run failed), and the NCBI COG definitions table that maps
         // the COG ids eggNOG 7 writes into COG_category to category letters
-        // (design doc Q16)
+        // (design doc Q16). Every list is collected SORTED and each versions.yml
+        // is the first of the SORTED list, not .first(): plain collect() and
+        // .first() follow task completion order, which changes this task's
+        // staged inputs (hence its hash) between runs and defeats -resume
+        // (design doc Q18)
         AGGREGATE_FUNCTIONS(
-            FEATURECOUNTS_GENES.out.counts.map { _meta, counts -> counts }.collect(),
-            EGGNOG_MAPPER_ANNOTATE.out.annotations.map { _meta, annotations -> annotations }.collect(),
-            ch_gene_gff.map { _meta, gff -> gff }.collect(),
-            ch_ags.map { _meta, ags -> ags }.collect().ifEmpty([]),
+            FEATURECOUNTS_GENES.out.counts.map { _meta, counts -> counts }.collect(sort: true),
+            EGGNOG_MAPPER_ANNOTATE.out.annotations.map { _meta, annotations -> annotations }.collect(sort: true),
+            ch_gene_gff.map { _meta, gff -> gff }.collect(sort: true),
+            ch_ags.map { _meta, ags -> ags }.collect(sort: true).ifEmpty([]),
             ch_dbcan_overviews_agg,
-            EGGNOG_MAPPER_ANNOTATE.out.versions.first(),
+            EGGNOG_MAPPER_ANNOTATE.out.versions.collect(sort: true).map { vs -> vs[0] },
             ch_dbcan_versions_agg,
             ch_cog_def.first(),
             params.assembly_mode,

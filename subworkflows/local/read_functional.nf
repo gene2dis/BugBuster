@@ -34,17 +34,22 @@ workflow READ_FUNCTIONAL {
 
     main:
     ch_versions = channel.empty()
+    // Study-level inputs are collected SORTED, and the backend versions.yml is
+    // the first of the SORTED list rather than .first(): both plain collect()
+    // and .first() follow task completion order, which changes the aggregation
+    // task's staged inputs (hence its hash) between runs and defeats -resume
+    // (design doc Q18)
 
     if ( params.read_level_functional == 'woltka' ) {
         WOLTKA_ALIGN(ch_reads.combine(ch_woltka_db))
         WOLTKA_CLASSIFY(WOLTKA_ALIGN.out.sam.combine(ch_woltka_db))
 
         AGGREGATE_READ_FUNCTIONS(
-            WOLTKA_CLASSIFY.out.functions.map { _meta, f -> f }.collect(),
-            WOLTKA_CLASSIFY.out.summary.map { _meta, f -> f }.collect(),
-            WOLTKA_CLASSIFY.out.unassigned.map { _meta, f -> f }.collect(),
-            ch_ags.map { _meta, ags -> ags }.collect().ifEmpty([]),
-            WOLTKA_CLASSIFY.out.versions.first(),
+            WOLTKA_CLASSIFY.out.functions.map { _meta, f -> f }.collect(sort: true),
+            WOLTKA_CLASSIFY.out.summary.map { _meta, f -> f }.collect(sort: true),
+            WOLTKA_CLASSIFY.out.unassigned.map { _meta, f -> f }.collect(sort: true),
+            ch_ags.map { _meta, ags -> ags }.collect(sort: true).ifEmpty([]),
+            WOLTKA_CLASSIFY.out.versions.collect(sort: true).map { vs -> vs[0] },
             'woltka'
         )
 
