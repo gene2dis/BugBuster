@@ -15,6 +15,7 @@ include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
+include { FORMAT_COG_DB           } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
@@ -38,6 +39,7 @@ workflow PREPARE_DATABASES {
     ch_eggnog_db        = channel.empty()
     ch_dbcan_db         = channel.empty()
     ch_bakta_db         = channel.empty()
+    ch_cog_def          = channel.empty()
     ch_versions         = channel.empty()
 
     //
@@ -212,6 +214,19 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // NCBI COG definitions table: maps the COG ids eggNOG 7 writes into
+    // COG_category to COG functional-category letters (design doc Q16)
+    //
+    if ( params.contig_level_functional ) {
+        if ( params.custom_cog_db ) {
+            ch_cog_def = channel.fromPath(params.custom_cog_db, checkIfExists: true)
+        } else {
+            ch_cog_ref = channel.fromList(params.cog_ref_db[params.cog_db]["url"])
+            ch_cog_def = FORMAT_COG_DB(ch_cog_ref)
+        }
+    }
+
+    //
     // dbCAN database for contig-level CAZy annotation (run_dbcan v5)
     // params.functional_cazy defaults to true, so an explicit CLI
     // `--functional_cazy false` arrives as the truthy String "false" —
@@ -279,5 +294,6 @@ workflow PREPARE_DATABASES {
     eggnog_db              = ch_eggnog_db
     dbcan_db               = ch_dbcan_db
     bakta_db               = ch_bakta_db
+    cog_def                = ch_cog_def
     versions               = ch_versions
 }

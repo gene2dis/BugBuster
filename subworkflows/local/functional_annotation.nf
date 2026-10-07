@@ -52,6 +52,7 @@ workflow FUNCTIONAL_ANNOTATION {
     ch_ags          // channel: [ meta, ags.tsv ] MicrobeCensus AGS tables; may be empty or miss samples (non-fatal failures)
     ch_refined_bins // channel: [ meta, bins_dir ] BINNING.out.refined_bins (one dir per sample / 'coassembly'; may hold only SKIPPED.txt)
     ch_bakta_db     // channel: Bakta db dir (schema 6 layout); empty when --mag_level_functional false
+    ch_cog_def      // channel: NCBI COG definitions table (cog-24.def.tab); empty when --contig_level_functional false
 
     main:
     ch_versions = channel.empty()
@@ -101,9 +102,11 @@ workflow FUNCTIONAL_ANNOTATION {
         // the annotations and GFFs (per-sample or single coassembly elements),
         // the eggNOG versions.yml for the version-aware layout guard, the dbCAN
         // overviews plus their versions.yml (empty lists when --functional_cazy
-        // false), and the MicrobeCensus AGS tables (ifEmpty([]) because the
+        // false), the MicrobeCensus AGS tables (ifEmpty([]) because the
         // channel legitimately emits nothing when MicrobeCensus is off or every
-        // sample's run failed)
+        // sample's run failed), and the NCBI COG definitions table that maps
+        // the COG ids eggNOG 7 writes into COG_category to category letters
+        // (design doc Q16)
         AGGREGATE_FUNCTIONS(
             FEATURECOUNTS_GENES.out.counts.map { _meta, counts -> counts }.collect(),
             EGGNOG_MAPPER_ANNOTATE.out.annotations.map { _meta, annotations -> annotations }.collect(),
@@ -112,6 +115,7 @@ workflow FUNCTIONAL_ANNOTATION {
             ch_dbcan_overviews_agg,
             EGGNOG_MAPPER_ANNOTATE.out.versions.first(),
             ch_dbcan_versions_agg,
+            ch_cog_def.first(),
             params.assembly_mode,
             params.dbcan_consensus
         )

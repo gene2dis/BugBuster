@@ -41,7 +41,9 @@ silent misparsing is the failure mode this guards against.
 
 Term splitting (Section 4.8 step 4, corrected 2026-08-29): KEGG_ko, EC, PFAMs
 and CAZy are comma-joined; COG_category is an undelimited letter string and
-splits per character. PFAMs values carry '_<start>_<end>' domain coordinates
+splits per character - and when it holds a COG id instead (eggNOG 7 does for
+most genes), the id is mapped to its category letters via --cog-def (NCBI
+cog-24.def.tab; design doc Q16). PFAMs values carry '_<start>_<end>' domain coordinates
 in v3, stripped to the Pfam name (design doc Q15, 2026-10-07); terms are
 de-duplicated per gene. dbCAN overview calls are '+'-joined with optional
 '(start-end)' domain ranges (stripped); the --dbcan-consensus policy picks the
@@ -77,7 +79,7 @@ EXPECTED_ANNOTATION_COLUMNS = (
 # (annotations column, ontology name, 5.1 db value, split mode)
 ONTOLOGY_FIELDS = [
     ('KEGG_ko', 'ko', 'eggnog_ko', 'comma'),
-    ('COG_category', 'cog', 'eggnog_cog', 'chars'),
+    ('COG_category', 'cog', 'eggnog_cog', 'cog'),
     ('EC', 'ec', 'eggnog_ec', 'comma'),
     ('PFAMs', 'pfam', 'eggnog_pfam', 'pfam'),
     ('CAZy', 'cazy', 'eggnog_cazy', 'comma'),
@@ -111,6 +113,17 @@ DBCAN_RANGE_RE = re.compile(r'\(\d+-\d+\)$')
 # coordinates.
 PFAM_DOMAIN_RE = re.compile(r'^(.+)_(\d+)_(\d+)$')
 
+# eggNOG 7 COG_category values are either functional-category letters (in
+# practice only 'S') or a COG ortholog-group id (e.g. COG0450, ~126 k OGs of
+# the eggNOG 7 DB; 75-80 % of annotated genes on real data). Ids are mapped to
+# their category letters with NCBI's COG definitions table (--cog-def,
+# cog-24.def.tab: COG id, category letters in order of importance, ...),
+# which covers all 4,911 COG ids eggNOG 7 uses (design doc Q16, owner option
+# b, 2026-10-07). Splitting an id per character produced bogus terms before.
+COG_ID_RE = re.compile(r'^COG\d+$')
+COG_LETTERS_RE = re.compile(r'^[A-Z]+$')
+COG_DEF = {}         # COG id -> category letters, filled from --cog-def
+COG_DEF_NAME = None  # basename of the --cog-def table (provenance)
 
 # Wide-matrix specs: (file label, backend filter, ontology filter). The two
 # CAZy backends get separate matrices, never one merged matrix (a gene called
@@ -459,8 +472,21 @@ def split_terms(value, mode):
     copy."""
     if value in ('', '-'):
         return []
-    if mode == 'chars':
-        terms = [ch for ch in value if ch not in ('-', ' ')]
+    if mode == 'cog':
+        if COG_ID_RE.match(value):
+            if not COG_DEF:
+                fail(f"COG_category value '{value}' is a COG id, but no --cog-def "
+                     f"table was given to map it to category letters (design doc Q16)")
+            if value not in COG_DEF:
+                fail(f"COG id '{value}' is not in the --cog-def table "
+                     f"({COG_DEF_NAME}) - use the COG release that covers the "
+                     f"eggNOG database's ids (design doc Q16)")
+            value = COG_DEF[value]
+        elif not COG_LETTERS_RE.match(value):
+            fail(f"COG_category value '{value}' is neither category letters nor "
+                 f"a COG id - not the eggNOG-mapper v3 layout this parser was "
+                 f"verified against (design doc Q16)")
+        terms = list(value)
     else:
         terms = [term for term in value.split(',') if term and term != '-']
     if mode == 'pfam':
@@ -475,6 +501,28 @@ def split_terms(value, mode):
             names.append(match.group(1))
         terms = names
     return list(dict.fromkeys(terms))
+
+
+def parse_cog_def(path):
+    """NCBI COG definitions table (cog-24.def.tab layout, no header): column 1
+    the COG id, column 2 its functional-category letters. Latin-1 tolerant
+    (older COG releases are not UTF-8); whitespace around the category is
+    stripped (cog-24 has 'O ' for COG6144)."""
+    mapping = {}
+    with open(path, encoding='latin-1') as handle:
+        for lineno, line in enumerate(handle, start=1):
+            fields = line.rstrip('\n').split('\t')
+            if len(fields) < 2:
+                fail(f"{path}:{lineno}: expected the NCBI COG definitions layout "
+                     f"(COG id <TAB> category letters <TAB> ...)")
+            cog_id, letters = fields[0].strip(), fields[1].strip()
+            if not COG_ID_RE.match(cog_id) or not COG_LETTERS_RE.match(letters):
+                fail(f"{path}:{lineno}: malformed COG definition "
+                     f"({cog_id!r}, {letters!r})")
+            mapping[cog_id] = letters
+    if not mapping:
+        fail(f"{path}: empty COG definitions table")
+    return mapping
 
 
 def explode_annotations(annotations):
@@ -539,6 +587,7 @@ Examples:
       --ags s1.ags.tsv s2.ags.tsv \\
       --dbcan s1.overview.tsv s2.overview.tsv \\
       --dbcan-versions-yml dbcan_versions.yml \\
+      --cog-def cog-24.def.tab \\
       --eggnog-versions-yml versions.yml --output-dir .
 
   # Co-assembly mode (one shared annotations file, GFF and dbCAN overview)
@@ -578,6 +627,11 @@ Examples:
                              "'recommended' uses the tool's Recommend Results "
                              "column (>= 2 tools), 'any' the union of the "
                              "per-tool columns")
+    parser.add_argument('--cog-def', type=Path, default=None,
+                        help='NCBI COG definitions table (cog-24.def.tab) used '
+                             'to map COG ids in COG_category to category '
+                             'letters (required whenever the annotations carry '
+                             'COG ids, i.e. on any real eggNOG 7 output)')
     parser.add_argument('--eggnog-versions-yml', required=True, type=Path,
                         help='versions.yml from EGGNOG_MAPPER_ANNOTATE (source '
                              'of the pinned tool and database versions)')
@@ -594,10 +648,16 @@ def main():
 
     for path in [*args.counts, *args.annotations, *args.gffs, *args.ags,
                  *args.dbcan, args.eggnog_versions_yml,
+                 *([args.cog_def] if args.cog_def else []),
                  *([args.dbcan_versions_yml] if args.dbcan_versions_yml else [])]:
         if not path.exists():
             fail(f"input file not found: {path}")
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    global COG_DEF, COG_DEF_NAME
+    if args.cog_def:
+        COG_DEF = parse_cog_def(args.cog_def)
+        COG_DEF_NAME = args.cog_def.name
 
     tool_version, db_version = parse_versions_yml(args.eggnog_versions_yml)
 
@@ -789,6 +849,11 @@ def main():
                                                  'length_bp', 'tool',
                                                  'tool_version', 'db_version'])
     gene_annotations['description'] = ''  # v3 dropped Description (design doc 4.8 record)
+    if COG_DEF_NAME:
+        # cog categories are eggNOG calls mapped through the COG table (Q16)
+        cog_rows = gene_annotations['db'] == 'eggnog_cog'
+        gene_annotations.loc[cog_rows, 'db_version'] = \
+            gene_annotations.loc[cog_rows, 'db_version'].astype(str) + f'; {COG_DEF_NAME}'
     gene_annotations = gene_annotations.sort_values(
         ['sample_id', 'gene_id', 'db', 'accession'], kind='mergesort',
         ignore_index=True)

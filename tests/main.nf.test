@@ -255,6 +255,8 @@ nextflow_pipeline {
             // RUN_DBCAN per sample plus its database download
             assert workflow.trace.tasks().count { task -> task.name.contains("RUN_DBCAN") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 1
+            // COG definitions table for the COG-id -> category mapping (Q16)
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 1
 
             // Published to the documented layout (design doc Section 9.1)
             assert path("${outputDir}/07_functional_annotation/gene_abundance/test_sample1/test_sample1.featureCounts.txt").exists()
@@ -595,6 +597,7 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_COG_DB") } == 0
             assert !path("${outputDir}/07_functional_annotation/summary").exists()
 
             // Per-bin outputs under mags/<sample>/ with the <sample>_<bin>

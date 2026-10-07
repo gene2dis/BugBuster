@@ -24,6 +24,11 @@
 #     mis-paired gene id sets all exit non-zero
 #   - the ags guard fails loudly on a wrong header, an unknown sample id, a
 #     non-positive genome_equivalents, and a filename/embedded-id mismatch
+#   - COG (Q16): COG ids in COG_category map to category letters via the
+#     --cog-def table (multi-letter split per character, trailing-space
+#     quirk tolerated, letter values kept), provenance names the table; a
+#     COG id without the table, an unknown id, another form or a malformed
+#     table all fail loudly
 #   - Pfam (Q15): '<name>_<start>_<end>' values stripped to the name, a
 #     repeated domain counted once per gene; a suffix-less value fails
 #   - dbCAN (T6): db=dbcan rows with per-row run_dbcan provenance in 5.1,
@@ -136,7 +141,7 @@ seed_assembly_inputs() {
     cp "${GFF_FIXTURE}" "${dir}/sampleA.gff.gz"
     cp "${GFF_FIXTURE}" "${dir}/sampleB.gff.gz"
     cp "${FIXTURES}/sampleA.ags.tsv" "${dir}/"
-    cp "${FIXTURES}/eggnog_versions.yml" "${dir}/"
+    cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${dir}/"
 }
 
 # sampleB has no ags table on purpose: it exercises the TPM-only fallback
@@ -145,7 +150,7 @@ ASSEMBLY_ARGS=(--assembly-mode assembly
     --annotations sampleA.emapper.annotations sampleB.emapper.annotations
     --gffs sampleA.gff.gz sampleB.gff.gz
     --ags sampleA.ags.tsv
-    --eggnog-versions-yml eggnog_versions.yml --output-dir .)
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .)
 
 #
 # 1. Assembly-mode happy path
@@ -184,6 +189,14 @@ check "2-KO gene double-counts at full TPM (K00001 and K00002 both 750000)" \
 # Corrected 4.8 step 4: COG 'EG' splits per character
 check "COG 'EG' yields separate E and G rows" \
     "grep -qP 'sampleA\tcontigs\teggnog-mapper\tcog\tE\t' '${D}/function_abundance.tsv' && grep -qP 'sampleA\tcontigs\teggnog-mapper\tcog\tG\t' '${D}/function_abundance.tsv' && ! grep -qP '\tcog\tEG\t' '${D}/function_abundance.tsv'"
+
+# Q16 (2026-10-07): eggNOG 7 writes a COG id into COG_category for most
+# genes; it maps to its category letters via the COG table (fixture
+# COG0001 -> 'EG'), never split into C/O/G/0/0/0/1 characters
+check "cog: COG id mapped to category letters, no id or digit fragments" \
+    "! grep -qP '\tcog\t(COG0001|[0-9]|C|O)\t' '${D}/function_abundance.tsv' && [ \$(wc -l < '${D}/function_wide_cog_tpm.tsv') -eq 3 ]"
+check "cog: provenance names the COG table on eggnog_cog rows" \
+    "grep -qP '\teggnog_cog\tE\t.*\t7.0.0; cog-fixture.def.tab\$' '${D}/gene_annotations.tsv' && grep -qP '\teggnog_ko\tK00001\t.*\t7.0.0\$' '${D}/gene_annotations.tsv'"
 
 # Q15 (2026-10-07): v3 PFAMs values are '<name>_<start>_<end>'; the
 # coordinates are stripped and a repeated domain counts once per gene
@@ -242,7 +255,7 @@ NEXT_WORKDIR="${D}" expect_pass "running without --ags succeeds (all-samples fal
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt \
     --annotations sampleA.emapper.annotations sampleB.emapper.annotations \
     --gffs sampleA.gff.gz sampleB.gff.gz \
-    --eggnog-versions-yml eggnog_versions.yml --output-dir .
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .
 check "no --ags: every ags_and_ge row unavailable, all cpge empty" \
     "[ \$(tail -n +2 '${D}/ags_and_ge.tsv' | grep -cP '\tunavailable\$') -eq 2 ] && [ -z \"\$(cut -f7 '${D}/gene_abundance.tsv' | tail -n +2 | tr -d '[:space:]')\" ]"
 
@@ -256,14 +269,14 @@ cp "${FIXTURES}/sampleA.featureCounts.txt" "${FIXTURES}/sampleB.featureCounts.tx
 sed 's/sampleA/coassembly/g' "${FIXTURES}/sampleA.emapper.annotations" > "${D}/coassembly.emapper.annotations"
 cp "${GFF_FIXTURE}" "${D}/coassembly.gff.gz"
 cp "${FIXTURES}/sampleA.ags.tsv" "${D}/"
-cp "${FIXTURES}/eggnog_versions.yml" "${D}/"
+cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${D}/"
 NEXT_WORKDIR="${D}" expect_pass "coassembly mode: shared gene set, per-sample counts" \
     --assembly-mode coassembly \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
     --annotations coassembly.emapper.annotations \
     --gffs coassembly.gff.gz \
     --ags sampleA.ags.tsv \
-    --eggnog-versions-yml eggnog_versions.yml --output-dir .
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .
 
 check "5.1 sample_id is 'coassembly' only" \
     "[ \"\$(tail -n +2 '${D}/gene_annotations.tsv' | cut -f1 | sort -u)\" = 'coassembly' ]"
@@ -284,11 +297,11 @@ printf '# Program:featureCounts v2.1.1; empty gene set\nGeneid\tChr\tStart\tEnd\
 # Header-only annotations (an emapper run over zero proteins)
 grep '^#' "${FIXTURES}/sampleA.emapper.annotations" > "${D}/sampleE.emapper.annotations"
 cp "${EMPTY_GFF_FIXTURE}" "${D}/sampleE.gff.gz"
-cp "${FIXTURES}/eggnog_versions.yml" "${D}/"
+cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${D}/"
 NEXT_WORKDIR="${D}" expect_pass "empty gene set aggregates without crashing" \
     --assembly-mode assembly \
     --counts sampleE.featureCounts.txt --annotations sampleE.emapper.annotations \
-    --gffs sampleE.gff.gz --eggnog-versions-yml eggnog_versions.yml --output-dir .
+    --gffs sampleE.gff.gz --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .
 
 check "empty sample: zero abundance rows, summary row with empty fractions" \
     "[ \$(tail -n +2 '${D}/gene_abundance.tsv' | wc -l) -eq 0 ] && grep -qP 'sampleE\tany\t0\t0\t\t\$' '${D}/annotated_fraction.tsv' && grep -qP 'sampleE\t\t\t\tunavailable\$' '${D}/ags_and_ge.tsv'"
@@ -303,11 +316,11 @@ seed_negative() {
     cp "${FIXTURES}/sampleA.featureCounts.txt" "${dir}/"
     cp "${FIXTURES}/sampleA.emapper.annotations" "${dir}/"
     cp "${GFF_FIXTURE}" "${dir}/sampleA.gff.gz"
-    cp "${FIXTURES}/eggnog_versions.yml" "${dir}/"
+    cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${dir}/"
 }
 NEG_ARGS=(--assembly-mode assembly --counts sampleA.featureCounts.txt
     --annotations sampleA.emapper.annotations --gffs sampleA.gff.gz
-    --eggnog-versions-yml eggnog_versions.yml --output-dir .)
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .)
 
 D="${WORK}/neg_renamed"; seed_negative "${D}"
 sed -i 's/\tKEGG_ko\t/\tKEGG_KO_RENAMED\t/' "${D}/sampleA.emapper.annotations"
@@ -330,6 +343,33 @@ check_grep "  ...naming the known-layout set" "../neg_unknown_version.log" "not 
 D="${WORK}/neg_missing_version"; seed_negative "${D}"
 grep -v 'eggnog-mapper:' "${FIXTURES}/eggnog_versions.yml" > "${D}/eggnog_versions.yml"
 NEXT_WORKDIR="${D}" expect_fail "missing emapper version in versions.yml fails" "${NEG_ARGS[@]}"
+
+# Q16: the letter form ('S', the only letter value in eggNOG 7) and the
+# trailing-space quirk of real cog-24 (fixture COG0002 -> 'O ')
+D="${WORK}/cog_letter_S"; seed_negative "${D}"
+sed -i 's/\tCOG0001\t/\tS\t/' "${D}/sampleA.emapper.annotations"
+NEXT_WORKDIR="${D}" expect_pass "COG_category letter value 'S' aggregates" "${NEG_ARGS[@]}"
+check_grep "  ...as cog term S" "function_abundance.tsv" "eggnog-mapper.cog.S"
+D="${WORK}/cog_trailing_space"; seed_negative "${D}"
+sed -i 's/\tCOG0001\t/\tCOG0002\t/' "${D}/sampleA.emapper.annotations"
+NEXT_WORKDIR="${D}" expect_pass "COG id whose table category has a trailing space aggregates" "${NEG_ARGS[@]}"
+check_grep "  ...as cog term O" "function_abundance.tsv" "eggnog-mapper.cog.O.."
+
+D="${WORK}/neg_cog_no_table"; seed_negative "${D}"
+NEXT_WORKDIR="${D}" expect_fail "COG id without --cog-def fails (Q16)" --assembly-mode assembly \
+    --counts sampleA.featureCounts.txt --annotations sampleA.emapper.annotations \
+    --gffs sampleA.gff.gz --eggnog-versions-yml eggnog_versions.yml --output-dir .
+check_grep "  ...asking for the COG table" "../neg_cog_no_table.log" "no --cog-def"
+D="${WORK}/neg_cog_unknown_id"; seed_negative "${D}"
+sed -i 's/\tCOG0001\t/\tCOG9999\t/' "${D}/sampleA.emapper.annotations"
+NEXT_WORKDIR="${D}" expect_fail "COG id missing from the COG table fails (Q16)" "${NEG_ARGS[@]}"
+check_grep "  ...naming the id" "../neg_cog_unknown_id.log" "COG id .COG9999. is not in the --cog-def table"
+D="${WORK}/neg_cog_other_form"; seed_negative "${D}"
+sed -i 's/\tCOG0001\t/\tCOG0001,COG0002\t/' "${D}/sampleA.emapper.annotations"
+NEXT_WORKDIR="${D}" expect_fail "COG_category in an unverified form fails (Q16)" "${NEG_ARGS[@]}"
+D="${WORK}/neg_cog_bad_table"; seed_negative "${D}"
+printf 'not a cog table\n' > "${D}/cog-fixture.def.tab"
+NEXT_WORKDIR="${D}" expect_fail "malformed COG definitions table fails (Q16)" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_pfam_no_coords"; seed_negative "${D}"
 sed -i 's/MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60/MockPfam/' "${D}/sampleA.emapper.annotations"
@@ -428,7 +468,7 @@ cp "${FIXTURES}/sampleA.featureCounts.txt" "${FIXTURES}/sampleB.featureCounts.tx
 cp "${FIXTURES}/coassembly.emapper.annotations" "${D}/"
 cp "${GFF_FIXTURE}" "${D}/coassembly.gff.gz"
 cp "${FIXTURES}/coassembly.overview.tsv" "${D}/"
-cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/dbcan_versions.yml" "${D}/"
+cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${FIXTURES}/dbcan_versions.yml" "${D}/"
 NEXT_WORKDIR="${D}" expect_pass "coassembly mode with one shared dbCAN overview" \
     --assembly-mode coassembly \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt \
@@ -436,7 +476,7 @@ NEXT_WORKDIR="${D}" expect_pass "coassembly mode with one shared dbCAN overview"
     --gffs coassembly.gff.gz \
     --dbcan coassembly.overview.tsv \
     --dbcan-versions-yml dbcan_versions.yml \
-    --eggnog-versions-yml eggnog_versions.yml --output-dir .
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .
 check "coassembly: dbcan 5.1 keyed 'coassembly', per-sample 5.3 rows" \
     "grep -qP 'coassembly\tcontig_1_1\tcontig_1\t1\t300\t\\+\t300\t10\tdbcan\tGH5_4\t' '${D}/gene_annotations.tsv' && grep -qP 'sampleA\tcontigs\trun_dbcan\tcazy\tGH5_4\t' '${D}/function_abundance.tsv' && grep -qP 'sampleB\tcontigs\trun_dbcan\tcazy\tGH5_4\t' '${D}/function_abundance.tsv'"
 

@@ -121,6 +121,7 @@ flowchart TD
     Contigdb -->|Yes| BLAST[FORMAT_NT_BLAST_DB]
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
+    Funcdb -->|Yes| CogDB[FORMAT_COG_DB]
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
     Magdb{mag_level_functional?} -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
@@ -129,7 +130,7 @@ flowchart TD
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `bakta_db`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 

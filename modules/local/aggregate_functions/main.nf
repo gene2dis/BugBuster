@@ -36,6 +36,9 @@
             input_reads_report.csv)
         dbcan_versions: versions.yml from RUN_DBCAN (same distinct-name
             staging; absent exactly when dbcan is absent)
+        cog_def: NCBI COG definitions table (cog-24.def.tab), maps the COG
+            ids eggNOG 7 writes into COG_category to category letters
+            (design doc Q16)
         assembly_mode: 'assembly' or 'coassembly' (join topology + 5.2 column)
         dbcan_consensus: 'recommended' or 'any' (which dbCAN calls feed
             aggregation, design doc Section 4.3 consensus policy)
@@ -64,6 +67,7 @@ process AGGREGATE_FUNCTIONS {
     path(dbcan, stageAs: 'dbcan/*')
     path(eggnog_versions, stageAs: 'eggnog_versions.yml')
     path(dbcan_versions, stageAs: 'dbcan_versions.yml')
+    path(cog_def, stageAs: 'cog_def/*')
     val(assembly_mode)
     val(dbcan_consensus)
 
@@ -94,6 +98,7 @@ process AGGREGATE_FUNCTIONS {
         ${dbcan_arg} \\
         ${dbcan_versions_arg} \\
         --dbcan-consensus ${dbcan_consensus} \\
+        --cog-def ${cog_def} \\
         --eggnog-versions-yml ${eggnog_versions} \\
         --output-dir . \\
         ${args}

@@ -35,8 +35,9 @@ nextflow_process {
                 input[4] = [ file("${projectDir}/tests/data/functional/sampleA.overview.tsv", checkIfExists: true) ]
                 input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
                 input[6] = file("${projectDir}/tests/data/functional/dbcan_versions.yml", checkIfExists: true)
-                input[7] = "assembly"
-                input[8] = "recommended"
+                input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
+                input[8] = "assembly"
+                input[9] = "recommended"
                 """
             }
         }
@@ -63,6 +64,12 @@ nextflow_process {
             assert functions.contains('run_dbcan\tcazy\tGH5_4')
             assert functions.contains('eggnog-mapper\tcazy\tGT2')
 
+            // Q16: the COG id in COG_category maps through the COG table
+            // (fixture COG0001 -> 'EG'); no id/character fragments
+            assert functions.contains('eggnog-mapper\tcog\tE\t')
+            assert functions.contains('eggnog-mapper\tcog\tG\t')
+            assert !functions.contains('\tcog\tCOG0001\t')
+
             // All twelve wide matrices (tpm + cpge, incl. cazy_dbcan);
             // AGS summary; per-backend provenance versions
             assert process.out.function_wide.get(0).size() == 12
@@ -88,8 +95,9 @@ nextflow_process {
                 input[4] = [ file("${projectDir}/tests/data/functional/coassembly.overview.tsv", checkIfExists: true) ]
                 input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
                 input[6] = file("${projectDir}/tests/data/functional/dbcan_versions.yml", checkIfExists: true)
-                input[7] = "coassembly"
-                input[8] = "recommended"
+                input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
+                input[8] = "coassembly"
+                input[9] = "recommended"
                 """
             }
         }
@@ -134,8 +142,9 @@ nextflow_process {
                 input[4] = []
                 input[5] = file("${projectDir}/tests/data/functional/eggnog_versions.yml", checkIfExists: true)
                 input[6] = []
-                input[7] = "assembly"
-                input[8] = "recommended"
+                input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
+                input[8] = "assembly"
+                input[9] = "recommended"
                 """
             }
         }

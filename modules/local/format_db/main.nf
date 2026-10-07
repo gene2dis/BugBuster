@@ -251,6 +251,31 @@ process FORMAT_BAKTA_DB {
         """
 }
 
+process FORMAT_COG_DB {
+    tag "format_cog_db"
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+
+    label 'process_download'
+
+    input:
+        val(db)
+
+    output:
+        path("*.def.tab")
+
+    script:
+        """
+        ${params.cog_ref_db[params.cog_db]["fmtscript"]} $db
+        """
+
+    stub:
+        """
+        touch cog-24.def.tab
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

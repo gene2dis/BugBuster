@@ -177,6 +177,15 @@ startup instead of being silently ignored. Update existing command lines and
   with a repeated domain counted toward several). `summary/` tables now carry the
   plain Pfam name, counted once per gene; an unexpected PFAMs format fails loudly
   (format verified on all 73.9 M pfam values of the eggNOG 7 database)
+- **Contig-branch COG categories were bogus**: eggNOG 7 writes a COG ortholog id
+  (e.g. `COG1629`) into `COG_category` for most genes (75-80 % on real data), and
+  the aggregation split it per character into fake categories (`C`, `O`, `G`,
+  digits). COG ids are now mapped to their functional-category letters with
+  NCBI's COG definitions table (`cog-24.def.tab`, ~410 KB, auto-downloaded with
+  md5 verification; `--cog_db` / `--custom_cog_db`); an unknown id or other form
+  fails loudly
+- Test harness: the blast bad-md5 fixture could leave the checksum unchanged
+  (1-in-16 CI flake); it now always corrupts it
 - Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
   decontamination DB and `--local` scoring, database download containers and
   script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,

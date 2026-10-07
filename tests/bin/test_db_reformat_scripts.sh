@@ -100,9 +100,11 @@ build_fixtures() {
             "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.000.tar.gz" \
             "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.001.tar.gz" > nt-nucl-metadata.json )
 
-    # Same blast repo but with a corrupted checksum for volume 001
+    # Same blast repo but with a corrupted checksum for volume 001 ('x' can
+    # never be a hex digit; the former '0' left the md5 unchanged whenever the
+    # timestamp-dependent tarball md5 already started with 0 - a 1-in-16 flake)
     cp -r "${f}/blastdb" "${f}/blastdb_badmd5"
-    sed 's/^./0/' "${f}/blastdb_badmd5/nt.001.tar.gz.md5" > "${f}/blastdb_badmd5/tmp.md5" \
+    sed 's/^./x/' "${f}/blastdb_badmd5/nt.001.tar.gz.md5" > "${f}/blastdb_badmd5/tmp.md5" \
         && mv "${f}/blastdb_badmd5/tmp.md5" "${f}/blastdb_badmd5/nt.001.tar.gz.md5"
 
     # Mock eggNOG emapper-3.0 data repository: the seven uncompressed data
@@ -160,6 +162,17 @@ build_fixtures() {
     head -c 100 /dev/urandom > "${f}/corrupt.tar.xz"
 }
 build_fixtures
+
+# NCBI COG definitions table fixtures (cog-24.def.tab layout + the release's
+# checksums.md5 next to it), plus a bad-md5 and a wrong-layout variant
+for v in cog cog_badmd5 cog_badlayout; do mkdir -p "${FIXTURES}/${v}"; done
+cp "${REPO_DIR}/tests/data/functional/cog-fixture.def.tab" "${FIXTURES}/cog/cog-24.def.tab"
+cp "${FIXTURES}/cog/cog-24.def.tab" "${FIXTURES}/cog_badmd5/cog-24.def.tab"
+printf 'not a cog table\n' > "${FIXTURES}/cog_badlayout/cog-24.def.tab"
+for v in cog cog_badlayout; do
+    (cd "${FIXTURES}/${v}" && md5sum cog-24.def.tab > checksums.md5)
+done
+echo "00000000000000000000000000000000  cog-24.def.tab" > "${FIXTURES}/cog_badmd5/checksums.md5"
 
 #
 # Local HTTP server for the fixtures
@@ -383,6 +396,21 @@ MOCK_BIN="${MOCK_FAIL}"
 expect_fail "bakta: amrfinder_update failure fails the provisioning" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
 MOCK_BIN=""
 RUN_IMG=""
+
+#
+# cog_db_reformat.sh (shared download image, FORMAT_COG_DB)
+#
+echo "--- cog_db_reformat.sh ---"
+expect_pass "cog: valid table + matching checksums.md5" cog_db_reformat.sh "${BASE_URL}/cog/cog-24.def.tab"
+check_file "cog: table kept under its release name" "cog-24.def.tab"
+if [ ! -e "${LAST_WORKDIR}/checksums.md5" ]; then
+    echo "✓ cog: checksums.md5 removed after verification"; PASS=$((PASS + 1))
+else
+    echo "✗ cog: checksums.md5 left in the output dir"; FAIL=$((FAIL + 1))
+fi
+expect_fail "cog: md5 mismatch fails" cog_db_reformat.sh "${BASE_URL}/cog_badmd5/cog-24.def.tab"
+expect_fail "cog: non-COG layout fails" cog_db_reformat.sh "${BASE_URL}/cog_badlayout/cog-24.def.tab"
+expect_fail "cog: 404 URL fails" cog_db_reformat.sh "${BASE_URL}/no_such_dir/cog-24.def.tab"
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

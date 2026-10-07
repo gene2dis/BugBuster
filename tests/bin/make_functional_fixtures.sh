@@ -8,8 +8,10 @@
 #   - sampleA.emapper.annotations  format-faithful eggNOG-mapper v3.0.0-beta6
 #     file: variable-length leading '##' block (ctime / version / argv /
 #     applied-filters / confidence legend), the exact 22-column '#query'
-#     header, one annotated gene (contig_1_1: two KEGG_ko terms, multi-letter
-#     COG 'EG', a CAZy family, PFAMs in the real v3 '<name>_<start>_<end>'
+#     header, one annotated gene (contig_1_1: two KEGG_ko terms, a COG id in
+#     COG_category as eggNOG 7 writes for most genes - 'COG0001', mapped via
+#     cog-fixture.def.tab to the multi-letter categories 'EG' (design doc
+#     Q16) -, a CAZy family, PFAMs in the real v3 '<name>_<start>_<end>'
 #     form (MockPfam twice - a repeated domain must count once - and
 #     Mock_dom_2, a name ending in digits; design doc Q15), '-' placeholders, 13-char positional
 #     confidence code) with contig_1_2 deliberately absent (unannotated), and
@@ -31,6 +33,7 @@
 #     CAZy call (GT2); contig_1_2 absent (no CAZyme call)
 #   - eggnog_versions.yml          versions.yml shape from EGGNOG_MAPPER_ANNOTATE
 #   - dbcan_versions.yml           versions.yml shape from RUN_DBCAN
+#   - cog-fixture.def.tab          NCBI COG definitions table shape (Q16)
 #
 # Gene ids reuse tests/data/gff/test_contig1_genes.gff.gz (contig_1_1 at
 # 1-300 +, contig_1_2 at 601-900 -, both 300 bp); the test harnesses copy that
@@ -60,7 +63,7 @@ cat > "${OUT_DIR}/sampleA.emapper.annotations" <<'EOF'
 ## confidence codes: h=high m=medium l=low -=not annotated
 ## confidence field order: Preferred_name GOs EC KEGG_ko KEGG_Pathway KEGG_Module KEGG_Reaction KEGG_rclass BRITE KEGG_TC CAZy BiGG_Reaction PFAMs
 #query	seed_ortholog	evalue	score	eggNOG_OGs	tax_ceiling	farthest_donor_lineage	COG_category	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs	annotation_confidence
-contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	EG	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60	h--h------h-h
+contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	COG0001	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60	h--h------h-h
 ## 1 queries scanned
 ## Total time (seconds): 1.0
 ## Rate: 1.00 q/s
@@ -102,6 +105,12 @@ cat > "${OUT_DIR}/sampleA.overview.tsv" <<'EOF'
 Gene ID	EC#	dbCAN_hmm	dbCAN_sub	DIAMOND	#ofTools	Recommend Results	Substrate
 contig_1_1	3.2.1.4:2|-	GH5(1-95)+CBM6(100-140)	GH5_4(1-95)	GH5;CBM6	3	GH5_4|CBM6	xylan
 EOF
+
+# NCBI COG definitions table fixture (cog-24.def.tab layout, 7 columns, no
+# header): COG0001 -> 'EG' (multi-letter, per-character split), COG0002 with
+# the trailing-space quirk real cog-24 has on COG6144 (design doc Q16)
+printf 'COG0001\tEG\tFixture COG one\tfixA\t\t\t\nCOG0002\tO \tFixture COG two\tfixB\t\t\t\n' \
+    > "${OUT_DIR}/cog-fixture.def.tab"
 
 cat > "${OUT_DIR}/dbcan_versions.yml" <<'EOF'
 "FUNCTIONAL_ANNOTATION:RUN_DBCAN":

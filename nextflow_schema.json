@@ -207,6 +207,18 @@
                     "description": "Path to custom Bakta database directory (schema 6 layout: version.json, amrfinderplus-db/, and the Bakta annotation databases).",
                     "fa_icon": "fas fa-folder"
                 },
+                "cog_db": {
+                    "type": "string",
+                    "default": "cog-24",
+                    "description": "Built-in NCBI COG definitions table used to map the COG ids eggNOG-mapper reports in COG_category to COG functional-category letters (contig functional branch): cog-24 (see config/databases.config; ~410 KB).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_cog_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a local NCBI COG definitions table (cog-24.def.tab layout: COG id, category letters, ...); skips the download. Must cover the COG ids of the eggNOG database in use.",
+                    "fa_icon": "fas fa-file"
+                },
                 "custom_kraken_db": {
                     "type": "string",
                     "format": "directory-path",

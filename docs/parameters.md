@@ -236,6 +236,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: full 31.9 GB download / light 1.3 GB download
 - **Example**: `--bakta_db v6.0-light`
 
+### `--cog_db`
+- **Type**: String
+- **Default**: `cog-24`
+- **Options**: `cog-24`
+- **Description**: NCBI COG definitions table for the contig functional branch (`--contig_level_functional`). eggNOG-mapper v3 / eggNOG 7 reports most genes' `COG_category` as a COG ortholog id (e.g. `COG1629`) rather than a functional category; the pipeline maps each id to its COG functional-category letters with this table (a COG with several categories contributes to each). Downloaded from `https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab` and verified against the release's `checksums.md5`; it covers every COG id of the eggNOG 7 database
+- **Size**: ~410 KB
+- **Example**: `--cog_db cog-24`
+
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
@@ -350,6 +358,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to custom Bakta database directory in the schema 6 layout (the content of an extracted `db.tar.xz`/`db-light.tar.xz`: `version.json`, `amrfinderplus-db/`, and the Bakta annotation databases). Must be schema 6 — Bakta 1.12.x rejects older schemas. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded database version is `custom`. **Note:** the official v6.0 tarball bundles an AMRFinderPlus database too old for the AMRFinderPlus in the pinned bakta container — refresh it once with `amrfinder_update --force_update --database <db>/amrfinderplus-db` (run inside the bakta container; see `docs/troubleshooting.md`), otherwise every annotation fails at the AMR expert step. The pipeline's auto-download path does this refresh automatically
 - **Example**: `--custom_bakta_db /path/to/bakta_db`
+
+### `--custom_cog_db`
+- **Type**: String (file path)
+- **Description**: Path to a local NCBI COG definitions table in the `cog-24.def.tab` layout (tab-separated, no header: COG id, functional-category letters, name, ...). It must cover every COG id the eggNOG database reports — an id missing from the table stops the aggregation with an error naming it
+- **Example**: `--custom_cog_db /shared/databases/cog/cog-24.def.tab`
 
 ---
 

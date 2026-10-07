@@ -301,6 +301,14 @@ and, if the columns changed, `EXPECTED_ANNOTATION_COLUMNS` in
 `tests/bin/test_aggregate_functions.sh` for the new layout. Do not bypass the
 check by editing the annotations file.
 
+Two related guards protect the term parsing (design: never misparse silently):
+`PFAMs value '<X>' is not '<pfam_name>_<start>_<end>'` and
+`COG_category value '<X>' is neither category letters nor a COG id` mean the
+eggNOG-mapper output format changed — re-verify before extending the parser.
+`COG id '<X>' is not in the --cog-def table` means the COG definitions table
+(`--cog_db` / `--custom_cog_db`) is older than the eggNOG database's COG ids:
+use a COG release that covers them (the default `cog-24` covers all of eggNOG 7).
+
 The same guard exists for the run_dbcan overview (`overview column header does
 not match the verified run_dbcan v5 layout ...` / `run_dbcan version '<X>' is
 not among the layouts ...`): after re-pinning the `RUN_DBCAN` module, re-verify

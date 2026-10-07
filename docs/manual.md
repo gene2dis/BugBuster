@@ -149,6 +149,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
+| **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's COG ids to COG functional categories | `contig_level_functional=true` |
 | **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
 | **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
 
@@ -205,6 +206,7 @@ nextflow run main.nf \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
+    --custom_cog_db /shared/databases/bugbuster/cog/cog-24.def.tab \
     -profile docker
 ```
 
@@ -349,6 +351,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
+| `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
 
@@ -371,6 +374,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
 | `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
 | `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
+| `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -794,7 +798,13 @@ results/
 > field). Pfam terms are Pfam family names (e.g. `BPD_transp_1`): eggNOG-mapper
 > v3 reports one value per domain hit with its coordinates appended
 > (`BPD_transp_1_210_403`), which the aggregation strips, so a gene with a
-> repeated domain counts once toward that family.
+> repeated domain counts once toward that family. COG terms are COG
+> functional categories (one letter, e.g. `P` = inorganic ion transport and
+> metabolism): eggNOG 7 reports most genes with a COG ortholog id instead of a
+> category (e.g. `COG1629`), which is mapped to its category letters with
+> NCBI's COG definitions table (`cog-24.def.tab`, downloaded with the branch);
+> a COG with several categories contributes to each. The table's name is
+> appended to `db_version` on the COG rows of `gene_annotations.tsv`.
 
 > **Two CAZy backends (`--functional_cazy`, on by default):** CAZy calls come
 > from both eggNOG-mapper (coarse, orthology-transferred) and run_dbcan v5
@@ -860,7 +870,8 @@ databases/                            # Database storage (configurable via --dat
 ├── checkm2/                          # CheckM2 database
 ├── gtdbtk/                           # GTDB-TK database
 ├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
-└── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
+├── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
+└── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work

@@ -484,6 +484,10 @@ workflow {
             ? PREPARE_DATABASES.out.eggnog_db
                 .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
             : channel.empty()
+        ch_cog_def = params.contig_level_functional
+            ? PREPARE_DATABASES.out.cog_def
+                .ifEmpty { error "ERROR: COG definitions table is empty. Ensure params.contig_level_functional is enabled and a valid COG table is configured (--custom_cog_db)." }
+            : channel.empty()
         ch_bakta_db = params.mag_level_functional
             ? PREPARE_DATABASES.out.bakta_db
                 .ifEmpty { error "ERROR: Bakta database is empty. Ensure params.mag_level_functional is enabled and a valid Bakta database is configured." }
@@ -496,7 +500,8 @@ workflow {
             ch_counting_bam,
             ch_ags,
             ch_refined_bins,
-            ch_bakta_db
+            ch_bakta_db,
+            ch_cog_def
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
     }
