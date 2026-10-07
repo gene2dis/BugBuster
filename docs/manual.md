@@ -200,12 +200,17 @@ for f in WoLr2.1.bt2l WoLr2.2.bt2l WoLr2.3.bt2l WoLr2.4.bt2l WoLr2.rev.1.bt2l Wo
 for f in coords.txt length.map; do get proteins/$f.xz; get proteins/$f.md5; done
 for f in orf-to-ko.map.xz orf-to-ko.map.md5 ko-to-ec.map ko-to-cog.map ko_name.txt; do get function/kegg/$f; done
 for f in orf-to-protein.map.xz orf-to-protein.map.md5 protein-to-enzrxn.map enzrxn-to-reaction.map \
-         reaction-to-pathway.map reaction-to-ec.map pathway_name.txt; do get function/metacyc/$f; done
+         reaction-to-pathway.map pathway_name.txt; do get function/metacyc/$f; done
 for f in orf-to-pfam.map.xz orf-to-pfam.map.md5 pfam_name.txt; do get function/pfam/$f; done
 for x in proteins/coords.txt proteins/length.map function/kegg/orf-to-ko.map \
          function/metacyc/orf-to-protein.map function/pfam/orf-to-pfam.map; do
     [ "$(xz -dc $DEST/$x.xz | md5sum | cut -d' ' -f1)" = "$(cut -d' ' -f1 $DEST/$x.md5)" ] \
         && echo "OK  $x" || echo "BAD $x"; done
+
+# NCBI COG 2024 definitions table (~410 KB; maps eggNOG's COG ids to COG
+# functional categories in the contig branch)
+wget -P /shared/databases/bugbuster/cog/ \
+    https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab
 
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
 # combined phiX + host Bowtie2 index from FASTA on first use
@@ -328,7 +333,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
-| `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (only with the functional branch; failure is non-fatal — affected samples fall back to TPM-only) |
+| `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (with the contig or read functional branch; failure is non-fatal — affected samples get no CPGE: TPM-only in the contig tables, native read counts only in the read tables) |
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
 | `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
 | `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
@@ -380,7 +385,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > profiling recovers the unassembled fraction but over-predicts, so it is never
 > merged with the assembly-based tables. The WoLr2 database is ~94 GB and
 > alignment needs **≥ 68 GB RAM** per task; pre-download it once and pass
-> `--custom_woltka_db` (Section 3, Manual Database Download).
+> `--custom_woltka_db` (Section 4, Manual Database Download).
 
 ### 6.3 Database Selection Options
 

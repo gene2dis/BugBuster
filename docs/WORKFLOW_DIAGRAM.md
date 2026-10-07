@@ -114,6 +114,8 @@ flowchart TD
     Start --> Funcdb{Functional<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
+    Start --> Magdb{mag_level_functional?}
+    Start --> Readfuncdb{"read_level_functional<br/>= woltka?"}
     
     Kraken -->|Yes| KrakenDB[FORMAT_KRAKEN_DB]
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
@@ -126,8 +128,8 @@ flowchart TD
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
     Funcdb -->|Yes| CogDB[FORMAT_COG_DB]
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
-    Magdb{mag_level_functional?} -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
-    Readfuncdb{"read_level_functional<br/>= woltka?"} -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
+    Magdb -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
+    Readfuncdb -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]

@@ -42,6 +42,10 @@ input:
       type: file
       description: versions.yml from RUN_DBCAN, source of the pinned run_dbcan and dbcan_db versions (absent exactly when dbcan is absent)
       pattern: "versions.yml"
+  - cog_def:
+      type: file
+      description: NCBI COG definitions table (cog-24.def.tab layout) that maps the COG ids eggNOG 7 writes into COG_category to COG functional-category letters (design doc Q16)
+      pattern: "*.def.tab"
   - assembly_mode:
       type: string
       description: "'assembly' or 'coassembly' - drives the join topology and the gene_abundance assembly_mode column"

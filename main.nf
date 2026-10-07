@@ -64,7 +64,7 @@ def printHelp() {
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
       --contig_level_functional     Enable contig-level functional annotation; needs singularity/apptainer (default: ${params.contig_level_functional})
-      --microbecensus               Estimate average genome size for CPGE normalization (functional branch; default: ${params.microbecensus})
+      --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
       --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
       --mag_level_functional        Bakta annotation of refined bins; needs --include_binning and >= 2 --binners (default: ${params.mag_level_functional})
