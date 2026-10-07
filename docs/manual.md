@@ -32,13 +32,13 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent, reported separately from the contig branch; needs no assembly)
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
 ```
 Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
-                                            ├──→ Read-level functions (Woltka/WoLr2, optional)
+                                            ├──→ Read-level functions (Woltka/WoLr2 or SUPER-FOCUS/SEED, optional)
                                             ↓
                                       Assembly (MEGAHIT)
                                             ↓
@@ -154,6 +154,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
 | **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
 | **Web of Life WoLr2** | ~94 GB (Bowtie2 index 93.6 GB + coordinates/maps ~0.6 GB) | Read-level functional profiling (Woltka); alignment needs ≥ 68 GB RAM | `read_level_functional='woltka'` |
+| **SUPER-FOCUS DB_90** | ~0.74 GB download (~1.9 GB unpacked) for DIAMOND, or ~0.9 GB (~2.5 GB unpacked) for MMseqs2; only the selected aligner's archive | Read-level SEED subsystem profiling (SUPER-FOCUS) | `read_level_functional='superfocus'` |
 
 ### Manual Database Download
 
@@ -207,6 +208,16 @@ for x in proteins/coords.txt proteins/length.map function/kegg/orf-to-ko.map \
     [ "$(xz -dc $DEST/$x.xz | md5sum | cut -d' ' -f1)" = "$(cut -d' ' -f1 $DEST/$x.md5)" ] \
         && echo "OK  $x" || echo "BAD $x"; done
 
+# SUPER-FOCUS DB_90 for the SUPER-FOCUS read-level backend (figshare, CC0).
+# The database ROOT is the directory CONTAINING db/; pass it as
+# --custom_superfocus_db. DIAMOND archive shown (~0.74 GB); for
+# --superfocus_aligner mmseqs2 use file 44075237 into db/static/mmseqs2 instead.
+mkdir -p /shared/databases/bugbuster/superfocus/db/static/diamond
+wget -O db90.zip https://ndownloader.figshare.com/files/44075225
+unzip -j db90.zip -d /shared/databases/bugbuster/superfocus/db/static/diamond
+wget -O /shared/databases/bugbuster/superfocus/db/database_PKs.txt \
+    https://raw.githubusercontent.com/metageni/SUPER-FOCUS/739404db8816de967cd4ac3e0d9effcdab7f1489/superfocus_app/db/database_PKs.txt
+
 # NCBI COG 2024 definitions table (~410 KB; maps eggNOG's COG ids to COG
 # functional categories in the contig branch)
 wget -P /shared/databases/bugbuster/cog/ \
@@ -232,6 +243,7 @@ nextflow run main.nf \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
     --custom_woltka_db /shared/databases/bugbuster/wol2 \
+    --custom_superfocus_db /shared/databases/bugbuster/superfocus \
     --custom_cog_db /shared/databases/bugbuster/cog/cog-24.def.tab \
     -profile docker
 ```
@@ -337,8 +349,9 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
 | `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
 | `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
-| `--read_level_functional` | `none` | `woltka`, `none` | Read-level functional profiling backend (needs no assembly; see the note below) |
+| `--read_level_functional` | `none` | `woltka`, `superfocus`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
 | `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
+| `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
@@ -387,6 +400,31 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > alignment needs **≥ 68 GB RAM** per task; pre-download it once and pass
 > `--custom_woltka_db` (Section 4, Manual Database Download).
 
+> **Note for `--read_level_functional superfocus`:** each sample's host-removed R1, R2
+> and singleton reads are concatenated into one query (mates counted as separate
+> reads) and profiled with SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster
+> database, using DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner
+> mmseqs2`). For each read, its equal-best-e-value hits passing the SUPER-FOCUS
+> defaults (≥ 60 % identity, ≥ 15 aa alignment, e-value ≤ 1e-5; set in the
+> `SUPERFOCUS` `ext.args`) are counted, and **each read with a hit contributes
+> exactly 1**, divided 1/k across the k distinct SEED (subsystem, function)
+> assignments of its best hits. The pipeline sums these function-level counts to SEED
+> subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`;
+> accessions are path-qualified — `L1`, `L1 | L2`, `L1 | L2 | L3` — because the
+> level-2 placeholder `-` occurs under many level-1 categories). SEED is never
+> mapped to KO or EC, and the read tables are never merged with the contig branch.
+> **No copies per genome equivalent are produced:** a SEED hit carries no gene
+> length, so no RPK (and no CPGE) exists — `abundance_cpge` stays blank and
+> `cpge_status` is `not_applicable`; MicrobeCensus still runs and its AGS / genome
+> equivalents are reported in `read_sample_summary.tsv`. The cluster level is fixed
+> at DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, only the selected
+> aligner's archive). MMseqs2 builds its k-mer index for the database at every run
+> (~13 GB RAM, ~45 s on 16 CPUs), and in its fast mode its result for borderline
+> reads can vary slightly with the thread count; DIAMOND results are stable. In its
+> fast mode MMseqs2 was also somewhat less sensitive in a single spot check (one
+> 2,000-read test sample: DIAMOND 1,011 reads hit, MMseqs2 924). The branch runs on
+> any container engine (docker included) and needs no assembly.
+
 ### 6.3 Database Selection Options
 
 | Parameter | Default | Options | Description |
@@ -401,6 +439,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
 | `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
+| `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
 | `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
@@ -425,6 +464,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
 | `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
 | `--custom_woltka_db` | Path to a local WoLr2 mirror in the FTP layout (see `docs/parameters.md`) |
+| `--custom_superfocus_db` | Path to a SUPER-FOCUS database ROOT, the directory containing `db/` (see `docs/parameters.md`) |
 | `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
 ### 6.5 FastP Quality Filtering Options
@@ -807,17 +847,23 @@ results/
     │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
     │   ├── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
     │   ├── read_function_abundance.tsv         # read branch (if read_level_functional != none): same schema, source=reads
-    │   ├── read_function_wide_{ontology}_native.tsv  # wide read-count matrix (ko, ec, cog, pfam, metacyc)
-    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (blank columns for samples without AGS)
-    │   ├── read_annotated_fraction.tsv         # share of ORF-assigned reads carrying a term, per ontology
+    │   ├── read_function_wide_{ontology}_native.tsv  # wide read-count matrix (woltka: ko, ec, cog, pfam, metacyc; superfocus: seed_level1/2/3)
+    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (woltka only; blank columns for samples without AGS)
+    │   ├── read_annotated_fraction.tsv         # share of reads carrying a term, per ontology (woltka: of ORF-assigned reads; superfocus: of all reads)
     │   └── read_sample_summary.tsv             # reads assigned / ambiguous, AGS, CPGE status, tool + DB version
     ├── reads/                                  # read-level functional profiling, one backend per run
-    │   └── woltka/{sample}/                    # (if read_level_functional=woltka; needs no assembly)
-    │       ├── {sample}.bowtie2.log            # alignment summary against WoLr2
-    │       ├── {sample}.woltka_orf.tsv         # Woltka per-ORF read counts
-    │       ├── {sample}.woltka_functions.tsv   # per-function read counts and RPK
-    │       ├── {sample}.woltka_summary.tsv     # reads assigned / annotated per ontology
-    │       └── {sample}.woltka_unassigned.tsv  # reads left unassigned by --woltka_uniq
+    │   ├── woltka/{sample}/                    # (if read_level_functional=woltka; needs no assembly)
+    │   │   ├── {sample}.bowtie2.log            # alignment summary against WoLr2
+    │   │   ├── {sample}.woltka_orf.tsv         # Woltka per-ORF read counts
+    │   │   ├── {sample}.woltka_functions.tsv   # per-function read counts and RPK
+    │   │   ├── {sample}.woltka_summary.tsv     # reads assigned / annotated per ontology
+    │   │   └── {sample}.woltka_unassigned.tsv  # reads left unassigned by --woltka_uniq
+    │   └── superfocus/{sample}/                # (if read_level_functional=superfocus; needs no assembly)
+    │       ├── {sample}.superfocus_functions.tsv   # SEED level 1-3 read counts (seed_level1/2/3)
+    │       ├── {sample}.superfocus_summary.tsv     # reads given to SUPER-FOCUS / with an accepted hit
+    │       ├── {sample}.superfocus_all_levels_and_function.xls  # raw SUPER-FOCUS table (tab-separated)
+    │       ├── {sample}.superfocus_subsystem_level_{1,2,3}.xls  # raw SUPER-FOCUS per-level tables (not used, see note)
+    │       └── {sample}.superfocus.log         # SUPER-FOCUS run log
     ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
     │   └── {sample}/                           # (if mag_level_functional=true; requires binning with >= 2 binners)
     │       ├── {sample}_{bin}.gff3             # annotation in GFF3
@@ -936,6 +982,20 @@ results/
 > groups (`COG0604`), not the single-letter categories of the contig branch;
 > Pfam accessions keep their version suffix as in WoLr2 (`PF00004.32`); MetaCyc
 > accessions are pathways (`PWY-5101`); EC numbers are derived via KO.
+>
+> For SUPER-FOCUS, `abundance_native` is reads with an accepted SEED hit (mates
+> counted separately; each read contributes 1 in total, fractional when divided
+> 1/k across its best-hit assignments), summed per level into `seed_level1`,
+> `seed_level2` and `seed_level3` with path-qualified accessions (`L1`,
+> `L1 | L2`, `L1 | L2 | L3`) and the level's own name as `description`; every
+> level sums to the reads with a hit. `abundance_cpge` is always empty (a SEED
+> hit has no gene length, so no RPK) and `cpge_status = not_applicable`; only
+> the three `_native` wide matrices are written. The raw SUPER-FOCUS tables are
+> kept for provenance (tab-separated despite the `.xls` suffix), but their `%`
+> columns and per-level files are **not** used: SUPER-FOCUS's own level files
+> aggregate by level name, merging the level-2 placeholder `-` across 33
+> level-1 categories; the pipeline recomputes the levels from the
+> function-level counts.
 
 ### Database Storage Directory
 
@@ -956,7 +1016,8 @@ databases/                            # Database storage (configurable via --dat
 ├── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
 ├── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
 ├── bakta/                            # Bakta database v6.0 (full 31.9 GB / light 1.3 GB download)
-└── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
+├── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
+└── superfocus/                       # SUPER-FOCUS DB_90 root for the selected aligner (~1.9-2.5 GB unpacked)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -988,6 +1049,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
 | `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin) |
 | `07_functional_annotation/reads/woltka/` | `read_level_functional='woltka'` | Woltka read-level ORF and function tables per sample (no assembly needed) |
+| `07_functional_annotation/reads/superfocus/` | `read_level_functional='superfocus'` | SUPER-FOCUS SEED level 1-3 tables and raw SUPER-FOCUS outputs per sample (no assembly needed) |
 | `07_functional_annotation/summary/read_*.tsv` | `read_level_functional != 'none'` | Study-level read-branch tables (same schema, `source=reads`), reported separately from the contig branch |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 

@@ -626,6 +626,123 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the SUPER-FOCUS read backend without an assembly") {
+        // T8b (design doc Section 4.6.3, Q17): the SUPER-FOCUS backend runs
+        // with --assembly_mode none. No --custom_superfocus_db: pins the
+        // FORMAT_SUPERFOCUS_DB provisioning path for the default (diamond)
+        // aligner. The SUPER-FOCUS image is a normal docker image: no engine
+        // guard applies.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "superfocus"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SUPERFOCUS_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("SUPERFOCUS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_READ_FUNCTIONS") } == 1
+            // MicrobeCensus gate unchanged (Q17: AGS/GE still reported)
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
+            // One backend per run: nothing of Woltka
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("MEGAHIT") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 0
+
+            // Section 9.1 layout: reads/superfocus/<id>/ + read_* summary tables;
+            // SEED levels only, no CPGE matrices (Q17), no KO/EC tables (10.2)
+            def fa = "${outputDir}/07_functional_annotation"
+            assert path("${fa}/reads/superfocus/test_sample1/test_sample1.superfocus_functions.tsv").exists()
+            assert path("${fa}/reads/superfocus/test_sample2/test_sample2.superfocus_all_levels_and_function.xls").exists()
+            assert path("${fa}/reads/superfocus/test_sample2/test_sample2.superfocus.log").exists()
+            assert path("${fa}/summary/read_function_abundance.tsv").exists()
+            ['seed_level1', 'seed_level2', 'seed_level3'].each { o ->
+                assert path("${fa}/summary/read_function_wide_${o}_native.tsv").exists()
+                assert !path("${fa}/summary/read_function_wide_${o}_cpge.tsv").exists()
+            }
+            assert !path("${fa}/summary/read_function_wide_ko_native.tsv").exists()
+            assert !path("${fa}/summary/read_function_wide_ec_native.tsv").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("superfocus: 1.8")
+            assert vtext.contains("superfocus_aligner: diamond")
+        }
+    }
+
+    test("Stub run wires SUPER-FOCUS (mmseqs2, custom DB) alongside the coassembly contig branch") {
+        // T8b next to the contig branch under coassembly: the read tables stay
+        // separate files (Section 2, 10.2), MicrobeCensus is shared, the
+        // --custom_superfocus_db path skips the download, and the aligner
+        // choice reaches the module
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control         = true
+                assembly_mode           = "coassembly"
+                taxonomic_profiler      = "none"
+                contig_level_functional = true
+                functional_cazy         = false
+                read_level_functional   = "superfocus"
+                superfocus_aligner      = "mmseqs2"
+                custom_superfocus_db    = "${projectDir}/tests/data/superfocus/sf_db"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("SUPERFOCUS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SUPERFOCUS_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_READ_FUNCTIONS") } == 1
+            def fa = "${outputDir}/07_functional_annotation"
+            assert path("${fa}/summary/function_abundance.tsv").exists()
+            assert path("${fa}/summary/function_wide_ko_tpm.tsv").exists()
+            assert path("${fa}/summary/read_function_abundance.tsv").exists()
+            assert path("${fa}/summary/read_function_wide_seed_level3_native.tsv").exists()
+            assert !path("${fa}/summary/read_function_wide_ko_native.tsv").exists()
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("superfocus_aligner: mmseqs2")
+        }
+    }
+
+    test("Rejects an unknown superfocus_aligner") {
+        // Rejected at launch (schema enum + main.nf validation), not at runtime
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                read_level_functional = "superfocus"
+                superfocus_aligner    = "rapsearch"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("superfocus_aligner")
+        }
+    }
+
     test("Rejects an unknown read_level_functional backend") {
         // Design doc Section 7: unknown backends are rejected at launch, not
         // at runtime (message-agnostic: the schema enum fires first)

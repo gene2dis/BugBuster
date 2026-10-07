@@ -94,7 +94,8 @@ This automatically enables:
 > and `low_disk` does nothing about them. The functional annotation branches in
 > particular add large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB,
 > Bakta full ~31.9 GB / light ~1.3 GB download, WoLr2 ~94 GB for the
-> read-level Woltka branch) —
+> read-level Woltka branch, SUPER-FOCUS DB_90 ~0.7-0.9 GB download for the
+> read-level SUPER-FOCUS branch) —
 > and pair badly with `low_disk`, since the long eggNOG runs are exactly
 > where `-resume` matters most (the pipeline warns about this combination at
 > launch). The Bakta light database is never selected automatically:

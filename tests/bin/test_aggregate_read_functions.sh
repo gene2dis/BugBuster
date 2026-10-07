@@ -1,7 +1,8 @@
 #!/bin/bash
 #
 # Direct tests for the read-level functional branch scripts (design doc
-# Sections 4.6, 4.6.2, 5.3, 6.2, 10.2; task T8a - Woltka backend), each run
+# Sections 4.6, 4.6.2, 4.6.3, 5.3, 6.2, 10.2; tasks T8a - Woltka backend and
+# T8b - the SUPER-FOCUS backend's aggregation), each run
 # inside the exact image its module pins:
 #
 #   bin/woltka_function_profile.py   (woltka image, WOLTKA_CLASSIFY)
@@ -27,6 +28,11 @@
 #     - wide native/cpge matrices for all five ontologies, always written
 #     - version-aware guard (unknown or missing woltka version), header,
 #       sample-set, ontology, duplicate and ags guards all fail loudly
+#     - superfocus backend (committed tests/data/superfocus composer
+#       outputs): seed_level1..3 only, CPGE blank / not_applicable with AGS
+#       still reported, only the three native wide matrices, and its own
+#       version / rpk / ontology / --unassigned guards
+#       (the SUPER-FOCUS composer itself: tests/bin/test_superfocus_scripts.sh)
 #
 # Requirements: docker (present on GitHub ubuntu-latest runners).
 #
@@ -250,6 +256,67 @@ expect_err "guard: ags for an unknown sample fails" "${G}/a.log" "unknown sample
 expect_err "guard: duplicate sample input fails" "${G}/d.log" "duplicate functions input" \
     in_report "${G}" --backend woltka --functions wtest.woltka_functions.tsv wtest.woltka_functions.tsv \
         --summaries wtest.woltka_summary.tsv --unassigned wtest.woltka_unassigned.tsv --versions-yml versions.yml --output-dir out
+
+#
+# aggregate_read_functions.py, superfocus backend (T8b, Q17)
+#
+echo "--- aggregate_read_functions.py: superfocus backend ---"
+SFIX="${REPO_DIR}/tests/data/superfocus"
+SF="${TMP_DIR}/agg_sf"; mkdir -p "${SF}/out"
+cp "${SFIX}"/sftest.superfocus_{functions,summary}.tsv "${SFIX}/sftest.ags.tsv" "${SFIX}/superfocus_versions.yml" "${SF}/"
+for f in "${SF}"/sftest.superfocus_*.tsv; do
+    sed 's/^sftest\t/sfcopy\t/' "${f}" > "${SF}/sfcopy.${f##*/sftest.}"
+done
+SF_ARGS=(--backend superfocus
+    --functions sftest.superfocus_functions.tsv sfcopy.superfocus_functions.tsv
+    --summaries sftest.superfocus_summary.tsv sfcopy.superfocus_summary.tsv)
+expect_ok "superfocus: aggregate two samples, AGS for one, no --unassigned" "${SF}/run.log" \
+    in_report "${SF}" "${SF_ARGS[@]}" --ags sftest.ags.tsv --versions-yml superfocus_versions.yml --output-dir out
+O="${SF}/out"
+check "superfocus: every row source=reads, backend=superfocus, native_unit=reads, empty tpm AND cpge" \
+    "[ \"\$(awk -F'\t' 'NR>1 && !(\$2==\"reads\" && \$3==\"superfocus\" && \$10==\"reads\" && \$7==\"\" && \$8==\"\")' ${O}/read_function_abundance.tsv | wc -l)\" -eq 0 ]"
+check "superfocus: only seed_level1/2/3 ontologies (absent from KO/EC tables, 10.2)" \
+    "[ \"\$(awk -F'\t' 'NR>1 {print \$4}' ${O}/read_function_abundance.tsv | sort -u | tr '\n' ' ')\" = 'seed_level1 seed_level2 seed_level3 ' ]"
+check "superfocus: abundance_native = composed count (TCA cycle in plants 7.000000)" \
+    "[ \"\$(value ${O}/read_function_abundance.tsv '\$1==\"sftest\" && \$6==\"TCA cycle in plants\"' 9)\" = '7.000000' ]"
+check "superfocus: exactly the three native wide matrices, no _cpge, no ko/ec" \
+    "[ \"\$(cd ${O} && ls read_function_wide_*.tsv | tr '\n' ' ')\" = 'read_function_wide_seed_level1_native.tsv read_function_wide_seed_level2_native.tsv read_function_wide_seed_level3_native.tsv ' ]"
+check "superfocus: wide level-2 matrix keeps the '-' rows apart per level-1 parent" \
+    "[ \"\$(value ${O}/read_function_wide_seed_level2_native.tsv '\$1==\"Carbohydrates | -\"' 2)\" = '2.000000' ]"
+check "superfocus: sample summary not_applicable, AGS still reported, ambiguity column blank" \
+    "[ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"sftest\"' 9)\" = 'not_applicable' ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"sfcopy\"' 9)\" = 'not_applicable' ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"sftest\"' 8)\" = '2.0' ] && [ -z \"\$(value ${O}/read_sample_summary.tsv '\$1==\"sftest\"' 6)\" ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"sftest\"' 3)\" = '1.8' ]"
+check "superfocus: annotated fraction any 0.8636 (19 of 22 reads)" \
+    "[ \"\$(value ${O}/read_annotated_fraction.tsv '\$1==\"sftest\" && \$3==\"any\"' 6)\" = '0.8636' ]"
+check "superfocus: no CPGE warning printed (not applicable, not a fallback)" \
+    "! grep -q 'abundance_cpge is left blank' ${SF}/run.log"
+
+SG="${TMP_DIR}/agg_sf_neg"; mkdir -p "${SG}/out"; cp "${SF}"/*.tsv "${SF}/superfocus_versions.yml" "${SG}/"
+sed 's/superfocus: 1.8/superfocus: 1.6/' "${SG}/superfocus_versions.yml" > "${SG}/v_old.yml"
+grep -v 'superfocus: ' "${SG}/superfocus_versions.yml" > "${SG}/v_missing.yml"
+mkdir -p "${SG}/rpk" "${SG}/ko"
+awk -F'\t' 'BEGIN{OFS="\t"} NR==2{$6="1.5"} {print}' "${SG}/sftest.superfocus_functions.tsv" > "${SG}/rpk/sftest.superfocus_functions.tsv"
+awk -F'\t' 'BEGIN{OFS="\t"} NR==2{$2="ko"} {print}' "${SG}/sftest.superfocus_functions.tsv" > "${SG}/ko/sftest.superfocus_functions.tsv"
+printf 'sample_id\treads_unassigned\nsftest\t0\n' > "${SG}/sftest.superfocus_unassigned.tsv"
+cp "${A}/versions.yml" "${SG}/woltka_versions.yml"
+expect_err "superfocus guard: unverified superfocus version fails" "${SG}/v1.log" "KNOWN_SUPERFOCUS_VERSIONS" \
+    in_report "${SG}" "${SF_ARGS[@]}" --versions-yml v_old.yml --output-dir out
+expect_err "superfocus guard: missing superfocus version fails" "${SG}/v2.log" "no 'superfocus:' version" \
+    in_report "${SG}" "${SF_ARGS[@]}" --versions-yml v_missing.yml --output-dir out
+expect_err "superfocus guard: woltka versions.yml for a superfocus run fails" "${SG}/v3.log" "no 'superfocus:' version" \
+    in_report "${SG}" "${SF_ARGS[@]}" --versions-yml woltka_versions.yml --output-dir out
+expect_err "superfocus guard: filled rpk fails (CPGE not computable)" "${SG}/r.log" "rpk must be blank" \
+    in_report "${SG}" --backend superfocus --functions rpk/sftest.superfocus_functions.tsv \
+        --summaries sftest.superfocus_summary.tsv --versions-yml superfocus_versions.yml --output-dir out
+expect_err "superfocus guard: a KO row in a superfocus table fails (never mapped to KO)" "${SG}/k.log" "unknown ontology" \
+    in_report "${SG}" --backend superfocus --functions ko/sftest.superfocus_functions.tsv \
+        --summaries sftest.superfocus_summary.tsv --versions-yml superfocus_versions.yml --output-dir out
+expect_err "superfocus guard: --unassigned is rejected for superfocus" "${SG}/u.log" "not used by the superfocus backend" \
+    in_report "${SG}" --backend superfocus --functions sftest.superfocus_functions.tsv \
+        --summaries sftest.superfocus_summary.tsv --unassigned sftest.superfocus_unassigned.tsv \
+        --versions-yml superfocus_versions.yml --output-dir out
+expect_err "woltka guard: missing --unassigned fails" "${SG}/w.log" "are required for the woltka backend" \
+    in_report "${A}" --backend woltka --functions wtest.woltka_functions.tsv --summaries wtest.woltka_summary.tsv \
+        --versions-yml versions.yml --output-dir out
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

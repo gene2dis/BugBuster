@@ -129,9 +129,10 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--read_level_functional`
 - **Type**: String
 - **Default**: `none`
-- **Options**: `woltka`, `none`
+- **Options**: `woltka`, `superfocus`, `none`
 - **Description**: Optional read-level functional profiling of the host-removed reads, one backend per run (validated at launch). `woltka`: Bowtie2 alignment against the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit settings, Woltka ORF classification (a read is assigned to an ORF when ≥ 80 % of it lies inside; mates count separately; a read whose reported alignments — up to 16 within the score threshold — hit k ORFs counts 1/k toward each unless `--woltka_uniq`), then per-function read counts and RPK for KO, EC (via KO), COG ortholog groups (via KO), Pfam and MetaCyc pathways — each read counted once toward each distinct term of its ORF. Per-sample tables go to `07_functional_annotation/reads/woltka/<sample>/`; study-level `read_function_abundance.tsv` (same schema as the contig branch, `source = reads`, native unit = reads, plus CPGE from MicrobeCensus), `read_function_wide_<ontology>_{native,cpge}.tsv`, `read_annotated_fraction.tsv` and `read_sample_summary.tsv` go to `07_functional_annotation/summary/`. Reported **separately** from the assembly-based tables, never merged (read-level profiling recovers the unassembled fraction but over-predicts). Needs no assembly (works with `--assembly_mode none`) and runs on any container engine. Downloads the WoLr2 subset (~94 GB, `--woltka_db`) on first use unless `--custom_woltka_db` is given; the alignment needs **≥ 68 GB RAM** per task (the WoLr2 index requirement)
-- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`
+  `superfocus`: SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster database with DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner`). Each sample's R1, R2 and singleton reads are concatenated into one query (mates count separately); a read's equal-best-e-value hits passing the SUPER-FOCUS defaults (≥ 60 % identity, ≥ 15 aa, e-value ≤ 1e-5; `SUPERFOCUS` `ext.args`) are counted, each read with a hit contributing exactly 1, divided 1/k across the k distinct SEED (subsystem, function) assignments of its best hits. The pipeline sums these to SEED subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`, path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`); SEED is never mapped to KO or EC. Per-sample tables go to `07_functional_annotation/reads/superfocus/<sample>/`; the same `read_*` summary tables are written, with only the three `read_function_wide_seed_level{1,2,3}_native.tsv` matrices — **no CPGE** (a SEED hit has no gene length, so no RPK; `cpge_status = not_applicable`, AGS/GE still reported). Downloads the DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB MMseqs2, `--superfocus_db`) unless `--custom_superfocus_db` is given; runs on any container engine
+- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`; `--read_level_functional superfocus --custom_superfocus_db /shared/databases/superfocus`
 
 ### `--arg_bin_clustering`
 - **Type**: Boolean
@@ -259,6 +260,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: ~94 GB
 - **Example**: `--woltka_db wolr2`
 
+### `--superfocus_db`
+- **Type**: String
+- **Default**: `db90`
+- **Options**: `db90`
+- **Description**: SUPER-FOCUS database for the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`). Downloads the prebuilt DB_90 archive for the selected `--superfocus_aligner` only from figshare (open.flinders.edu.au, CC0): DIAMOND format 3 `90_clusters.db.dmnd` (zip ~0.74 GB, ~1.9 GB unpacked) or MMseqs2 `mmseqs_90.zip` (~0.9 GB, ~2.5 GB unpacked), plus `database_PKs.txt` (SEED subsystem levels per subsystem) from the SUPER-FOCUS v1.8 tag; both md5-verified. Stored as a database root at `<databases_dir>/superfocus/superfocus_db`. The cluster level is fixed at DB_90
+- **Size**: ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download
+- **Example**: `--superfocus_db db90`
+
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
@@ -383,6 +392,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to a local Web of Life release 2 mirror in the FTP layout of `https://ftp.microbio.me/pub/wol2` — at least `databases/bowtie2/WoLr2.{1,2,3,4,rev.1,rev.2}.bt2l`, `proteins/coords.txt.xz`, `proteins/length.map.xz`, `function/kegg/{orf-to-ko.map.xz,ko-to-ec.map,ko-to-cog.map,ko_name.txt}`, `function/metacyc/{orf-to-protein.map.xz,protein-to-enzrxn.map,enzrxn-to-reaction.map,reaction-to-pathway.map,pathway_name.txt}` and `function/pfam/{orf-to-pfam.map.xz,pfam_name.txt}` (a download recipe is in `docs/manual.md`, Manual Database Download). The index and the coordinate/map files must come from the same release. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<index name>)`
 - **Example**: `--custom_woltka_db /shared/databases/wol2`
+
+### `--custom_superfocus_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local SUPER-FOCUS database **root** — the directory that CONTAINS `db/`: `db/database_PKs.txt` plus `db/static/diamond/90_clusters.db.dmnd` (for `--superfocus_aligner diamond`) or `db/static/mmseqs2/90_clusters.db*` (for `mmseqs2`). Pointing at the `db/` folder itself fails with an explicit message, as does a database without the selected aligner's DB_90 files. A database root from an existing SUPER-FOCUS install (e.g. made with an older SUPER-FOCUS version; DIAMOND format 3 `.dmnd`) works unmodified. A download recipe is in `docs/manual.md`, Manual Database Download. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<aligner> DB_90)`
+- **Example**: `--custom_superfocus_db /shared/databases/superfocus`
 
 ---
 
@@ -701,7 +715,7 @@ Override automatic downloads by providing custom database paths:
 ### `--microbecensus`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches
+- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches (the SUPER-FOCUS read backend has no CPGE — a SEED hit carries no gene length — so there its AGS/GE are only reported in `read_sample_summary.tsv`)
 - **Example**: `--microbecensus false`
 - **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
 
@@ -726,6 +740,13 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `true`, `false`
 - **Description**: Multi-mapping policy of the Woltka read-level backend. Reads are aligned to WoLr2 with the SHOGUN multi-hit Bowtie2 settings (`--very-sensitive -k 16 --np 1 --mp 1,1 --rdg 0,1 --rfg 0,1 --score-min L,0,-0.05`, the WoL/Qiita standard). By default Woltka divides a read whose reported alignments (up to 16 within the score threshold) overlap k ORFs 1/k to each, so the read totals stay equal to the number of reads assigned. With `true` such ambiguous reads are left unassigned instead (Woltka `--uniq`); how many is reported per sample in `read_sample_summary.tsv` (`reads_unassigned_ambiguous`)
 - **Example**: `--woltka_uniq true`
+
+### `--superfocus_aligner`
+- **Type**: String
+- **Default**: `diamond`
+- **Options**: `diamond`, `mmseqs2`
+- **Description**: Search backend of the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`): `diamond` (DIAMOND 2.2.1 blastx) or `mmseqs2` (MMseqs2 18 easy-search). Selects which DB_90 archive is downloaded; a `--custom_superfocus_db` must contain that aligner's files. MMseqs2 builds its k-mer index for the database at every run (~13 GB RAM, ~45 s on 16 CPUs) and, in its fast mode, its result for borderline reads can vary slightly with the thread count; DIAMOND results are stable. In a single spot check MMseqs2's fast mode was also somewhat less sensitive (one 2,000-read test sample: DIAMOND 1,011 reads hit, MMseqs2 924). Identity / alignment-length / e-value thresholds are set in the `SUPERFOCUS` `ext.args` (`config/modules.config`), not as parameters
+- **Example**: `--superfocus_aligner mmseqs2`
 
 ---
 

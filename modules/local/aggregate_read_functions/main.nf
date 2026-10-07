@@ -3,7 +3,7 @@
     AGGREGATE_READ_FUNCTIONS Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Study-level aggregation of the read-level functional branch (design doc
-    Sections 4.6 and 5.3, task T8a): converts every sample's per-function
+    Sections 4.6 and 5.3, tasks T8a/T8b): converts every sample's per-function
     read abundances into the canonical function abundance schema with
     source=reads, plus wide matrices, annotated fractions and a per-sample
     summary. Thin wrapper around bin/aggregate_read_functions.py (version-
@@ -15,15 +15,19 @@
     CPGE (RPK / genome equivalents, Section 6.2) needs the MicrobeCensus AGS
     tables, which are optional: samples whose MicrobeCensus failed (non-fatal)
     or runs with --microbecensus false get blank CPGE and an 'unavailable'
-    cpge_status in read_sample_summary.tsv.
+    cpge_status in read_sample_summary.tsv. The superfocus backend has no
+    gene length: CPGE is 'not_applicable' and no _cpge matrices are written
+    (design doc Q17).
 
-    Input:  path(functions)   all samples' <id>.woltka_functions.tsv
-            path(summaries)   all samples' <id>.woltka_summary.tsv
+    Input:  path(functions)   all samples' <id>.<backend>_functions.tsv
+            path(summaries)   all samples' <id>.<backend>_summary.tsv
             path(unassigned)  all samples' <id>.woltka_unassigned.tsv
+                              (woltka only; [] for superfocus)
             path(ags)         MicrobeCensus <id>.ags.tsv files (may be empty)
-            path(backend_versions)  WOLTKA_CLASSIFY versions.yml (staged
-                              under a distinct name: this process emits its own)
-            val(backend)      'woltka'
+            path(backend_versions)  WOLTKA_CLASSIFY / SUPERFOCUS versions.yml
+                              (staged under a distinct name: this process
+                              emits its own)
+            val(backend)      'woltka' | 'superfocus'
     Output: read_function_abundance.tsv, read_function_wide_*.tsv,
             read_annotated_fraction.tsv, read_sample_summary.tsv, versions.yml
 ----------------------------------------------------------------------------------------
@@ -58,12 +62,13 @@ process AGGREGATE_READ_FUNCTIONS {
     script:
     def args = task.ext.args ?: ''
     def ags_arg = ags ? "--ags ${ags}" : ''
+    def unassigned_arg = unassigned ? "--unassigned ${unassigned}" : ''
     """
     aggregate_read_functions.py \\
         --backend ${backend} \\
         --functions ${functions} \\
         --summaries ${summaries} \\
-        --unassigned ${unassigned} \\
+        ${unassigned_arg} \\
         ${ags_arg} \\
         --versions-yml ${backend_versions} \\
         --output-dir . \\
@@ -77,11 +82,12 @@ process AGGREGATE_READ_FUNCTIONS {
     """
 
     stub:
+    def wide_files = backend == 'superfocus' ?
+        ['seed_level1', 'seed_level2', 'seed_level3'].collect { o -> "read_function_wide_${o}_native.tsv" } :
+        ['ko', 'ec', 'cog', 'pfam', 'metacyc'].collect { o -> "read_function_wide_${o}_native.tsv read_function_wide_${o}_cpge.tsv" }
     """
     touch read_function_abundance.tsv
-    for ontology in ko ec cog pfam metacyc; do
-        touch read_function_wide_\${ontology}_native.tsv read_function_wide_\${ontology}_cpge.tsv
-    done
+    touch ${wide_files.join(' ')}
     touch read_annotated_fraction.tsv
     touch read_sample_summary.tsv
 

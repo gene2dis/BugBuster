@@ -129,9 +129,13 @@ jobs:
         run: |
           tests/bin/test_aggregate_functions.sh
 
-      - name: Run read-level functional script tests (design doc T8a)
+      - name: Run read-level functional script tests (design doc T8a/T8b)
         run: |
           tests/bin/test_aggregate_read_functions.sh
+
+      - name: Run SUPER-FOCUS backend script tests (design doc T8b)
+        run: |
+          tests/bin/test_superfocus_scripts.sh
 
       - name: Run bin-directory recognition regression tests (audit #6)
         run: |

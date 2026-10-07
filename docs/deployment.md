@@ -276,6 +276,7 @@ For better performance, pre-download databases to shared storage:
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
 # Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
 # Web of Life WoLr2 subset (~94 GB, read-level Woltka branch; recipe in manual.md)
+# SUPER-FOCUS DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, read-level SUPER-FOCUS branch; recipe in manual.md)
 ```
 
 Then specify paths:
@@ -289,6 +290,7 @@ nextflow run main.nf \
     --custom_dbcan_db /shared/db/dbcan/dbcan_db \
     --custom_bakta_db /shared/db/bakta/bakta_db \
     --custom_woltka_db /shared/db/wol2 \
+    --custom_superfocus_db /shared/db/superfocus \
     ...
 ```
 
@@ -301,7 +303,10 @@ nextflow run main.nf \
 > is unaffected: it uses a normal biocontainer and runs on any engine, and so
 > is the read-level branch (`--read_level_functional woltka`) — but note its
 > Bowtie2 alignment against WoLr2 needs ≥ 68 GB RAM per task, so size the
-> cloud instance type / queue accordingly.
+> cloud instance type / queue accordingly. The SUPER-FOCUS read backend
+> (`--read_level_functional superfocus`) also runs on any engine; with
+> `--superfocus_aligner mmseqs2` each task builds a ~13 GB k-mer index of the
+> database in memory.
 
 ---
 

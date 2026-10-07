@@ -68,8 +68,9 @@ def printHelp() {
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
       --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
       --mag_level_functional        Bakta annotation of refined bins; needs --include_binning and >= 2 --binners (default: ${params.mag_level_functional})
-      --read_level_functional       Read-level functional profiling backend: 'woltka', 'none' (default: ${params.read_level_functional})
+      --read_level_functional       Read-level functional profiling backend: 'woltka', 'superfocus', 'none' (default: ${params.read_level_functional})
       --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
+      --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
       --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
@@ -240,9 +241,13 @@ workflow {
     // Read-level functional backend (design doc Section 7: unknown values
     // are rejected at launch). The schema enum already enforces this; kept
     // here so the accepted set lives next to the other launch validations
-    def valid_read_functional = ['woltka', 'none']
+    def valid_read_functional = ['woltka', 'superfocus', 'none']
     if (!(params.read_level_functional in valid_read_functional)) {
         error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
+    }
+    def valid_superfocus_aligners = ['diamond', 'mmseqs2']
+    if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
+        error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
     }
     if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
         error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
@@ -265,7 +270,7 @@ workflow {
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
     if (workflow.profile.tokenize(',').contains('low_disk') && (params.contig_level_functional || params.mag_level_functional || params.read_level_functional != 'none')) {
-        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB) are stored at --databases_dir regardless of this profile"
+        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -283,7 +288,7 @@ workflow {
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
-    log.info "  Read functional      : ${params.read_level_functional}"
+    log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : ''}"
     log.info "  MicrobeCensus        : ${params.microbecensus}"
     log.info "  dbCAN CAZy           : ${params.functional_cazy}"
     log.info ""
@@ -526,10 +531,15 @@ workflow {
     // reported separately from the contig branch's
     //
     if ( run_read_functional ) {
+        // the selected backend's database (only that one is provisioned)
+        def ch_read_db = params.read_level_functional == 'woltka' ?
+            PREPARE_DATABASES.out.woltka_db
+                .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." } :
+            PREPARE_DATABASES.out.superfocus_db
+                .ifEmpty { error "ERROR: SUPER-FOCUS database is empty. Ensure --read_level_functional superfocus is set and a valid SUPER-FOCUS database root is configured (--custom_superfocus_db, the directory containing db/)." }
         READ_FUNCTIONAL(
             ch_clean_reads,
-            PREPARE_DATABASES.out.woltka_db
-                .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." },
+            ch_read_db,
             ch_ags
         )
         ch_versions = ch_versions.mix(READ_FUNCTIONAL.out.versions)

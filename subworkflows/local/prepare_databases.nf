@@ -16,6 +16,7 @@ include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_WOLTKA_DB        } from '../../modules/local/format_db/main'
+include { FORMAT_SUPERFOCUS_DB    } from '../../modules/local/format_db/main'
 include { FORMAT_COG_DB           } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
@@ -41,6 +42,7 @@ workflow PREPARE_DATABASES {
     ch_dbcan_db         = channel.empty()
     ch_bakta_db         = channel.empty()
     ch_woltka_db        = channel.empty()
+    ch_superfocus_db    = channel.empty()
     ch_cog_def          = channel.empty()
     ch_versions         = channel.empty()
 
@@ -273,6 +275,21 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // SUPER-FOCUS DB_90 for the SUPER-FOCUS read-level functional backend
+    // (design doc Section 4.6.3, Q17). Only the --superfocus_aligner archive
+    // is fetched (~0.74 GB diamond / ~0.9 GB mmseqs2); a database root
+    // (db/database_PKs.txt + db/static/<aligner>/) is passed with
+    // --custom_superfocus_db
+    //
+    if ( params.read_level_functional == 'superfocus' ) {
+        if ( params.custom_superfocus_db ) {
+            ch_superfocus_db = channel.fromPath(params.custom_superfocus_db, checkIfExists: true)
+        } else {
+            ch_superfocus_db = FORMAT_SUPERFOCUS_DB(channel.of(params.superfocus_aligner))
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( params.rgi_prediction ) {
@@ -311,6 +328,7 @@ workflow PREPARE_DATABASES {
     dbcan_db               = ch_dbcan_db
     bakta_db               = ch_bakta_db
     woltka_db              = ch_woltka_db
+    superfocus_db          = ch_superfocus_db
     cog_def                = ch_cog_def
     versions               = ch_versions
 }

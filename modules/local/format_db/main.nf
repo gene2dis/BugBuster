@@ -309,6 +309,45 @@ process FORMAT_WOLTKA_DB {
         """
 }
 
+process FORMAT_SUPERFOCUS_DB {
+    tag "format_superfocus_db"
+    // Runs in the pinned SUPER-FOCUS image the SUPERFOCUS module uses: it
+    // carries GNU wget and unzip (the shared wget image has no unzip), and
+    // the archives are prebuilt for the aligners in that same image (design
+    // doc Q17). Downloads only the --superfocus_aligner archive.
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
+        'oras://community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:fa641269f461e1f8' :
+        'community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:72a2f2b49608ab17' }"
+
+    label 'process_download'
+
+    input:
+        val(aligner)
+
+    output:
+        path("superfocus_db")
+
+    script:
+        def entry = params.superfocus_ref_db[params.superfocus_db]
+        """
+        ${entry["fmtscript"]} \
+            ${aligner} \
+            '${entry[aligner]["url"]}' \
+            '${entry[aligner]["md5"]}' \
+            '${entry["pks_url"]}' \
+            '${entry["pks_md5"]}' \
+            '${entry["dbversion"]}'
+        """
+
+    stub:
+        def static_file = aligner == 'diamond' ? 'diamond/90_clusters.db.dmnd' : 'mmseqs2/90_clusters.db'
+        """
+        mkdir -p superfocus_db/db/static/${aligner}
+        touch superfocus_db/db/database_PKs.txt superfocus_db/db/static/${static_file} \
+            superfocus_db/DB_VERSION
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

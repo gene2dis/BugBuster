@@ -470,6 +470,49 @@ WoLr2 release, in the FTP layout.
 `docs/manual.md`, and check the md5 files (`xz -dc <file>.xz | md5sum` against
 `<file>.md5` — WoLr2 checksums cover the uncompressed content).
 
+### SUPERFOCUS fails: not a SUPER-FOCUS database root / no DB_90 files for the aligner
+
+**Errors:**
+```
+ERROR: <dir> looks like the db/ folder itself; point --custom_superfocus_db at its PARENT (the directory containing db/)
+ERROR: <dir>/db/database_PKs.txt not found - not a SUPER-FOCUS database root
+ERROR: <dir>/db/static/mmseqs2/90_clusters.db not found - the database has no mmseqs2 DB_90 files (--superfocus_aligner mmseqs2)
+```
+
+**Cause:** `--custom_superfocus_db` must be the database **root**, the directory
+that contains `db/` (`db/database_PKs.txt` plus `db/static/<aligner>/`), not
+`db/` itself. The database formats are aligner-specific, so the root must also
+hold the DB_90 files of the selected `--superfocus_aligner`
+(`db/static/diamond/90_clusters.db.dmnd` or `db/static/mmseqs2/90_clusters.db*`).
+
+**Solution:** pass the parent of `db/`; if the aligner's files are missing,
+either switch `--superfocus_aligner` to the one the database was built for or
+add that aligner's DB_90 archive (download recipe in `docs/manual.md`, Manual
+Database Download).
+
+### AGGREGATE_READ_FUNCTIONS / SUPERFOCUS fail with a layout or version message
+
+**Errors:**
+```
+superfocus version '<X>' is not among the versions this parser was verified against ...
+... unexpected header ... the SUPER-FOCUS output layout changed or the query was not the single file '<sample>.fastq'
+... total count <N> exceeds the <M> input reads - was the table produced with -n 0, or for a different query?
+```
+
+**Cause:** deliberate guards, as for Woltka. The first two mean the SUPER-FOCUS
+version or its output layout is not the one the scripts were verified against
+(pinned: SUPER-FOCUS 1.8) — re-verify on real output before extending
+`KNOWN_SUPERFOCUS_VERSIONS` in `bin/aggregate_read_functions.py` (and the layout
+checks in `bin/superfocus_function_profile.py`, plus
+`tests/bin/test_superfocus_scripts.sh`). The last means a read was counted more
+than once: the per-level composition relies on SUPER-FOCUS dividing each read
+1/k (`-n 1`, fixed in the module); an `-n 0` added to the `SUPERFOCUS`
+`ext.args` breaks that.
+
+**Solution:** keep the pinned container and remove `-n` from any custom
+`ext.args` for `SUPERFOCUS` (only the identity / alignment-length / e-value /
+fast-mode thresholds belong there).
+
 ---
 
 ## Database Issues

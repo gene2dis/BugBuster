@@ -183,7 +183,8 @@ rgi_prediction: false
 contig_tax_and_arg: false
 contig_level_functional: false
 mag_level_functional: false
-read_level_functional: "none"   # or "woltka"
+read_level_functional: "none"   # or "woltka", "superfocus"
+superfocus_aligner: "diamond"   # SUPER-FOCUS only: or "mmseqs2"
 include_binning: false
 ```
 

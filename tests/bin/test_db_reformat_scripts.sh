@@ -30,8 +30,11 @@ WOLTKA_IMG=$(grep -o "'quay.io/biocontainers/woltka:[^']*'" "${REPO_DIR}/modules
     | tr -d "'" | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# FORMAT_SUPERFOCUS_DB runs in the pinned SUPER-FOCUS image (GNU wget + unzip)
+SF_IMG=$(grep -o "'community.wave.seqera.io/library/super-focus[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ] || [ -z "${SF_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
@@ -41,6 +44,7 @@ echo "Download image: ${DOWNLOAD_IMG}"
 echo "Bakta image:    ${BAKTA_IMG}"
 echo "Woltka image:   ${WOLTKA_IMG}"
 echo "Report image:   ${REPORT_IMG}"
+echo "SUPER-FOCUS image: ${SF_IMG}"
 echo ""
 
 TMP_DIR=$(mktemp -d)
@@ -194,6 +198,31 @@ build_wol_fixture wol2_emptyindex
 : > "${FIXTURES}/wol2_emptyindex/databases/bowtie2/WoLr2.3.bt2l"
 build_wol_fixture wol2_missing
 rm "${FIXTURES}/wol2_missing/function/metacyc/pathway_name.txt"
+
+# SUPER-FOCUS DB_90 archives as figshare serves them, zipped from the
+# committed read-branch fixture (tests/data/superfocus/sf_db, made by
+# tests/bin/make_superfocus_fixtures.sh): diamond .dmnd at the archive root,
+# mmseqs2 files inside a folder (the script unpacks with -j), plus broken
+# variants, and the database_PKs.txt table
+mkdir -p "${FIXTURES}/sf"
+python3 - "${REPO_DIR}/tests/data/superfocus/sf_db/db" "${FIXTURES}/sf" <<'PY'
+import pathlib, sys, zipfile
+db, out = map(pathlib.Path, sys.argv[1:])
+mmseqs = sorted((db / 'static' / 'mmseqs2').iterdir())
+with zipfile.ZipFile(out / 'diamond90.zip', 'w') as z:
+    z.write(db / 'static' / 'diamond' / '90_clusters.db.dmnd', '90_clusters.db.dmnd')
+with zipfile.ZipFile(out / 'mmseqs90.zip', 'w') as z:
+    for f in mmseqs:
+        z.write(f, f'mmseqs_90/{f.name}')
+with zipfile.ZipFile(out / 'mmseqs90_nodbtype.zip', 'w') as z:
+    for f in mmseqs:
+        if f.name != '90_clusters.db.dbtype':
+            z.write(f, f'mmseqs_90/{f.name}')
+with zipfile.ZipFile(out / 'wrong.zip', 'w') as z:
+    z.writestr('README.txt', 'not a SUPER-FOCUS database\n')
+PY
+cp "${REPO_DIR}/tests/data/superfocus/sf_db/db/database_PKs.txt" "${FIXTURES}/sf/database_PKs.txt"
+printf 'not\tthe\tsubsystem table\n' > "${FIXTURES}/sf/bad_PKs.txt"
 
 #
 # Local HTTP server for the fixtures
@@ -458,6 +487,54 @@ expect_fail "woltka: md5 mismatch (uncompressed content) fails" woltka_db_reform
 expect_fail "woltka: empty index file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_emptyindex"
 expect_fail "woltka: missing map file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_missing"
 expect_fail "woltka: 404 base URL fails" woltka_db_reformat.sh "${BASE_URL}/no_such_dir"
+RUN_IMG=""
+
+#
+# superfocus_db_reformat.sh
+#
+echo "--- superfocus_db_reformat.sh ---"
+RUN_IMG="${SF_IMG}"
+sf_md5() { md5sum "${FIXTURES}/sf/$1" | cut -d' ' -f1; }
+SF_PKS=("${BASE_URL}/sf/database_PKs.txt" "$(sf_md5 database_PKs.txt)")
+expect_pass "superfocus: diamond DB_90 archive" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+check_file "superfocus: database_PKs.txt in the root's db/" "superfocus_db/db/database_PKs.txt"
+check_file "superfocus: diamond .dmnd in db/static/diamond/" "superfocus_db/db/static/diamond/90_clusters.db.dmnd"
+if grep -q '^SUPER-FOCUS test; diamond DB_90 (' "${LAST_WORKDIR}/superfocus_db/DB_VERSION" 2>/dev/null \
+        && [ "$(wc -l < "${LAST_WORKDIR}/superfocus_db/DB_VERSION")" -eq 1 ]; then
+    echo "✓ superfocus: single-line DB_VERSION records release, aligner and archive"
+    PASS=$((PASS + 1))
+else
+    echo "✗ superfocus: DB_VERSION missing, multi-line or incomplete"
+    FAIL=$((FAIL + 1))
+fi
+if [ -z "$(ls "${LAST_WORKDIR}" | grep -v '^superfocus_db$')" ]; then
+    echo "✓ superfocus: downloaded archive removed after unpacking"
+    PASS=$((PASS + 1))
+else
+    echo "✗ superfocus: leftover files next to superfocus_db/"
+    FAIL=$((FAIL + 1))
+fi
+expect_pass "superfocus: mmseqs2 DB_90 archive (folder inside the zip)" superfocus_db_reformat.sh mmseqs2 \
+    "${BASE_URL}/sf/mmseqs90.zip" "$(sf_md5 mmseqs90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+check_file "superfocus: mmseqs2 database unpacked flat" "superfocus_db/db/static/mmseqs2/90_clusters.db"
+check_file "superfocus: mmseqs2 .dbtype present" "superfocus_db/db/static/mmseqs2/90_clusters.db.dbtype"
+expect_fail "superfocus: archive md5 mismatch fails" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/diamond90.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
+expect_fail "superfocus: database_PKs.txt md5 mismatch fails" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${BASE_URL}/sf/database_PKs.txt" 00000000000000000000000000000000 "SUPER-FOCUS test"
+expect_fail "superfocus: database_PKs.txt without the subsystem header fails" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${BASE_URL}/sf/bad_PKs.txt" "$(sf_md5 bad_PKs.txt)" "SUPER-FOCUS test"
+expect_fail "superfocus: archive without the aligner's database fails" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/wrong.zip" "$(sf_md5 wrong.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+expect_fail "superfocus: diamond archive given for mmseqs2 fails" superfocus_db_reformat.sh mmseqs2 \
+    "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+expect_fail "superfocus: incomplete mmseqs2 database (no .dbtype) fails" superfocus_db_reformat.sh mmseqs2 \
+    "${BASE_URL}/sf/mmseqs90_nodbtype.zip" "$(sf_md5 mmseqs90_nodbtype.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+expect_fail "superfocus: unknown aligner fails" superfocus_db_reformat.sh rapsearch \
+    "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
+expect_fail "superfocus: 404 archive URL fails" superfocus_db_reformat.sh diamond \
+    "${BASE_URL}/sf/no_such.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
 RUN_IMG=""
 
 #

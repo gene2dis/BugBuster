@@ -1,0 +1,11 @@
+sample_id	ontology	accession	description	count	rpk
+sftest	seed_level1	Amino Acids and Derivatives	Amino Acids and Derivatives	3	
+sftest	seed_level1	Carbohydrates	Carbohydrates	16	
+sftest	seed_level2	Amino Acids and Derivatives | -	-	3	
+sftest	seed_level2	Carbohydrates | -	-	2	
+sftest	seed_level2	Carbohydrates | Central carbohydrate metabolism	Central carbohydrate metabolism	14	
+sftest	seed_level3	Amino Acids and Derivatives | - | Creatine and Creatinine Degradation	Creatine and Creatinine Degradation	3	
+sftest	seed_level3	Carbohydrates | - | Sugar utilization in Thermotogales	Sugar utilization in Thermotogales	2	
+sftest	seed_level3	Carbohydrates | Central carbohydrate metabolism | Dehydrogenase complexes	Dehydrogenase complexes	4	
+sftest	seed_level3	Carbohydrates | Central carbohydrate metabolism | TCA Cycle	TCA Cycle	3	
+sftest	seed_level3	Carbohydrates | Central carbohydrate metabolism | TCA cycle in plants	TCA cycle in plants	7	

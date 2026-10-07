@@ -67,6 +67,57 @@ nextflow_process {
         }
     }
 
+    test("aggregates a SUPER-FOCUS sample: SEED levels only, CPGE not applicable") {
+        // T8b (design doc 4.6.3, Q17): no --unassigned input, AGS still
+        // reported, only the three native wide matrices
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = [ file("${projectDir}/tests/data/superfocus/sftest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/superfocus/superfocus_versions.yml", checkIfExists: true)
+                input[5] = 'superfocus'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert rows.every { r -> r[2] == 'superfocus' && r[3].startsWith('seed_level') && r[6] == '' && r[7] == '' }
+            assert rows.any { r -> r[4] == 'Carbohydrates | Central carbohydrate metabolism | TCA cycle in plants' && r[8] == '7.000000' }
+            assert process.out.function_wide.get(0).collect { f -> file(f).name }.sort() ==
+                ['read_function_wide_seed_level1_native.tsv', 'read_function_wide_seed_level2_native.tsv',
+                 'read_function_wide_seed_level3_native.tsv']
+            def summary = path(process.out.sample_summary.get(0)).readLines()[1].split('\t', -1)
+            assert summary[8] == 'not_applicable' && summary[7] == '2.0' && summary[5] == ''
+        }
+    }
+
+    test("stub emits the superfocus wide-matrix set") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/superfocus/superfocus_versions.yml", checkIfExists: true)
+                input[5] = 'superfocus'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 3
+        }
+    }
+
     test("stub emits all declared outputs") {
         options "-stub"
 

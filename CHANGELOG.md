@@ -38,6 +38,29 @@ next release is tagged.
     alignment needs ≥ 68 GB RAM
   - MicrobeCensus now also runs for the read branch (once per sample when both
     branches are on)
+- **SUPER-FOCUS read-level backend (`--read_level_functional superfocus`)**
+  - SUPER-FOCUS 1.8 (`SUPERFOCUS`, pinned Seqera Containers image with
+    DIAMOND 2.2.1 and MMseqs2 18.8cc5c; docker works) against the DB_90 SEED
+    subsystem cluster database; search backend via `--superfocus_aligner
+    diamond|mmseqs2` (default `diamond`); R1, R2 and singleton reads
+    concatenated into one query (mates counted separately), each read with a
+    hit contributing 1, divided 1/k across its best-hit SEED assignments
+  - SEED subsystem levels 1-3 summed by the pipeline from the function-level
+    counts (ontologies `seed_level1`, `seed_level2`, `seed_level3`;
+    path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`) — SUPER-FOCUS's
+    own per-level files merge the level-2 `-` placeholder across level-1
+    categories and are kept only as raw outputs. SEED is never mapped to KO/EC
+  - No copies per genome equivalent for this backend (a SEED hit has no gene
+    length): `abundance_cpge` blank, `cpge_status = not_applicable`, only the
+    `read_function_wide_seed_level{1,2,3}_native.tsv` matrices; AGS/GE still
+    reported. Per-sample tables to `07_functional_annotation/reads/superfocus/<sample>/`
+  - DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB
+    MMseqs2, figshare CC0, md5-verified, plus `database_PKs.txt` from the
+    SUPER-FOCUS v1.8 tag; `FORMAT_SUPERFOCUS_DB`, `--superfocus_db db90`), or
+    a local database root via `--custom_superfocus_db`
+  - `bin/aggregate_read_functions.py` generalized to per-backend settings
+    (file suffixes, versions keys, verified versions, ontologies, CPGE
+    applicability); Woltka outputs unchanged (byte-identical on the fixtures)
 - **MAG-level functional annotation (`--mag_level_functional`)**
   - Bakta 1.12.1 annotation of every MetaWRAP-refined bin, one task per bin
     (nf-core `bakta/bakta` module, patched to emit `versions.yml`; per-bin
