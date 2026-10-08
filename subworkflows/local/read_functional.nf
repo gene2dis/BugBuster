@@ -20,24 +20,29 @@
       superfocus (T8b, Section 4.6.3): SUPERFOCUS (SUPER-FOCUS 1.8, DIAMOND
         or MMseqs2 vs the DB_90 SEED cluster database, per-level composition
         to seed_level1/2/3) -> AGGREGATE_READ_FUNCTIONS
+      humann (T8c, Section 4.6.1): HUMANN (HUMAnN 4.0.0a2 with MetaPhlAn
+        4.1.2 prescreen, RPK; gene families regrouped to ko/ec, MetaCyc
+        pathways to metacyc) -> AGGREGATE_READ_FUNCTIONS
 
     CPGE uses the MicrobeCensus AGS channel (optional: samples whose
     MicrobeCensus failed, or --microbecensus false, keep blank CPGE). The
     SUPER-FOCUS backend has no gene length, so CPGE is not applicable there
-    (design doc Q17); AGS / genome equivalents are still reported.
+    (design doc Q17); AGS / genome equivalents are still reported. HUMAnN
+    reports RPK, so CPGE = RPK / GE as for Woltka.
 ----------------------------------------------------------------------------------------
 */
 
 include { WOLTKA_ALIGN             } from '../../modules/local/woltka_align/main'
 include { WOLTKA_CLASSIFY          } from '../../modules/local/woltka_classify/main'
 include { SUPERFOCUS               } from '../../modules/local/superfocus/main'
+include { HUMANN                   } from '../../modules/local/humann/main'
 include { AGGREGATE_READ_FUNCTIONS } from '../../modules/local/aggregate_read_functions/main'
 
 workflow READ_FUNCTIONAL {
 
     take:
     ch_reads     // channel: [ meta, [ R1, R2(, Singleton) ] ] host-removed reads
-    ch_read_db   // channel: the selected backend's db dir (woltka: WoLr2 FTP layout; superfocus: database root)
+    ch_read_db   // channel: the selected backend's db dir (woltka: WoLr2 FTP layout; superfocus / humann: database root)
     ch_ags       // channel: [ meta, ags.tsv ] MicrobeCensus AGS tables; may be empty or miss samples
     ch_cog_def   // channel: NCBI COG definitions table (cog-24.def.tab); woltka backend only, empty otherwise
 
@@ -95,6 +100,28 @@ workflow READ_FUNCTIONAL {
             SUPERFOCUS.out.versions.first(),
             AGGREGATE_READ_FUNCTIONS.out.versions
         )
+    } else if ( params.read_level_functional == 'humann' ) {
+        HUMANN(ch_reads.combine(ch_read_db))
+
+        AGGREGATE_READ_FUNCTIONS(
+            HUMANN.out.functions.map { _meta, f -> f }.collect(sort: true),
+            HUMANN.out.summary.map { _meta, f -> f }.collect(sort: true),
+            [],
+            ch_ags.map { _meta, ags -> ags }.collect(sort: true).ifEmpty([]),
+            HUMANN.out.versions.collect(sort: true).map { vs -> vs[0] },
+            'humann'
+        )
+
+        ch_sample_functions    = HUMANN.out.functions
+        ch_function_abundance  = AGGREGATE_READ_FUNCTIONS.out.function_abundance
+        ch_function_wide       = AGGREGATE_READ_FUNCTIONS.out.function_wide
+        ch_annotated_fraction  = AGGREGATE_READ_FUNCTIONS.out.annotated_fraction
+        ch_sample_summary      = AGGREGATE_READ_FUNCTIONS.out.sample_summary
+
+        ch_versions = ch_versions.mix(
+            HUMANN.out.versions.first(),
+            AGGREGATE_READ_FUNCTIONS.out.versions
+        )
     } else {
         ch_sample_functions    = channel.empty()
         ch_function_abundance  = channel.empty()
@@ -106,7 +133,7 @@ workflow READ_FUNCTIONAL {
     emit:
     sample_functions   = ch_sample_functions    // [ meta, <id>.<backend>_functions.tsv ] per sample
     function_abundance = ch_function_abundance  // read_function_abundance.tsv (Section 5.3, source=reads)
-    function_wide      = ch_function_wide       // read_function_wide_<ontology>_native.tsv (+ _cpge.tsv for woltka)
+    function_wide      = ch_function_wide       // read_function_wide_<ontology>_native.tsv (+ _cpge.tsv for woltka / humann)
     annotated_fraction = ch_annotated_fraction  // read_annotated_fraction.tsv
     sample_summary     = ch_sample_summary      // read_sample_summary.tsv
     versions           = ch_versions

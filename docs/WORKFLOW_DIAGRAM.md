@@ -47,7 +47,7 @@ flowchart TD
 
     %% Functional Annotation Branch
     CleanReads -->|"if (contig_level_functional or read_level_functional)<br/>& microbecensus (default)"| MicrobeCensus[MICROBECENSUS<br/>Avg Genome Size / GE]
-    CleanReads -->|"if read_level_functional = woltka | superfocus<br/>(no assembly needed)"| ReadFunctional["READ_FUNCTIONAL SUBWORKFLOW<br/>woltka: WOLTKA_ALIGN (Bowtie2 vs WoLr2)<br/>→ WOLTKA_CLASSIFY<br/>superfocus: SUPERFOCUS (DIAMOND/MMseqs2 vs DB_90)<br/>→ AGGREGATE_READ_FUNCTIONS<br/>(read_* tables, reported separately)"]
+    CleanReads -->|"if read_level_functional = woltka | superfocus | humann<br/>(no assembly needed)"| ReadFunctional["READ_FUNCTIONAL SUBWORKFLOW<br/>woltka: WOLTKA_ALIGN (Bowtie2 vs WoLr2)<br/>→ WOLTKA_CLASSIFY<br/>superfocus: SUPERFOCUS (DIAMOND/MMseqs2 vs DB_90)<br/>humann: HUMANN (HUMAnN 4.0.0a2 + MetaPhlAn 4.1.2)<br/>→ AGGREGATE_READ_FUNCTIONS<br/>(read_* tables, reported separately)"]
     MicrobeCensus --> ReadFunctional
     Pyrodigal -->|if contig_level_functional| Functional["FUNCTIONAL_ANNOTATION SUBWORKFLOW<br/>eggNOG-mapper v3 (search + annotate)<br/>+ RUN_DBCAN CAZy (if functional_cazy, default)<br/>+ FEATURECOUNTS_GENES → AGGREGATE_FUNCTIONS<br/>(TPM + CPGE tables)"]
     MicrobeCensus --> Functional
@@ -117,6 +117,7 @@ flowchart TD
     Start --> Magdb{mag_level_functional?}
     Start --> Readfuncdb{"read_level_functional<br/>= woltka?"}
     Start --> Sfdb{"read_level_functional<br/>= superfocus?"}
+    Start --> Hudb{"read_level_functional<br/>= humann?"}
     
     Kraken -->|Yes| KrakenDB[FORMAT_KRAKEN_DB]
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
@@ -133,13 +134,14 @@ flowchart TD
     Readfuncdb -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
     Readfuncdb -->|"Yes (shared with the contig branch)"| CogDB
     Sfdb -->|Yes| SuperfocusDB[FORMAT_SUPERFOCUS_DB]
+    Hudb -->|Yes| HumannDB[FORMAT_HUMANN_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 
@@ -309,9 +311,10 @@ flowchart TD
 | `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
 | `dbcan_consensus` | `'recommended'` | Which dbCAN calls feed aggregation: 'recommended' (≥2 tools) or 'any' |
 | `microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (non-fatal on failure) |
-| `read_level_functional` | `'none'` | Read-level functional profiling backend: 'woltka', 'superfocus', 'none' (no assembly needed) |
+| `read_level_functional` | `'none'` | Read-level functional profiling backend: 'woltka', 'superfocus', 'humann', 'none' (no assembly needed) |
 | `woltka_uniq` | `false` | Woltka: leave multi-hit reads unassigned instead of dividing them 1/k |
 | `superfocus_aligner` | `'diamond'` | SUPER-FOCUS search backend: 'diamond', 'mmseqs2' |
+| `humann_db` | `'v4_alpha-full'` | HUMAnN database set: 'v4_alpha-full' (ChocoPhlAn 44.8 GB) or 'v4_alpha-ec_filtered' (6.9 GB) |
 | `featurecounts_multimap` | `'primary'` | featureCounts multi-mapping policy: 'primary', 'all', 'none' |
 | `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
@@ -357,7 +360,7 @@ flowchart LR
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
-- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / AGGREGATE_READ_FUNCTIONS (read level), METACERBERUS
+- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level), METACERBERUS
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
 - **Reporting**: custom report generators
 
@@ -375,7 +378,7 @@ flowchart LR
 | `ASSEMBLY` | Metagenome assembly (per-sample or co-assembly) |
 | `BINNING` | Unified binning workflow (mode-agnostic) |
 | `FUNCTIONAL_ANNOTATION` | Functional annotation, two independent branches: contig (eggNOG-mapper v3, run_dbcan CAZy, featureCounts gene abundance, study-level TPM/CPGE aggregation) and MAG (Bakta per refined bin) |
-| `READ_FUNCTIONAL` | Optional read-level functional profiling, one backend per run (Woltka vs WoLr2, or SUPER-FOCUS vs its DB_90 SEED database); independent of assembly, tables reported separately |
+| `READ_FUNCTIONAL` | Optional read-level functional profiling, one backend per run (Woltka vs WoLr2, SUPER-FOCUS vs its DB_90 SEED database, or HUMAnN 4.0.0a2 with a MetaPhlAn 4.1.2 prescreen); independent of assembly, tables reported separately |
 
 ### Quality Control (QC Subworkflow)
 | Module | Description |
@@ -452,7 +455,8 @@ flowchart LR
 | `WOLTKA_ALIGN` | if `read_level_functional = woltka` | Bowtie2 (SHOGUN multi-hit settings) of the clean reads against the WoLr2 genomes; trimmed SAM (≥ 68 GB RAM) |
 | `WOLTKA_CLASSIFY` | if `read_level_functional = woltka` | Woltka ORF classification, then per-ORF de-duplicated KO / EC / COG-category / Pfam-name / MetaCyc read counts and RPK (COG and Pfam in the contig branch's vocabularies, via the NCBI COG table) |
 | `SUPERFOCUS` | if `read_level_functional = superfocus` | SUPER-FOCUS 1.8 (DIAMOND or MMseqs2, `superfocus_aligner`) of the concatenated clean reads against DB_90, then SEED level 1-3 read counts summed from the function-level counts |
-| `AGGREGATE_READ_FUNCTIONS` | if `read_level_functional != none` | Study-level `read_*` tables (same schema, `source=reads`; native read counts + CPGE for woltka, native read counts only for superfocus), never merged with the contig branch |
+| `HUMANN` | if `read_level_functional = humann` | HUMAnN 4.0.0a2 (MetaPhlAn 4.1.2 prescreen, ChocoPhlAn nucleotide search, UniRef90 EC-filtered translated search) of the concatenated clean reads in RPK, then KO / EC regrouping of the gene families and MetaCyc pathway abundance |
+| `AGGREGATE_READ_FUNCTIONS` | if `read_level_functional != none` | Study-level `read_*` tables (same schema, `source=reads`; native read counts + CPGE for woltka, native read counts only for superfocus, native RPK + CPGE for humann), never merged with the contig branch |
 
 ---
 
@@ -471,7 +475,7 @@ results/
 └── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
                                  # gene abundance, MicrobeCensus, TPM/CPGE
                                  # summary tables, Bakta MAG annotations
-                                 # (mags/), read-level Woltka / SUPER-FOCUS tables
+                                 # (mags/), read-level Woltka / SUPER-FOCUS / HUMAnN tables
                                  # (reads/ + summary/read_*) and
                                  # MetaCerberus contigs/
 ```

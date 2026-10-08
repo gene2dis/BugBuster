@@ -129,10 +129,11 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--read_level_functional`
 - **Type**: String
 - **Default**: `none`
-- **Options**: `woltka`, `superfocus`, `none`
+- **Options**: `woltka`, `superfocus`, `humann`, `none`
 - **Description**: Optional read-level functional profiling of the host-removed reads, one backend per run (validated at launch). `woltka`: Bowtie2 alignment against the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit settings, Woltka ORF classification (a read is assigned to an ORF when ≥ 80 % of it lies inside; mates count separately; a read whose reported alignments — up to 16 within the score threshold — hit k ORFs counts 1/k toward each unless `--woltka_uniq`), then per-function read counts and RPK for KO, EC (via KO), COG functional categories (via KO; WoLr2's COG ids mapped with the `--cog_db` table, as in the contig branch), Pfam families (by name, as in the contig branch; the versioned accession is kept in `description`) and MetaCyc pathways — each read counted once toward each distinct term of its ORF. Per-sample tables go to `07_functional_annotation/reads/woltka/<sample>/`; study-level `read_function_abundance.tsv` (same schema as the contig branch, `source = reads`, native unit = reads, plus CPGE from MicrobeCensus), `read_function_wide_<ontology>_{native,cpge}.tsv`, `read_annotated_fraction.tsv` and `read_sample_summary.tsv` go to `07_functional_annotation/summary/`. Reported **separately** from the assembly-based tables, never merged (read-level profiling recovers the unassembled fraction but over-predicts). Needs no assembly (works with `--assembly_mode none`) and runs on any container engine. Downloads the WoLr2 subset (~94 GB, `--woltka_db`) on first use unless `--custom_woltka_db` is given; the alignment needs **≥ 68 GB RAM** per task (the WoLr2 index requirement)
   `superfocus`: SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster database with DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner`). Each sample's R1, R2 and singleton reads are concatenated into one query (mates count separately); a read's equal-best-e-value hits passing the SUPER-FOCUS defaults (≥ 60 % identity, ≥ 15 aa, e-value ≤ 1e-5; `SUPERFOCUS` `ext.args`) are counted, each read with a hit contributing exactly 1, divided 1/k across the k distinct SEED (subsystem, function) assignments of its best hits. The pipeline sums these to SEED subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`, path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`); SEED is never mapped to KO or EC. Per-sample tables go to `07_functional_annotation/reads/superfocus/<sample>/`; the same `read_*` summary tables are written, with only the three `read_function_wide_seed_level{1,2,3}_native.tsv` matrices — **no CPGE** (a SEED hit has no gene length, so no RPK; `cpge_status = not_applicable`, AGS/GE still reported). Downloads the DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB MMseqs2, `--superfocus_db`) unless `--custom_superfocus_db` is given; runs on any container engine
-- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`; `--read_level_functional superfocus --custom_superfocus_db /shared/databases/superfocus`
+  `humann`: HUMAnN 4.0.0a2 (an **alpha** release, pinned exactly) with its MetaPhlAn 4.1.2 prescreen against the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` (the only one this HUMAnN version accepts), nucleotide search against the prescreened ChocoPhlAn pangenomes, then translated search of the remaining reads against UniRef90 (EC-filtered, the only protein database HUMAnN 4 offers). Each sample's R1, R2 and singleton reads are concatenated into one input (mates count separately). HUMAnN runs with `--count-normalization RPKs`; the pipeline reports MetaCyc pathway abundance (`metacyc`) and regroups the gene families to KO (`ko`, UniRef90 families only — UniClust90 families never map to a KO) and level-4 EC (`ec`) itself, a family carrying several terms contributing its full RPK to each. `abundance_native` is RPK (`native_unit = rpk`) and CPGE = RPK / genome equivalents. Per-sample HUMAnN tables (`_1_metaphlan_profile`, `_2_genefamilies`, `_3_reactions`, `_4_pathabundance`, log) go to `07_functional_annotation/reads/humann/<sample>/`, with the same `read_*` summary tables (six wide matrices: ko/ec/metacyc × native/cpge). Sample names must not contain `s__` or `t__` (a HUMAnN 4.0.0a2 defect; rejected at launch). Downloads ~71 GB (`--humann_db v4_alpha-full`) or ~33 GB (`v4_alpha-ec_filtered`) unless `--custom_humann_db` is given; runs on any container engine; the MetaPhlAn prescreen loads a ~20 GB Bowtie2 index
+- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`; `--read_level_functional superfocus --custom_superfocus_db /shared/databases/superfocus`; `--read_level_functional humann --custom_humann_db /shared/databases/humann`
 
 ### `--arg_bin_clustering`
 - **Type**: Boolean
@@ -268,6 +269,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download
 - **Example**: `--superfocus_db db90`
 
+### `--humann_db`
+- **Type**: String
+- **Default**: `v4_alpha-full`
+- **Options**: `v4_alpha-full`, `v4_alpha-ec_filtered`
+- **Description**: HUMAnN database set for the HUMAnN read-level backend (`--read_level_functional humann`). Both keys download the HUMAnN v4_alpha UniRef90 EC-filtered DIAMOND database (0.94 GB), the v4 utility mapping (2.8 GB; KO / EC maps and the MetaCyc pathway files) and the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` with its prebuilt Bowtie2 index (~22.5 GB, md5-verified); they differ in the ChocoPhlAn pangenome database: `v4_alpha-full` (44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB, only EC-annotated genes — fewer gene families and KOs). The choice is recorded in provenance (`read_sample_summary.tsv`, `software_versions.yml`). Stored as a database root at `<databases_dir>/humann/humann_db`; HUMAnN publishes no checksums for its own archives, so those are checked for layout only
+- **Size**: ~71 GB (`v4_alpha-full`) / ~33 GB (`v4_alpha-ec_filtered`) download
+- **Example**: `--humann_db v4_alpha-ec_filtered`
+
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
@@ -397,6 +406,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to a local SUPER-FOCUS database **root** — the directory that CONTAINS `db/`: `db/database_PKs.txt` plus `db/static/diamond/90_clusters.db.dmnd` (for `--superfocus_aligner diamond`) or `db/static/mmseqs2/90_clusters.db*` (for `mmseqs2`). Pointing at the `db/` folder itself fails with an explicit message, as does a database without the selected aligner's DB_90 files. A database root from an existing SUPER-FOCUS install (e.g. made with an older SUPER-FOCUS version; DIAMOND format 3 `.dmnd`) works unmodified. A download recipe is in `docs/manual.md`, Manual Database Download. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<aligner> DB_90)`
 - **Example**: `--custom_superfocus_db /shared/databases/superfocus`
+
+### `--custom_humann_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local HUMAnN database **root** containing `chocophlan/` (ChocoPhlAn v4_alpha pangenomes), `uniref/` (the UniRef90 EC-filtered `.dmnd`), `utility_mapping/` (the `full_mapping_v4_alpha` files: `map_ko_uniref90.txt.gz`, `map_level4ec_uniclust90.txt.gz`, their name maps and the two MetaCyc pathway files) and `metaphlan/` (`mpa_vOct22_CHOCOPhlAnSGB_202403.pkl` plus its `.bt2l` Bowtie2 index — HUMAnN 4.0.0a2 refuses any other MetaPhlAn database, e.g. vJun23). This is the layout `humann_databases --download` produces for the three HUMAnN archives, plus the MetaPhlAn files in their own folder. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom`
+- **Example**: `--custom_humann_db /shared/databases/humann`
 
 ---
 
@@ -715,7 +729,7 @@ Override automatic downloads by providing custom database paths:
 ### `--microbecensus`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches (the SUPER-FOCUS read backend has no CPGE — a SEED hit carries no gene length — so there its AGS/GE are only reported in `read_sample_summary.tsv`)
+- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches (the SUPER-FOCUS read backend has no CPGE — a SEED hit carries no gene length — so there its AGS/GE are only reported in `read_sample_summary.tsv`; the HUMAnN backend uses them for CPGE = RPK / GE)
 - **Example**: `--microbecensus false`
 - **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
 

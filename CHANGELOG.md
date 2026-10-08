@@ -61,6 +61,34 @@ next release is tagged.
   - `bin/aggregate_read_functions.py` generalized to per-backend settings
     (file suffixes, versions keys, verified versions, ontologies, CPGE
     applicability); Woltka outputs unchanged (byte-identical on the fixtures)
+- **HUMAnN 4 read-level backend (`--read_level_functional humann`)**
+  - HUMAnN 4.0.0a2 (an alpha, pinned exactly) with MetaPhlAn 4.1.2 and the
+    MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` — the only
+    combination this HUMAnN build accepts — in a pinned Seqera Containers
+    image (`HUMANN`; no HUMAnN 4 conda package or biocontainer exists; docker
+    works). R1, R2 and singleton reads concatenated into one input; run with
+    `--count-normalization RPKs`
+  - Ontologies `metacyc` (pathway abundance), `ko` and `ec` (gene families
+    regrouped by the pipeline with the HUMAnN 4 mapping files; UniClust90
+    families reach EC but never KO). `abundance_native` = RPK
+    (`native_unit = rpk`), CPGE = RPK / genome equivalents; six wide
+    matrices. Per-sample raw HUMAnN tables (MetaPhlAn profile, gene families,
+    reactions, pathway abundance, log) to `07_functional_annotation/reads/humann/<sample>/`
+  - Version-aware parsing (`bin/humann_function_profile.py`): the exact
+    4.0.0a2 table layout is required, anything else fails with an explanatory
+    error. Works around two 4.0.0a2 defects: its own regroup / renorm
+    utilities mishandle the `READS_UNMAPPED` row (the pipeline regroups
+    itself), and sample names containing `s__` or `t__` crash its
+    MetaPhlAn-profile parsing (rejected at launch)
+  - Databases (`FORMAT_HUMANN_DB`, `--humann_db v4_alpha-full` (default,
+    ChocoPhlAn 44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB), recorded in
+    provenance): ChocoPhlAn, UniRef90 EC-filtered (0.94 GB), the v4 utility
+    mapping (2.8 GB) and the MetaPhlAn database with its prebuilt Bowtie2
+    index (~22.5 GB, md5-verified) — ~71 GB / ~33 GB in total; or a local
+    database root via `--custom_humann_db`
+  - `bin/aggregate_read_functions.py`: per-backend native unit and
+    annotated-fraction mode; Woltka and SUPER-FOCUS outputs unchanged
+    (byte-identical on the fixtures)
 - **MAG-level functional annotation (`--mag_level_functional`)**
   - Bakta 1.12.1 annotation of every MetaWRAP-refined bin, one task per bin
     (nf-core `bakta/bakta` module, patched to emit `versions.yml`; per-bin

@@ -17,6 +17,7 @@ include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_WOLTKA_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_SUPERFOCUS_DB    } from '../../modules/local/format_db/main'
+include { FORMAT_HUMANN_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_COG_DB           } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
@@ -44,6 +45,7 @@ workflow PREPARE_DATABASES {
     ch_bakta_db         = channel.empty()
     ch_woltka_db        = channel.empty()
     ch_superfocus_db    = channel.empty()
+    ch_humann_db        = channel.empty()
     ch_cog_def          = channel.empty()
     ch_versions         = channel.empty()
 
@@ -289,6 +291,22 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // HUMAnN 4.0.0a2 database set for the HUMAnN read-level functional
+    // backend (design doc Section 4.6.1, Q2, T8c): ChocoPhlAn (--humann_db
+    // flavour), UniRef90 EC-filtered, the v4 utility mapping and the MetaPhlAn
+    // vOct22_CHOCOPhlAnSGB_202403 database with its Bowtie2 index (~71 GB with
+    // the full ChocoPhlAn). A database root with that layout is passed with
+    // --custom_humann_db
+    //
+    if ( params.read_level_functional == 'humann' ) {
+        if ( params.custom_humann_db ) {
+            ch_humann_db = channel.fromPath(params.custom_humann_db, checkIfExists: true)
+        } else {
+            ch_humann_db = FORMAT_HUMANN_DB(channel.of(params.humann_db))
+        }
+    }
+
+    //
     // RGI CARD database for AMR prediction
     //
     if ( flagOn(params.rgi_prediction) ) {
@@ -328,6 +346,7 @@ workflow PREPARE_DATABASES {
     bakta_db               = ch_bakta_db
     woltka_db              = ch_woltka_db
     superfocus_db          = ch_superfocus_db
+    humann_db              = ch_humann_db
     cog_def                = ch_cog_def
     versions               = ch_versions
 }

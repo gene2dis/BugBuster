@@ -118,6 +118,59 @@ nextflow_process {
         }
     }
 
+    test("aggregates a HUMAnN sample: RPK native unit, CPGE, ko/ec/metacyc") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/humann/htest.humann_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/humann/htest.humann_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = [ file("${projectDir}/tests/data/humann/htest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/humann/humann_versions.yml", checkIfExists: true)
+                input[5] = 'humann'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert rows.every { r -> r[2] == 'humann' && r[3] in ['ko', 'ec', 'metacyc'] && r[6] == '' && r[9] == 'rpk' }
+            // CPGE = RPK / GE (GE 2.0 in the fixture AGS)
+            assert rows.every { r -> Math.abs(r[7].toDouble() - r[8].toDouble() / 2.0) < 1e-6 }
+            assert process.out.function_wide.get(0).collect { f -> file(f).name }.sort() ==
+                ['read_function_wide_ec_cpge.tsv', 'read_function_wide_ec_native.tsv',
+                 'read_function_wide_ko_cpge.tsv', 'read_function_wide_ko_native.tsv',
+                 'read_function_wide_metacyc_cpge.tsv', 'read_function_wide_metacyc_native.tsv']
+            def summary = path(process.out.sample_summary.get(0)).readLines()[1].split('\t', -1)
+            assert summary[2] == '4.0.0.alpha.2' && summary[8] == 'ok'
+            def fractions = path(process.out.annotated_fraction.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert fractions.find { r -> r[2] == 'ko' }[3] == ''
+        }
+    }
+
+    test("stub emits the humann wide-matrix set") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/humann/htest.humann_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/humann/htest.humann_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/humann/humann_versions.yml", checkIfExists: true)
+                input[5] = 'humann'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 6
+        }
+    }
+
     test("stub emits all declared outputs") {
         options "-stub"
 

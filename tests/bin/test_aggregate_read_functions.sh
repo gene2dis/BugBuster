@@ -345,6 +345,50 @@ expect_err "woltka guard: missing --unassigned fails" "${SG}/w.log" "are require
     in_report "${A}" --backend woltka --functions wtest.woltka_functions.tsv --summaries wtest.woltka_summary.tsv \
         --versions-yml versions.yml --output-dir out
 
+echo "--- aggregate_read_functions.py: humann backend ---"
+HFIX="${REPO_DIR}/tests/data/humann"
+HU="${TMP_DIR}/agg_hu"; mkdir -p "${HU}/out"
+cp "${HFIX}"/htest.humann_{functions,summary}.tsv "${HFIX}/htest.ags.tsv" "${HFIX}/humann_versions.yml" "${HU}/"
+for f in "${HU}"/htest.humann_*.tsv; do
+    sed 's/^htest\t/hcopy\t/' "${f}" > "${HU}/hcopy.${f##*/htest.}"
+done
+HU_ARGS=(--backend humann
+    --functions htest.humann_functions.tsv hcopy.humann_functions.tsv
+    --summaries htest.humann_summary.tsv hcopy.humann_summary.tsv)
+expect_ok "humann: aggregate two samples, AGS for one, no --unassigned" "${HU}/run.log" \
+    in_report "${HU}" "${HU_ARGS[@]}" --ags htest.ags.tsv --versions-yml humann_versions.yml --output-dir out
+O="${HU}/out"
+check "humann: every row source=reads, backend=humann, native_unit=rpk, empty tpm" \
+    "[ \"\$(awk -F'\t' 'NR>1 && !(\$2==\"reads\" && \$3==\"humann\" && \$10==\"rpk\" && \$7==\"\")' ${O}/read_function_abundance.tsv | wc -l)\" -eq 0 ]"
+check "humann: only ko, ec and metacyc ontologies" \
+    "[ \"\$(awk -F'\t' 'NR>1 {print \$4}' ${O}/read_function_abundance.tsv | sort -u | tr '\n' ' ')\" = 'ec ko metacyc ' ]"
+K2=$(value "${HFIX}/htest.humann_functions.tsv" '$2=="ko" && $3=="K00002"' 6)
+check "humann: abundance_native = RPK (K00002)" \
+    "[ \"\$(value ${O}/read_function_abundance.tsv '\$1==\"htest\" && \$5==\"K00002\"' 9)\" = \"\$(printf '%.6f' ${K2})\" ]"
+check "humann: abundance_cpge = RPK / GE exactly (GE 2.0)" \
+    "[ \"\$(value ${O}/read_function_abundance.tsv '\$1==\"htest\" && \$5==\"K00002\"' 8)\" = \"\$(python3 -c \"print('%.6f' % (${K2} / 2.0))\")\" ]"
+check "humann: AGS-less sample has blank CPGE, never 0" \
+    "[ \"\$(awk -F'\t' '\$1==\"hcopy\" && \$8!=\"\"' ${O}/read_function_abundance.tsv | wc -l)\" -eq 0 ]"
+check "humann: six wide matrices (ko/ec/metacyc x native/cpge)" \
+    "[ \"\$(cd ${O} && ls read_function_wide_*.tsv | tr '\n' ' ')\" = 'read_function_wide_ec_cpge.tsv read_function_wide_ec_native.tsv read_function_wide_ko_cpge.tsv read_function_wide_ko_native.tsv read_function_wide_metacyc_cpge.tsv read_function_wide_metacyc_native.tsv ' ]"
+check "humann: annotated fraction 'any' from reads, ontology rows = composer RPK share with blank read columns" \
+    "[ \"\$(value ${O}/read_annotated_fraction.tsv '\$1==\"htest\" && \$3==\"any\"' 6)\" = \"\$(printf '%.4f' $(value "${HFIX}/htest.humann_summary.tsv" '$2=="any"' 5))\" ] && [ \"\$(value ${O}/read_annotated_fraction.tsv '\$1==\"htest\" && \$3==\"ko\"' 6)\" = \"\$(printf '%.4f' $(value "${HFIX}/htest.humann_summary.tsv" '$2=="ko"' 5))\" ] && [ -z \"\$(value ${O}/read_annotated_fraction.tsv '\$3!=\"any\" && NR>1' 4 | tr -d '\n')\" ]"
+check "humann: sample summary ok / unavailable, tool 4.0.0.alpha.2, db provenance" \
+    "[ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"htest\"' 9)\" = 'ok' ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"hcopy\"' 9)\" = 'unavailable' ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"htest\"' 3)\" = '4.0.0.alpha.2' ] && [ \"\$(value ${O}/read_sample_summary.tsv '\$1==\"htest\"' 4)\" = 'fixture' ]"
+
+HG="${TMP_DIR}/agg_hu_neg"; mkdir -p "${HG}/out" "${HG}/reads" "${HG}/frac"; cp "${HU}"/*.tsv "${HU}/humann_versions.yml" "${HG}/"
+sed 's/humann: 4.0.0.alpha.2/humann: 4.0.0.alpha.3/' "${HG}/humann_versions.yml" > "${HG}/v_new.yml"
+awk -F'\t' 'BEGIN{OFS="\t"} $2=="ko"{$3="12"} {print}' "${HG}/htest.humann_summary.tsv" > "${HG}/reads/htest.humann_summary.tsv"
+awk -F'\t' 'BEGIN{OFS="\t"} $2=="ko"{$5="1.5"} {print}' "${HG}/htest.humann_summary.tsv" > "${HG}/frac/htest.humann_summary.tsv"
+expect_err "humann guard: unverified HUMAnN version fails" "${HG}/v.log" "KNOWN_HUMANN_VERSIONS" \
+    in_report "${HG}" "${HU_ARGS[@]}" --versions-yml v_new.yml --output-dir out
+expect_err "humann guard: read counts on an ontology summary row fail" "${HG}/r.log" "must have blank read columns" \
+    in_report "${HG}" --backend humann --functions htest.humann_functions.tsv \
+        --summaries reads/htest.humann_summary.tsv --versions-yml humann_versions.yml --output-dir out
+expect_err "humann guard: RPK share outside [0,1] fails" "${HG}/f.log" "outside \[0, 1\]" \
+    in_report "${HG}" --backend humann --functions htest.humann_functions.tsv \
+        --summaries frac/htest.humann_summary.tsv --versions-yml humann_versions.yml --output-dir out
+
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "${FAIL}" -eq 0 ]

@@ -32,6 +32,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
 7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
+   - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
 8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
 9. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
 10. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
@@ -152,6 +153,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **NCBI COG 2024 definitions** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` | `--custom_cog_db` |
 | **Web of Life WoLr2** | ~94 GB | Read-level functional profiling with Woltka (alignment needs ≥ 68 GB RAM) | `read_level_functional='woltka'` | `--custom_woltka_db` |
 | **SUPER-FOCUS DB_90** | ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download, selected aligner only | Read-level SEED subsystem profiling with SUPER-FOCUS | `read_level_functional='superfocus'` | `--custom_superfocus_db` |
+| **HUMAnN 4 databases + MetaPhlAn vOct22** | ~71 GB (full ChocoPhlAn 44.8 GB) or ~33 GB (EC-filtered ChocoPhlAn 6.9 GB), plus UniRef90 EC-filtered 0.94 GB, utility mapping 2.8 GB and the MetaPhlAn database with its Bowtie2 index ~22.5 GB | Read-level profiling with HUMAnN 4.0.0a2 | `read_level_functional='humann'` | `--custom_humann_db` |
 
 ### Database Sources
 
@@ -171,6 +173,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **dbcan_db**: [`dbCAN S3 release db_v5-2-9_5-5-2026`](https://dbcan.s3.us-west-2.amazonaws.com/db_v5-2-9_5-5-2026/)
 - **woltka_db**: [`Web of Life release 2 (WoLr2)`](https://ftp.microbio.me/pub/wol2/)
 - **superfocus_db**: [`SUPER-FOCUS DB_90 (figshare, CC0): DIAMOND`](https://doi.org/10.25451/flinders.25009748.v2) / [`MMseqs2`](https://doi.org/10.25451/flinders.25009751.v2)
+- **humann_db**: [`HUMAnN v4_alpha databases`](https://github.com/biobakery/humann) (ChocoPhlAn, UniRef90 EC-filtered, utility mapping) + [`MetaPhlAn mpa_vOct22_CHOCOPhlAnSGB_202403`](https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/)
 - **cog_db**: [`NCBI COG 2024 definitions (cog-24.def.tab)`](https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/)
 
 ## Samplesheet Format
@@ -356,6 +359,7 @@ results/
     ├── mags/{sample}/          # Bakta per-bin MAG annotation (if mag_level_functional=true; needs binning with >= 2 binners)
     ├── reads/woltka/{sample}/  # Woltka read-level ORF and function tables (if read_level_functional=woltka)
     ├── reads/superfocus/{sample}/ # SUPER-FOCUS SEED level 1-3 tables + raw outputs (if read_level_functional=superfocus)
+    ├── reads/humann/{sample}/  # HUMAnN gene families / reactions / pathways (RPK), MetaPhlAn profile, KO/EC/MetaCyc tables (if read_level_functional=humann)
     └── contigs/{sample}/       # MetaCerberus results (if contig_level_metacerberus=true)
 ```
 

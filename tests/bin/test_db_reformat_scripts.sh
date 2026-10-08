@@ -224,6 +224,34 @@ PY
 cp "${REPO_DIR}/tests/data/superfocus/sf_db/db/database_PKs.txt" "${FIXTURES}/sf/database_PKs.txt"
 printf 'not\tthe\tsubsystem table\n' > "${FIXTURES}/sf/bad_PKs.txt"
 
+# HUMAnN database archives as huttenhower.sph.harvard.edu / the MetaPhlAn
+# server publish them, built from the committed read-branch fixture database
+# (tests/data/humann/db, made by tests/bin/make_humann_fixtures.sh): flat
+# tar.gz archives (one ChocoPhlAn variant wrapped in a folder), plain MetaPhlAn
+# tars with their published-style .md5 files (the Bowtie2 index inside a
+# folder), plus broken variants
+HU="${FIXTURES}/hu"
+HDB="${REPO_DIR}/tests/data/humann/db"
+mkdir -p "${HU}/wrap/chocophlan_v4" "${HU}/mpa" "${HU}/bt2/bowtie2_indexes"
+tar -czf "${HU}/chocophlan.tar.gz" -C "${HDB}/chocophlan" .
+cp "${HDB}"/chocophlan/* "${HU}/wrap/chocophlan_v4/"
+tar -czf "${HU}/chocophlan_wrapped.tar.gz" -C "${HU}/wrap" chocophlan_v4
+tar -czf "${HU}/uniref.tar.gz" -C "${HDB}/uniref" .
+tar -czf "${HU}/utility.tar.gz" -C "${HDB}/utility_mapping" .
+tar -czf "${HU}/utility_noko.tar.gz" -C "${HDB}/utility_mapping" --exclude map_ko_uniref90.txt.gz .
+tar -czf "${HU}/empty.tar.gz" -C "${HU}/wrap" --files-from /dev/null
+head -c 2000 "${HU}/chocophlan.tar.gz" > "${HU}/truncated.tar.gz"
+IDX=mpa_vOct22_CHOCOPhlAnSGB_202403
+printf 'pkl fixture\n' > "${HU}/mpa/${IDX}.pkl"
+tar -cf "${HU}/${IDX}.tar" -C "${HU}/mpa" "${IDX}.pkl"
+for ext in 1 2 3 4 rev.1 rev.2; do printf 'bt2l %s\n' "${ext}" > "${HU}/bt2/bowtie2_indexes/${IDX}.${ext}.bt2l"; done
+tar -cf "${HU}/${IDX}_bt2.tar" -C "${HU}/bt2" bowtie2_indexes
+rm "${HU}/bt2/bowtie2_indexes/${IDX}.rev.2.bt2l"
+tar -cf "${HU}/bt2_incomplete.tar" -C "${HU}/bt2" bowtie2_indexes
+( cd "${HU}" && md5sum "${IDX}.tar" > "${IDX}.md5" && md5sum "${IDX}_bt2.tar" > "${IDX}_bt2.md5" )
+printf '%s  %s\n' "$(md5sum "${HU}/bt2_incomplete.tar" | cut -d' ' -f1)" "${IDX}_bt2.tar" > "${HU}/bt2_incomplete.md5"
+printf '00000000000000000000000000000000  %s\n' "${IDX}_bt2.tar" > "${HU}/bad_bt2.md5"
+
 #
 # Local HTTP server for the fixtures
 #
@@ -260,6 +288,7 @@ run_script() {
     fi
     docker run --rm --network host -u "$(id -u):$(id -g)" -e HOME=/tmp \
         -e WOLTKA_DB_RETRIES=1 -e WOLTKA_DB_RETRY_WAIT=0 \
+        -e HUMANN_DB_RETRIES=1 -e HUMANN_DB_RETRY_WAIT=0 \
         "${mock_args[@]}" \
         -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
         -v "${workdir}:/dbwork" -w /dbwork \
@@ -536,6 +565,55 @@ expect_fail "superfocus: unknown aligner fails" superfocus_db_reformat.sh rapsea
 expect_fail "superfocus: 404 archive URL fails" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/no_such.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
 RUN_IMG=""
+
+#
+# humann_db_reformat.sh
+#
+echo "--- humann_db_reformat.sh ---"
+H="${BASE_URL}/hu"
+IDX=mpa_vOct22_CHOCOPhlAnSGB_202403
+# hu_args <chocophlan> <uniref> <utility> <bt2-tar-url> <bt2-md5-url>
+hu_args() {
+    echo v4_alpha-test "${H}/$1" "${H}/$2" "${H}/$3" "${IDX}" "${H}/${IDX}.tar" "${H}/${IDX}.md5" "${H}/$4" "${H}/$5" "HUMAnN-test"
+}
+expect_pass "humann: full database set" humann_db_reformat.sh \
+    $(hu_args chocophlan.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+check_file "humann: ChocoPhlAn pangenomes in chocophlan/" "humann_db/chocophlan/SGB1871_pangenome90.fna.gz"
+check_file "humann: DIAMOND database in uniref/" "humann_db/uniref/demo_proteins_uniref90_uniref50_like_v2019_06.dmnd"
+check_file "humann: KO map in utility_mapping/" "humann_db/utility_mapping/map_ko_uniref90.txt.gz"
+check_file "humann: MetaPhlAn .pkl in metaphlan/" "humann_db/metaphlan/${IDX}.pkl"
+check_file "humann: Bowtie2 index brought up from the tar's folder" "humann_db/metaphlan/${IDX}.rev.2.bt2l"
+if [ "$(cat "${LAST_WORKDIR}/humann_db/DB_VERSION" 2>/dev/null)" = "v4_alpha-test: HUMAnN-test" ]; then
+    echo "✓ humann: single-line DB_VERSION records the registry key (ChocoPhlAn flavour) and release"
+    PASS=$((PASS + 1))
+else
+    echo "✗ humann: DB_VERSION missing or wrong"
+    FAIL=$((FAIL + 1))
+fi
+if [ -z "$(ls "${LAST_WORKDIR}" | grep -v '^humann_db$')" ]; then
+    echo "✓ humann: downloaded archives removed after unpacking"
+    PASS=$((PASS + 1))
+else
+    echo "✗ humann: leftover files next to humann_db/"
+    FAIL=$((FAIL + 1))
+fi
+expect_pass "humann: ChocoPhlAn archive wrapped in a folder is flattened" humann_db_reformat.sh \
+    $(hu_args chocophlan_wrapped.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+check_file "humann: wrapped ChocoPhlAn flattened into chocophlan/" "humann_db/chocophlan/SGB2091_pangenome90.fna.gz"
+expect_fail "humann: Bowtie2 index md5 mismatch fails" humann_db_reformat.sh \
+    $(hu_args chocophlan.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" bad_bt2.md5)
+expect_fail "humann: incomplete Bowtie2 index fails" humann_db_reformat.sh \
+    $(hu_args chocophlan.tar.gz uniref.tar.gz utility.tar.gz bt2_incomplete.tar bt2_incomplete.md5)
+expect_fail "humann: utility mapping without the KO map fails" humann_db_reformat.sh \
+    $(hu_args chocophlan.tar.gz uniref.tar.gz utility_noko.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+expect_fail "humann: ChocoPhlAn archive without pangenomes fails" humann_db_reformat.sh \
+    $(hu_args empty.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+expect_fail "humann: UniRef archive without a .dmnd fails" humann_db_reformat.sh \
+    $(hu_args chocophlan.tar.gz chocophlan.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+expect_fail "humann: truncated archive fails" humann_db_reformat.sh \
+    $(hu_args truncated.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+expect_fail "humann: 404 archive URL fails" humann_db_reformat.sh \
+    $(hu_args no_such.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

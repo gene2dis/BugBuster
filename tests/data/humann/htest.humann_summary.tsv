@@ -1,0 +1,5 @@
+sample_id	ontology	reads_assigned	reads_annotated	fraction_annotated
+htest	any	2874	1555	0.541058
+htest	ko			0.004614
+htest	ec			0.004384
+htest	metacyc			0.049828

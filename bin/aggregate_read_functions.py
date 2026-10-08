@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Aggregate read-level functional profiles into the canonical function
 abundance schema (design doc Sections 4.6, 5.3, 6.2; tasks T8a — Woltka,
-T8b — SUPER-FOCUS). One backend per run; BACKEND_SPECS below holds every
+T8b — SUPER-FOCUS, T8c — HUMAnN). One backend per run; BACKEND_SPECS below holds every
 backend-specific detail (file suffixes, versions.yml keys, verified versions,
 ontologies, whether CPGE is computable).
 
@@ -9,11 +9,12 @@ The read branch is reported SEPARATELY from the contig branch (Section 2:
 "Report separately, do not merge"): this script writes its own read_*
 tables and never touches function_abundance.tsv.
 
-Inputs per sample (<stem> = woltka | superfocus):
+Inputs per sample (<stem> = woltka | superfocus | humann):
   - <id>.<stem>_functions.tsv   sample_id ontology accession description count rpk
                                 (woltka: WOLTKA_CLASSIFY, bin/woltka_function_profile.py;
                                 superfocus: SUPERFOCUS, bin/superfocus_function_profile.py,
-                                rpk always blank)
+                                rpk always blank; humann: HUMANN,
+                                bin/humann_function_profile.py, count = rpk = HUMAnN RPK)
   - <id>.<stem>_summary.tsv     sample_id ontology reads_assigned reads_annotated
                                 fraction_annotated
   - <id>.woltka_unassigned.tsv  sample_id reads_unassigned (woltka only)
@@ -26,6 +27,13 @@ length behind a SEED hit, so no RPK and no CPGE: abundance_cpge stays blank,
 no _cpge wide matrices are written, cpge_status is 'not_applicable' and
 reads_unassigned_ambiguous is blank. AGS / genome equivalents are still
 reported in read_sample_summary.tsv when MicrobeCensus produced them.
+
+HUMAnN (T8c): ontologies ko / ec / metacyc in RPK (native_unit = rpk, HUMAnN
+run with --count-normalization RPKs); CPGE = RPK / GE as for Woltka. Its
+summary carries read counts on the 'any' row only; the per-ontology rows have
+blank read columns and an RPK-share fraction_annotated computed by the
+composer (no per-family read counts exist under RPKs), which is passed
+through as-is (fraction_mode 'composer').
 
 Outputs (TSV with header, deterministic ordering):
   - read_function_abundance.tsv      Section 5.3 schema, source=reads,
@@ -64,6 +72,7 @@ import pandas as pd
 # only after re-verifying on real output of the new version.
 KNOWN_WOLTKA_VERSIONS = {'0.1.7'}
 KNOWN_SUPERFOCUS_VERSIONS = {'1.8'}
+KNOWN_HUMANN_VERSIONS = {'4.0.0.alpha.2'}
 
 BACKEND_SPECS = {
     'woltka': {
@@ -74,6 +83,8 @@ BACKEND_SPECS = {
         'ontologies': ['ko', 'ec', 'cog', 'pfam', 'metacyc'],
         'cpge': True,          # RPK over the WoLr2 ORF length
         'unassigned': True,    # reads left unassigned by --uniq ambiguity
+        'native_unit': 'reads',
+        'fraction_mode': 'reads',
     },
     'superfocus': {
         'stem': 'superfocus',
@@ -83,6 +94,20 @@ BACKEND_SPECS = {
         'ontologies': ['seed_level1', 'seed_level2', 'seed_level3'],
         'cpge': False,         # no gene length behind a SEED hit (Q17)
         'unassigned': False,
+        'native_unit': 'reads',
+        'fraction_mode': 'reads',
+    },
+    'humann': {
+        'stem': 'humann',
+        'tool_key': 'humann',
+        'db_key': 'humann_db',
+        'known_versions': KNOWN_HUMANN_VERSIONS,
+        'ontologies': ['ko', 'ec', 'metacyc'],
+        'cpge': True,          # HUMAnN RPK (--count-normalization RPKs) / GE
+        'unassigned': False,
+        'native_unit': 'rpk',
+        # 'any' row in reads; per-ontology rows: RPK share from the composer
+        'fraction_mode': 'composer',
     },
 }
 
@@ -195,8 +220,8 @@ def collect(paths, columns, suffix, label):
 
 def parse_arguments():
     parser = argparse.ArgumentParser(
-        description='Aggregate read-level functional profiles (Woltka or '
-                    'SUPER-FOCUS backend) into the canonical function abundance schema.')
+        description='Aggregate read-level functional profiles (Woltka, '
+                    'SUPER-FOCUS or HUMAnN backend) into the canonical function abundance schema.')
     parser.add_argument('--backend', required=True, choices=sorted(BACKEND_SPECS))
     parser.add_argument('--functions', nargs='+', required=True,
                         help='<id>.<backend>_functions.tsv files')
@@ -296,7 +321,7 @@ def main():
         'abundance_tpm': '',
         'abundance_cpge': long.apply(cpge_cell, axis=1) if not long.empty else [],
         'abundance_native': [NATIVE_FORMAT.format(v) for v in long['count_num']],
-        'native_unit': 'reads',
+        'native_unit': spec['native_unit'],
     }, columns=OUT_53_COLUMNS)
     out = out.sort_values(['sample_id', 'ontology', 'backend', 'accession'],
                           kind='mergesort')
@@ -342,6 +367,39 @@ def main():
         expected = ['any'] + ontologies
         if list(table['ontology']) != expected:
             fail(f"{path}: expected ontology rows {expected}, got {list(table['ontology'])}")
+        if spec['fraction_mode'] == 'composer':
+            # 'any' row: reads; ontology rows: blank reads, composer RPK share
+            any_row = table.iloc[[0]]
+            assigned = to_float(any_row, 'reads_assigned', path).iloc[0]
+            annotated = to_float(any_row, 'reads_annotated', path).iloc[0]
+            if annotated > assigned + 1e-6:
+                fail(f"{path}: reads_annotated exceeds reads_assigned for any")
+            fraction_rows.append({
+                'sample_id': sample, 'backend': args.backend, 'ontology': 'any',
+                'reads_assigned': NATIVE_FORMAT.format(assigned),
+                'reads_annotated': NATIVE_FORMAT.format(annotated),
+                'fraction_annotated': (FRACTION_FORMAT.format(annotated / assigned)
+                                       if assigned > 0 else ''),
+            })
+            for _, row in table.iloc[1:].iterrows():
+                if row['reads_assigned'] != '' or row['reads_annotated'] != '':
+                    fail(f"{path}: {row['ontology']} row must have blank read columns "
+                         f"for the {args.backend} backend (RPK-share fraction only)")
+                raw = row['fraction_annotated']
+                if raw != '':
+                    try:
+                        value = float(raw)
+                    except ValueError:
+                        fail(f"{path}: non-numeric fraction_annotated '{raw}'")
+                    if not 0.0 <= value <= 1.0 + 1e-9:
+                        fail(f"{path}: fraction_annotated '{raw}' outside [0, 1]")
+                fraction_rows.append({
+                    'sample_id': sample, 'backend': args.backend,
+                    'ontology': row['ontology'], 'reads_assigned': '',
+                    'reads_annotated': '',
+                    'fraction_annotated': '' if raw == '' else FRACTION_FORMAT.format(float(raw)),
+                })
+            continue
         assigned = to_float(table, 'reads_assigned', path)
         annotated = to_float(table, 'reads_annotated', path)
         for ontology, a, n in zip(table['ontology'], assigned, annotated):
@@ -370,7 +428,9 @@ def main():
                 fail(f"{upath}: expected exactly one data row, found {len(utable)}")
             reads_unassigned = to_float(utable, 'reads_unassigned', upath).iloc[0]
         spath, stable = summaries[sample]
-        reads_assigned = to_float(stable, 'reads_assigned', spath).iloc[0]
+        # the 'any' row only: for the humann backend the per-ontology rows
+        # have blank read columns
+        reads_assigned = to_float(stable.iloc[[0]], 'reads_assigned', spath).iloc[0]
         values = ags_by_sample.get(sample)
         summary_rows.append({
             'sample_id': sample,

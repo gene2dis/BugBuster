@@ -32,13 +32,13 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), one backend per run, reported separately from the contig branch; needs no assembly
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
 ```
 Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
-                                            ├──→ Read-level functions (Woltka/WoLr2 or SUPER-FOCUS/SEED, optional)
+                                            ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
                                             ↓
@@ -155,6 +155,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
 | **Web of Life WoLr2** | ~94 GB (Bowtie2 index 93.6 GB + coordinates/maps ~0.6 GB) | Read-level functional profiling (Woltka); alignment needs ≥ 68 GB RAM | `read_level_functional='woltka'` |
 | **SUPER-FOCUS DB_90** | ~0.74 GB download (~1.9 GB unpacked) for DIAMOND, or ~0.9 GB (~2.5 GB unpacked) for MMseqs2; only the selected aligner's archive | Read-level SEED subsystem profiling (SUPER-FOCUS) | `read_level_functional='superfocus'` |
+| **HUMAnN 4 databases + MetaPhlAn vOct22** | ~71 GB download with the full ChocoPhlAn (44.8 GB), ~33 GB with the EC-filtered one (6.9 GB); plus UniRef90 EC-filtered 0.94 GB, utility mapping 2.8 GB and MetaPhlAn `mpa_vOct22_CHOCOPhlAnSGB_202403` with its Bowtie2 index ~22.5 GB | Read-level profiling with HUMAnN 4.0.0a2 | `read_level_functional='humann'` (`humann_db='v4_alpha-full'` or `'v4_alpha-ec_filtered'`) |
 
 ### Manual Database Download
 
@@ -218,6 +219,23 @@ unzip -j db90.zip -d /shared/databases/bugbuster/superfocus/db/static/diamond
 wget -O /shared/databases/bugbuster/superfocus/db/database_PKs.txt \
     https://raw.githubusercontent.com/metageni/SUPER-FOCUS/739404db8816de967cd4ac3e0d9effcdab7f1489/superfocus_app/db/database_PKs.txt
 
+# HUMAnN 4.0.0a2 database ROOT for the HUMAnN read-level backend (~71 GB with
+# the full ChocoPhlAn; for the EC-filtered one use chocophlan_EC_FILTERED.v4_alpha.tar.gz).
+# Pass the root as --custom_humann_db. The MetaPhlAn database MUST be
+# mpa_vOct22_CHOCOPhlAnSGB_202403 (HUMAnN 4.0.0a2 refuses any other).
+H=https://huttenhower.sph.harvard.edu/humann_data
+M=https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases
+R=/shared/databases/bugbuster/humann
+mkdir -p $R/chocophlan $R/uniref $R/utility_mapping $R/metaphlan
+wget -O - $H/chocophlan/chocophlan.v4_alpha.tar.gz | tar -xz -C $R/chocophlan
+wget -O - $H/uniprot/uniref_ec_filtered/uniref90_annotated_v4_alpha_ec_filtered.tar.gz | tar -xz -C $R/uniref
+wget -O - $H/full_mapping_v4_alpha.tar.gz | tar -xz -C $R/utility_mapping
+for t in mpa_vOct22_CHOCOPhlAnSGB_202403 bowtie2_indexes/mpa_vOct22_CHOCOPhlAnSGB_202403_bt2; do
+    wget -O $(basename $t).tar $M/$t.tar && wget -O - $M/$t.md5 | md5sum -c - \
+        && tar -xf $(basename $t).tar -C $R/metaphlan; done
+# the .pkl and all six .bt2l files must sit directly in $R/metaphlan
+find $R/metaphlan -mindepth 2 -type f -exec mv -t $R/metaphlan {} +
+
 # NCBI COG 2024 definitions table (~410 KB; maps eggNOG's COG ids to COG
 # functional categories in the contig branch)
 wget -P /shared/databases/bugbuster/cog/ \
@@ -244,6 +262,7 @@ nextflow run main.nf \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
     --custom_woltka_db /shared/databases/bugbuster/wol2 \
     --custom_superfocus_db /shared/databases/bugbuster/superfocus \
+    --custom_humann_db /shared/databases/bugbuster/humann \
     --custom_cog_db /shared/databases/bugbuster/cog/cog-24.def.tab \
     -profile docker
 ```
@@ -349,7 +368,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
 | `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
 | `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
-| `--read_level_functional` | `none` | `woltka`, `superfocus`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
+| `--read_level_functional` | `none` | `woltka`, `superfocus`, `humann`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
 | `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
@@ -425,6 +444,41 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > 2,000-read test sample: DIAMOND 1,011 reads hit, MMseqs2 924). The branch runs on
 > any container engine (docker included) and needs no assembly.
 
+> **Note for `--read_level_functional humann`:** HUMAnN 4 is an **alpha** release;
+> the pipeline pins exactly HUMAnN 4.0.0a2 with MetaPhlAn 4.1.2 and the MetaPhlAn
+> database `mpa_vOct22_CHOCOPhlAnSGB_202403` (the only combination this HUMAnN
+> build accepts — an existing MetaPhlAn 4 database such as vJun23 is refused).
+> Each sample's host-removed R1, R2 and singleton reads are concatenated into one
+> input (mates counted as separate reads). HUMAnN prescreens the community with
+> MetaPhlAn, aligns the reads to the pangenomes of the detected species
+> (ChocoPhlAn, nucleotide search), then searches the remaining reads against
+> UniRef90 (translated search; HUMAnN 4 offers only the EC-filtered UniRef90
+> database). It runs with `--count-normalization RPKs`, so **`abundance_native` is
+> RPK** (`native_unit = rpk`) and copies per genome equivalent are computed as for
+> Woltka (`CPGE = RPK / genome_equivalents`, blank without MicrobeCensus). Three
+> ontologies are reported: `metacyc` (HUMAnN's MetaCyc pathway abundance), and
+> `ko` / `ec`, which the pipeline derives from HUMAnN's gene families with the
+> HUMAnN 4 mapping files — a gene family carrying several terms contributes its
+> full RPK to each (the same intentional double counting as the other branches).
+> HUMAnN 4 gene families are a mix of UniRef90 and UniClust90 clusters: only
+> UniRef90 families can map to a KO, while EC maps cover both, so KO coverage is
+> lower than EC coverage. `read_annotated_fraction.tsv` reports, for HUMAnN, the
+> share of reads mapped by HUMAnN (`any` row: reads given minus `READS_UNMAPPED`)
+> and, per ontology, the share of the gene-family RPK that carries a term (blank
+> read columns; for `metacyc`, the share of pathway abundance outside `UNMAPPED` /
+> `UNINTEGRATED`). The raw HUMAnN tables (MetaPhlAn profile, gene families,
+> MetaCyc reactions, pathway abundance, log) are published per sample; HUMAnN
+> 4.0.0a2 writes no pathway-coverage table. Two defects of this alpha are worked
+> around: its own `humann_renorm_table` / `humann_regroup_table` mishandle the
+> `READS_UNMAPPED` row (the pipeline does its own regrouping — drop that row if you
+> post-process the raw tables), and a sample name containing `s__` or `t__`
+> crashes its MetaPhlAn-profile parsing, so such names are rejected at launch.
+> Database footprint: ~71 GB with the full ChocoPhlAn (`--humann_db
+> v4_alpha-full`, default) or ~33 GB with the EC-filtered one
+> (`v4_alpha-ec_filtered`: fewer gene families and KOs); the MetaPhlAn prescreen
+> loads a ~20 GB Bowtie2 index. The branch runs on any container engine and needs
+> no assembly.
+
 ### 6.3 Database Selection Options
 
 | Parameter | Default | Options | Description |
@@ -440,6 +494,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
 | `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
 | `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
+| `--humann_db` | `v4_alpha-full` | `v4_alpha-full`, `v4_alpha-ec_filtered` | HUMAnN 4 database set: full (44.8 GB) or EC-filtered (6.9 GB) ChocoPhlAn, plus UniRef90 EC-filtered, utility mapping and MetaPhlAn vOct22 (recorded in provenance) |
 | `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
@@ -465,6 +520,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
 | `--custom_woltka_db` | Path to a local WoLr2 mirror in the FTP layout (see `docs/parameters.md`) |
 | `--custom_superfocus_db` | Path to a SUPER-FOCUS database ROOT, the directory containing `db/` (see `docs/parameters.md`) |
+| `--custom_humann_db` | Path to a HUMAnN database ROOT with `chocophlan/`, `uniref/`, `utility_mapping/` and `metaphlan/` (see `docs/parameters.md`) |
 | `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
 ### 6.5 FastP Quality Filtering Options
@@ -847,9 +903,9 @@ results/
     │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
     │   ├── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
     │   ├── read_function_abundance.tsv         # read branch (if read_level_functional != none): same schema, source=reads
-    │   ├── read_function_wide_{ontology}_native.tsv  # wide read-count matrix (woltka: ko, ec, cog, pfam, metacyc; superfocus: seed_level1/2/3)
-    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (woltka only; blank columns for samples without AGS)
-    │   ├── read_annotated_fraction.tsv         # share of reads carrying a term, per ontology (woltka: of ORF-assigned reads; superfocus: of all reads)
+    │   ├── read_function_wide_{ontology}_native.tsv  # wide native matrix (woltka: ko, ec, cog, pfam, metacyc read counts; superfocus: seed_level1/2/3 read counts; humann: ko, ec, metacyc RPK)
+    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (woltka and humann; blank columns for samples without AGS)
+    │   ├── read_annotated_fraction.tsv         # share annotated, per ontology (woltka: of ORF-assigned reads; superfocus: of all reads; humann: reads mapped + RPK share per ontology)
     │   └── read_sample_summary.tsv             # reads assigned / ambiguous, AGS, CPGE status, tool + DB version
     ├── reads/                                  # read-level functional profiling, one backend per run
     │   ├── woltka/{sample}/                    # (if read_level_functional=woltka; needs no assembly)
@@ -858,12 +914,20 @@ results/
     │   │   ├── {sample}.woltka_functions.tsv   # per-function read counts and RPK
     │   │   ├── {sample}.woltka_summary.tsv     # reads assigned / annotated per ontology
     │   │   └── {sample}.woltka_unassigned.tsv  # reads left unassigned by --woltka_uniq
-    │   └── superfocus/{sample}/                # (if read_level_functional=superfocus; needs no assembly)
-    │       ├── {sample}.superfocus_functions.tsv   # SEED level 1-3 read counts (seed_level1/2/3)
-    │       ├── {sample}.superfocus_summary.tsv     # reads given to SUPER-FOCUS / with an accepted hit
-    │       ├── {sample}.superfocus_all_levels_and_function.xls  # raw SUPER-FOCUS table (tab-separated)
-    │       ├── {sample}.superfocus_subsystem_level_{1,2,3}.xls  # raw SUPER-FOCUS per-level tables (not used, see note)
-    │       └── {sample}.superfocus.log         # SUPER-FOCUS run log
+    │   ├── superfocus/{sample}/                # (if read_level_functional=superfocus; needs no assembly)
+    │   │   ├── {sample}.superfocus_functions.tsv   # SEED level 1-3 read counts (seed_level1/2/3)
+    │   │   ├── {sample}.superfocus_summary.tsv     # reads given to SUPER-FOCUS / with an accepted hit
+    │   │   ├── {sample}.superfocus_all_levels_and_function.xls  # raw SUPER-FOCUS table (tab-separated)
+    │   │   ├── {sample}.superfocus_subsystem_level_{1,2,3}.xls  # raw SUPER-FOCUS per-level tables (not used, see note)
+    │   │   └── {sample}.superfocus.log         # SUPER-FOCUS run log
+    │   └── humann/{sample}/                    # (if read_level_functional=humann; needs no assembly)
+    │       ├── {sample}_1_metaphlan_profile.tsv    # MetaPhlAn 4.1.2 prescreen profile
+    │       ├── {sample}_2_genefamilies.tsv     # HUMAnN gene families (RPK; UniRef90 / UniClust90, stratified rows included)
+    │       ├── {sample}_3_reactions.tsv        # HUMAnN MetaCyc reactions (RPK)
+    │       ├── {sample}_4_pathabundance.tsv    # HUMAnN MetaCyc pathway abundance (RPK)
+    │       ├── {sample}_0.log                  # HUMAnN run log
+    │       ├── {sample}.humann_functions.tsv   # ko / ec / metacyc RPK composed by the pipeline
+    │       └── {sample}.humann_summary.tsv     # reads given / mapped, RPK share annotated per ontology
     ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
     │   └── {sample}/                           # (if mag_level_functional=true; requires binning with >= 2 binners)
     │       ├── {sample}_{bin}.gff3             # annotation in GFF3
@@ -1004,6 +1068,13 @@ results/
 > aggregate by level name, merging the level-2 placeholder `-` across 33
 > level-1 categories; the pipeline recomputes the levels from the
 > function-level counts.
+>
+> For HUMAnN, `abundance_native` is HUMAnN's RPK (`native_unit = rpk`;
+> `--count-normalization RPKs`), unstratified: `metacyc` is the pathway
+> abundance (accession = pathway id, description = its name; `UNMAPPED` /
+> `UNINTEGRATED` excluded), `ko` / `ec` the summed RPK of the gene families
+> carrying each term (`READS_UNMAPPED` excluded). `abundance_cpge` = RPK /
+> genome equivalents, blank when MicrobeCensus is unavailable for the sample.
 
 ### Database Storage Directory
 
@@ -1025,7 +1096,8 @@ databases/                            # Database storage (configurable via --dat
 ├── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
 ├── bakta/                            # Bakta database v6.0 (full 31.9 GB / light 1.3 GB download)
 ├── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
-└── superfocus/                       # SUPER-FOCUS DB_90 root for the selected aligner (~1.9-2.5 GB unpacked)
+├── superfocus/                       # SUPER-FOCUS DB_90 root for the selected aligner (~1.9-2.5 GB unpacked)
+└── humann/                           # HUMAnN 4 database root + MetaPhlAn vOct22 (~71 GB / ~33 GB EC-filtered)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -1058,6 +1130,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin) |
 | `07_functional_annotation/reads/woltka/` | `read_level_functional='woltka'` | Woltka read-level ORF and function tables per sample (no assembly needed) |
 | `07_functional_annotation/reads/superfocus/` | `read_level_functional='superfocus'` | SUPER-FOCUS SEED level 1-3 tables and raw SUPER-FOCUS outputs per sample (no assembly needed) |
+| `07_functional_annotation/reads/humann/` | `read_level_functional='humann'` | HUMAnN 4 raw tables (MetaPhlAn profile, gene families, reactions, pathway abundance) and the composed ko / ec / metacyc tables per sample (no assembly needed) |
 | `07_functional_annotation/summary/read_*.tsv` | `read_level_functional != 'none'` | Study-level read-branch tables (same schema, `source=reads`), reported separately from the contig branch |
 | `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 

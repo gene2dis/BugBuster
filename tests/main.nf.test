@@ -785,6 +785,119 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the HUMAnN read backend without an assembly") {
+        // T8c (design doc Section 4.6.1, Q2): the HUMAnN backend runs with
+        // --assembly_mode none. No --custom_humann_db: pins the
+        // FORMAT_HUMANN_DB provisioning path for the default database set
+        // (v4_alpha-full). The HUMAnN image is a normal docker image: no
+        // engine guard applies.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "humann"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_HUMANN_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("HUMANN (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_READ_FUNCTIONS") } == 1
+            // MicrobeCensus feeds the HUMAnN CPGE (RPK / GE)
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 2
+            // One backend per run: nothing of Woltka / SUPER-FOCUS
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("SUPERFOCUS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("MEGAHIT") } == 0
+
+            // Section 9.1 layout: reads/humann/<id>/ + read_* summary tables
+            // (ko/ec/metacyc, native + CPGE matrices)
+            def fa = "${outputDir}/07_functional_annotation"
+            assert path("${fa}/reads/humann/test_sample1/test_sample1.humann_functions.tsv").exists()
+            assert path("${fa}/reads/humann/test_sample1/test_sample1_2_genefamilies.tsv").exists()
+            assert path("${fa}/reads/humann/test_sample2/test_sample2_4_pathabundance.tsv").exists()
+            assert path("${fa}/reads/humann/test_sample2/test_sample2_1_metaphlan_profile.tsv").exists()
+            ['ko', 'ec', 'metacyc'].each { o ->
+                assert path("${fa}/summary/read_function_wide_${o}_native.tsv").exists()
+                assert path("${fa}/summary/read_function_wide_${o}_cpge.tsv").exists()
+            }
+            assert !path("${fa}/summary/read_function_wide_cog_native.tsv").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("humann: 4.0.0.alpha.2")
+            assert vtext.contains("metaphlan: 4.1.2")
+        }
+    }
+
+    test("Stub run wires HUMAnN with a custom database (no download)") {
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "humann"
+                custom_humann_db      = "${projectDir}/tests/data/humann/db"
+                microbecensus         = false
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_HUMANN_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("HUMANN (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_READ_FUNCTIONS") } == 1
+        }
+    }
+
+    test("Rejects sample names containing s__ or t__ for the HUMAnN backend") {
+        tag "samplesheet_validation"
+        // HUMAnN 4.0.0a2 misreads a MetaPhlAn profile line holding both 's__'
+        // and 't__' (incl. the header lines carrying the sample name) and
+        // crashes (design doc Q2 bug 2): such names are rejected at input check
+        when {
+            params {
+                input = {
+                    def sheet = new File("${outputDir}", "humann_name_samplesheet.csv")
+                    sheet.parentFile.mkdirs()
+                    def reads_dir = "${projectDir}/tests/data/reads"
+                    sheet.text = "sample,r1,r2,s\nplots__site1,${reads_dir}/singleton_test_R1.fastq.gz,${reads_dir}/singleton_test_R2.fastq.gz,\n"
+                    sheet.absolutePath
+                }()
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "humann"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).any { line -> line.contains("must not contain 's__' or 't__'") }
+        }
+    }
+
     test("Rejects an unknown superfocus_aligner") {
         // Rejected at launch (schema enum + main.nf validation), not at runtime
         when {

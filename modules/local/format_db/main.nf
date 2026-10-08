@@ -309,6 +309,47 @@ process FORMAT_WOLTKA_DB {
         """
 }
 
+process FORMAT_HUMANN_DB {
+    tag "format_humann_db"
+    // Shared wget image: wget, GNU tar (gzip auto-detected) and md5sum are all
+    // the script needs (verified 2026-10-08; the MetaPhlAn tars are plain .tar
+    // and only their .pkl / .bt2l members are used, so no bzip2 is required).
+    // Downloads ~71 GB with the full ChocoPhlAn (design doc Q2, T8c).
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
+        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+
+    label 'process_download_extensive'
+
+    input:
+        val(key)
+
+    output:
+        path("humann_db")
+
+    script:
+        def entry = params.humann_ref_db[key]
+        """
+        ${entry["fmtscript"]} \
+            '${key}' \
+            '${entry["chocophlan_url"]}' \
+            '${entry["uniref_url"]}' \
+            '${entry["utility_url"]}' \
+            '${entry["metaphlan_index"]}' \
+            '${entry["metaphlan_url"]}' \
+            '${entry["metaphlan_md5_url"]}' \
+            '${entry["metaphlan_bt2_url"]}' \
+            '${entry["metaphlan_bt2_md5_url"]}' \
+            '${entry["dbversion"]}'
+        """
+
+    stub:
+        """
+        mkdir -p humann_db/chocophlan humann_db/uniref humann_db/utility_mapping humann_db/metaphlan
+        touch humann_db/DB_VERSION
+        """
+}
+
 process FORMAT_SUPERFOCUS_DB {
     tag "format_superfocus_db"
     // Runs in the pinned SUPER-FOCUS image the SUPERFOCUS module uses: it

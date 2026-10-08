@@ -542,6 +542,60 @@ than once: the per-level composition relies on SUPER-FOCUS dividing each read
 `ext.args` for `SUPERFOCUS` (only the identity / alignment-length / e-value /
 fast-mode thresholds belong there).
 
+### HUMANN fails: database root, MetaPhlAn database version, or sample name
+
+**Errors:**
+```
+ERROR: <dir>/metaphlan/ not found - not a HUMAnN database root (chocophlan/, uniref/, utility_mapping/, metaphlan/; see --custom_humann_db)
+ERROR: <dir>/metaphlan/mpa_vOct22_CHOCOPhlAnSGB_202403.pkl not found - HUMAnN 4.0.0a2 accepts only the MetaPhlAn database mpa_vOct22_CHOCOPhlAnSGB_202403
+ERROR: MetaPhlAn DB version check failed. Expected one of: ['vOct22_CHOCOPhlAnSGB_202403'] Detected tag-like strings: [...]
+Invalid sample name '<name>' for --read_level_functional humann: sample names must not contain 's__' or 't__' ...
+```
+
+**Cause:** `--custom_humann_db` must be a database **root** with `chocophlan/`,
+`uniref/`, `utility_mapping/` and `metaphlan/`. HUMAnN 4.0.0a2 (the pinned
+alpha) accepts exactly one MetaPhlAn database, `mpa_vOct22_CHOCOPhlAnSGB_202403`,
+and checks its tag at run time — a MetaPhlAn 4 database you already have (e.g.
+`vJun23`, or the server's newer `mpa_latest`) is refused. The pipeline exposes
+`<root>/metaphlan/` to that check through `METAPHLAN_DB_DIR`; the files must sit
+directly in that folder. The sample-name rule works around a 4.0.0a2 defect: a
+MetaPhlAn profile line holding both `s__` and `t__` — including the header line
+that carries the sample name — is misread as a taxon row and crashes HUMAnN with
+`IndexError: list index out of range`.
+
+**Solution:** let the pipeline download the database set (`--humann_db`), or
+assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
+(the MetaPhlAn files come from
+`https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/`:
+`mpa_vOct22_CHOCOPhlAnSGB_202403.tar` and
+`bowtie2_indexes/mpa_vOct22_CHOCOPhlAnSGB_202403_bt2.tar`, unpacked flat into
+`metaphlan/`). Rename samples whose names contain `s__` or `t__`.
+
+### AGGREGATE_READ_FUNCTIONS / HUMANN fail with a layout or version message
+
+**Errors:**
+```
+... unexpected gene-family header '...' - not the HUMAnN layout this parser was verified against ...
+... HUMAnN version '<X>' is not among the versions this parser was verified against ...
+... unexpected gene-family feature / unexpected pathway feature ...
+humann version '<X>' is not among the versions this parser was verified against ...
+```
+
+**Cause:** deliberate guards (design doc Section 4.6.1: HUMAnN 4 is an alpha
+whose output layout may change between builds; silent misparsing is the failure
+being prevented). The pinned build is HUMAnN 4.0.0a2, run with
+`--count-normalization RPKs`; a header that names other units (e.g. `Adjusted
+CPMs`) means `--count-normalization` was overridden in the `HUMANN` `ext.args`.
+
+**Solution:** keep the pinned container and do not set `--count-normalization`
+in `ext.args`. Moving to another HUMAnN build requires re-verifying its output
+on real data and then extending `KNOWN_HUMANN_VERSIONS` in both
+`bin/humann_function_profile.py` and `bin/aggregate_read_functions.py` (plus
+`tests/bin/test_humann_scripts.sh`). Note also that HUMAnN 4.0.0a2's own
+`humann_renorm_table` / `humann_regroup_table` mishandle the `READS_UNMAPPED`
+row of its gene-family table (fixed upstream after 4.0.0a2): if you post-process
+the raw `_2_genefamilies.tsv` yourself, drop that row first.
+
 ---
 
 ## Database Issues

@@ -277,6 +277,7 @@ For better performance, pre-download databases to shared storage:
 # Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
 # Web of Life WoLr2 subset (~94 GB, read-level Woltka branch; recipe in manual.md)
 # SUPER-FOCUS DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, read-level SUPER-FOCUS branch; recipe in manual.md)
+# HUMAnN 4 databases + MetaPhlAn vOct22 (~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered, read-level HUMAnN branch; layout in manual.md)
 ```
 
 Then specify paths:
@@ -291,6 +292,7 @@ nextflow run main.nf \
     --custom_bakta_db /shared/db/bakta/bakta_db \
     --custom_woltka_db /shared/db/wol2 \
     --custom_superfocus_db /shared/db/superfocus \
+    --custom_humann_db /shared/db/humann \
     ...
 ```
 
@@ -306,7 +308,9 @@ nextflow run main.nf \
 > cloud instance type / queue accordingly. The SUPER-FOCUS read backend
 > (`--read_level_functional superfocus`) also runs on any engine; with
 > `--superfocus_aligner mmseqs2` each task builds a ~13 GB k-mer index of the
-> database in memory.
+> database in memory. The HUMAnN backend (`--read_level_functional humann`)
+> runs on any engine too; its MetaPhlAn prescreen loads a ~20 GB Bowtie2
+> index, so budget tens of GB of RAM per task (`process_high`).
 
 ---
 
