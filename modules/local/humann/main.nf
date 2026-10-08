@@ -16,9 +16,12 @@
 
     Behaviours of 4.0.0a2 handled here, each verified on the pinned image:
       - HUMAnN checks the MetaPhlAn DB tag by running `metaphlan --version`
-        WITHOUT --db_dir, so the DB is only found through METAPHLAN_DB_DIR
-        (exported); --metaphlan-options REPLACES HUMAnN's default
-        '-t rel_ab_w_read_stats', so that flag is passed explicitly
+        without a database option, so the DB is only found through
+        METAPHLAN_DB_DIR (exported); --metaphlan-options REPLACES HUMAnN's
+        default '-t rel_ab_w_read_stats', so that flag is passed explicitly.
+        MetaPhlAn 4.1.2 names its database option --bowtie2db (--db_dir only
+        exists from 4.2 and is rejected as an unrecognized argument - found
+        on the real-database acceptance run)
       - --utility-database does NOT redirect the MetaCyc pathway files, so
         --pathways-database names both files from the database root
       - an empty input exits 1 ('Unable to determine the input file format')
@@ -112,7 +115,7 @@ process HUMANN {
             --utility-database ${humann_db}/utility_mapping \\
             --pathways-database ${humann_db}/utility_mapping/metacyc_reactions_level4ec_only.uniref.bz2,${humann_db}/utility_mapping/metacyc_pathways_structured_filtered_v24_subreactions \\
             --count-normalization RPKs \\
-            --metaphlan-options "-t rel_ab_w_read_stats --db_dir \${METAPHLAN_DB_DIR} --index ${mpa_index} --nproc ${task.cpus}" \\
+            --metaphlan-options "-t rel_ab_w_read_stats --bowtie2db \${METAPHLAN_DB_DIR} --index ${mpa_index} --nproc ${task.cpus}" \\
             --remove-temp-output \\
             ${args}
         table_args="--genefamilies ${prefix}_2_genefamilies.tsv --pathabundance ${prefix}_4_pathabundance.tsv"

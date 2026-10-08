@@ -129,6 +129,22 @@ check "gene-family header is the verified RPK layout" \
     "[ \"\$(head -1 ${H}/htest_2_genefamilies.tsv)\" = \"\$(printf '# Gene Family HUMAnN v4.0.0.alpha.2 RPKs\thtest')\" ]"
 check "no pathway coverage table (writer disabled in 4.0.0a2)" "[ ! -e ${H}/htest_5_pathcoverage.tsv ]"
 
+# The module's --metaphlan-options must be accepted by the pinned MetaPhlAn
+# (4.1.2 names its database option --bowtie2db; --db_dir only exists from 4.2
+# and was rejected on the real-database acceptance run). No MetaPhlAn database
+# exists in CI, so the run is expected to fail on the empty placeholder files -
+# but never on argument parsing. The option string is taken from the module.
+MPA_OPTS=$(grep -o -- '--metaphlan-options "[^"]*"' "${REPO_DIR}/modules/local/humann/main.nf" \
+    | sed -e 's/^--metaphlan-options "//' -e 's/"$//' \
+          -e 's/\\\${METAPHLAN_DB_DIR}/\/fix\/db\/metaphlan/' \
+          -e 's/\${mpa_index}/mpa_vOct22_CHOCOPhlAnSGB_202403/' -e 's/\${task.cpus}/1/')
+M="${TMP_DIR}/mpa"; mkdir -p "${M}"
+in_humann "${M}" "zcat /fix/reads/htest_R1.fastq.gz > r.fastq; metaphlan r.fastq --input_type fastq ${MPA_OPTS} --offline \
+    -o profile.tsv --bowtie2out bt2.txt" > "${M}/run.log" 2>&1 || true
+check "module MetaPhlAn options extracted (${MPA_OPTS})" "[ -n \"${MPA_OPTS}\" ] && echo '${MPA_OPTS}' | grep -q -- '--bowtie2db /fix/db/metaphlan --index mpa_vOct22_CHOCOPhlAnSGB_202403'"
+check "MetaPhlAn 4.1.2 accepts every option the module passes" \
+    "! grep -qE 'unrecognized arguments|invalid choice' ${M}/run.log"
+
 #
 # humann_function_profile.py
 #

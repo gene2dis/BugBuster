@@ -462,7 +462,14 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > full RPK to each (the same intentional double counting as the other branches).
 > HUMAnN 4 gene families are a mix of UniRef90 and UniClust90 clusters: only
 > UniRef90 families can map to a KO, while EC maps cover both, so KO coverage is
-> lower than EC coverage. `read_annotated_fraction.tsv` reports, for HUMAnN, the
+> lower than EC coverage. **KO tables from this backend are sparse:** HUMAnN
+> 4.0.0a2's utility mapping ships a legacy UniRef90→KO map that does not cover
+> most HUMAnN 4 gene families — on the nf-core test reads only 17–18 % of the
+> gene-family abundance mapped to a KO, against 39–61 % for EC (UniClust90
+> families were only 3–4 % of the abundance, so they are not the cause). Check
+> the `ko` row of `read_annotated_fraction.tsv` for your data before relying on
+> HUMAnN KO tables; for KO profiles, the Woltka backend or the contig branch are
+> better sources. `read_annotated_fraction.tsv` reports, for HUMAnN, the
 > share of reads mapped by HUMAnN (`any` row: reads given minus `READS_UNMAPPED`)
 > and, per ontology, the share of the gene-family RPK that carries a term (blank
 > read columns; for `metacyc`, the share of pathway abundance outside `UNMAPPED` /

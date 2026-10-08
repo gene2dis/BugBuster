@@ -70,7 +70,9 @@ next release is tagged.
     `--count-normalization RPKs`
   - Ontologies `metacyc` (pathway abundance), `ko` and `ec` (gene families
     regrouped by the pipeline with the HUMAnN 4 mapping files; UniClust90
-    families reach EC but never KO). `abundance_native` = RPK
+    families reach EC but never KO; KO coverage is limited by HUMAnN 4.0.0a2's
+    legacy KO map, ~17-18 % of gene-family abundance on the test data vs
+    ~39-61 % for EC). `abundance_native` = RPK
     (`native_unit = rpk`), CPGE = RPK / genome equivalents; six wide
     matrices. Per-sample raw HUMAnN tables (MetaPhlAn profile, gene families,
     reactions, pathway abundance, log) to `07_functional_annotation/reads/humann/<sample>/`
