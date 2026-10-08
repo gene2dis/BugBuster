@@ -126,7 +126,7 @@ workflow QC {
         ch_reads_report = READS_REPORT(
             ch_decontaminated.report
                 .concat(ch_fastp_reads_report.reads_report)
-                .collect(),
+                .collect(sort: true),
             "contaminants"
         ).report
         ch_versions = ch_versions.mix(READS_REPORT.out.versions)
@@ -143,7 +143,7 @@ workflow QC {
 
         ch_clean_reads = ch_count.reads
         ch_report = READS_REPORT(
-            ch_count.reads_report.collect(),
+            ch_count.reads_report.collect(sort: true),
             "none"
         ).report
         ch_versions = ch_versions.mix(READS_REPORT.out.versions)

@@ -135,6 +135,12 @@ feat(modules): add DIAMOND module for protein alignment
   command-line value arrives as a String, so `--x false` would otherwise be the truthy
   `"false"`. Convert numeric parameters with `as Integer` before comparing them or doing
   arithmetic; interpolating them into a command line needs no conversion
+- When one task consumes the outputs of many tasks, give it a fixed input order: use
+  `.collect(sort: true)` for lists of files and `.toSortedList { a, b -> a[0].id <=> b[0].id }`
+  for `[meta, files]` tuples, and sort the grouped lists after `groupTuple`. Plain
+  `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
+  task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
+  directory path, which is stable while the upstream tasks are cached, not by sample name.)
 
 ### Process Structure
 

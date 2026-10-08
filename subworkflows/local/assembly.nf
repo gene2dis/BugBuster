@@ -96,14 +96,18 @@ workflow ASSEMBLY {
     // Co-assembly mode
     //
     if ( params.assembly_mode == "coassembly" ) {
-        // Prepare coassembly input: collect all reads from per-sample channel and pool them
-        ch_coassembly_input = reads
-            .map { _meta, reads_files -> reads_files }
-            .collect()
-            .map { all_reads -> [[id: "coassembly"], all_reads.flatten()] }
-        
+        // Pool all samples' reads for the co-assembly, ordered by sample id
+        // (each sample keeps its own R1, R2(, singleton) order, so MEGAHIT's
+        // R1/R2 lists stay paired). Plain collect() followed task completion
+        // order, which changed the MEGAHIT task hash between identical runs
+        // and could re-run the whole co-assembly on -resume (design doc Q19).
+        // Built once and reused for the co-assembly alignment below.
+        ch_pooled_reads = reads
+            .toSortedList { a, b -> a[0].id <=> b[0].id }
+            .map { items -> items.collect { item -> item[1] }.flatten() }
+
         // Co-assemble all reads with unified MEGAHIT process
-        MEGAHIT(ch_coassembly_input)
+        MEGAHIT(ch_pooled_reads.map { all_reads -> [[id: "coassembly"], all_reads] })
         
         // Collect versions
         ch_versions = ch_versions.mix(MEGAHIT.out.versions.first())
@@ -124,10 +128,8 @@ workflow ASSEMBLY {
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
             // Prepare input: combine all original reads with filtered contigs
             // More efficient: collect reads first, then combine with contigs
-            ch_alignment_input = reads
-                .map { _meta, reads_files -> reads_files }
-                .collect()
-                .map { all_reads -> [[id: "coassembly"], all_reads.flatten()] }
+            ch_alignment_input = ch_pooled_reads
+                .map { all_reads -> [[id: "coassembly"], all_reads] }
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
                 .map { meta, reads_list, contigs -> [meta, reads_list, contigs] }
             
@@ -159,8 +161,8 @@ workflow ASSEMBLY {
     // Generate contig filtering summary report
     if ( params.assembly_mode != "none" ) {
         CONTIG_FILTER_SUMMARY(
-            ch_filter_reports.collect().ifEmpty([]),
-            ch_empty_reports.collect().ifEmpty([])
+            ch_filter_reports.collect(sort: true).ifEmpty([]),
+            ch_empty_reports.collect(sort: true).ifEmpty([])
         )
         ch_versions = ch_versions.mix(CONTIG_FILTER_SUMMARY.out.versions)
     }

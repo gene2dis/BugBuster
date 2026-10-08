@@ -762,6 +762,22 @@ Azure Batch authentication failed
 2. Verify process exit status in trace file
 3. Re-run with `-resume`
 
+### `-resume` re-runs a summary or batch step that already finished
+
+**Symptom (older pipeline versions):** a resumed run that changed nothing still re-runs a step
+that combines many samples. The steps affected were the co-assembly (`MEGAHIT` / its read
+alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`, or one of the report steps (reads,
+taxonomy, ARG, RGI and bin reports).
+
+**Cause:** these steps received their inputs in the order the upstream tasks happened to
+finish, which can differ between runs and changes the step's cache key.
+
+**Solution:** fixed in the current release; inputs are now passed in a fixed order (by sample).
+After upgrading, an existing run may re-run each of these steps once on its next `-resume`,
+then stays fully cached. Note that MEGAHIT itself is not byte-reproducible with several
+threads (a re-run can differ in a handful of contigs), so a co-assembly that re-runs is not
+expected to be identical to the previous one.
+
 ---
 
 ## Debug Mode

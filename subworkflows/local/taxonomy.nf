@@ -58,7 +58,7 @@ workflow TAXONOMY {
         
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
-            KRAKEN2.out.report.map { _meta, report -> report }.collect(),
+            KRAKEN2.out.report.map { _meta, report -> report }.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'kraken2',
             params.kraken2_db
@@ -67,7 +67,7 @@ workflow TAXONOMY {
         
         // Generate phyloseq-compatible tables and plots
         TAXONOMY_PHYLOSEQ(
-            BRACKEN.out.txt.map { _meta, report -> report }.collect(),
+            BRACKEN.out.txt.map { _meta, report -> report }.collect(sort: true),
             'kraken2',
             params.kraken2_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
@@ -101,7 +101,7 @@ workflow TAXONOMY {
 
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
-            ch_sm_taxonomy.report.collect(),
+            ch_sm_taxonomy.report.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'sourmash',
             params.sourmash_db
@@ -110,7 +110,7 @@ workflow TAXONOMY {
         
         // Generate phyloseq-compatible tables and plots
         TAXONOMY_PHYLOSEQ(
-            ch_sm_taxonomy.sourmash_gather.collect(),
+            ch_sm_taxonomy.sourmash_gather.collect(sort: true),
             'sourmash',
             params.sourmash_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',

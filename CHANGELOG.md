@@ -220,6 +220,15 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **Steps that combine many samples re-ran on `-resume`**: the co-assembly (`MEGAHIT` and
+  the co-assembly read alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`,
+  `BIN_SUMMARY` and the report steps (reads, contig filtering, taxonomy, ARG, RGI, BlobTools,
+  ARG clustering, bin quality/taxonomy) received their inputs in task-completion order, so
+  their cache key could change between otherwise identical runs (observed: 2 of 8 resumes of
+  one configuration re-ran the CheckM2 or GTDB-Tk batch). Inputs are now ordered by sample
+  (pooled co-assembly reads keep each sample's R1/R2 together). An existing run may re-run
+  each of these steps once on its next `-resume`. MEGAHIT multi-threaded output is not
+  byte-reproducible regardless of input order, so a re-run co-assembly can differ slightly
 - **`--<option> false` turned options on with Nextflow 26.04**: Nextflow 26.04 (verified
   26.04.4 and 26.04.6) passes every command-line parameter as text, so `--include_binning
   false` was the truthy string `"false"`: the branch ran, or a launch check rejected a valid

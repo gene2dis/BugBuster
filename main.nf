@@ -350,7 +350,7 @@ workflow {
             ch_arg_prediction
                 .concat(ch_argv_prediction.kargva_reports)
                 .concat(ch_args_oap)
-                .collect()
+                .collect(sort: true)
         )
         ch_versions = ch_versions.mix(
             ARGS_OAP.out.versions.first(),
@@ -382,9 +382,9 @@ workflow {
         
         // Generate summary report
         RGI_REPORT(
-            ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(),
-            ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(),
-            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect()
+            ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(sort: true),
+            ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(sort: true),
+            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect(sort: true)
         )
         ch_versions = ch_versions.mix(
             ch_rgi_bwt.versions.first(),
@@ -576,7 +576,7 @@ workflow {
                 .join(ch_index_bam)
                 .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
         )
-        BLOBPLOT(ch_blob_table.only_blob.collect())
+        BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
         // Contig proteins come from the shared PYRODIGAL step above
         ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
@@ -584,7 +584,7 @@ workflow {
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
             ch_contig_args.only_deeparg
                 .concat(ch_blob_table.only_blob)
-                .collect()
+                .collect(sort: true)
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
 
@@ -610,7 +610,7 @@ workflow {
         ch_deeparg = DEEPARG_BINS.out.deeparg_bins
         ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
-        CLUSTERING(ch_arg_fasta.collect())
+        CLUSTERING(ch_arg_fasta.collect(sort: true))
 
         ch_versions = ch_versions.mix(
             PRODIGAL_BINS.out.versions.first(),
