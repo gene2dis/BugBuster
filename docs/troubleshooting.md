@@ -111,6 +111,24 @@ or a validation error naming a parameter you passed.
 - Check the spelling against [`parameters.md`](parameters.md)
 - If you are following instructions written for an older release, the parameter may have been removed or renamed (e.g. `--kraken_db_used`, `--sourmash_db_name`, `--validationShowHiddenParams`, `--enable_work_cleanup`, and all `--mmseqs_*` parameters no longer exist; `--bbmap_lenght` is now `--bbmap_length`; `--custom_phiX_index` and `--custom_bowtie_host_index` were replaced by `--custom_decontamination_index` / `--custom_phiX_fasta` / `--custom_host_fasta`)
 
+### `--<option> false` is ignored, or a launch check fires for an option you turned off
+
+**Symptoms (older pipeline versions on Nextflow 26.04 or newer):** a branch runs although
+you passed `--<option> false`, or the launch fails with a dependency check such as
+`--include_binning requires an assembly` for an option you set to `false`; a numeric option
+such as `--min_read_sample 1000` fails with `Cannot compare java.lang.Integer ... with
+java.lang.String`.
+
+**Cause:** since Nextflow 26.04 every command-line parameter reaches the pipeline as text
+(`false` is the string `"false"`), and the parameter schema check does not convert it. Nextflow
+25.10 still converted these values itself.
+
+**Solution:** fixed in the current release, which reads every on/off option and numeric
+comparison in a way that works on both Nextflow versions. On an older release, omit the flag
+instead of passing `false` (all on/off options except `--quality_control`, `--microbecensus`,
+`--functional_cazy`, `--rgi_include_wildcard` and `--azure_delete_pools` are off by default),
+or set the values in a `-params-file` YAML, where `false` and numbers keep their types.
+
 ---
 
 ## Resource Errors

@@ -23,6 +23,7 @@ include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
+include { flagOn                  } from './utils_params'
 
 workflow PREPARE_DATABASES {
     
@@ -94,7 +95,7 @@ workflow PREPARE_DATABASES {
     //
     // KARGA/KARGVA databases for read-level ARG prediction
     //
-    if ( params.read_arg_prediction ) {
+    if ( flagOn(params.read_arg_prediction) ) {
         if ( params.custom_karga_db ) {
             ch_karga_db = channel.of(file(params.custom_karga_db, checkIfExists: true))
         } else {
@@ -113,7 +114,7 @@ workflow PREPARE_DATABASES {
     //
     // Combined decontamination index (PhiX + host) for QC
     //
-    if ( params.quality_control ) {
+    if ( flagOn(params.quality_control) ) {
         if ( params.custom_decontamination_index ) {
             // Use pre-built combined index
             ch_decontamination_index = channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
@@ -157,7 +158,7 @@ workflow PREPARE_DATABASES {
     //
     // DeepARG for contig-level analysis and/or bin-level ARG clustering
     //
-    if ( params.contig_tax_and_arg || params.arg_bin_clustering ) {
+    if ( flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering) ) {
         if ( params.custom_deeparg_db ) {
             ch_deeparg_db = channel.fromPath(params.custom_deeparg_db, checkIfExists: true)
         } else {
@@ -170,7 +171,7 @@ workflow PREPARE_DATABASES {
     //
     // BLAST and taxdump for contig-level taxonomy
     //
-    if ( params.contig_tax_and_arg ) {
+    if ( flagOn(params.contig_tax_and_arg) ) {
         if ( params.custom_blast_db ) {
             ch_blast_db = channel.fromPath(params.custom_blast_db, checkIfExists: true)
         } else {
@@ -189,7 +190,7 @@ workflow PREPARE_DATABASES {
     //
     // GTDB-TK and CheckM2 databases for binning
     //
-    if ( params.include_binning ) {
+    if ( flagOn(params.include_binning) ) {
         if ( params.custom_gtdbtk_db ) {
             ch_gtdbtk_db = channel.fromPath(params.custom_gtdbtk_db, checkIfExists: true)
         } else {
@@ -208,7 +209,7 @@ workflow PREPARE_DATABASES {
     //
     // eggNOG 7 data for contig-level functional annotation (eggNOG-mapper v3)
     //
-    if ( params.contig_level_functional ) {
+    if ( flagOn(params.contig_level_functional) ) {
         if ( params.custom_eggnog_db ) {
             ch_eggnog_db = channel.fromPath(params.custom_eggnog_db, checkIfExists: true)
         } else {
@@ -222,7 +223,7 @@ workflow PREPARE_DATABASES {
     // COG_category (design doc Q16) and the WoLr2 ko-to-cog COG ids of the
     // Woltka read backend (Q14) to COG functional-category letters
     //
-    if ( params.contig_level_functional || params.read_level_functional == 'woltka' ) {
+    if ( flagOn(params.contig_level_functional) || params.read_level_functional == 'woltka' ) {
         if ( params.custom_cog_db ) {
             ch_cog_def = channel.fromPath(params.custom_cog_db, checkIfExists: true)
         } else {
@@ -233,11 +234,8 @@ workflow PREPARE_DATABASES {
 
     //
     // dbCAN database for contig-level CAZy annotation (run_dbcan v5)
-    // params.functional_cazy defaults to true, so an explicit CLI
-    // `--functional_cazy false` arrives as the truthy String "false" —
-    // normalize before gating (same Q13 handling as params.microbecensus)
     //
-    if ( params.contig_level_functional && params.functional_cazy.toString().toBoolean() ) {
+    if ( flagOn(params.contig_level_functional) && flagOn(params.functional_cazy) ) {
         if ( params.custom_dbcan_db ) {
             ch_dbcan_db = channel.fromPath(params.custom_dbcan_db, checkIfExists: true)
         } else {
@@ -252,7 +250,7 @@ workflow PREPARE_DATABASES {
     // recorded in provenance via the DB_VERSION file; low_disk never
     // switches it (Q10)
     //
-    if ( params.mag_level_functional ) {
+    if ( flagOn(params.mag_level_functional) ) {
         if ( params.custom_bakta_db ) {
             ch_bakta_db = channel.fromPath(params.custom_bakta_db, checkIfExists: true)
         } else {
@@ -293,7 +291,7 @@ workflow PREPARE_DATABASES {
     //
     // RGI CARD database for AMR prediction
     //
-    if ( params.rgi_prediction ) {
+    if ( flagOn(params.rgi_prediction) ) {
         if ( params.custom_rgi_card_db && params.custom_rgi_wildcard ) {
             // Use existing CARD database and add custom WildCARD
             ch_card_base = channel.fromPath(params.custom_rgi_card_db, checkIfExists: true)
@@ -307,7 +305,7 @@ workflow PREPARE_DATABASES {
             // Download and prepare CARD database (with optional WildCARD)
             ch_rgi_card_db = RGI_LOAD(
                 params.rgi_card_version,
-                params.rgi_include_wildcard
+                flagOn(params.rgi_include_wildcard)
             ).card_db
             ch_versions = ch_versions.mix(RGI_LOAD.out.versions)
         }

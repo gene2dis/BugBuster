@@ -220,6 +220,15 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **`--<option> false` turned options on with Nextflow 26.04**: Nextflow 26.04 (verified
+  26.04.4 and 26.04.6) passes every command-line parameter as text, so `--include_binning
+  false` was the truthy string `"false"`: the branch ran, or a launch check rejected a valid
+  run (e.g. `--assembly_mode none --include_binning false`), and a numeric
+  `--min_read_sample` crashed QC with `Cannot compare java.lang.Integer ... with
+  java.lang.String`. Every on/off option is now read through one helper
+  (`subworkflows/local/utils_params.nf`), and `min_read_sample` is converted before the
+  comparison. Nextflow 25.10 converted these values itself and was not affected. Also fixed
+  on every version: `--azure_delete_pools false` was turned back on by a `?: true` default
 - **Functional aggregation steps re-ran on `-resume`**: `AGGREGATE_FUNCTIONS` and
   `AGGREGATE_READ_FUNCTIONS` received their study-level inputs in task-completion order
   (plain `collect()`, and the version-guard `versions.yml` taken with `.first()`), so

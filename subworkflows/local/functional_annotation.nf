@@ -40,6 +40,7 @@ include { RUN_DBCAN              } from '../../modules/local/run_dbcan/main'
 include { FEATURECOUNTS_GENES    } from '../../modules/local/featurecounts_genes/main'
 include { AGGREGATE_FUNCTIONS    } from '../../modules/local/aggregate_functions/main'
 include { BAKTA_BAKTA            } from '../../modules/nf-core/bakta/bakta/main'
+include { flagOn                 } from './utils_params'
 
 workflow FUNCTIONAL_ANNOTATION {
 
@@ -62,16 +63,14 @@ workflow FUNCTIONAL_ANNOTATION {
     // MAG branch can run without it; the else arm keeps every emit-backing
     // channel defined for MAG-only runs
     //
-    if ( params.contig_level_functional ) {
+    if ( flagOn(params.contig_level_functional) ) {
         EGGNOG_MAPPER_SEARCH(ch_proteins.combine(ch_eggnog_db))
         EGGNOG_MAPPER_ANNOTATE(EGGNOG_MAPPER_SEARCH.out.seed_orthologs.combine(ch_eggnog_db))
 
-        // run_dbcan CAZy branch (design doc Section 4.3). functional_cazy
-        // defaults to true, so an explicit CLI `--functional_cazy false` arrives
-        // as the truthy String "false" — normalize before gating (Q13 handling,
-        // same as params.microbecensus). When off, AGGREGATE_FUNCTIONS receives
-        // empty --dbcan inputs and emits eggNOG-only CAZy tables
-        def run_dbcan_branch = params.functional_cazy.toString().toBoolean()
+        // run_dbcan CAZy branch (design doc Section 4.3). When off,
+        // AGGREGATE_FUNCTIONS receives empty --dbcan inputs and emits
+        // eggNOG-only CAZy tables
+        def run_dbcan_branch = flagOn(params.functional_cazy)
         ch_dbcan_module_versions = channel.empty()
         if ( run_dbcan_branch ) {
             RUN_DBCAN(ch_proteins.combine(ch_dbcan_db))
@@ -163,7 +162,7 @@ workflow FUNCTIONAL_ANNOTATION {
     // main.nf validation requires >= 2 binners, so the quality filter
     // (bin_refinement -c/-x) always ran on what gets annotated
     //
-    if ( params.mag_level_functional ) {
+    if ( flagOn(params.mag_level_functional) ) {
         ch_bins = ch_refined_bins.flatMap { meta, bins_dir ->
             bins_dir.listFiles()
                 .findAll { f -> f.name.endsWith('.fa') }

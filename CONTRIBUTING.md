@@ -129,6 +129,12 @@ feat(modules): add DIAMOND module for protein alignment
 - Include `meta.yml` for new modules
 - Add `versions.yml` output for software tracking
 - Add `stub` blocks for dry-run testing
+- Read boolean parameters through `flagOn(params.x)` (include it from
+  `subworkflows/local/utils_params.nf`) in `main.nf` and subworkflows, or inline
+  `params.x.toString().toBoolean()` in modules and config files: on Nextflow >= 26.04 a
+  command-line value arrives as a String, so `--x false` would otherwise be the truthy
+  `"false"`. Convert numeric parameters with `as Integer` before comparing them or doing
+  arithmetic; interpolating them into a command line needs no conversion
 
 ### Process Structure
 

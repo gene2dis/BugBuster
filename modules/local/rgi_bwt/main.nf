@@ -25,7 +25,7 @@ process RGI_BWT {
         def args = task.ext.args ?: ''
         def prefix = "${meta.id}"
         def aligner = params.rgi_aligner ?: 'kma'
-        def wildcard = params.rgi_include_wildcard ? '--include_wildcard' : ''
+        def wildcard = params.rgi_include_wildcard.toString().toBoolean() ? '--include_wildcard' : ''
         
         // rgi bwt only accepts --read_one/--read_two, so read-level RGI runs on
         // the paired reads only; singleton reads (reads[2], carried since the

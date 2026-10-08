@@ -151,6 +151,7 @@ include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
+include { flagOn                   } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
 /*
@@ -167,7 +168,7 @@ workflow {
     //
 
     // Show help message
-    if (params.help) {
+    if (flagOn(params.help)) {
         printHelp()
         System.exit(0)
     }
@@ -220,22 +221,22 @@ workflow {
     }
 
     // Reject contradictory feature combinations instead of silently skipping stages
-    if (params.include_binning && params.assembly_mode == 'none') {
+    if (flagOn(params.include_binning) && params.assembly_mode == 'none') {
         error("--include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
-    if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
+    if (flagOn(params.contig_tax_and_arg) && params.assembly_mode == 'none') {
         error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
-    if (params.contig_level_functional && params.assembly_mode == 'none') {
+    if (flagOn(params.contig_level_functional) && params.assembly_mode == 'none') {
         error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
-    if (params.arg_bin_clustering && !params.include_binning) {
+    if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
-    if (params.mag_level_functional && !params.include_binning) {
+    if (flagOn(params.mag_level_functional) && !flagOn(params.include_binning)) {
         error("--mag_level_functional requires --include_binning (Bakta annotates the refined bins)")
     }
-    if (params.mag_level_functional && binners_list.size() < 2) {
+    if (flagOn(params.mag_level_functional) && binners_list.size() < 2) {
         error("--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
     }
     // Read-level functional backend (design doc Section 7: unknown values
@@ -249,7 +250,7 @@ workflow {
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
         error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
     }
-    if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
+    if (flagOn(params.contig_level_metacerberus) && params.assembly_mode != 'assembly') {
         error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
     }
 
@@ -260,7 +261,7 @@ workflow {
     // CI and nf-test green under the docker profile. Deliberately keyed on
     // contig_level_functional only: Bakta ships a normal biocontainer, so a
     // MAG-only run (--mag_level_functional) stays docker-compatible.
-    if (params.contig_level_functional && !workflow.stubRun
+    if (flagOn(params.contig_level_functional) && !workflow.stubRun
             && !(workflow.containerEngine in ['singularity', 'apptainer'])) {
         error("--contig_level_functional requires a singularity or apptainer container engine: eggNOG-mapper v3 (beta) ships only an Apptainer image, no docker image exists yet. Use -profile singularity or -profile apptainer for this branch (docker support returns when eggNOG-mapper v3.0.0 final is released on bioconda)")
     }
@@ -269,7 +270,7 @@ workflow {
     // pairing with the long functional annotation runs and their large
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
-    if (workflow.profile.tokenize(',').contains('low_disk') && (params.contig_level_functional || params.mag_level_functional || params.read_level_functional != 'none')) {
+    if (workflow.profile.tokenize(',').contains('low_disk') && (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional) || params.read_level_functional != 'none')) {
         log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download) are stored at --databases_dir regardless of this profile"
     }
 
@@ -339,7 +340,7 @@ workflow {
     //
     // ARG PREDICTION IN READS
     //
-    if ( params.read_arg_prediction ) {
+    if ( flagOn(params.read_arg_prediction) ) {
         ARGS_OAP(ch_clean_reads)
         ch_args_oap = ARGS_OAP.out.args_oap_s1
         ch_argv_prediction = KARGVA(ch_clean_reads.combine(PREPARE_DATABASES.out.kargva_db))
@@ -362,7 +363,7 @@ workflow {
     //
     // RGI AMR PREDICTION IN READS
     //
-    if ( params.rgi_prediction ) {
+    if ( flagOn(params.rgi_prediction) ) {
         // Store rgi_card_db to allow reuse
         ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
             .ifEmpty { error "ERROR: RGI database is empty. Ensure params.rgi_prediction is enabled and a valid CARD database is configured." }
@@ -413,7 +414,7 @@ workflow {
         //
         // SUBWORKFLOW: Binning
         //
-        if ( params.include_binning ) {
+        if ( flagOn(params.include_binning) ) {
             BINNING(
                 ASSEMBLY.out.bam,
                 PREPARE_DATABASES.out.checkm2_db
@@ -429,7 +430,7 @@ workflow {
         //
         // MetaCerberus annotation (per-sample assembly only)
         //
-        if ( params.assembly_mode == "assembly" && params.contig_level_metacerberus ) {
+        if ( params.assembly_mode == "assembly" && flagOn(params.contig_level_metacerberus) ) {
             METACERBERUS_CONTIGS(ch_contigs_meta)
             ch_versions = ch_versions.mix(METACERBERUS_CONTIGS.out.versions.first())
         }
@@ -443,7 +444,7 @@ workflow {
     ch_contig_proteins  = channel.empty()
     ch_contig_genes_gff = channel.empty()
 
-    if ( (params.contig_tax_and_arg || params.contig_level_functional) && params.assembly_mode != "none" ) {
+    if ( (flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
         // Run nf-core PYRODIGAL for contig ORF prediction
         // nf-core PYRODIGAL signature:
@@ -467,15 +468,9 @@ workflow {
     // branch needs no assembly.
     // Failure is non-fatal (errorStrategy in config/modules.config): a failed
     // sample emits nothing here and falls back to TPM-only in aggregation.
-    //
-    // The only default-true feature toggle: disabling requires an explicit
-    // "--microbecensus false", which Nextflow delivers as the STRING "false"
-    // (truthy in Groovy) — normalize before gating. nf-schema has already
-    // rejected any value that is not a boolean or "true"/"false".
-    //
-    def run_microbecensus = params.microbecensus.toString().toBoolean()
+    def run_microbecensus = flagOn(params.microbecensus)
     ch_ags = channel.empty()
-    def run_contig_functional = params.contig_level_functional && params.assembly_mode != "none"
+    def run_contig_functional = flagOn(params.contig_level_functional) && params.assembly_mode != "none"
     def run_read_functional   = params.read_level_functional != "none"
     if ( run_microbecensus && (run_contig_functional || run_read_functional) ) {
         MICROBECENSUS(ch_clean_reads)
@@ -489,25 +484,23 @@ workflow {
     // (Bakta on refined bins). The branches are independent; each DB channel
     // is only demanded (.ifEmpty error) when its branch is on
     //
-    if ( (params.contig_level_functional || params.mag_level_functional) && params.assembly_mode != "none" ) {
-        // functional_cazy defaults to true: normalize the CLI-String form
-        // before gating (same Q13 handling as params.microbecensus above).
-        // With the toggle off the dbCAN DB channel is legitimately empty and
-        // the subworkflow never consumes it
-        def run_functional_cazy = params.contig_level_functional && params.functional_cazy.toString().toBoolean()
+    if ( (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional)) && params.assembly_mode != "none" ) {
+        // With functional_cazy off the dbCAN DB channel is legitimately empty
+        // and the subworkflow never consumes it
+        def run_functional_cazy = flagOn(params.contig_level_functional) && flagOn(params.functional_cazy)
         ch_dbcan_db = run_functional_cazy
             ? PREPARE_DATABASES.out.dbcan_db
                 .ifEmpty { error "ERROR: dbCAN database is empty. Ensure params.functional_cazy is enabled and a valid dbCAN database is configured." }
             : channel.empty()
-        ch_eggnog_db = params.contig_level_functional
+        ch_eggnog_db = flagOn(params.contig_level_functional)
             ? PREPARE_DATABASES.out.eggnog_db
                 .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
             : channel.empty()
-        ch_cog_def = params.contig_level_functional
+        ch_cog_def = flagOn(params.contig_level_functional)
             ? PREPARE_DATABASES.out.cog_def
                 .ifEmpty { error "ERROR: COG definitions table is empty. --contig_level_functional (and --read_level_functional woltka) need a valid COG table (--cog_db, or --custom_cog_db)." }
             : channel.empty()
-        ch_bakta_db = params.mag_level_functional
+        ch_bakta_db = flagOn(params.mag_level_functional)
             ? PREPARE_DATABASES.out.bakta_db
                 .ifEmpty { error "ERROR: Bakta database is empty. Ensure params.mag_level_functional is enabled and a valid Bakta database is configured." }
             : channel.empty()
@@ -555,7 +548,7 @@ workflow {
     //
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
-    if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
+    if ( flagOn(params.contig_tax_and_arg) && params.assembly_mode != "none" ) {
         // The list wrap keeps a multi-file BLAST DB as ONE tuple element
         // (path(nt_db)) instead of flattening it into the tuple, which staged
         // only the first DB file into NT_BLASTN
@@ -609,7 +602,7 @@ workflow {
     //
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
-    if ( params.arg_bin_clustering && params.include_binning ) {
+    if ( flagOn(params.arg_bin_clustering) && flagOn(params.include_binning) ) {
         PRODIGAL_BINS(ch_refined_bins)
         ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
         DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db

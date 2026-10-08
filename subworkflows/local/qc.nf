@@ -12,6 +12,7 @@ include { QFILTER                    } from '../../modules/local/qfilter/main'
 include { COUNT_READS                } from '../../modules/local/count_reads/main'
 include { BOWTIE2_DECONTAMINATE      } from '../../modules/local/bowtie2_decontaminate/main'
 include { READS_REPORT               } from '../../modules/local/reads_report/main'
+include { flagOn                     } from './utils_params'
 
 workflow QC {
     take:
@@ -21,7 +22,7 @@ workflow QC {
     main:
     ch_versions = channel.empty()
 
-    if ( params.quality_control ) {
+    if ( flagOn(params.quality_control) ) {
         //
         // Read quality filtering with nf-core Fastp
         // nf-core FASTP signature: tuple val(meta), path(reads), path(adapter_fasta)
@@ -100,7 +101,8 @@ workflow QC {
         ch_fastp_reads_filtered = ch_fastp_reads_report.qfilter
             .map { meta, reads_out, read_count_file ->
                 def after_reads = read_count_file.text.trim()
-                if ( Integer.parseInt(after_reads) >= params.min_read_sample ) {
+                // as Integer: numeric CLI params arrive as Strings on Nextflow >= 26.04 (Q13)
+                if ( Integer.parseInt(after_reads) >= (params.min_read_sample as Integer) ) {
                     return [meta, reads_out]
                 } else {
                     log.warn "Sample ${meta.id} has ${after_reads} reads after filtering, below threshold ${params.min_read_sample}. Skipping."

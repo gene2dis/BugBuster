@@ -630,6 +630,62 @@ nextflow_pipeline {
         }
     }
 
+    test("String-valued CLI toggles and numbers are honoured (Nextflow >= 26.04)") {
+        // Design doc Q13: on Nextflow >= 26.04 every CLI parameter arrives as a
+        // String (`--include_binning false` is the truthy String "false"; a
+        // number is a String too), and nf-schema validates without converting.
+        // nf-test hands these String values through the same way, so this test
+        // reproduces the CLI form. Before the fix, include_binning "false" with
+        // assembly_mode none was rejected at launch and min_read_sample "10"
+        // crashed QC. Runs where the nf-test suite runs (CI: latest Nextflow);
+        // Nextflow 25.10 converts CLI values itself and its nf-schema rejects
+        // String booleans given this way, so the case cannot arise there.
+        options "-stub"
+
+        when {
+            params {
+                input  = "${projectDir}/assets/test_samplesheet.csv"
+                output = "${outputDir}"
+                assembly_mode         = "none"
+                taxonomic_profiler    = "none"
+                read_level_functional = "woltka"
+                custom_woltka_db      = "${projectDir}/tests/data/woltka/db"
+                // String "true" must still enable, String "false" must disable
+                quality_control         = "true"
+                include_binning         = "false"
+                contig_tax_and_arg      = "false"
+                contig_level_functional = "false"
+                mag_level_functional    = "false"
+                read_arg_prediction     = "false"
+                rgi_prediction          = "false"
+                microbecensus           = "false"
+                functional_cazy         = "false"
+                woltka_uniq             = "false"
+                min_read_sample         = "10"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            // "true": QC ran; the min_read_sample comparison passed both samples
+            assert workflow.trace.tasks().count { task -> task.name.contains("QC:FASTP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_CLASSIFY") } == 2
+            // "false": every disabled branch stays off
+            assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("KARGA") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_CHECKM2_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_BAKTA_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("DOWNLOAD_DEEPARG_DB") } == 0
+        }
+    }
+
     test("Stub run wires the SUPER-FOCUS read backend without an assembly") {
         // T8b (design doc Section 4.6.3, Q17): the SUPER-FOCUS backend runs
         // with --assembly_mode none. No --custom_superfocus_db: pins the

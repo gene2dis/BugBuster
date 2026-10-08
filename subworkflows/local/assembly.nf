@@ -40,6 +40,7 @@ include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main
 // task (accepted trade-off, revisit at T9 if it dominates runtime).
 include { BOWTIE2_SAMTOOLS as BOWTIE2_SAMTOOLS_PER_SAMPLE } from '../../modules/local/bowtie2_samtools/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
+include { flagOn                } from './utils_params'
 
 workflow ASSEMBLY {
     take:
@@ -79,7 +80,7 @@ workflow ASSEMBLY {
         ch_contigs_only = BBMAP.out.contigs_only
 
         // Generate BAM files for binning/contig analysis/gene counting if needed
-        if ( params.include_binning || params.contig_tax_and_arg || params.contig_level_functional ) {
+        if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
             BOWTIE2_SAMTOOLS(BBMAP.out.contigs_with_reads)
 
             ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
@@ -120,7 +121,7 @@ workflow ASSEMBLY {
         ch_contigs_only = BBMAP.out.contigs_only
 
         // Generate BAM files for binning/contig analysis if needed
-        if ( params.include_binning || params.contig_tax_and_arg ) {
+        if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
             // Prepare input: combine all original reads with filtered contigs
             // More efficient: collect reads first, then combine with contigs
             ch_alignment_input = reads
@@ -142,7 +143,7 @@ workflow ASSEMBLY {
         // (design doc Q1/T3): the pooled BAM above has no read groups, so it
         // cannot yield per-sample counts. Per-sample meta.id (!= 'coassembly')
         // selects the module's per-sample script branch.
-        if ( params.contig_level_functional ) {
+        if ( flagOn(params.contig_level_functional) ) {
             ch_per_sample_input = reads
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
                 .map { meta, reads_files, contigs -> [meta, reads_files, contigs] }
