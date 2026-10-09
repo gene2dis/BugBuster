@@ -118,7 +118,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "assembly"
@@ -181,7 +181,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "assembly"
@@ -228,7 +228,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
                 assembly_mode           = "assembly"
@@ -291,7 +291,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
                 assembly_mode           = "coassembly"
@@ -347,7 +347,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "assembly"
@@ -379,7 +379,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control     = true
                 assembly_mode       = "none"
@@ -419,7 +419,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "none"
@@ -541,7 +541,7 @@ nextflow_pipeline {
         // wording changes between plugin versions).
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode = "asembly"
             }
@@ -560,7 +560,7 @@ nextflow_pipeline {
         // fail the run and name the offending parameter.
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 metabat_maxP = "notanumber"
             }
@@ -583,7 +583,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control       = true
                 assembly_mode         = "none"
@@ -644,7 +644,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode         = "none"
                 taxonomic_profiler    = "none"
@@ -696,7 +696,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control       = true
                 assembly_mode         = "none"
@@ -750,7 +750,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
                 assembly_mode           = "coassembly"
@@ -795,7 +795,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control       = true
                 assembly_mode         = "none"
@@ -844,7 +844,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control       = true
                 assembly_mode         = "none"
@@ -902,7 +902,7 @@ nextflow_pipeline {
         // Rejected at launch (schema enum + main.nf validation), not at runtime
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 read_level_functional = "superfocus"
                 superfocus_aligner    = "rapsearch"
@@ -921,7 +921,7 @@ nextflow_pipeline {
         // at runtime (message-agnostic: the schema enum fires first)
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 read_level_functional = "humann_typo"
             }
@@ -943,7 +943,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control      = true
                 assembly_mode        = "assembly"
@@ -996,7 +996,7 @@ nextflow_pipeline {
         // contradictory without binning (same fail-fast policy as audit #15)
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode        = "assembly"
                 mag_level_functional = true
@@ -1016,7 +1016,7 @@ nextflow_pipeline {
         // Bakta must never see unfiltered single-binner output
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode        = "assembly"
                 include_binning      = true
@@ -1037,7 +1037,7 @@ nextflow_pipeline {
         // fail fast instead of silently skipping stages.
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode   = "none"
                 include_binning = true
@@ -1056,7 +1056,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "none"
