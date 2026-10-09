@@ -20,11 +20,15 @@ process BLOBTOOLS {
         nodes_dmp=\$(find -L . -maxdepth 2 -name nodes.dmp | head -n 1)
         names_dmp=\$(find -L . -maxdepth 2 -name names.dmp | head -n 1)
 
+        # --db: write the parsed nodesDB into the task dir; the default is
+        # inside the blobtools package, which is read-only in a
+        # singularity/apptainer image (design doc Q21)
         blobtools create \\
                   --infile ${contigs} \\
                   --hitsfile ${blastn_hits} \\
                   --nodes \${nodes_dmp} \\
                   --names \${names_dmp} \\
+                  --db nodesDB.txt \\
                   --bam ${bam} \\
                   --out ${prefix}
 

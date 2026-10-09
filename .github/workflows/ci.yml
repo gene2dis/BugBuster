@@ -148,3 +148,7 @@ jobs:
       - name: Run RGI_BWT low-coverage fallback regression tests (audit #8)
         run: |
           tests/bin/test_rgi_bwt_fallback.sh
+
+      - name: Run BLOBTOOLS read-only image regression test (design doc Q21)
+        run: |
+          tests/bin/test_blobtools_readonly.sh

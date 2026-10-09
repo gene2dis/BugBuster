@@ -258,6 +258,10 @@ startup instead of being silently ignored. Update existing command lines and
   have failed. These processes now use the docker image for every engine (singularity and
   apptainer convert it at pull time). Found by the end-to-end apptainer runs; CI is
   docker-only
+- **`BLOBTOOLS` failed under singularity/apptainer**: `blobtools create` wrote its parsed
+  taxonomy into its own install directory, which is read-only in a singularity image. It
+  now writes `nodesDB.txt` in the task directory (`--db`); regression test
+  `tests/bin/test_blobtools_readonly.sh`
 - **Steps that combine many samples re-ran on `-resume`**: the co-assembly (`MEGAHIT` and
   the co-assembly read alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`,
   `BIN_SUMMARY` and the report steps (reads, contig filtering, taxonomy, ARG, RGI, BlobTools,
