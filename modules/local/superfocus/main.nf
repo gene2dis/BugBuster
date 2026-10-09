@@ -46,9 +46,10 @@ process SUPERFOCUS {
     tag "${meta.id}"
     label 'process_medium'
 
-    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
-        'oras://community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:fa641269f461e1f8' :
-        'community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:72a2f2b49608ab17' }"
+    // Docker image for every engine: the image's oras:// singularity variant
+    // has no gzip (design doc Q20); singularity/apptainer convert the docker
+    // image at pull time
+    container 'community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:72a2f2b49608ab17'
 
     input:
     tuple val(meta), path(reads), path(sf_db)

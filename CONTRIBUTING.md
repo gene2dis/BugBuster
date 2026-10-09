@@ -141,6 +141,15 @@ feat(modules): add DIAMOND module for protein alignment
   `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
   task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
   directory path, which is stable while the upstream tasks are cached, not by sample name.)
+- CI and nf-test run under docker only, so nothing automated exercises the image a process
+  gets under singularity/apptainer. A separately built singularity image (a Seqera
+  `oras://` variant, a depot.galaxyproject.org sif) can lack tools its docker twin has:
+  the Seqera singularity variants of the wget, SUPER-FOCUS and HUMAnN images have no
+  `gzip` or `tar`, and those processes now pin the docker URI for every engine (the engine
+  converts it at pull time). Before pinning a separate singularity image, check that it has
+  every command the script calls, and run the process once under apptainer. Also remember
+  that a singularity/apptainer image is read-only: a tool must not write inside its own
+  install directory
 
 ### Process Structure
 

@@ -1,8 +1,11 @@
+// The FORMAT_* / DOWNLOAD_* processes that use the shared wget image pin its
+// docker URI for every engine: the image's oras:// singularity variant has
+// no tar or gzip, which the reformat scripts need (design doc Q20);
+// singularity/apptainer convert the docker image at pull time.
+
 process FORMAT_KRAKEN_DB {
     tag "format_kraken_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
@@ -26,9 +29,7 @@ process FORMAT_KRAKEN_DB {
 
 process FORMAT_NT_BLAST_DB {
     tag "format_blast_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download_extensive'
 
@@ -51,9 +52,7 @@ process FORMAT_NT_BLAST_DB {
 
 process FORMAT_TAXDUMP_FILES {
     tag "format_taxdump"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
@@ -113,9 +112,7 @@ process DOWNLOAD_DEEPARG_DB {
 
 process FORMAT_CHECKM2_DB {
     tag "format_checkm2_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
@@ -138,9 +135,7 @@ process FORMAT_CHECKM2_DB {
 
 process DOWNLOAD_GTDBTK_DB {
     tag "download_gtdbtk_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
@@ -164,9 +159,7 @@ process DOWNLOAD_GTDBTK_DB {
 
 process FORMAT_EGGNOG_DB {
     tag "format_eggnog_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download_extensive'
 
@@ -193,9 +186,7 @@ process FORMAT_EGGNOG_DB {
 
 process FORMAT_DBCAN_DB {
     tag "format_dbcan_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download_extensive'
 
@@ -253,9 +244,7 @@ process FORMAT_BAKTA_DB {
 
 process FORMAT_COG_DB {
     tag "format_cog_db"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
@@ -315,9 +304,7 @@ process FORMAT_HUMANN_DB {
     // the script needs (verified 2026-10-08; the MetaPhlAn tars are plain .tar
     // and only their .pkl / .bt2l members are used, so no bzip2 is required).
     // Downloads ~71 GB with the full ChocoPhlAn (design doc Q2, T8c).
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/wget:1.21.4--5d7af37cfa52d45f' :
-        'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d' }"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download_extensive'
 
@@ -356,9 +343,10 @@ process FORMAT_SUPERFOCUS_DB {
     // carries GNU wget and unzip (the shared wget image has no unzip), and
     // the archives are prebuilt for the aligners in that same image (design
     // doc Q17). Downloads only the --superfocus_aligner archive.
-    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
-        'oras://community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:fa641269f461e1f8' :
-        'community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:72a2f2b49608ab17' }"
+    // Docker image for every engine: the image's oras:// singularity variant
+    // has no gzip (design doc Q20); singularity/apptainer convert the docker
+    // image at pull time
+    container 'community.wave.seqera.io/library/super-focus_diamond_mmseqs2_unzip_wget:72a2f2b49608ab17'
 
     label 'process_download'
 

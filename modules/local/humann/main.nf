@@ -55,9 +55,10 @@ process HUMANN {
     tag "${meta.id}"
     label 'process_high'
 
-    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
-        'oras://community.wave.seqera.io/library/python_metaphlan_diamond_bowtie2_pruned:7258ebd7ee8c9707' :
-        'community.wave.seqera.io/library/python_metaphlan_diamond_bowtie2_pruned:386bc0e5651a4c44' }"
+    // Docker image for every engine: the image's oras:// singularity variant
+    // has no gzip (design doc Q20); singularity/apptainer convert the docker
+    // image at pull time
+    container 'community.wave.seqera.io/library/python_metaphlan_diamond_bowtie2_pruned:386bc0e5651a4c44'
 
     input:
     tuple val(meta), path(reads), path(humann_db)

@@ -250,6 +250,14 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **SUPER-FOCUS, HUMAnN and every database download under singularity/apptainer**: the
+  separately built singularity images of the SUPER-FOCUS and HUMAnN containers have no
+  `gzip`, so `SUPERFOCUS`/`HUMANN` failed at once (exit 127) under apptainer and singularity.
+  Under `-profile singularity`, the singularity image of the shared download container has
+  no `tar`, so the kraken, GTDB-Tk, CheckM2, BLAST nt, taxdump and HUMAnN downloads would
+  have failed. These processes now use the docker image for every engine (singularity and
+  apptainer convert it at pull time). Found by the end-to-end apptainer runs; CI is
+  docker-only
 - **Steps that combine many samples re-ran on `-resume`**: the co-assembly (`MEGAHIT` and
   the co-assembly read alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`,
   `BIN_SUMMARY` and the report steps (reads, contig filtering, taxonomy, ARG, RGI, BlobTools,
