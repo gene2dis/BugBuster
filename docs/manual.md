@@ -530,8 +530,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > read tables; the read branch still writes only its own `read_*` files and
 > per-backend directories, never the contig-branch tables. With
 > `--contig_level_functional` on, the whole run needs singularity/apptainer (see
-> the engine note above), read backends included — they run from the same
-> pinned images, automatically converted.
+> the engine note above), read backends included; all three read backends were
+> verified under apptainer alongside the contig branch.
 
 ### 6.3 Database Selection Options
 
@@ -757,7 +757,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
-| `low_disk` | Free disk after the run: work-dir deletion after a successful run (does not lower peak usage during the run) (`cleanup = true`; a completed run cannot be resumed, an interrupted one can) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
+| `low_disk` | Deletes the work dir after a successful run (`cleanup = true`; does not lower peak usage during the run; a completed run cannot be resumed, an interrupted one can) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
 
 > **`low_disk` with the functional branches:** the profile only cleans the work

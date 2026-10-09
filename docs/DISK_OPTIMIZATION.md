@@ -193,7 +193,8 @@ nextflow run main.nf \
     -profile docker,low_disk \
     -resume
 
-# Check cached processes: the summary line ends with "cached=<n>"
+# Check cached processes: tasks reused from the first run show status CACHED
+nextflow log <run name> -f name,status    # run names: nextflow log
 ```
 
 ### What Gets Cached

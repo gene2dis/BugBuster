@@ -143,9 +143,9 @@ feat(modules): add DIAMOND module for protein alignment
   directory path, which is stable while the upstream tasks are cached, not by sample name.)
 - Every `errorStrategy` in `nextflow.config` and `config/modules.config` must start with
   `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
-  (then your own rule, e.g. `'retry'`). A local task with no exit status has, in practice,
-  asked for more CPUs or memory than the local executor's pool and can never be scheduled
-  (a task whose wrapper was killed, e.g. by SIGKILL, also has none); with `'finish'`, `'retry'` or
+  (then your own rule, e.g. `'retry'`). A local task with no exit status asked for more CPUs
+  or memory than the local executor's pool and can never be scheduled (a task killed while
+  running reports its signal status, e.g. 137, instead); with `'finish'`, `'retry'` or
   `'ignore'` instead, the run can hang forever waiting for it. Profiles that switch to a
   non-local executor (`conf/aws.config`, `conf/slurm.config`, ...) have no such pool and
   are exempt
