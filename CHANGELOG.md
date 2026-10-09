@@ -257,8 +257,9 @@ startup instead of being silently ignored. Update existing command lines and
   run succeeds, and the in-task cleanup of temporary files runs in every profile, so peak
   disk use is the same with or without `low_disk`. Behaviour is unchanged; the text now
   says what happens: work dir deleted after a successful run (that run cannot be
-  resumed; an interrupted one can), task directories reused from the cache survive a
-  resumed run's cleanup (`nextflow clean -f`), and running out of disk mid-run calls for a
+  resumed; an interrupted one can), task directories reused from the cache or left by
+  the interrupted run survive a resumed run's cleanup (delete `work/` once resuming is no
+  longer needed), and running out of disk mid-run calls for a
   larger `-work-dir` filesystem or fewer concurrent tasks
 - **`max_*` set in a `-c` config file were ignored**: `process.resourceLimits` copied
   `max_cpus`/`max_memory`/`max_time` while `nextflow.config` was parsed, so values from a

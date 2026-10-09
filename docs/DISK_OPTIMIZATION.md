@@ -76,8 +76,9 @@ What this means in practice:
   success, so the work directory is still there.
 - **After a resumed run succeeds, some task directories are left behind.** Cleanup deletes
   only the tasks the final run executed. Tasks reused from the cache, and tasks aborted by
-  the interruption, stay in `work/`. Remove them with `nextflow clean -f` (or delete
-  `work/`) once you no longer need to resume.
+  the interruption, stay in `work/`. Delete `work/` once you no longer need to resume.
+  `nextflow clean -f` is not enough here: it removes only the last run's tasks, and a
+  task directory created just before the interruption may not be recorded in any run.
 - The final results directory is the same with or without the profile, plus
   `clean_reads/`.
 
@@ -122,8 +123,9 @@ Peak usage is in the work directory, so:
    the executor's CPU pool); on a cluster, lower the executor's `queueSize` in a `-c` config.
 3. **Split large studies** into batches of samples (each batch its own run and work dir).
    Co-assembly needs all samples in one run.
-4. **Free space between runs**: once a run's results are final, delete its work directory
-   or run `nextflow clean -f`. This is what `low_disk` does automatically on success.
+4. **Free space between runs**: once a run's results are final, delete its work directory.
+   This is what `low_disk` does automatically on success. (`nextflow clean -f` removes
+   only the last run's tasks, so after resumed runs it leaves the earlier ones behind.)
 5. **Monitor usage** with the monitoring script below to see where the peak is.
 
 ## Monitoring Disk Usage
@@ -238,8 +240,10 @@ not help here: it deletes the work directory only after the run succeeds.
 **Cause**: The run was resumed. Cleanup deletes only the tasks the final run executed;
 tasks reused from the cache and tasks aborted by the earlier interruption remain.
 
-**Solution**: `nextflow clean -f` in the launch directory, or delete `work/`, once you no
-longer need to resume.
+**Solution**: delete `work/` once you no longer need to resume. `nextflow clean -f` alone
+removes only the last run's tasks; `nextflow clean -f <run name>` (names from
+`nextflow log`) removes an earlier run's recorded tasks, but a task directory created just
+before an interruption may not be recorded in any run.
 
 ### Issue: Outputs missing from results directory
 
