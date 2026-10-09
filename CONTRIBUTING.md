@@ -141,6 +141,13 @@ feat(modules): add DIAMOND module for protein alignment
   `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
   task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
   directory path, which is stable while the upstream tasks are cached, not by sample name.)
+- Every `errorStrategy` in `nextflow.config` and `config/modules.config` must start with
+  `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
+  (then your own rule, e.g. `'retry'`). A local task with no exit status asked for more CPUs
+  or memory than the local executor's pool and can never run; with `'finish'`, `'retry'` or
+  `'ignore'` instead, the run can hang forever waiting for it. Profiles that switch to a
+  non-local executor (`conf/aws.config`, `conf/slurm.config`, ...) have no such pool and
+  are exempt
 - CI and nf-test run under docker only, so nothing automated exercises the image a process
   gets under singularity/apptainer. A separately built singularity image (a Seqera
   `oras://` variant, a depot.galaxyproject.org sif) can lack tools its docker twin has:
