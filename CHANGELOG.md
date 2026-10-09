@@ -250,6 +250,16 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **`low_disk` was described as freeing disk during the run**: the `--help` text, the
+  profile description, the launch warning, the README, the manual and
+  `docs/DISK_OPTIMIZATION.md` called its work-dir cleanup "progressive" and promised a
+  60-70 % lower peak. Nextflow's `cleanup = true` deletes the work directory only once the
+  run succeeds, and the in-task cleanup of temporary files runs in every profile, so peak
+  disk use is the same with or without `low_disk`. Behaviour is unchanged; the text now
+  says what happens: work dir deleted after a successful run (that run cannot be
+  resumed; an interrupted one can), task directories reused from the cache survive a
+  resumed run's cleanup (`nextflow clean -f`), and running out of disk mid-run calls for a
+  larger `-work-dir` filesystem or fewer concurrent tasks
 - **`max_*` set in a `-c` config file were ignored**: `process.resourceLimits` copied
   `max_cpus`/`max_memory`/`max_time` while `nextflow.config` was parsed, so values from a
   later `-c` file (the documented way in manual §10.1, and `-c conf/my_institution.config`)

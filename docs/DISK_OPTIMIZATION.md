@@ -1,79 +1,54 @@
-# BugBuster Pipeline - Disk Space Optimization
+# BugBuster Pipeline - Disk Space
 
-This document describes the disk space optimization features implemented in BugBuster to prevent running out of disk space during pipeline execution.
+This document describes what BugBuster does to limit disk use, what the `low_disk` profile
+does (and does not do), and how to run on a machine with limited disk space.
 
 ## Overview
 
-The pipeline implements a **progressive cleanup strategy** that frees disk space **during execution**, not after. This is achieved through two complementary mechanisms:
+Disk use comes from three places, which behave differently:
 
-1. **Internal process cleanup** - Remove temporary files within processes as soon as they're no longer needed
-2. **Nextflow cleanup configuration** - Enable automatic work directory cleanup
+1. **The work directory** (`work/`, or `-work-dir`): every task's inputs, intermediates and
+   outputs. This is where peak usage happens, and it is also the `-resume` cache.
+2. **The results directory** (`--output`): copies of the published outputs.
+3. **The databases** (`--databases_dir`, default `<output>/../databases`): reference
+   databases, kept across runs.
 
-All publishing uses standard `publishDir` with `mode: 'copy'` (`publish_dir_mode`). Publishing never removes files from the work directory; disk is reclaimed by the internal cleanup steps below and by Nextflow's `cleanup` setting.
+BugBuster reduces disk use in two ways:
 
-## Implementation Details
+1. **In-task cleanup**, always on: a few large processes delete their own temporary files
+   before they finish (see below). This lowers the size of their task directories in every
+   run, with or without `low_disk`.
+2. **Work-dir deletion after a successful run**: Nextflow's `cleanup = true`, set by the
+   `low_disk` profile. It runs **once, when the run completes successfully**. It does not
+   free space while the run is in progress, so it does **not** lower peak disk use.
 
-### Phase 1: Key Output Publishing
+All publishing uses standard `publishDir` with `mode: 'copy'` (`publish_dir_mode`).
+Publishing never removes files from the work directory.
 
-- **BOWTIE2_DECONTAMINATE (clean reads)**: published to `output/clean_reads/{sample_id}/` only when `--store_clean_reads` is set (enabled by the `low_disk` profile). Configured in `config/modules.config`.
-- **BBMAP (filtered contigs)**: always published to `output/03_assembly/per_sample/{sample_id}/` (or `03_assembly/coassembly/`) — `*_filtered_contigs.fa` and `*_contig.stats`.
-- **METAWRAP (refined bins)**: always published to `output/04_binning/per_sample/{sample_id}/refined_bins/` (or `04_binning/coassembly/refined_bins/`) — the `*_metawrap_*_bins/` directory.
+## In-Task Cleanup (all runs)
 
-### Phase 2: Internal Process Cleanup
-
-The following processes clean up temporary files during execution:
+These processes delete temporary files inside their own task directory before finishing:
 
 #### MEGAHIT (Assembly)
 - **Location**: `modules/local/megahit/main.nf`
-- **Removes**:
-  - `intermediate_contigs/` - Intermediate assembly files
-  - `kmer_k*/` - K-mer data directories
-  - `*.tmp` - Temporary files
-  - `checkpoints.txt` - Assembly checkpoints
-- **Keeps**: Final contigs and log files
-- **Disk savings**: ~1-3 GB per sample
-- **Timing**: Immediately after moving final contigs
+- **Removes**: `intermediate_contigs/`, `kmer_k*/`, `*.tmp`, `checkpoints.txt`
+- **Keeps**: final contigs and log files
 
 #### BOWTIE2_SAMTOOLS (Alignment)
 - **Location**: `modules/local/bowtie2_samtools/main.nf`
-- **Removes**:
-  - `*_index*.bt2` - Bowtie2 index files (after alignment)
-  - `*_paired.bam`, `*_singleton.bam` - Intermediate BAMs (after merging)
-  - `*_paired.log`, `*_singleton.log` - Log files
-- **Keeps**: Final merged BAM file
-- **Disk savings**: ~3-5 GB per sample
-- **Timing**: Progressive cleanup as each step completes
+- **Removes**: the per-task Bowtie2 index (`*_index*.bt2`) after alignment, the
+  intermediate `*_paired.bam` / `*_singleton.bam` after merging, and their logs
+- **Keeps**: the final merged BAM
 
 #### SEMIBIN (Binning)
 - **Location**: `modules/local/semibin/main.nf`
-- **Removes**:
-  - `output/` - Temporary output directory
-  - `contig_output/` - Intermediate feature data
-  - `*_semibin_bins/` - Temporary bins directory
-- **Keeps**: Final bins in `*_semibin_output_bins/`
-- **Disk savings**: ~500 MB - 1 GB per sample
-- **Timing**: After moving final bins
-- **Note**: Already implemented, verified comprehensive
+- **Removes**: `output/`, `contig_output/` and the temporary `*_semibin_bins/` directory
+- **Keeps**: the final bins in `*_semibin_output_bins/`
 
-### Phase 3: Nextflow Configuration
+Because these files are removed inside the task, the task's outputs (and therefore
+`-resume`) are unaffected.
 
-#### Cache Strategy
-- **File**: `conf/base.config`
-- **Setting**: `cache = 'lenient'`
-- **Purpose**: Allows resume even when work directories are cleaned
-- **Behavior**: Nextflow looks for outputs in `storeDir`/`publishDir` locations instead of work directory
-
-#### Cleanup Profile
-- **File**: `nextflow.config`
-- **Profile**: `low_disk`
-- **Settings**:
-  - `cleanup = true` - Enable automatic work directory cleanup
-  - `store_clean_reads = true` - Publish clean reads to `<output>/clean_reads/` (publishDir)
-  - `process.cache = 'lenient'` - Support resume with cleanup
-
-## Usage
-
-### Use the low_disk Profile
+## The `low_disk` Profile
 
 ```bash
 nextflow run main.nf \
@@ -82,27 +57,49 @@ nextflow run main.nf \
     -profile docker,low_disk
 ```
 
-This automatically enables:
-- ✅ Work directory cleanup (`cleanup = true` — the work dir is deleted after a successful run, so **low_disk runs are not resumable**)
-- ✅ Clean-reads publishing (`store_clean_reads`)
-- ✅ Lenient cache
+It sets:
 
-> **Note**: Work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a pipeline parameter — there is no `--flag` for it. Use `-profile low_disk`, or add `cleanup = true` to a custom config passed with `-c`.
+- `cleanup = true`: when the run **completes successfully**, Nextflow deletes the work
+  directories of the tasks that run executed.
+- `store_clean_reads = true`: the decontaminated reads are published to
+  `<output>/clean_reads/{sample_id}/`, so they survive the work-dir deletion.
+- `process.cache = 'lenient'`: the same cache mode every run already uses (from
+  `conf/base.config`).
 
-> **Note — databases are unaffected**: reference databases live at
+What this means in practice:
+
+- **Peak disk use is unchanged.** The work directory grows during the run exactly as it
+  does without the profile. Size the work-dir filesystem for the full run.
+- **A completed `low_disk` run cannot be resumed.** Its work directory is gone, so
+  re-running with a changed or added option recomputes everything.
+- **An interrupted or failed `low_disk` run can be resumed.** Cleanup only runs on
+  success, so the work directory is still there.
+- **After a resumed run succeeds, some task directories are left behind.** Cleanup deletes
+  only the tasks the final run executed. Tasks reused from the cache, and tasks aborted by
+  the interruption, stay in `work/`. Remove them with `nextflow clean -f` (or delete
+  `work/`) once you no longer need to resume.
+- The final results directory is the same with or without the profile, plus
+  `clean_reads/`.
+
+> **Note**: work-dir cleanup is a Nextflow config setting (`cleanup = true`), not a
+> pipeline parameter, so there is no `--flag` for it. Use `-profile low_disk`, or add
+> `cleanup = true` to a custom config passed with `-c`.
+
+> **Note: databases are unaffected.** Reference databases live at
 > `--databases_dir` (default `<output>/../databases`), outside the work dir,
 > and `low_disk` does nothing about them. The functional annotation branches in
 > particular add large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB,
 > Bakta full ~31.9 GB / light ~1.3 GB download, WoLr2 ~94 GB for the
 > read-level Woltka branch, SUPER-FOCUS DB_90 ~0.7-0.9 GB download for the
 > read-level SUPER-FOCUS branch, HUMAnN ~71 GB with the full ChocoPhlAn or
-> ~33 GB EC-filtered for the read-level HUMAnN branch) —
-> and pair badly with `low_disk`, since the long eggNOG runs are exactly
-> where `-resume` matters most (the pipeline warns about this combination at
-> launch). The Bakta light database is never selected automatically:
+> ~33 GB EC-filtered for the read-level HUMAnN branch). They also pair badly with
+> `low_disk`: a completed run cannot be resumed, so changing an option afterwards
+> repeats the long eggNOG-mapper and read-level steps (the pipeline warns about this
+> combination at launch). The Bakta light database is never selected automatically:
 > `--bakta_db v6.0-light` is always an explicit choice, recorded in provenance.
 
-To publish clean reads without the cleanup trade-off, use `--store_clean_reads` on its own:
+To publish the clean reads without deleting the work directory, use `--store_clean_reads`
+on its own:
 
 ```bash
 nextflow run main.nf \
@@ -113,9 +110,25 @@ nextflow run main.nf \
     -resume
 ```
 
+## Running With Limited Disk Space
+
+Peak usage is in the work directory, so:
+
+1. **Put the work directory on the largest filesystem available**:
+   `-work-dir /scratch/bugbuster_work`. The results and databases directories can live
+   elsewhere.
+2. **Run fewer tasks at once.** Fewer concurrent tasks means fewer task directories at
+   their largest at the same time. With the local executor, lower `--max_cpus` (it is also
+   the executor's CPU pool); on a cluster, lower the executor's `queueSize` in a `-c` config.
+3. **Split large studies** into batches of samples (each batch its own run and work dir).
+   Co-assembly needs all samples in one run.
+4. **Free space between runs**: once a run's results are final, delete its work directory
+   or run `nextflow clean -f`. This is what `low_disk` does automatically on success.
+5. **Monitor usage** with the monitoring script below to see where the peak is.
+
 ## Monitoring Disk Usage
 
-A monitoring script is provided to track disk usage during pipeline execution:
+A monitoring script tracks disk usage during pipeline execution:
 
 ```bash
 # Start monitoring in background
@@ -126,7 +139,7 @@ MONITOR_PID=$!
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    -profile docker,low_disk \
+    -profile docker \
     -resume
 
 # Stop monitoring when done
@@ -148,33 +161,17 @@ The script generates:
 ./bin/monitor_disk_usage.sh ./work ./results 30  # 30s interval
 ```
 
-## Expected Disk Space Impact
-
-### Per Sample (Typical Metagenomic Dataset)
-
-| Stage | Before | After | Savings |
-|-------|--------|-------|---------|
-| QC (clean reads) | 10 GB | 2 GB | 8 GB |
-| Assembly (contigs) | 8 GB | 3 GB | 5 GB |
-| Alignment (BAMs) | 12 GB | 7 GB | 5 GB |
-| Binning (bins) | 5 GB | 2 GB | 3 GB |
-| **Total per sample** | **35 GB** | **14 GB** | **21 GB** |
-
-### For 10 Samples
-
-| Metric | Without Cleanup | With Cleanup | Reduction |
-|--------|----------------|--------------|-----------|
-| Peak work directory | 250-300 GB | 80-120 GB | **60-70%** |
-| Final output directory | 50 GB | 50 GB | 0% (same) |
-| Total disk required | 300-350 GB | 130-170 GB | **50-60%** |
-
 ## Resume Functionality
 
 ### How Resume Interacts with Cleanup
 
-1. `-resume` relies on the **work directory**: a task is cached only while its work dir (and outputs) still exist
-2. **Cache strategy** is set to `lenient` to tolerate internal cleanup of temporary files inside completed task dirs
-3. `cleanup = true` (the `low_disk` profile) deletes the work directory **at the end of a successful run**, so a completed `low_disk` run cannot be resumed; an interrupted one can
+1. `-resume` relies on the **work directory**: a task is cached only while its work dir
+   (and outputs) still exist.
+2. The cache mode is `lenient` in every run (`conf/base.config`): input files are matched
+   by path and size, ignoring timestamps.
+3. `cleanup = true` (the `low_disk` profile) deletes the work directory **at the end of a
+   successful run**, so a completed `low_disk` run cannot be resumed; an interrupted one
+   can.
 
 ### Testing Resume
 
@@ -194,8 +191,7 @@ nextflow run main.nf \
     -profile docker,low_disk \
     -resume
 
-# Check cached processes
-grep "Cached" .nextflow.log | wc -l
+# Check cached processes: the summary line ends with "cached=<n>"
 ```
 
 ### What Gets Cached
@@ -209,7 +205,7 @@ grep "Cached" .nextflow.log | wc -l
 
 ### What Gets Re-run
 
-- ❌ Processes whose outputs were manually deleted
+- ❌ Processes whose work dirs were deleted (including by `low_disk` after a completed run)
 - ❌ Processes with changed inputs or parameters
 - ❌ Processes with modified scripts
 
@@ -217,31 +213,33 @@ grep "Cached" .nextflow.log | wc -l
 
 ### Issue: Pipeline runs out of disk space
 
-**Cause**: Cleanup not enabled or insufficient disk space for peak usage
+**Cause**: The work-dir filesystem is smaller than the run's peak usage. `low_disk` does
+not help here: it deletes the work directory only after the run succeeds.
 
 **Solution**:
-1. Ensure you're using `-profile low_disk`
-2. Monitor disk usage with the monitoring script
-3. Consider reducing number of parallel samples
+1. Start the run again with `-work-dir` on a larger filesystem. Do not count on resuming
+   from a work directory copied elsewhere: task directories refer to each other by
+   absolute path
+2. Run fewer tasks at once, or split the samples into batches (see "Running With Limited
+   Disk Space")
+3. Monitor disk usage with the monitoring script
 
 ### Issue: Resume not working after cleanup
 
-**Cause**: Outputs not found in expected locations
+**Cause**: The work directory was deleted. A completed `low_disk` run deletes it.
 
 **Solution**:
-1. Verify the `work/` directory still exists (it is deleted at the end of a completed `low_disk` run)
-2. Verify `cache = 'lenient'` is set in `conf/base.config`
-3. Check `.nextflow.log` for cache lookup messages
+1. Verify the `work/` directory still exists
+2. If it is gone, the run has to be recomputed. Use `low_disk` only for runs you will not
+   need to resume or extend.
 
-### Issue: Work directory still growing
+### Issue: Work directory not empty after a successful `low_disk` run
 
-**Cause**: Cleanup happens after process completion, not during
+**Cause**: The run was resumed. Cleanup deletes only the tasks the final run executed;
+tasks reused from the cache and tasks aborted by the earlier interruption remain.
 
-**Solution**:
-1. This is expected - work dir grows during process execution
-2. Cleanup occurs when process completes successfully
-3. Monitor with the disk usage script to see cleanup patterns
-4. Consider reducing parallel process count with `max_cpus`
+**Solution**: `nextflow clean -f` in the launch directory, or delete `work/`, once you no
+longer need to resume.
 
 ### Issue: Outputs missing from results directory
 
@@ -264,18 +262,17 @@ grep "Cached" .nextflow.log | wc -l
 
 | Setting | Value | Description |
 |---------|-------|-------------|
-| `cache` | `'lenient'` | Cache strategy for resume support |
-| `cleanup` | `true` (in low_disk profile) | Enable work directory cleanup |
+| `cache` | `'lenient'` (all runs, `conf/base.config`) | Match input files by path and size, ignoring timestamps |
+| `cleanup` | `true` (in the `low_disk` profile) | Delete the work directory after a successful run |
 
 ## Best Practices
 
 1. **Always use `-resume`** when restarting failed runs
-2. **Monitor disk usage** during first run to understand patterns
-3. **Use `low_disk` profile** on systems with limited disk space
-4. **Keep output directory** on a filesystem with sufficient space
-5. **Don't manually delete** work directories during execution
-6. **Check logs** if resume doesn't work as expected
-7. **Test with small dataset** first to verify cleanup behavior
+2. **Size the work-dir filesystem for the peak**, and put it on the largest disk available
+3. **Monitor disk usage** during a first run to learn where the peak is
+4. **Use `low_disk` for final runs** you will not need to resume or extend
+5. **Keep the output directory** on a filesystem with sufficient space
+6. **Don't manually delete** work directories during execution
 
 ## Technical Details
 
@@ -292,18 +289,18 @@ grep "Cached" .nextflow.log | wc -l
 
 | Strategy | Behavior | Use Case |
 |----------|----------|----------|
-| `standard` | Check work dir only | Default, no cleanup |
-| `lenient` | Match inputs by path/size only (tolerates touched files) | With internal cleanup enabled |
-| `deep` | Check all inputs deeply | Strict reproducibility |
+| `standard` | Match input files by path, size and last-modified time | Nextflow default |
+| `lenient` | Match input files by path and size only (tolerates touched files) | What BugBuster uses |
+| `deep` | Match input files by content | Strict reproducibility |
 
 ### Cleanup Timing
 
-- **Internal cleanup**: During process execution (rm commands in script)
-- **Nextflow cleanup** (`cleanup = true`): at the end of a successful run
+- **In-task cleanup**: during process execution (rm commands in the process script), every run
+- **Nextflow cleanup** (`cleanup = true`, `low_disk` only): once, at the end of a successful run
 
 ## Version History
 
-- **v1.1.0dev** - Current: `low_disk` profile (work-dir cleanup + clean-reads publishing); storeDir replaced by conditional publishDir
+- **v1.1.0dev** - Current: `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir replaced by conditional publishDir; this document corrected to the measured behaviour (cleanup does not lower peak usage)
 - **v1.0.0** - Initial disk optimization implementation
   - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
   - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS
@@ -311,7 +308,7 @@ grep "Cached" .nextflow.log | wc -l
 
 ## Support
 
-For issues or questions about disk space optimization:
+For issues or questions about disk space:
 1. Check this documentation first
 2. Review `.nextflow.log` for detailed execution information
 3. Use the monitoring script to track disk usage patterns

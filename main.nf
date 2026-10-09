@@ -88,7 +88,7 @@ def printHelp() {
       -profile aws                  Run on AWS Batch (combine: aws,docker)
       -profile gcp                  Run on Google Cloud Batch (combine: gcp,docker)
       -profile azure                Run on Azure Batch (combine: azure,docker)
-      -profile low_disk             Progressive work-dir cleanup (runs not resumable)
+      -profile low_disk             Delete the work dir after a successful run (completed runs not resumable)
       -profile test                 Run with minimal test dataset
 
     \u001B[1;33mOther options:\u001B[0m
@@ -266,12 +266,13 @@ workflow {
         error("--contig_level_functional requires a singularity or apptainer container engine: eggNOG-mapper v3 (beta) ships only an Apptainer image, no docker image exists yet. Use -profile singularity or -profile apptainer for this branch (docker support returns when eggNOG-mapper v3.0.0 final is released on bioconda)")
     }
 
-    // low_disk deletes work dirs as the run progresses (not resumable) — a bad
+    // low_disk deletes the work dir when the run succeeds, so a completed run
+    // cannot be resumed or extended with -resume (an interrupted one can) — a bad
     // pairing with the long functional annotation runs and their large
     // databases, where -resume matters most (design doc Q10: warn, stay
     // results-neutral)
     if (workflow.profile.tokenize(',').contains('low_disk') && (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional) || params.read_level_functional != 'none')) {
-        log.warn "functional annotation under -profile low_disk: runs are not resumable, and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
+        log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration

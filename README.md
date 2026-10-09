@@ -98,7 +98,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
-| `low_disk` | Progressive work-dir cleanup for limited disk space (runs are not resumable) |
+| `low_disk` | Deletes the work dir after a successful run, for limited disk space (completed runs are not resumable; interrupted ones are) |
 | `test` | Run with minimal test data |
 
 Combine profiles as needed: `-profile slurm,singularity` or `-profile aws,docker`

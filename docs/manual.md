@@ -757,7 +757,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
-| `low_disk` | Minimize disk usage: automatic work-dir cleanup (`cleanup = true`, disables `-resume`) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
+| `low_disk` | Free disk after the run: work-dir deletion after a successful run (does not lower peak usage during the run) (`cleanup = true`; a completed run cannot be resumed, an interrupted one can) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
 
 > **`low_disk` with the functional branches:** the profile only cleans the work

@@ -182,10 +182,12 @@ No space left on device
    nextflow run main.nf -work-dir /scratch/work ...
    ```
 
-3. Enable cleanup on success in config:
-   ```groovy
-   cleanup = true
-   ```
+3. Run fewer tasks at once (lower `--max_cpus` with the local executor) or split the
+   samples into batches; see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md#running-with-limited-disk-space).
+
+Note that `cleanup = true` (the `low_disk` profile) does not help with this error: it
+deletes the work directory only after the run succeeds, so peak usage during the run is
+unchanged.
 
 ### Process timeout
 
