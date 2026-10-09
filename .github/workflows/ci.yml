@@ -45,6 +45,10 @@ jobs:
         run: |
           nextflow run ${GITHUB_WORKSPACE} -profile test,docker --output ./results
 
+      - name: Check resource-limit overrides (-c, -params-file, CLI; design doc Q22)
+        run: |
+          tests/bin/test_resource_limits.sh
+
   lint:
     name: Nextflow config lint
     runs-on: ubuntu-latest

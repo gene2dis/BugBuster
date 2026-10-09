@@ -1390,6 +1390,13 @@ params {
     custom_decontamination_index  = '/shared/db/bowtie_index'
 }
 
+// The local executor's machine-wide pool is copied from max_cpus/max_memory
+// before a -c file is read, so a -c file that raises them sets the pool too
+executor {
+    cpus   = 32
+    memory = '256.GB'
+}
+
 singularity {
     cacheDir = '/shared/singularity_cache'
 }
@@ -1403,6 +1410,14 @@ nextflow run main.nf \
     -c my_config.config \
     -profile singularity
 ```
+
+> **Raising the resource limits.** `--max_cpus`, `--max_memory` and `--max_time` cap every
+> task, and with the local executor `max_cpus`/`max_memory` are also the run's machine-wide
+> pool. On the command line or in a `-params-file`, they set both. In a `-c` file, the
+> `params` values cap each task, but the pool keeps the profile's values unless the file also
+> has the `executor` block above. Without it, a task asking for more than the pool fails with
+> `Process requirement exceeds available CPUs` (or `memory`). This matters most on top of
+> `-profile test`, whose pool and caps are 2 CPUs / 6 GB / 6 h.
 
 ### 10.2 Institutional Profile
 

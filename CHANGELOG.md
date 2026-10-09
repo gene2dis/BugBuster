@@ -250,6 +250,16 @@ startup instead of being silently ignored. Update existing command lines and
 
 ### Fixed
 
+- **`max_*` set in a `-c` config file were ignored**: `process.resourceLimits` copied
+  `max_cpus`/`max_memory`/`max_time` while `nextflow.config` was parsed, so values from a
+  later `-c` file (the documented way in manual §10.1, and `-c conf/my_institution.config`)
+  never reached it. After `-profile test`, tasks stayed at 2 CPUs / 6 GB / 6 h. The limits are
+  now read at task time, so `-c`, `-params-file` and the command line all work. The local
+  executor's pool still follows only the command line and `-params-file` (executor settings
+  are fixed at parse time): a `-c` file that raises the limits must also set
+  `executor { cpus; memory }`, and otherwise fails loudly with "Process requirement exceeds
+  available CPUs". Documented in the manual, parameters and troubleshooting; regression test
+  `tests/bin/test_resource_limits.sh`
 - **SUPER-FOCUS, HUMAnN and every database download under singularity/apptainer**: the
   separately built singularity images of the SUPER-FOCUS and HUMAnN containers have no
   `gzip`, so `SUPERFOCUS`/`HUMANN` failed at once (exit 127) under apptainer and singularity.

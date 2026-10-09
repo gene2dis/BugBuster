@@ -205,6 +205,32 @@ Process exceeded time limit
 
 ---
 
+### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored
+
+**Error:**
+```
+Process requirement exceeds available CPUs -- req: 8; avail: 2
+```
+
+**Cause:** With the local executor, `--max_cpus`/`--max_memory` set two things: the cap on
+every task, and the run's machine-wide CPU and memory pool. The pool is fixed before a `-c`
+config file is read. A `-c` file that raises `max_*` in `params {}` lifts the per-task caps
+but leaves the pool at the profile's values, so a task bigger than the pool cannot be
+scheduled. After `-profile test`, the pool is 2 CPUs / 6 GB.
+
+**Solution:** either pass the limits on the command line or in a `-params-file` (these set
+both), or add an `executor` block to the `-c` file:
+```bash
+nextflow run main.nf -profile test,docker --max_cpus 32 --max_memory 256.GB --max_time 48.h ...
+```
+```groovy
+// my_config.config, passed with -c
+params   { max_cpus = 32; max_memory = '256.GB'; max_time = '48.h' }
+executor { cpus = 32; memory = '256.GB' }
+```
+
+---
+
 ## Container Issues
 
 ### Docker permission denied

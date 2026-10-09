@@ -820,16 +820,23 @@ Bowtie2 parameters for read alignment during host filtering:
 
 ## Resource Limit Parameters
 
+Every task's request is capped at these values. With the local executor, `max_cpus` and
+`max_memory` are also the run's machine-wide pool. Set them on the command line or in a
+`-params-file` to change both. A `-c` config file that sets them in `params {}` changes the
+per-task caps but not the pool, so it must also set `executor { cpus = ...; memory = ... }`.
+Otherwise a task asking for more than the pool fails with `Process requirement exceeds
+available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
+
 ### `--max_cpus`
 - **Type**: Integer
 - **Default**: `16`
-- **Description**: Maximum number of CPUs that can be requested for any single job
+- **Description**: Maximum number of CPUs that can be requested for any single job; also the local executor's CPU pool (and queue size)
 - **Example**: `--max_cpus 32`
 
 ### `--max_memory`
 - **Type**: String
 - **Default**: `128.GB`
-- **Description**: Maximum amount of memory that can be requested for any single job
+- **Description**: Maximum amount of memory that can be requested for any single job; also the local executor's memory pool
 - **Example**: `--max_memory 256.GB`
 
 ### `--max_time`
