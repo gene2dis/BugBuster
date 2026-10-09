@@ -30,6 +30,19 @@ def generate_safe_colors(n):
         return [safe_colors[i % len(safe_colors)] for i in range(n)]
 
 
+def fraction_percent_label(x, _pos):
+    """Tick label for a 0-1 fraction axis (0.25 -> '25%').
+
+    Module-level (not a lambda) so the figure can be pickled.
+    """
+    return f'{int(x*100)}%'
+
+
+def percent_label(y, _pos):
+    """Tick label for a 0-100 percentage axis (25 -> '25%')."""
+    return f'{int(y)}%'
+
+
 def main():
     """Main function to generate ARG blob plot."""
     
@@ -108,7 +121,7 @@ def main():
     ax_blob.set_xlabel('GC content', fontsize=25)
     ax_blob.set_ylabel('Coverage (log)', fontsize=25)
     ax_blob.set_xlim(0, 1)
-    ax_blob.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x*100)}%'))
+    ax_blob.xaxis.set_major_formatter(plt.FuncFormatter(fraction_percent_label))
     ax_blob.tick_params(axis='both', labelsize=20)
     ax_blob.grid(True, alpha=0.3)
     ax_blob.legend(title='Predicted ARG Class', fontsize=20, title_fontsize=22,
@@ -131,7 +144,7 @@ def main():
     ax_bar.set_xticklabels(class_counts['predicted_ARG_class'], rotation=40, ha='right', fontsize=20)
     ax_bar.set_ylim(0, 100)
     ax_bar.set_ylabel('Percentage', fontsize=25)
-    ax_bar.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{int(y)}%'))
+    ax_bar.yaxis.set_major_formatter(plt.FuncFormatter(percent_label))
     ax_bar.tick_params(axis='y', labelsize=18)
     ax_bar.grid(axis='y', linestyle='--', alpha=0.7)
     ax_bar.set_axisbelow(True)

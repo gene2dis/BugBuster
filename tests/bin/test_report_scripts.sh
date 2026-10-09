@@ -7,7 +7,9 @@
 #     every input is header-only (previously a "successful" empty report),
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
-#   - and the happy paths still produce their real outputs.
+#   - and the happy paths still produce their real outputs,
+#   - bin/blobplot.py and bin/arg_blobplot.py pickle their figure without
+#     error (design doc T9 finding: lambda tick formatters broke pickle.dump).
 #
 # The scripts run inside the same pinned images the report processes use.
 #
@@ -303,6 +305,45 @@ for f in KARGA_norm.csv KARGVA_norm.csv; do
         PASS=$((PASS + 1))
     fi
 done
+
+#
+# blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the
+# figure is also pickled, and lambda tick formatters made pickle.dump fail
+# after the PNG was written. Fixtures are cut from a real T9 run (BlobTools
+# 1.1.1 table, ARG_CONTIG_LEVEL_REPORT output); runs in the image the
+# BLOBPLOT/ARG_BLOBPLOT modules pin.
+#
+echo "--- blobplot.py / arg_blobplot.py ---"
+RUN_IMG=$(grep -o "'quay.io/biocontainers/mulled-v2-[^']*'" "${REPO_DIR}/modules/local/blobplot/main.nf" \
+    | tr -d "'" | head -1)
+check_pickle() {
+    # check_pickle <desc> <script-module> <pkl> — the pickled figure loads back
+    if docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e MPLCONFIGDIR=/tmp \
+        -v "${REPO_DIR}/bin:/pipeline_bin:ro" -v "${LAST_WORKDIR}:/repwork" -w /repwork \
+        -e PYTHONPATH=/pipeline_bin "${RUN_IMG}" python3 -c \
+        "import pickle, sys; sys.modules['__main__'] = __import__('$2'); fig = pickle.load(open('$3', 'rb')); assert len(fig.axes) == 2" \
+        > /dev/null 2>&1; then
+        echo "✓ $1"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ $1"
+        FAIL=$((FAIL + 1))
+    fi
+}
+BP_WORK="${WORK}/blobplot"
+mkdir -p "${BP_WORK}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" "${BP_WORK}/"
+NEXT_WORKDIR="${BP_WORK}"
+expect_pass "blobplot: real BlobTools table plotted and pickled" blobplot.py
+check_file "blobplot: PNG created" "Phylum_blob_plot.png"
+check_pickle "blobplot: pickled figure loads back" blobplot "Phylum_final_blobplot.pkl"
+ABP_WORK="${WORK}/arg_blobplot"
+mkdir -p "${ABP_WORK}"
+cp "${REPO_DIR}/tests/data/reports/Contig_tax_and_arg_prediction.tsv" "${ABP_WORK}/"
+NEXT_WORKDIR="${ABP_WORK}"
+expect_pass "arg_blobplot: contig ARG table plotted and pickled" arg_blobplot.py
+check_file "arg_blobplot: PNG created" "ARG_blob_plot.png"
+check_pickle "arg_blobplot: pickled figure loads back" arg_blobplot "ARG_final_blobplot.pkl"
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

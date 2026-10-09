@@ -262,6 +262,9 @@ startup instead of being silently ignored. Update existing command lines and
   taxonomy into its own install directory, which is read-only in a singularity image. It
   now writes `nodesDB.txt` in the task directory (`--db`); regression test
   `tests/bin/test_blobtools_readonly.sh`
+- **`BLOBPLOT` / `ARG_BLOBPLOT` always failed**: saving the figure object (`.pkl`) failed on
+  its lambda tick formatters after the PNG had been written, so `--contig_tax_and_arg` runs
+  stopped there. The formatters are now named functions. PNGs are unchanged
 - **Steps that combine many samples re-ran on `-resume`**: the co-assembly (`MEGAHIT` and
   the co-assembly read alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`,
   `BIN_SUMMARY` and the report steps (reads, contig filtering, taxonomy, ARG, RGI, BlobTools,
