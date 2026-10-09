@@ -339,8 +339,7 @@ results/
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
-│   │   ├── deeparg/            # Per-sample DeepARG predictions
-│   │   ├── prodigal/           # Per-sample contig ORFs
+│   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/)
 │   │   ├── summary/            # Combined tax + ARG report
 │   │   └── figures/            # ARG scatter plots
 │   └── bin_level/              # Bin-level ARG (if arg_bin_clustering=true)
@@ -350,13 +349,13 @@ results/
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                # BlobTools plots
 └── 07_functional_annotation/   # Functional annotation
-    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional)
-    ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true)
-    ├── dbcan/{sample}/         # run_dbcan CAZy calls + substrates (if contig_level_functional=true and functional_cazy=true)
-    ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true)
-    ├── microbecensus/{sample}/ # MicrobeCensus average genome size (if microbecensus=true and contig_level_functional=true or read_level_functional != none)
+    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional; coassembly/ under co-assembly)
+    ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true; coassembly/ under co-assembly)
+    ├── dbcan/{sample}/         # run_dbcan CAZy calls + substrates (if contig_level_functional=true and functional_cazy=true; coassembly/ under co-assembly)
+    ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true; per sample in both assembly modes)
+    ├── microbecensus/{sample}/ # MicrobeCensus average genome size (if microbecensus=true and contig_level_functional=true or read_level_functional != none; per sample in both assembly modes)
     ├── summary/                # Study-level TPM/CPGE tables + annotated fraction + AGS summary (if contig_level_functional=true); read_* tables (if read_level_functional != none)
-    ├── mags/{sample}/          # Bakta per-bin MAG annotation (if mag_level_functional=true; needs binning with >= 2 binners)
+    ├── mags/{sample}/          # Bakta per-bin MAG annotation (if mag_level_functional=true; needs binning with >= 2 binners; coassembly/ under co-assembly)
     ├── reads/woltka/{sample}/  # Woltka read-level ORF and function tables (if read_level_functional=woltka)
     ├── reads/superfocus/{sample}/ # SUPER-FOCUS SEED level 1-3 tables + raw outputs (if read_level_functional=superfocus)
     ├── reads/humann/{sample}/  # HUMAnN gene families / reactions / pathways (RPK), MetaPhlAn profile, KO/EC/MetaCyc tables (if read_level_functional=humann)

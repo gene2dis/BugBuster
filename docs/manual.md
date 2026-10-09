@@ -78,6 +78,43 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
 | Full pipeline with binning | 128 GB | 16 | 200 GB |
 | Large datasets / co-assembly | 256 GB | 32 | 500 GB |
 
+#### Functional annotation branches
+
+The functional branches add a few memory-heavy steps. Peak memory (RSS) and run
+time observed on the pipeline's own validation runs:
+
+| Step | Branch | Peak memory | Run time | Data |
+|------|--------|-------------|----------|------|
+| `EGGNOG_MAPPER_SEARCH` | contig | **79.9 GB** | 2 h 50 min | real 5-sample co-assembly, 67,812 proteins |
+| `EGGNOG_MAPPER_SEARCH` | contig | 23–28 GB | 48–60 min | 2-sample test data (loading the eggNOG DIAMOND database dominates, so even tiny inputs take this long) |
+| `EGGNOG_MAPPER_ANNOTATE` | contig | 35.1 GB | 18 min | real co-assembly |
+| `RUN_DBCAN` | contig | 5.6 GB | 40 min | real co-assembly |
+| `WOLTKA_ALIGN` | read (woltka) | 64.8 GB | — | test data; the WoLr2 index alone needs ≥ 68 GB RAM |
+| `HUMANN` | read (humann) | 23.5 GB | ~9 min per sample | test data, full ChocoPhlAn |
+| `SUPERFOCUS` | read (superfocus) | ~16 GB | 66–93 min per sample | real samples, DIAMOND |
+| `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
+
+These are observations, not limits: needs grow with input size and community
+complexity. The eggNOG search requests `process_high` resources (16 CPUs,
+72 GB on the first attempt; an out-of-memory failure is retried with
+2 × 72 GB, capped at `--max_memory`, default 128 GB). The 79.9 GB peak above
+was measured under apptainer, which does not enforce task memory on a local
+machine. Where memory is enforced (docker, SLURM, cloud batch), a real
+co-assembly can exceed the first attempt and only finish on the retry, so make
+at least ~96 GB available to it. The annotate step (`process_medium`, 36 GB on
+the first attempt) peaked at 35.1 GB, close to that request, so on larger
+co-assemblies it may also need its retry.
+
+#### Contig taxonomy against NCBI nt
+
+The megablast search of `--contig_tax_and_arg` (`NT_BLASTN`) memory-maps the
+~434 GB NCBI nt database. How much memory it appears to use therefore depends
+on how much RAM the machine has: on a large machine the operating system keeps
+most of the database in memory, which counts toward the task's reported peak
+(close to 400 GB on a 2 TB machine), but those pages can be released again. It
+runs fastest when much of nt fits in RAM. No minimum has been measured; the task
+requests `process_high` resources (72 GB on the first attempt).
+
 ---
 
 ## 3. Installation
@@ -486,6 +523,16 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > loads a ~20 GB Bowtie2 index. The branch runs on any container engine and needs
 > no assembly.
 
+> **Combining the functional branches:** `--contig_level_functional`,
+> `--mag_level_functional` and `--read_level_functional` are independent and can
+> all be enabled in one launch (one read backend per run). MicrobeCensus then
+> runs once per sample and its genome equivalents feed both the contig and the
+> read tables; the read branch still writes only its own `read_*` files and
+> per-backend directories, never the contig-branch tables. With
+> `--contig_level_functional` on, the whole run needs singularity/apptainer (see
+> the engine note above), read backends included — they run from the same
+> pinned images, automatically converted.
+
 ### 6.3 Database Selection Options
 
 | Parameter | Default | Options | Description |
@@ -713,6 +760,16 @@ nextflow run main.nf \
 | `low_disk` | Minimize disk usage: automatic work-dir cleanup (`cleanup = true`, disables `-resume`) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
 
+> **`low_disk` with the functional branches:** the profile only cleans the work
+> directory. It does nothing about the functional annotation databases, which
+> are stored at `--databases_dir` (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta up to
+> ~31.9 GB download, WoLr2 ~94 GB, HUMAnN up to ~71 GB — see Section 4). And
+> because the work directory is deleted when a `low_disk` run succeeds, the run
+> cannot be resumed afterwards: re-running with a changed or added option
+> repeats the multi-hour eggNOG-mapper and read-level steps from scratch. The
+> pipeline warns about this combination at launch; see
+> [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
+
 **Combine profiles as needed:**
 ```bash
 -profile slurm,singularity
@@ -878,17 +935,17 @@ results/
 │       └── *.png
 └── 07_functional_annotation/                   # Functional annotation
     ├── gene_calling/                           # Pyrodigal ORF predictions on contigs
-    │   └── {sample}/                           # (if contig_tax_and_arg=true or contig_level_functional=true)
+    │   └── {sample}/ or coassembly/            # (if contig_tax_and_arg=true or contig_level_functional=true)
     │       ├── {sample}.faa.gz
     │       ├── {sample}.fna.gz
     │       ├── {sample}.gff.gz
     │       └── {sample}.score.gz
     ├── eggnog/                                 # eggNOG-mapper v3 functional annotation
-    │   └── {sample}/                           # (if contig_level_functional=true; needs singularity/apptainer)
+    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true; needs singularity/apptainer)
     │       ├── {sample}.emapper.seed_orthologs
     │       └── {sample}.emapper.annotations
     ├── dbcan/                                  # run_dbcan v5 CAZy annotation
-    │   └── {sample}/                           # (if contig_level_functional=true and functional_cazy=true)
+    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true and functional_cazy=true)
     │       ├── {sample}.overview.tsv           # per-gene CAZy calls with per-tool columns retained
     │       ├── {sample}.dbCANsub_hmm_results.tsv  # dbCAN-sub results incl. substrate predictions
     │       ├── {sample}.dbCAN_hmm_results.tsv  # raw dbCAN HMM results (provenance)
@@ -898,7 +955,8 @@ results/
     │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
     │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
     ├── microbecensus/                          # MicrobeCensus average genome size
-    │   └── {sample}/                           # (if microbecensus=true and contig_level_functional=true or read_level_functional != none)
+    │   └── {sample}/                           # (if microbecensus=true and contig_level_functional=true or read_level_functional != none;
+    │                                           #  per sample in both assembly modes)
     │       ├── {sample}.ags.tsv                # AGS, genome equivalents, total bases
     │       └── {sample}.microbecensus.txt      # raw MicrobeCensus output (provenance)
     ├── summary/                                # study-level tables (if contig_level_functional=true)
@@ -936,8 +994,8 @@ results/
     │       ├── {sample}.humann_functions.tsv   # ko / ec / metacyc RPK composed by the pipeline
     │       └── {sample}.humann_summary.tsv     # reads given / mapped, RPK share annotated per ontology
     ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
-    │   └── {sample}/                           # (if mag_level_functional=true; requires binning with >= 2 binners)
-    │       ├── {sample}_{bin}.gff3             # annotation in GFF3
+    │   └── {sample}/ or coassembly/            # (if mag_level_functional=true; requires binning with >= 2 binners)
+    │       ├── {sample}_{bin}.gff3             # annotation in GFF3 (coassembly_{bin}.* under co-assembly)
     │       ├── {sample}_{bin}.gbff             # annotation in GenBank flat file
     │       ├── {sample}_{bin}.faa              # protein sequences
     │       ├── {sample}_{bin}.fna              # replicon/contig sequences
@@ -956,7 +1014,11 @@ results/
 > shared across samples and gene-level comparisons between samples within the
 > run are valid. Under `--assembly_mode assembly` each sample has its own
 > assembly and gene set: gene ids are sample-specific, and only function-level
-> results (not per-gene rows) may be compared across samples. Counts are
+> results (not per-gene rows) may be compared across samples. The directory
+> keys follow the same split: under co-assembly, `gene_calling/`, `eggnog/`,
+> `dbcan/` and `mags/` hold one set keyed `coassembly` (files named
+> `coassembly.*` / `coassembly_<bin>.*`), while `gene_abundance/` and
+> `microbecensus/` stay per sample in both modes. Counts are
 > read-level (each mate counted separately), not fragment-level; the
 > multi-mapping policy is set by `--featurecounts_multimap`.
 
@@ -1128,13 +1190,13 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
-| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs |
-| `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins |
-| `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions |
+| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
-| `07_functional_annotation/microbecensus/` | `microbecensus=true` and (`contig_level_functional=true` or `read_level_functional != 'none'`) | MicrobeCensus average genome size and genome equivalents per sample |
+| `07_functional_annotation/microbecensus/` | `microbecensus=true` and (`contig_level_functional=true` or `read_level_functional != 'none'`) | MicrobeCensus average genome size and genome equivalents (per sample in both assembly modes) |
 | `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
-| `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin) |
+| `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin; under `coassembly/` with co-assembly binning) |
 | `07_functional_annotation/reads/woltka/` | `read_level_functional='woltka'` | Woltka read-level ORF and function tables per sample (no assembly needed) |
 | `07_functional_annotation/reads/superfocus/` | `read_level_functional='superfocus'` | SUPER-FOCUS SEED level 1-3 tables and raw SUPER-FOCUS outputs per sample (no assembly needed) |
 | `07_functional_annotation/reads/humann/` | `read_level_functional='humann'` | HUMAnN 4 raw tables (MetaPhlAn profile, gene families, reactions, pathway abundance) and the composed ko / ec / metacyc tables per sample (no assembly needed) |

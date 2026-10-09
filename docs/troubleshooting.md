@@ -158,6 +158,12 @@ exitCode: 137
 
 3. Use a larger instance type (cloud) or node (HPC)
 
+The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
+on a real co-assembly, above its 72 GB first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
+see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step are
+listed under [Functional annotation branches](manual.md#functional-annotation-branches)
+in the manual.
+
 ### Out of disk space
 
 **Error:**
