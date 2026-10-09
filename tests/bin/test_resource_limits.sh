@@ -6,13 +6,16 @@
 # after `-profile test` every task stayed clamped at 2 CPU / 6 GB however the
 # -c file raised them. resourceLimits is now a closure read at task time; the
 # local executor pool (conf/base.config) still copies max_* at parse time, so a
-# -c file must set executor.cpus/memory too, and otherwise fails loudly.
+# -c file must set executor.cpus/memory too, and otherwise fails and exits: a
+# local task that can never be scheduled ends the run ('terminate'; with the
+# old 'finish' the run reported the error and then hung, Q22 reopened).
 #
 # Each case is a stub launch of the QC-only test profile under docker; the
 # per-task limits are read from the `--cpu-shares` / `--memory` options
 # Nextflow writes into each task's .command.run (1024 shares per CPU).
 #   - -c (params + executor): tasks clamped at the raised 4 CPU / 12 GB
-#   - -c (params only, raised above the pool): fails with "exceeds available"
+#   - -c (params only, raised above the pool): fails with "exceeds available" and
+#     exits (a hang is caught by the 300 s timeout and fails the test)
 #   - -params-file and --max_* on the command line: tasks at 4 CPU / 12 GB
 #   - no override: tasks stay at the test profile's 2 CPU / 6 GB
 #
@@ -36,6 +39,11 @@ printf "params { max_cpus = 4; max_memory = '12.GB'; max_time = '2.h' }\nexecuto
     > "${TMP_DIR}/limits_with_executor.config"
 printf "params { max_cpus = 4; max_memory = '12.GB'; max_time = '2.h' }\n" > "${TMP_DIR}/limits_params_only.config"
 printf "max_cpus: 4\nmax_memory: '12.GB'\nmax_time: '2.h'\n" > "${TMP_DIR}/limits.yaml"
+# Local reads (tests/bin/make_test_read_fixtures.sh): the stub launches need no download
+READS="${REPO_DIR}/tests/data/reads"
+printf "sample,r1,r2,s\ntest_sample1,%s,%s,\ntest_sample2,%s,%s,\n" \
+    "${READS}/test_sample1_R1.fastq.gz" "${READS}/test_sample1_R2.fastq.gz" \
+    "${READS}/test_sample2_R1.fastq.gz" "${READS}/test_sample2_R2.fastq.gz" > "${TMP_DIR}/samplesheet.csv"
 
 PASS=0
 FAIL=0
@@ -46,8 +54,10 @@ launch() {
     # launch <case-dir> <nextflow global opts> <run opts> — returns the run's exit status
     local dir="${TMP_DIR}/$1"
     mkdir -p "${dir}"
-    (cd "${dir}" && nextflow $2 run "${REPO_DIR}/main.nf" -profile test,docker -stub \
-        --output results $3 > run.log 2>&1)
+    # timeout: a run that reports an error but never exits must not pass (or
+    # stall CI); exit status 124 = hung
+    (cd "${dir}" && timeout 300 nextflow $2 run "${REPO_DIR}/main.nf" -profile test,docker -stub \
+        --input "${TMP_DIR}/samplesheet.csv" --output results $3 > run.log 2>&1)
 }
 
 max_limits() {
@@ -77,8 +87,12 @@ else
 fi
 expect_limits "-c with params + executor: tasks clamped at the raised limits" c_executor 4096 12288
 
-if launch c_params_only "-c ${TMP_DIR}/limits_params_only.config" ""; then
+rc=0
+launch c_params_only "-c ${TMP_DIR}/limits_params_only.config" "" || rc=$?
+if [ "${rc}" -eq 0 ]; then
     fail "-c with params only (above the 2-CPU test pool): expected a scheduling failure"
+elif [ "${rc}" -eq 124 ]; then
+    fail "-c with params only: reported the error but did not exit (hung, killed after 300 s)"
 elif grep -q "exceeds available" "${TMP_DIR}/c_params_only/run.log"; then
     pass "-c with params only (above the 2-CPU test pool): fails loudly ('exceeds available')"
 else

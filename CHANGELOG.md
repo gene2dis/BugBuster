@@ -257,8 +257,11 @@ startup instead of being silently ignored. Update existing command lines and
   now read at task time, so `-c`, `-params-file` and the command line all work. The local
   executor's pool still follows only the command line and `-params-file` (executor settings
   are fixed at parse time): a `-c` file that raises the limits must also set
-  `executor { cpus; memory }`, and otherwise fails loudly with "Process requirement exceeds
-  available CPUs". Documented in the manual, parameters and troubleshooting; regression test
+  `executor { cpus; memory }`. Otherwise the run fails with "Process requirement exceeds
+  available CPUs" and stops: a local task that can never be scheduled now ends the run
+  (`terminate`) instead of the default `finish`, which waited forever for queued tasks that
+  could not run either (the same applies to the download labels, `RGI_BWT` and
+  `MICROBECENSUS`). Documented in the manual, parameters and troubleshooting; regression test
   `tests/bin/test_resource_limits.sh`
 - **SUPER-FOCUS, HUMAnN and every database download under singularity/apptainer**: the
   separately built singularity images of the SUPER-FOCUS and HUMAnN containers have no

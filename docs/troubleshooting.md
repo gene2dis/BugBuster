@@ -216,7 +216,8 @@ Process requirement exceeds available CPUs -- req: 8; avail: 2
 every task, and the run's machine-wide CPU and memory pool. The pool is fixed before a `-c`
 config file is read. A `-c` file that raises `max_*` in `params {}` lifts the per-task caps
 but leaves the pool at the profile's values, so a task bigger than the pool cannot be
-scheduled. After `-profile test`, the pool is 2 CPUs / 6 GB.
+scheduled, and the run stops at the first such task. After `-profile test`, the pool is
+2 CPUs / 6 GB.
 
 **Solution:** either pass the limits on the command line or in a `-params-file` (these set
 both), or add an `executor` block to the `-c` file:
