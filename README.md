@@ -145,7 +145,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
-| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3; requires the singularity/apptainer profile while v3 is in beta) | `contig_level_functional=true` | `--custom_eggnog_db` |
+| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
 | **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |
 | **NCBI COG 2024 definitions** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` | `--custom_cog_db` |
@@ -214,7 +214,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly and `-profile singularity` or `apptainer` |
+| `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
 | `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
 | `--read_level_functional` | `none` | Read-level functional profiling: `woltka`, `superfocus`, `humann` or `none` (needs no assembly) |
 | `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |

@@ -256,8 +256,8 @@ nextflow_pipeline {
     test("Stub run wires the contig functional annotation branch (assembly mode)") {
         // Wiring test for design doc T2/T3: eggNOG two-stage annotation plus
         // featureCounts gene quantification compose end-to-end under
-        // per-sample assembly. Stub runs are exempt from the sif-only engine
-        // guard, so this runs under the docker CI profile. The counting BAM
+        // per-sample assembly, under the docker CI profile (the docker path
+        // uses the pipeline-built eggNOG-mapper image). The counting BAM
         // comes from BOWTIE2_SAMTOOLS via the gate extended with
         // contig_level_functional (Q1) - binning and contig_tax_and_arg are
         // both off here to prove the branch produces its own BAM.
@@ -637,7 +637,7 @@ nextflow_pipeline {
     test("Stub run wires the read-level functional branch without an assembly") {
         // T8a (design doc Sections 3.4, 4.6.2): the read branch must run
         // with --assembly_mode none and nothing of the contig/MAG branches.
-        // Woltka ships normal biocontainers, so no engine guard applies.
+        // Woltka ships normal biocontainers.
         // No --custom_woltka_db here: pins the FORMAT_WOLTKA_DB provisioning
         // path (the assembly-mode functional test pins the custom path).
         options "-stub"
@@ -850,8 +850,7 @@ nextflow_pipeline {
         // T8c (design doc Section 4.6.1, Q2): the HUMAnN backend runs with
         // --assembly_mode none. No --custom_humann_db: pins the
         // FORMAT_HUMANN_DB provisioning path for the default database set
-        // (v4_alpha-full). The HUMAnN image is a normal docker image: no
-        // engine guard applies.
+        // (v4_alpha-full). The HUMAnN image is a normal docker image.
         options "-stub"
 
         when {

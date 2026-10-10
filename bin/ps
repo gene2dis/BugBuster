@@ -12,6 +12,8 @@
 #      wrapper itself, invoking exactly `ps -e -o pid= -o ppid=`; emulate that
 #      one output from /proc.
 #
+# Only the official .sif used under singularity/apptainer needs this: the
+# pipeline-built docker image (containers/eggnog-mapper) includes procps.
 # Delete this shim when eggNOG-mapper v3 ships an image with procps
 # (tracked as design doc Q11 alongside the container re-pin).
 #

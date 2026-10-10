@@ -63,7 +63,7 @@ def printHelp() {
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
-      --contig_level_functional     Enable contig-level functional annotation; needs singularity/apptainer (default: ${params.contig_level_functional})
+      --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
       --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
@@ -247,18 +247,6 @@ workflow {
     def valid_superfocus_aligners = ['diamond', 'mmseqs2']
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
         error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
-    }
-
-    // eggNOG-mapper v3 is a beta that ships only an Apptainer image (no
-    // bioconda/biocontainer/docker image), so the functional branch can only
-    // execute under singularity/apptainer for now (design doc Section 2, Q11).
-    // Stub runs are exempt: the module stubs run without a container, keeping
-    // CI and nf-test green under the docker profile. Deliberately keyed on
-    // contig_level_functional only: Bakta ships a normal biocontainer, so a
-    // MAG-only run (--mag_level_functional) stays docker-compatible.
-    if (flagOn(params.contig_level_functional) && !workflow.stubRun
-            && !(workflow.containerEngine in ['singularity', 'apptainer'])) {
-        error("--contig_level_functional requires a singularity or apptainer container engine: eggNOG-mapper v3 (beta) ships only an Apptainer image, no docker image exists yet. Use -profile singularity or -profile apptainer for this branch (docker support returns when eggNOG-mapper v3.0.0 final is released on bioconda)")
     }
 
     // low_disk deletes the work dir when the run succeeds, so a completed run

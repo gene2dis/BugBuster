@@ -13,10 +13,12 @@
     design doc Q23) and stops if the installed method is not the beta6 one.
 
     Container: eggNOG-mapper v3 is a beta with no bioconda/biocontainer or
-    docker image — only the upstream Apptainer .sif exists. Under any other
-    engine the container resolves to none so the stub still runs (bare metal);
-    real runs under docker/podman are rejected by the launch guard in main.nf.
-    Re-pin to the biocontainer when v3.0.0 final ships (design doc Q11).
+    docker image — upstream publishes only an Apptainer .sif, used under
+    singularity/apptainer. Every other engine uses the pipeline-built image of
+    the same beta6 (containers/eggnog-mapper/Dockerfile, published to GHCR by
+    .github/workflows/eggnog-image.yml; pinned by digest — re-pin after a
+    rebuild). Re-pin both to the biocontainer when v3.0.0 final ships (design
+    doc Q11).
 
     Input:
         tuple val(meta), path(seed_orthologs), path(eggnog_db)
@@ -33,7 +35,7 @@ process EGGNOG_MAPPER_ANNOTATE {
 
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
         'https://data.cgmlab.org/eggnog-mapper/emapper-3.0/eggnog-mapper-3.0.0-beta6.sif' :
-        '' }"
+        'ghcr.io/gene2dis/bugbuster-eggnog-mapper@sha256:4082fbe1ca8be9adcc6653e986cf227a0f725cafdeb4fff9b2b5fb3777f8f6b8' }"
 
     input:
     tuple val(meta), path(seed_orthologs), path(eggnog_db)

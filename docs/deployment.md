@@ -296,13 +296,13 @@ nextflow run main.nf \
     ...
 ```
 
-> **Note — functional annotation branch on cloud executors:**
-> `--contig_level_functional` requires a singularity/apptainer container
-> engine while eggNOG-mapper v3 is in beta, so it cannot run under the
-> docker-based `aws`, `gcp`, and `azure` profiles for now (SLURM with the
-> `apptainer`/`singularity` profile works). See the engine note in
-> [`manual.md`](manual.md). The MAG branch (`--mag_level_functional`, Bakta)
-> is unaffected: it uses a normal biocontainer and runs on any engine, and so
+> **Note — functional annotation branches on cloud executors:**
+> `--contig_level_functional` runs under the docker-based `aws`, `gcp` and
+> `azure` profiles using the pipeline-built eggNOG-mapper image
+> (`ghcr.io/gene2dis/bugbuster-eggnog-mapper`; see the container note in
+> [`manual.md`](manual.md)); its eggNOG-mapper search peaked at ~80 GB RAM on
+> a real 5-sample co-assembly, so size the instance type / queue for it. The
+> MAG branch (`--mag_level_functional`, Bakta) runs on any engine, and so
 > is the read-level branch (`--read_level_functional woltka`) — but note its
 > Bowtie2 alignment against WoLr2 needs ≥ 68 GB RAM per task, so size the
 > cloud instance type / queue accordingly. The SUPER-FOCUS read backend

@@ -117,9 +117,7 @@ next release is tagged.
     official tarball's copy is too old for the AMRFinderPlus in the pinned
     bakta container and would fail every annotation at the AMR expert step —
     custom databases need the same one-time refresh, see troubleshooting)
-  - Independent of `--contig_level_functional` and runs on any container
-    engine (docker included) — the singularity/apptainer requirement applies
-    only to the contig branch
+  - Independent of `--contig_level_functional`; runs on any container engine
 - **Contig-level functional annotation (`--contig_level_functional`)**
   - Shared Pyrodigal gene calling on contigs (one pass feeds both DeepARG and
     functional annotation), published to `07_functional_annotation/gene_calling/`
@@ -184,9 +182,13 @@ next release is tagged.
     documented parameter (`--dbcan_consensus`: `recommended` = calls
     supported by >= 2 tools, `any` = per-tool union), and the overview
     parser is version-aware like the eggNOG one
-  - Note: the branch requires a singularity/apptainer container engine while
-    eggNOG-mapper v3 is in beta (no docker image exists upstream); real runs
-    under docker/podman abort at launch with an explanatory error
+  - Runs on every container engine. eggNOG-mapper 3.0.0-beta6 is published
+    only as an Apptainer image, which singularity/apptainer use; docker/podman
+    and the cloud profiles use `ghcr.io/gene2dis/bugbuster-eggnog-mapper`, an
+    image of the same version built from the authors' recipe with the same
+    tool versions (`containers/eggnog-mapper/Dockerfile`, published by the
+    `eggnog-image` workflow; same annotations as the official image). It is
+    replaced by the bioconda image once v3.0.0 final is released
   - `docs/WORKFLOW_DIAGRAM.md` refreshed to cover the functional annotation
     branch (shared Pyrodigal gene calling, eggNOG/dbCAN database preparation,
     per-sample co-assembly counting alignments, the FUNCTIONAL_ANNOTATION

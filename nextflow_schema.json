@@ -89,7 +89,7 @@
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + run_dbcan v5 CAZy annotation + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly, and a singularity/apptainer container engine while eggNOG-mapper v3 is in beta.",
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + run_dbcan v5 CAZy annotation + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "mag_level_functional": {

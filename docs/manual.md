@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles); MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; see the container note under the feature toggles); MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
@@ -411,16 +411,16 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
 
-> **Engine note for `--contig_level_functional`:** eggNOG-mapper v3 is in beta and its
-> authors publish only an Apptainer image, so this branch requires
-> `-profile singularity` or `-profile apptainer`. Nextflow uses one container engine
-> per run, which means enabling this branch switches the **entire run** to that
-> engine — every other tool runs from the same pinned images, automatically
-> converted, so results are unchanged (expect a one-time image-conversion delay on
-> first run). Because the cloud profiles (`aws`, `gcp`, `azure`) are docker-based,
-> this branch cannot run on cloud batch executors during the beta. Runs without
-> this flag are unaffected on every engine. Docker/cloud support returns when
-> eggNOG-mapper v3.0.0 final is released on bioconda.
+> **Container note for `--contig_level_functional`:** the branch uses eggNOG-mapper
+> 3.0.0-beta6, whose authors publish only an Apptainer image. Under
+> `-profile singularity` or `-profile apptainer` the pipeline uses that official image;
+> under docker/podman and the docker-based cloud profiles (`aws`, `gcp`, `azure`) it
+> uses `ghcr.io/gene2dis/bugbuster-eggnog-mapper`, an image of the same beta6 built by
+> this pipeline from the authors' own recipe, with the same tool versions (both were
+> checked to give identical results). Both engines apply a run-time fix for an
+> eggNOG-mapper beta6 bug that cost some genes their COG category (upstream issue
+> #620; see troubleshooting). The pipeline will switch to the official bioconda image
+> once eggNOG-mapper v3.0.0 final is released.
 
 > **Note for `--mag_level_functional`:** Bakta annotates the refined bins, one task
 > per bin, publishing per-bin GFF3/GBFF/FAA/FNA/TSV/summary files under
@@ -528,9 +528,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 > runs once per sample and its genome equivalents feed both the contig and the
 > read tables; the read branch still writes only its own `read_*` files and
 > per-backend directories, never the contig-branch tables. With
-> `--contig_level_functional` on, the whole run needs singularity/apptainer (see
-> the engine note above), read backends included; all three read backends were
-> verified under apptainer alongside the contig branch.
+> `--contig_level_functional` on, all three read backends were verified alongside
+> the contig branch.
 
 ### 6.3 Database Selection Options
 
@@ -930,7 +929,7 @@ results/
     │       ├── {sample}.gff.gz
     │       └── {sample}.score.gz
     ├── eggnog/                                 # eggNOG-mapper v3 functional annotation
-    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true; needs singularity/apptainer)
+    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true)
     │       ├── {sample}.emapper.seed_orthologs
     │       └── {sample}.emapper.annotations
     ├── dbcan/                                  # run_dbcan v5 CAZy annotation

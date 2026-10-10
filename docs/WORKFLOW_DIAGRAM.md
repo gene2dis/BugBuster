@@ -303,7 +303,7 @@ flowchart TD
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
-| `contig_level_functional` | `false` | Enable the contig functional annotation branch (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables; needs singularity/apptainer) |
+| `contig_level_functional` | `false` | Enable the contig functional annotation branch (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables) |
 | `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
 | `dbcan_consensus` | `'recommended'` | Which dbCAN calls feed aggregation: 'recommended' (≥2 tools) or 'any' |
 | `microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (non-fatal on failure) |

@@ -3,10 +3,10 @@
     EGGNOG_MAPPER_ANNOTATE Module Test
 
     Stage 2 of the two-stage eggNOG-mapper v3 run (design doc Section 4.2,
-    task T2). Stub-mode only: a real run needs the ~44 GB eggNOG 7 database
-    and a singularity/apptainer engine (v3 beta ships only an Apptainer
-    image), neither CI-feasible. Under the suite's docker profile the module's
-    container resolves to none, so the stub runs bare-metal. The Section 10.2
+    task T2). Stub-mode only: a real run needs the ~44 GB eggNOG 7 database,
+    which is not CI-feasible. Under the suite's docker profile the stub runs in
+    the pipeline-built eggNOG-mapper image (ghcr.io/gene2dis/
+    bugbuster-eggnog-mapper, design doc Q11 interim). The Section 10.2
     acceptance check (non-empty annotations on a test protein set) is a manual
     run against a real database.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
