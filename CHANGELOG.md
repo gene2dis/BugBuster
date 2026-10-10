@@ -208,6 +208,12 @@ next release is tagged.
   `05_arg_prediction/contig_level/prodigal/` to
   `07_functional_annotation/gene_calling/` (same predictions, gzipped, now
   produced once for both DeepARG and functional annotation)
+- **Breaking (output layout)**: under `--assembly_mode coassembly`, the CheckM2
+  and GTDB-Tk reports moved from `04_binning/per_sample/coassembly/quality/`
+  and `.../taxonomy/` to `04_binning/coassembly/quality/checkm2/` and
+  `04_binning/coassembly/taxonomy/gtdbtk/`, next to the co-assembly bins; a
+  co-assembly run no longer creates `04_binning/per_sample/`. Per-sample mode
+  is unchanged
 - Updated README.md with RGI feature description and usage examples
 - Updated docs/manual.md with RGI parameters, output structure, and usage examples
 - Updated docs/parameters.md with complete RGI parameter reference

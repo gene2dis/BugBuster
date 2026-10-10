@@ -851,8 +851,8 @@ results/
 │       ├── coassembly_contig.stats             # Assembly statistics
 │       └── coassembly_contigs.fa               # Raw MEGAHIT contigs
 ├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/                             # Per-sample binning results
-│   │   └── {sample}/                           # (coassembly/ under co-assembly: quality/ and taxonomy/ only)
+│   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
+│   │   └── {sample}/
 │   │       ├── raw_bins/                       # Raw bins, one folder per selected binner
 │   │       │   ├── metabat2/                   # MetaBAT2 bins
 │   │       │   ├── semibin/                    # SemiBin bins
@@ -865,6 +865,10 @@ results/
 │   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
 │   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
 │   │   ├── refined_bins/                       # MetaWRAP refined bins (if >= 2 binners)
+│   │   ├── quality/                            # CheckM2 quality reports
+│   │   │   └── checkm2/
+│   │   ├── taxonomy/                           # GTDB-TK taxonomy
+│   │   │   └── gtdbtk/
 │   │   ├── coverage/                           # Bin coverage information
 │   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
 │   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')

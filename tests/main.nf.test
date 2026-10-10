@@ -166,6 +166,43 @@ nextflow_pipeline {
             // --mag_level_functional must run no Bakta and publish no mags/
             assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA") } == 0
             assert !path("${outputDir}/07_functional_annotation/mags").exists()
+
+            // CheckM2 / GTDB-Tk batch reports are routed per sample by saveAs
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/quality/checkm2/test_sample1_semibin_quality_report.tsv").exists()
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/taxonomy/gtdbtk/test_sample1_gtdbtk_bac120.tsv").exists()
+            assert !path("${outputDir}/04_binning/coassembly").exists()
+        }
+    }
+
+    test("Stub run publishes co-assembly binning outputs") {
+        // Co-assembly binning results all live under 04_binning/coassembly/:
+        // the CheckM2 / GTDB-Tk batch reports used to land in
+        // 04_binning/per_sample/coassembly/, away from the bins they describe.
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "coassembly"
+                include_binning    = true
+                binners            = "semibin,metabat2"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert path("${outputDir}/04_binning/coassembly/refined_bins").exists()
+            assert path("${outputDir}/04_binning/coassembly/summary").exists()
+            assert path("${outputDir}/04_binning/coassembly/quality/checkm2/coassembly_semibin_quality_report.tsv").exists()
+            assert path("${outputDir}/04_binning/coassembly/taxonomy/gtdbtk/coassembly_gtdbtk_bac120.tsv").exists()
+            assert !path("${outputDir}/04_binning/per_sample").exists()
         }
     }
 

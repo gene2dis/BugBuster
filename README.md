@@ -323,8 +323,7 @@ results/
 │   └── coassembly/             # Co-assembly results
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
 │   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK)
-│   ├── per_sample/coassembly/  # Co-assembly mode: quality/ (CheckM2) and taxonomy/ (GTDB-TK) only
-│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), coverage/, summary/
+│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/
 │   ├── quality/summary/        # Aggregated quality reports (assembly mode)
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
