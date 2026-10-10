@@ -158,6 +158,13 @@ feat(modules): add DIAMOND module for protein alignment
   every command the script calls, and run the process once under apptainer. Also remember
   that a singularity/apptainer image is read-only: a tool must not write inside its own
   install directory
+- Upstream bugs are worked around in `bin/`, never by editing an image:
+  `bin/run_microbe_census_py3fix.py` and `bin/emapper_ogs_fix.py` replace one broken
+  function and then run the stock CLI with the same arguments, and `bin/ps` stands in for
+  the `ps` the eggNOG-mapper `.sif` lacks. A patching wrapper must check that the installed
+  code is the exact version it was written for and stop otherwise, so an upstream update
+  surfaces as an error instead of a silent double fix. Each one names its removal
+  condition (a fixed upstream release); remove it with the re-pin
 
 ### Process Structure
 

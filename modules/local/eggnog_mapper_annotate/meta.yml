@@ -1,5 +1,5 @@
 name: eggnog_mapper_annotate
-description: eggNOG-mapper stage 2 - orthology-transfer annotation of seed orthologs (-m no_search --annotate_hits_table)
+description: eggNOG-mapper stage 2 - orthology-transfer annotation of seed orthologs (-m no_search --annotate_hits_table), run through bin/emapper_ogs_fix.py, which patches the beta6 OG-name parsing bug (upstream #620)
 keywords:
   - functional annotation
   - orthology

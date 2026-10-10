@@ -8,6 +8,10 @@
     annotation_confidence is a positional code — downstream parsing must be
     version-aware (design doc Section 4.2).
 
+    emapper.py runs through bin/emapper_ogs_fix.py, which patches the beta6
+    OG-string parser for eggNOG 7 OG names containing '|' (upstream #620,
+    design doc Q23) and stops if the installed method is not the beta6 one.
+
     Container: eggNOG-mapper v3 is a beta with no bioconda/biocontainer or
     docker image — only the upstream Apptainer .sif exists. Under any other
     engine the container resolves to none so the stub still runs (bare metal);
@@ -45,7 +49,7 @@ process EGGNOG_MAPPER_ANNOTATE {
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
     """
-    emapper.py \\
+    emapper_ogs_fix.py \\
         -m no_search \\
         --annotate_hits_table ${seed_orthologs} \\
         ${args} \\

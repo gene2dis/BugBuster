@@ -329,6 +329,24 @@ Bakta) uses a normal biocontainer and runs on any engine.
 > delegating `ps` shim in `bin/` — do not remove `bin/ps` while the functional
 > branch uses the upstream image.
 
+### EGGNOG_MAPPER_ANNOTATE fails with "the installed eggNOG-mapper _parse_ogs_string is not the v3.0.0-beta6 method"
+
+**Cause:** the annotate step runs eggNOG-mapper through `bin/emapper_ogs_fix.py`,
+which corrects a bug in eggNOG-mapper 3.0.0-beta6 (upstream issue #620): OG
+names whose family part contains `|` (about 2 % of eggNOG 7 OGs, e.g.
+`ABC_tran|TL31Y9@131567|A-1`) were cut short, so those genes lost their COG
+category or took it from another OG (about 1-4 % of annotated genes; KO, EC,
+Pfam and CAZy were not affected). The wrapper replaces only that parsing
+function, and only after checking that the installed code is exactly the
+beta6 version it was written for. This error means the eggNOG-mapper image
+was changed to a different version.
+
+**Solution:** this only happens if the eggNOG-mapper container was changed
+(e.g. a custom `process.container` override, or a pipeline update to a newer
+eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
+check whether issue #620 is fixed in the new version and update or remove
+`bin/emapper_ogs_fix.py` accordingly.
+
 ### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
 
 **Error:**

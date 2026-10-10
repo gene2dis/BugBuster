@@ -152,6 +152,13 @@ next release is tagged.
     Pfam family is reported by name and counted once per gene (format
     verified on all 73.9 M Pfam values of the eggNOG 7 database). An unknown
     COG id or an unexpected `PFAMs` form fails loudly
+  - eggNOG-mapper 3.0.0-beta6 truncates OG names whose family part contains
+    `|` (upstream issue #620; ~2 % of eggNOG 7 OGs), which cost those genes
+    their COG category or gave them another OG's (1-4 % of annotated genes
+    on real data; KO, EC, Pfam and CAZy unaffected). The annotate step runs
+    through `bin/emapper_ogs_fix.py`, which applies the fix proposed on the
+    issue at run time and refuses to run on any eggNOG-mapper version other
+    than the beta6 it targets
   - MicrobeCensus average genome size estimation on the host-removed reads
     (`--microbecensus`, on by default with the branch), published to
     `07_functional_annotation/microbecensus/`, enabling the CPGE
