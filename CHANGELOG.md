@@ -219,6 +219,11 @@ next release is tagged.
 - Minimum Nextflow version raised from 23.04.0 to **24.04.0** with parameter
   validation now enforced by the nf-schema 2.4.2 plugin (audit #25): unknown
   `--params` are a hard startup error
+- **Breaking (Nextflow version, after v1.1)**: minimum Nextflow raised again,
+  from 24.04.0 to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now
+  follows Nextflow's strict syntax, whose parser needs nf-schema >= 2.7.2,
+  which in turn needs Nextflow >= 25.10. nf-schema 2.8.0 needs Nextflow >= 26.04,
+  so the plugin stays pinned at 2.7.3
 - Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
   wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
   `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
@@ -226,8 +231,8 @@ next release is tagged.
 ### Removed
 
 **Breaking**: parameter validation is now strict (nf-schema
-`failUnrecognisedParams`), so passing any removed parameter aborts the run at
-startup instead of being silently ignored. Update existing command lines and
+`validation.logging.unrecognisedParams = 'error'`), so passing any removed
+parameter aborts the run at startup instead of being silently ignored. Update existing command lines and
 `-params-file` YAMLs accordingly.
 
 - `--custom_phiX_index` and `--custom_bowtie_host_index` — replaced by

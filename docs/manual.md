@@ -386,7 +386,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|-------------|
 | `--input` | *required* | Path to samplesheet CSV file |
 | `--output` | *required* | Output directory for results |
-| `--publish_dir_mode` | `copy` | How to save results: `copy`, `symlink`, `link`, `move` |
+| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` |
 
 ### 6.2 Pipeline Execution Options
 
@@ -817,13 +817,13 @@ results/
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
-├── 01_quality_control/                         # Quality control (if quality_control=true)
-│   ├── fastp/                                  # FastP reports per sample
+├── 01_quality_control/                         # Quality control
+│   ├── fastp/                                  # FastP reports per sample (if quality_control=true)
 │   │   └── {sample}/                           # Per-sample QC results
 │   │       ├── {sample}.fastp.html             # HTML report
 │   │       ├── {sample}.fastp.json             # JSON report
 │   │       └── {sample}.fastp.log              # Log file
-│   └── summary/                                # Aggregated QC statistics
+│   └── summary/                                # Aggregated read counts (also with quality_control=false)
 │       ├── Reads_report.csv                    # Read count summary
 │       └── *.png                               # QC plots
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
@@ -851,29 +851,27 @@ results/
 │       ├── coassembly_contig.stats             # Assembly statistics
 │       └── coassembly_contigs.fa               # Raw MEGAHIT contigs
 ├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
-│   │   └── {sample}/
-│   │       ├── raw_bins/                       # Raw bins from 3 binners
+│   ├── per_sample/                             # Per-sample binning results
+│   │   └── {sample}/                           # (coassembly/ under co-assembly: quality/ and taxonomy/ only)
+│   │       ├── raw_bins/                       # Raw bins, one folder per selected binner
 │   │       │   ├── metabat2/                   # MetaBAT2 bins
 │   │       │   ├── semibin/                    # SemiBin bins
 │   │       │   └── comebin/                    # COMEBin bins
-│   │       ├── refined_bins/                   # MetaWRAP refined bins
+│   │       ├── refined_bins/                   # MetaWRAP refined bins (if >= 2 binners)
 │   │       ├── quality/                        # CheckM2 quality reports
 │   │       │   └── checkm2/
 │   │       └── taxonomy/                       # GTDB-TK taxonomy
 │   │           └── gtdbtk/
 │   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
-│   │   ├── raw_bins/                           # Raw bins from 3 binners
-│   │   ├── refined_bins/                       # MetaWRAP refined bins
-│   │   ├── quality/                            # CheckM2 quality reports
-│   │   ├── taxonomy/                           # GTDB-TK taxonomy
+│   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
+│   │   ├── refined_bins/                       # MetaWRAP refined bins (if >= 2 binners)
 │   │   ├── coverage/                           # Bin coverage information
-│   │   └── summary/                            # Bin summary statistics
-│   ├── quality/                                # Aggregated quality reports
+│   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
+│   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')
 │   │   └── summary/
 │   │       ├── *.csv                           # Quality summary tables
 │   │       └── *.png                           # Quality plots
-│   └── taxonomy/                               # Aggregated taxonomy reports
+│   └── taxonomy/                               # Aggregated taxonomy reports (if assembly_mode='assembly')
 │       └── summary/
 │           ├── *.csv                           # Taxonomy summary tables
 │           └── *.png                           # Taxonomy plots
@@ -904,7 +902,7 @@ results/
 │   │       └── *.csv
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── deeparg/                            # DeepARG predictions per sample
-│   │   │   └── {sample}/
+│   │   │   └── {sample}/                       # (coassembly/ under co-assembly)
 │   │   │       └── *_contigs_deep_arg.out.mapping.ARG
 │   │   ├── summary/                            # ARG summary reports
 │   │   │   └── Contig_tax_and_arg_prediction.tsv
@@ -912,9 +910,9 @@ results/
 │   │       └── *.png
 │   └── bin_level/                              # Bin-level ARG (if arg_bin_clustering=true)
 │       ├── proteins/                           # Prodigal ORF predictions
-│       │   └── {sample}/
+│       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       ├── deeparg/                            # DeepARG predictions per bin
-│       │   └── {sample}/
+│       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
@@ -1162,7 +1160,8 @@ The following outputs are only generated when specific parameters are enabled:
 
 | Output Directory | Required Parameter | Description |
 |------------------|-------------------|-------------|
-| `01_quality_control/` | `quality_control=true` | Quality control and filtering results |
+| `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
+| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`, extended with taxonomy when a profiler runs) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
 | `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |
 | `03_assembly/` | `assembly_mode != 'none'` | Assembly results |

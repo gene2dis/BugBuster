@@ -214,6 +214,11 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
+| `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly and `-profile singularity` or `apptainer` |
+| `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
+| `--read_level_functional` | `none` | Read-level functional profiling: `woltka`, `superfocus`, `humann` or `none` (needs no assembly) |
+| `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |
+| `--functional_cazy` | `true` | run_dbcan CAZy annotation in the contig functional branch |
 | `--arg_bin_clustering` | `false` | Bin-level ARG prediction and clustering |
 
 ### Database Selection
@@ -304,7 +309,7 @@ The pipeline generates organized output with numbered prefixes:
 results/
 ├── pipeline_info/              # Execution reports, logs, contig filtering summary
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
-├── 01_quality_control/         # QC results (if quality_control=true)
+├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports
 │   └── summary/                # Aggregated statistics
 ├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
@@ -317,15 +322,11 @@ results/
 │   ├── per_sample/             # Per-sample assemblies
 │   └── coassembly/             # Co-assembly results
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/{sample}/ or coassembly/
-│   │   ├── raw_bins/           # MetaBAT2, SemiBin, COMEBin
-│   │   ├── refined_bins/       # MetaWRAP refined bins
-│   │   ├── quality/            # CheckM2 reports
-│   │   └── taxonomy/           # GTDB-TK classifications
-│   ├── coassembly/coverage/    # Per-bin coverage (coassembly mode)
-│   ├── coassembly/summary/     # Bin summary (coassembly mode)
-│   ├── quality/summary/        # Aggregated quality reports
-│   └── taxonomy/summary/       # Aggregated taxonomy reports
+│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK)
+│   ├── per_sample/coassembly/  # Co-assembly mode: quality/ (CheckM2) and taxonomy/ (GTDB-TK) only
+│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), coverage/, summary/
+│   ├── quality/summary/        # Aggregated quality reports (assembly mode)
+│   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
 │   ├── read_level/             # Read-level predictions
 │   │   ├── karga/              # KARGA results (if read_arg_prediction=true)
@@ -336,7 +337,7 @@ results/
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
-│   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/)
+│   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/; coassembly/ under co-assembly)
 │   │   ├── summary/            # Combined tax + ARG report
 │   │   └── figures/            # ARG scatter plots
 │   └── bin_level/              # Bin-level ARG (if arg_bin_clustering=true)
