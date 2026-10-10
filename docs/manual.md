@@ -1643,4 +1643,4 @@ https://github.com/gene2dis/BugBuster
 
 ---
 
-*BugBuster v1.1.0dev - Built with Nextflow*
+*BugBuster v2.0.0dev - Built with Nextflow*

@@ -305,7 +305,8 @@ before an interruption may not be recorded in any run.
 
 ## Version History
 
-- **v1.1.0dev** - Current: `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir replaced by conditional publishDir; this document corrected to the measured behaviour (cleanup does not lower peak usage)
+- **v2.0.0dev** - Current: this document corrected to the measured behaviour (cleanup does not lower peak usage)
+- **v1.1** - `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir replaced by conditional publishDir
 - **v1.0.0** - Initial disk optimization implementation
   - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
   - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS

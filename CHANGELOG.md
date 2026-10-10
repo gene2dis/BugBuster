@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The pipeline self-reports this state as `1.1.0dev` (manifest version) until the
+The pipeline self-reports this state as `2.0.0dev` (manifest version) until the
 next release is tagged.
 
 ### Added
@@ -31,7 +31,15 @@ next release is tagged.
     `read_annotated_fraction.tsv` and `read_sample_summary.tsv` to
     `07_functional_annotation/summary/`; per-sample tables to
     `07_functional_annotation/reads/woltka/<sample>/`. Reported separately
-    from, never merged with, the assembly-based tables
+    from, never merged with, the assembly-based tables. Inputs are collected
+    in a fixed (sorted) order, so resumed runs are fully cached
+  - Same `cog` / `pfam` vocabularies as the contig branch: WoLr2's COG ortholog
+    ids are mapped to COG functional categories with NCBI's `cog-24.def.tab`
+    (downloaded for `--read_level_functional woltka` too; letters counted once
+    per ORF), and Pfam families are reported by name, with the versioned
+    accession in `description`. Five malformed COG strings in the WoLr2
+    `ko-to-cog` map (e.g. `COG:1140`) and four ids absent from COG 2024 are
+    skipped with a warning; any other unmapped id fails loudly
   - WoLr2 subset (~94 GB: Bowtie2 index + ORF coordinates + KEGG / MetaCyc /
     Pfam maps) auto-downloaded from the official host with md5 verification
     (`--woltka_db wolr2`), or a local mirror via `--custom_woltka_db`; the
@@ -133,7 +141,17 @@ next release is tagged.
     CAZy; intentional double-counting of multi-term genes), wide TPM and
     CPGE matrices per ontology, a per-sample annotated-fraction report and
     an AGS summary (`ags_and_ge.tsv`); the eggNOG annotations parser is
-    version-aware and fails loudly on layout drift
+    version-aware and fails loudly on layout drift. Inputs are collected in a
+    fixed (sorted) order, so resumed runs are fully cached
+  - COG and Pfam terms: eggNOG 7 writes a COG ortholog id (e.g. `COG1629`)
+    into `COG_category` for most genes (75-80 % on real data); these are
+    mapped to COG functional-category letters with NCBI's COG definitions
+    table (`cog-24.def.tab`, ~410 KB, auto-downloaded with md5 verification;
+    `--cog_db` / `--custom_cog_db`). eggNOG-mapper v3 writes `PFAMs` values as
+    `<pfam_name>_<start>_<end>`; the domain coordinates are stripped, so each
+    Pfam family is reported by name and counted once per gene (format
+    verified on all 73.9 M Pfam values of the eggNOG 7 database). An unknown
+    COG id or an unexpected `PFAMs` form fails loudly
   - MicrobeCensus average genome size estimation on the host-removed reads
     (`--microbecensus`, on by default with the branch), published to
     `07_functional_annotation/microbecensus/`, enabling the CPGE
@@ -167,31 +185,13 @@ next release is tagged.
     per-sample co-assembly counting alignments, the FUNCTIONAL_ANNOTATION
     subworkflow and its parameters)
 
-- **Provenance tracking (audit #27)**
-  - `versions.yml` emitted by every live module (previously ~20 in-use modules
-    emitted none) and, for the first time, aggregated: each run now writes a
-    deduplicated `pipeline_info/software_versions.yml` covering every executed
-    process plus the pipeline and Nextflow versions
-  - DeepARG database downloads record the tool version and download date; the
-    CARD version captured by RGI_LOAD now actually reaches the aggregate report
-
-- **RGI AMR Prediction**
-  - New `--rgi_prediction` parameter to enable AMR gene prediction with pathogen-of-origin analysis
-  - RGI_LOAD module for automatic CARD database download and preparation
-  - RGI_LOAD_WILDCARD module for combining separate CARD and WildCARD databases
-  - RGI_BWT module for read-level AMR gene alignment using KMA aligner
-  - RGI_KMER module for k-mer based pathogen-of-origin prediction
-  - RGI_REPORT module for aggregated results and visualizations
-  - Support for WildCARD variants for extended allelic diversity
-  - Custom database support via `--custom_rgi_card_db` and `--custom_rgi_wildcard` parameters
-  - Flexible database options: automatic download, pre-prepared complete database, or separate CARD + WildCARD
-  - Comprehensive documentation in `docs/RGI_WILDCARD_USAGE.md` (originally also `docs/RGI_IMPLEMENTATION_{PLAN,SUMMARY}.md`, since consolidated)
-  - RGI-specific parameters: `rgi_card_version`, `rgi_include_wildcard`, `rgi_aligner`, `rgi_kmer_size`, `rgi_min_kmer_coverage`
-  - Integration with PREPARE_DATABASES subworkflow for automatic database management
-  - Output includes per-sample results, pathogen predictions, and multi-sample summary reports with plots
-
 ### Changed
 
+- **Breaking (Nextflow version)**: minimum Nextflow raised again, from
+  24.04.0 (v1.1) to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now
+  follows Nextflow's strict syntax, whose parser needs nf-schema >= 2.7.2,
+  which in turn needs Nextflow >= 25.10. nf-schema 2.8.0 needs Nextflow >= 26.04,
+  so the plugin stays pinned at 2.7.3
 - **Breaking (GTDB-Tk databases)**: GTDB-Tk re-pinned 2.5.2 → 2.7.2 and the
   reference-data registry moved from GTDB R220 to **R232** (~61 GB download,
   pinned release URL; default `--gtdbtk_db release_232`). GTDB-Tk 2.7.x
@@ -214,50 +214,9 @@ next release is tagged.
   `04_binning/coassembly/taxonomy/gtdbtk/`, next to the co-assembly bins; a
   co-assembly run no longer creates `04_binning/per_sample/`. Per-sample mode
   is unchanged
-- Updated README.md with RGI feature description and usage examples
-- Updated docs/manual.md with RGI parameters, output structure, and usage examples
-- Updated docs/parameters.md with complete RGI parameter reference
-- Enhanced ARG prediction capabilities with complementary tool (RGI alongside KARGA/KARGVA)
-- Documentation corrected to match real behavior (audit #26): sample read-count
-  filter default, database storage location, output trees, profile lists;
-  MultiQC removed from docs, dead wiring, and vendored modules (audit #28;
-  re-enabling requires re-vendoring via `nf-core modules install multiqc`)
-- Minimum Nextflow version raised from 23.04.0 to **24.04.0** with parameter
-  validation now enforced by the nf-schema 2.4.2 plugin (audit #25): unknown
-  `--params` are a hard startup error
-- **Breaking (Nextflow version, after v1.1)**: minimum Nextflow raised again,
-  from 24.04.0 to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now
-  follows Nextflow's strict syntax, whose parser needs nf-schema >= 2.7.2,
-  which in turn needs Nextflow >= 25.10. nf-schema 2.8.0 needs Nextflow >= 26.04,
-  so the plugin stays pinned at 2.7.3
-- Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
-  wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
-  `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
 
 ### Removed
 
-**Breaking**: parameter validation is now strict (nf-schema
-`validation.logging.unrecognisedParams = 'error'`), so passing any removed
-parameter aborts the run at startup instead of being silently ignored. Update existing command lines and
-`-params-file` YAMLs accordingly.
-
-- `--custom_phiX_index` and `--custom_bowtie_host_index` — replaced by
-  `--custom_decontamination_index` (pre-built combined index),
-  `--custom_phiX_fasta`, and `--custom_host_fasta` (the pipeline builds the
-  combined Bowtie2 index from FASTAs); the old params had been silent no-ops
-- `--enable_work_cleanup` — was never consumed; work-dir cleanup is Nextflow's
-  `cleanup = true`, enabled by `-profile low_disk`
-- `--kraken_db_used`, `--sourmash_db_name` — report database names are derived
-  from the selected database
-- `--store_filtered_contigs`, `--store_refined_bins` — were no-ops; filtered
-  contigs and refined bins are always published
-- `--tracedir` — trace/report/timeline/DAG always go to
-  `<output>/pipeline_info/`
-- `--validationShowHiddenParams`, `--validationSchemaIgnoreParams` —
-  nf-validation 1.x options superseded by the nf-schema `validation {}` scope
-- All eleven `--mmseqs_*` parameters — unused; clustering settings are fixed
-  tiers in `modules/local/clustering`
-- Renamed: `--bbmap_lenght` → `--bbmap_length`
 - **Breaking**: the MetaCerberus contig annotation path —
   `--contig_level_metacerberus`, `--metacerberus_hmm`,
   `--metacerberus_minscore`, `--metacerberus_evalue` and its
@@ -265,7 +224,8 @@ parameter aborts the run at startup instead of being silently ignored. Update ex
   functional branch (`--contig_level_functional`: eggNOG-mapper v3 +
   run_dbcan, TPM / copies-per-genome-equivalent tables), which also runs under
   `--assembly_mode coassembly`; one contig annotation backend is kept so the
-  results have a single threshold model and ontology mapping
+  results have a single threshold model and ontology mapping. Passing any of
+  these params aborts the run at startup
 
 ### Fixed
 
@@ -326,38 +286,80 @@ parameter aborts the run at startup instead of being silently ignored. Update ex
   (`subworkflows/local/utils_params.nf`), and `min_read_sample` is converted before the
   comparison. Nextflow 25.10 converted these values itself and was not affected. Also fixed
   on every version: `--azure_delete_pools false` was turned back on by a `?: true` default
-- **Functional aggregation steps re-ran on `-resume`**: `AGGREGATE_FUNCTIONS` and
-  `AGGREGATE_READ_FUNCTIONS` received their study-level inputs in task-completion order
-  (plain `collect()`, and the version-guard `versions.yml` taken with `.first()`), so
-  their task hash could change between otherwise identical runs. Inputs are now collected
-  sorted and the `versions.yml` is chosen deterministically; resumed runs are fully cached
-  (outputs unchanged — the aggregation is input-order independent). Existing runs re-run
-  these two cheap tasks once on their next `-resume`.
-- **Contig-branch Pfam terms were fragmented by domain coordinates**: eggNOG-mapper
-  v3 writes `PFAMs` values as `<pfam_name>_<start>_<end>`, and the aggregation kept
-  each string as the accession, so one Pfam family appeared as many terms (and a gene
-  with a repeated domain counted toward several). `summary/` tables now carry the
-  plain Pfam name, counted once per gene; an unexpected PFAMs format fails loudly
-  (format verified on all 73.9 M pfam values of the eggNOG 7 database)
-- **Contig-branch COG categories were bogus**: eggNOG 7 writes a COG ortholog id
-  (e.g. `COG1629`) into `COG_category` for most genes (75-80 % on real data), and
-  the aggregation split it per character into fake categories (`C`, `O`, `G`,
-  digits). COG ids are now mapped to their functional-category letters with
-  NCBI's COG definitions table (`cog-24.def.tab`, ~410 KB, auto-downloaded with
-  md5 verification; `--cog_db` / `--custom_cog_db`); an unknown id or other form
-  fails loudly
-- **Read- and contig-branch `cog` / `pfam` vocabularies differed**: Woltka `cog`
-  rows were COG ortholog ids and `pfam` rows versioned Pfam accessions, while the
-  contig branch reports COG functional categories and Pfam names. The Woltka
-  backend now maps its COG ids to categories with the same `cog-24.def.tab`
-  (downloaded for `--read_level_functional woltka` too; letters counted once per
-  ORF) and reports Pfam families by name, with the versioned accession in
-  `description`. This also drops five malformed COG strings of the WoLr2
-  `ko-to-cog` map (e.g. `COG:1140`) that were reported verbatim as accessions;
-  they and four ids absent from COG 2024 are skipped with a warning, and any
-  other unmapped id fails loudly
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
+
+## [1.1] - 2026-08-25
+
+### Added
+
+- **Provenance tracking (audit #27)**
+  - `versions.yml` emitted by every live module (previously ~20 in-use modules
+    emitted none) and, for the first time, aggregated: each run now writes a
+    deduplicated `pipeline_info/software_versions.yml` covering every executed
+    process plus the pipeline and Nextflow versions
+  - DeepARG database downloads record the tool version and download date; the
+    CARD version captured by RGI_LOAD now actually reaches the aggregate report
+
+- **RGI AMR Prediction**
+  - New `--rgi_prediction` parameter to enable AMR gene prediction with pathogen-of-origin analysis
+  - RGI_LOAD module for automatic CARD database download and preparation
+  - RGI_LOAD_WILDCARD module for combining separate CARD and WildCARD databases
+  - RGI_BWT module for read-level AMR gene alignment using KMA aligner
+  - RGI_KMER module for k-mer based pathogen-of-origin prediction
+  - RGI_REPORT module for aggregated results and visualizations
+  - Support for WildCARD variants for extended allelic diversity
+  - Custom database support via `--custom_rgi_card_db` and `--custom_rgi_wildcard` parameters
+  - Flexible database options: automatic download, pre-prepared complete database, or separate CARD + WildCARD
+  - Comprehensive documentation in `docs/RGI_WILDCARD_USAGE.md` (originally also `docs/RGI_IMPLEMENTATION_{PLAN,SUMMARY}.md`, since consolidated)
+  - RGI-specific parameters: `rgi_card_version`, `rgi_include_wildcard`, `rgi_aligner`, `rgi_kmer_size`, `rgi_min_kmer_coverage`
+  - Integration with PREPARE_DATABASES subworkflow for automatic database management
+  - Output includes per-sample results, pathogen predictions, and multi-sample summary reports with plots
+
+### Changed
+
+- Updated README.md with RGI feature description and usage examples
+- Updated docs/manual.md with RGI parameters, output structure, and usage examples
+- Updated docs/parameters.md with complete RGI parameter reference
+- Enhanced ARG prediction capabilities with complementary tool (RGI alongside KARGA/KARGVA)
+- Documentation corrected to match real behavior (audit #26): sample read-count
+  filter default, database storage location, output trees, profile lists;
+  MultiQC removed from docs, dead wiring, and vendored modules (audit #28;
+  re-enabling requires re-vendoring via `nf-core modules install multiqc`)
+- Minimum Nextflow version raised from 23.04.0 to **24.04.0** with parameter
+  validation now enforced by the nf-schema 2.4.2 plugin (audit #25): unknown
+  `--params` are a hard startup error
+- Dead documented knobs fixed (audit #14): `fastp_qualified_quality_phred`
+  wired, METABAT2 selectors collapsed (pTNF/minCV/minCVSum now delivered),
+  `bbmap_lenght` doc typo corrected, unused `mmseqs_*` params removed
+
+### Removed
+
+**Breaking**: parameter validation is now strict (nf-schema
+`failUnrecognisedParams`), so passing any removed parameter aborts the run at
+startup instead of being silently ignored. Update existing command lines and
+`-params-file` YAMLs accordingly.
+
+- `--custom_phiX_index` and `--custom_bowtie_host_index` — replaced by
+  `--custom_decontamination_index` (pre-built combined index),
+  `--custom_phiX_fasta`, and `--custom_host_fasta` (the pipeline builds the
+  combined Bowtie2 index from FASTAs); the old params had been silent no-ops
+- `--enable_work_cleanup` — was never consumed; work-dir cleanup is Nextflow's
+  `cleanup = true`, enabled by `-profile low_disk`
+- `--kraken_db_used`, `--sourmash_db_name` — report database names are derived
+  from the selected database
+- `--store_filtered_contigs`, `--store_refined_bins` — were no-ops; filtered
+  contigs and refined bins are always published
+- `--tracedir` — trace/report/timeline/DAG always go to
+  `<output>/pipeline_info/`
+- `--validationShowHiddenParams`, `--validationSchemaIgnoreParams` —
+  nf-validation 1.x options superseded by the nf-schema `validation {}` scope
+- All eleven `--mmseqs_*` parameters — unused; clustering settings are fixed
+  tiers in `modules/local/clustering`
+- Renamed: `--bbmap_lenght` → `--bbmap_length`
+
+### Fixed
+
 - Extensive audit-fix series on branch `fix-pending-issues` (2026-08): host
   decontamination DB and `--local` scoring, database download containers and
   script hardening, kraken2/bracken report parsers, contig tax/ARG arm wiring,
@@ -402,7 +404,7 @@ parameter aborts the run at startup instead of being silently ignored. Update ex
 - **Module Improvements**
   - Fixed bash null checks using Groovy conditionals
   - Added `versions.yml` output to some modules (full coverage and aggregation
-    landed later, in [Unreleased])
+    landed later, in [1.1])
   - Added `stub` blocks for some modules (full coverage landed later)
   - Added `meta.yml` descriptors for key modules
 
@@ -437,6 +439,7 @@ parameter aborts the run at startup instead of being silently ignored. Update ex
 - Quality assessment with CheckM2
 - Taxonomic classification with GTDB-TK
 
-[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.1...HEAD
+[1.1]: https://github.com/gene2dis/BugBuster/releases/tag/v1.1
 [1.0.0]: https://github.com/gene2dis/BugBuster/releases/tag/v1.0.0
 [0.1.0]: https://github.com/gene2dis/BugBuster/tree/v0.1.0

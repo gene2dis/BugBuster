@@ -940,4 +940,4 @@ nextflow run main.nf \
 
 ---
 
-*BugBuster v1.1.0dev - Complete Parameter Reference*
+*BugBuster v2.0.0dev - Complete Parameter Reference*
