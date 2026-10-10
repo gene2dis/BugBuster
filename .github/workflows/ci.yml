@@ -149,6 +149,11 @@ jobs:
         run: |
           tests/bin/test_emapper_ogs_fix.sh
 
+      - name: Check module meta.yml descriptors against the process declarations
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml > /dev/null
+          tests/bin/test_module_meta.sh
+
       - name: Run bin-directory recognition regression tests (audit #6)
         run: |
           tests/bin/test_identify_bin_dir.sh

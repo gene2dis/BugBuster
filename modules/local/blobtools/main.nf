@@ -1,6 +1,7 @@
 process BLOBTOOLS {
     container 'quay.io/ffuentessantander/blobtools:1.1.1'
 
+    tag "${meta.id}"
     label 'process_single'
 
     input:

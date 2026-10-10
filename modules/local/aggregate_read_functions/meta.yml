@@ -45,7 +45,7 @@ output:
       pattern: "read_function_abundance.tsv"
   - function_wide:
       type: file
-      description: Wide matrices per ontology - woltka: ko, ec, cog, pfam, metacyc (native read counts and CPGE); superfocus: seed_level1, seed_level2, seed_level3 (native read counts only)
+      description: "Wide matrices per ontology - woltka: ko, ec, cog, pfam, metacyc (native read counts and CPGE); superfocus: seed_level1, seed_level2, seed_level3 (native read counts only)"
       pattern: "read_function_wide_*.tsv"
   - annotated_fraction:
       type: file

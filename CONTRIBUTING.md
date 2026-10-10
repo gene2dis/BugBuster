@@ -255,6 +255,15 @@ authors:
   - "@your_github_handle"
 ```
 
+`input:` lists the process inputs in order (a `meta` map plus one entry per `val`/`path`
+variable, using its name) and `output:` lists every `emit:` name (a `meta` entry for tuple
+outputs is optional). When one `main.nf` defines several processes (`format_db`,
+`deeparg`, `bowtie2_samtools`), keep a single `meta.yml` with `tools` once at the top and a
+`processes:` list instead of top-level `input`/`output`, each item with `name` (the process
+name), `description`, `input` and `output`. `tests/bin/test_module_meta.sh` (run in CI)
+checks every local module against these rules and that every process has a `tag` and a
+`label`.
+
 ## Testing
 
 ### Local Testing

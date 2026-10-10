@@ -1,6 +1,7 @@
 process RGI_LOAD_WILDCARD {
     container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
     
+    tag "card_wildcard"
     label 'process_medium'
 
     input:

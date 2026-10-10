@@ -1,0 +1,43 @@
+name: karga
+description: k-mer-based ARG detection with KARGA (k = 17) on the concatenated host-removed reads of one sample against the MEGARes database (by default)
+keywords:
+  - antimicrobial resistance
+  - k-mer
+  - reads
+  - megares
+tools:
+  - karga:
+      description: Multi-platform toolkit for k-mer-based antibiotic resistance gene analysis of high-throughput sequencing data (KARGA 1.1, run as a bare Java class)
+      homepage: https://github.com/DataIntellSystLab/KARGA
+      documentation: https://github.com/DataIntellSystLab/KARGA/blob/main/README.md
+      doi: "10.1109/BHI50953.2021.9508479"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - report:
+      type: file
+      description: KARGVA mapped-genes table of the sample, carried in the tuple from KARGVA's kargva_reads emit; not used by the KARGA command
+      pattern: "*_all_reads_KARGVA_mappedGenes.csv"
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2, optional singleton], concatenated into one <sample>_all_reads.fastq.gz before the run
+      pattern: "*.fastq.gz"
+  - karga_db:
+      type: file
+      description: KARGA reference FASTA (MEGARes v3.0 by default, or --custom_karga_db)
+
+output:
+  - kargva:
+      type: file
+      description: KARGA per-gene table (GeneIdx, PercentGeneCovered, AverageKMerDepth); a single NA row when KARGA writes no table. The emit is named kargva but carries the KARGA output
+      pattern: "*_all_reads_KARGA_mappedGenes.csv"
+  - versions:
+      type: file
+      description: Software versions (karga hardcoded from the container tag, as the class has no version flag; java)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

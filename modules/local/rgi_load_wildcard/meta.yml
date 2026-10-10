@@ -1,0 +1,34 @@
+name: rgi_load_wildcard
+description: Adds user-supplied WildCARD variants to a copy of a user-supplied CARD database (--custom_rgi_card_db with --custom_rgi_wildcard), running rgi wildcard_annotation unless a wildcard_database_v*.fasta is already present, then rgi load --local
+keywords:
+  - antimicrobial resistance
+  - card
+  - wildcard
+  - database
+tools:
+  - rgi:
+      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.3)
+      homepage: https://github.com/arpcard/rgi
+      documentation: https://github.com/arpcard/rgi/blob/master/README.rst
+      doi: "10.1093/nar/gkac920"
+
+input:
+  - card_db:
+      type: directory
+      description: Existing CARD database directory with card.json and card_database_v*.fasta; copied with symlinks dereferenced and self-referencing 'rgi' symlinks removed
+  - wildcard_dir:
+      type: directory
+      description: Decompressed WildCARD variants directory, including index-for-model-sequences.txt; copied into the output as wildcard_data/
+
+output:
+  - card_db:
+      type: directory
+      description: Local RGI database directory with CARD and WildCARD loaded (localDB/, wildcard_data/, database_version.txt)
+      pattern: "card_db_with_wildcard"
+  - versions:
+      type: file
+      description: Software versions (rgi and the CARD version from card.json)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

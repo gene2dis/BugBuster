@@ -1,0 +1,33 @@
+name: arg_norm_report
+description: Study-level read-level ARG report that filters the KARGA (>= 90% gene coverage) and KARGVA (>= 2 SNP k-mer hits, >= 80% coverage) hits of all samples, parses their MEGARes/KARGVA headers and normalizes the average k-mer depth to CPM and copies per cell using the ARGs-OAP read and cell counts (bin/arg_norm_report.py)
+keywords:
+  - antimicrobial resistance
+  - normalization
+  - karga
+  - kargva
+  - args-oap
+tools:
+  - pandas:
+      description: Python data analysis library used by the normalization script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - arg_data:
+      type: file
+      description: Collected per-sample KARGA (*KARGA_mappedGenes.csv) and KARGVA (*KARGVA_mappedGenes.csv) tables plus ARGs-OAP stage-one directories (*_args_oap_s1_out, read for metadata.txt nRead/n16S/nCell); the script exits with an error if any of the three is missing
+      pattern: "{*KARGA_mappedGenes.csv,*KARGVA_mappedGenes.csv,*_args_oap_s1_out}"
+
+output:
+  - arg_reports:
+      type: file
+      description: KARGA_norm.csv and KARGVA_norm.csv - filtered hits joined to per-sample read and cell counts with CPM_ARGs (depth per million reads) and copies_per_cell columns; zero read or cell counts give empty cells rather than inf
+      pattern: "*.csv"
+  - versions:
+      type: file
+      description: Software versions (python, pandas)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

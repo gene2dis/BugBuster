@@ -1,0 +1,38 @@
+name: nt_blastn
+description: Megablast of assembled contigs against the NCBI nt database, writing tabular hits (qseqid staxids bitscore + standard columns) for BlobTools
+keywords:
+  - blast
+  - megablast
+  - contig taxonomy
+  - nt
+tools:
+  - blast:
+      description: BLAST+ command-line suite; blastn -task megablast is used (2.15.0)
+      homepage: https://blast.ncbi.nlm.nih.gov/Blast.cgi
+      documentation: https://www.ncbi.nlm.nih.gov/books/NBK279690/
+      doi: "10.1186/1471-2105-10-421"
+      licence: ["US-Government-Work"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - contigs:
+      type: file
+      description: Assembled contigs (query)
+  - nt_db:
+      type: file
+      description: BLAST nt database, staged as a directory (--custom_blast_db) or as loose volume files (FORMAT_NT_BLAST_DB); the DB prefix is resolved from the *.nal alias file or a single *.nin index
+
+output:
+  - megablast_to_blob:
+      type: file
+      description: Tuple of meta, the contigs and the megablast hits table (outfmt '6 qseqid staxids bitscore std')
+      pattern: "*_megablast.out"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

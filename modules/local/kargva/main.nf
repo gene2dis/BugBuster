@@ -1,6 +1,7 @@
 process KARGVA {
     container 'quay.io/ffuentessantander/kargva:1.0'
 
+    tag "${meta.id}"
     label 'process_low'
 
     input:

@@ -1,0 +1,160 @@
+name: format_db
+description: Downloads and formats the reference databases needed by the enabled pipeline options (PREPARE_DATABASES); each FORMAT_*/DOWNLOAD_* process runs the registry's fmtscript from config/databases.config, and SOURMASH_TAX_PREPARE builds the sourmash lineage database
+keywords:
+  - database
+  - download
+  - reference data
+  - setup
+tools:
+  - wget:
+      description: GNU Wget, non-interactive download of files from the web; used by every bin/*_reformat.sh script (busybox wget in the woltka and bakta images)
+      homepage: https://www.gnu.org/software/wget/
+      documentation: https://www.gnu.org/software/wget/manual/wget.html
+      licence: ["GPL-3.0-or-later"]
+  - deeparg:
+      description: DeepARG antibiotic resistance gene predictor; its download_data command fetches the DeepARG data (1.0.4)
+      homepage: https://github.com/gaarangoa/deeparg
+      documentation: https://github.com/gaarangoa/deeparg
+      doi: "10.1186/s40168-018-0401-z"
+      licence: ["MIT"]
+  - amrfinderplus:
+      description: NCBI AMRFinderPlus; amrfinder_update refreshes the AMRFinderPlus database bundled in the Bakta database (bakta 1.12.1 image)
+      homepage: https://github.com/ncbi/amr/wiki
+      documentation: https://github.com/ncbi/amr/wiki
+      doi: "10.1038/s41598-021-91456-0"
+      licence: ["Public Domain"]
+  - sourmash:
+      description: FracMinHash sketching and comparison toolkit; sourmash tax prepare converts the lineage CSV into a SQLite taxonomy database (4.8.11)
+      homepage: https://sourmash.readthedocs.io/
+      documentation: https://sourmash.readthedocs.io/
+      doi: "10.21105/joss.00027"
+      licence: ["BSD-3-Clause"]
+
+processes:
+  - name: FORMAT_KRAKEN_DB
+    description: Runs bin/kraken_db_reformat.sh - downloads the Kraken2 database tarball, extracts it into k2_ref_db/ and checks for hash.k2d, opts.k2d and taxo.k2d
+    input:
+      - db:
+          type: value
+          description: Kraken2 database tarball URL (params.kraken_ref_db[params.kraken2_db].url)
+    output: []
+
+  - name: FORMAT_NT_BLAST_DB
+    description: Runs bin/blast_nt_reformat.sh - reads the nt volume list from nt-nucl-metadata.json, downloads every volume with its .md5, verifies (md5sum -c) and extracts them, checks the taxdb files and one .nin index per volume, and moves everything into blast_nt_db/
+    input:
+      - db:
+          type: value
+          description: NCBI BLAST database base URL (params.blast_ref_db[params.blast_db].url)
+    output: []
+
+  - name: FORMAT_TAXDUMP_FILES
+    description: Runs bin/tax_files_reformat.sh - downloads the NCBI taxdump tarball, extracts it and keeps only nodes.dmp and names.dmp in tax_files/
+    input:
+      - db:
+          type: value
+          description: taxdump.tar.gz URL (params.taxonomy_files[params.taxdump_files].url)
+    output: []
+
+  - name: DOWNLOAD_DEEPARG_DB
+    description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date
+    input: []
+    output:
+      - deeparg_db:
+          type: directory
+          description: DeepARG data directory
+          pattern: "deeparg_db"
+      - versions:
+          type: file
+          description: Software versions (deeparg, and deeparg_db as 'unversioned, downloaded <date>')
+          pattern: "versions.yml"
+
+  - name: FORMAT_CHECKM2_DB
+    description: Runs bin/checkm2_db_reformat.sh - downloads and extracts the CheckM2 database tarball and moves the DIAMOND database (*.dmnd) to the task root
+    input:
+      - db:
+          type: value
+          description: CheckM2 database tarball URL (params.checkm2_ref_db[params.checkm2_db].url)
+    output: []
+
+  - name: DOWNLOAD_GTDBTK_DB
+    description: Runs bin/gtdb-tk_db_reformat.sh - downloads and extracts the GTDB-Tk reference data package and checks it is not empty
+    input:
+      - db:
+          type: value
+          description: GTDB-Tk data package URL (params.gtdbtk_ref_db[params.gtdbtk_db].url)
+    output: []
+
+  - name: FORMAT_EGGNOG_DB
+    description: Runs bin/eggnog_db_reformat.sh - downloads the seven eggNOG-mapper v3 data files (eggnog.db and its .bin indices, eggnog.taxa.db and traverse.pkl, eggnog_proteins.dmnd, go-basic.obo) into eggnog_db/ and checks each is non-empty
+    input:
+      - db:
+          type: value
+          description: eggNOG-mapper 3.0 data base URL (params.eggnog_ref_db[params.eggnog_db].url)
+    output: []
+
+  - name: FORMAT_DBCAN_DB
+    description: Runs bin/dbcan_db_reformat.sh - downloads CAZy.dmnd, dbCAN.hmm, dbCAN_sub.hmm (saved as dbCAN-sub.hmm) and fam-substrate-mapping.tsv into dbcan_db/ and writes the release name to DB_VERSION
+    input:
+      - db:
+          type: value
+          description: dbCAN release base URL (params.dbcan_ref_db[params.dbcan_db].url)
+    output: []
+
+  - name: FORMAT_BAKTA_DB
+    description: Runs bin/bakta_db_reformat.sh in the bakta image - downloads and extracts the Bakta database tarball into bakta_db/, checks the schema-6 version.json and the bundled AMRFinderPlus database, refreshes it with amrfinder_update --force_update and writes DB_VERSION
+    input:
+      - db:
+          type: value
+          description: Bakta database tarball URL (params.bakta_ref_db[params.bakta_db].url)
+    output: []
+
+  - name: FORMAT_COG_DB
+    description: Runs bin/cog_db_reformat.sh - downloads the COG definition table, verifies it against the release's checksums.md5 and validates its COG id / functional category columns
+    input:
+      - db:
+          type: value
+          description: COG definition table URL (params.cog_ref_db[params.cog_db].url)
+    output: []
+
+  - name: FORMAT_WOLTKA_DB
+    description: Runs bin/woltka_db_reformat.sh in the woltka image - downloads the WoLr2 Bowtie2 index, protein coordinates and KEGG/MetaCyc/Pfam function maps into woltka_db/ with retries, verifies the md5 of the xz-compressed files on their uncompressed content and writes DB_VERSION
+    input:
+      - db:
+          type: value
+          description: WoLr2 base URL (params.woltka_ref_db[params.woltka_db].url)
+    output: []
+
+  - name: FORMAT_HUMANN_DB
+    description: Runs bin/humann_db_reformat.sh - downloads and extracts the ChocoPhlAn, UniRef90 and utility mapping databases and the md5-verified MetaPhlAn index and Bowtie2 tarballs into humann_db/, checks the required files and writes DB_VERSION
+    input:
+      - key:
+          type: value
+          description: HUMAnN database key (params.humann_db); selects the params.humann_ref_db entry whose URLs, MetaPhlAn index name and provenance are passed to the script
+    output: []
+
+  - name: FORMAT_SUPERFOCUS_DB
+    description: Runs bin/superfocus_db_reformat.sh in the SUPER-FOCUS image - downloads and md5-verifies database_PKs.txt and the DB_90 archive for the selected aligner, unzips it into superfocus_db/db/static/<aligner>/ and writes DB_VERSION
+    input:
+      - aligner:
+          type: value
+          description: SUPER-FOCUS aligner (diamond or mmseqs2; params.superfocus_aligner); only that aligner's archive is downloaded
+    output: []
+
+  - name: SOURMASH_TAX_PREPARE
+    description: Converts the sourmash lineage CSV into a SQLite taxonomy database with sourmash tax prepare (once per run, not per sample)
+    input:
+      - tax_file:
+          type: file
+          description: sourmash lineages file (second entry of the sourmash database registry URL list, or of --custom_sourmash_db)
+    output:
+      - tax_db:
+          type: file
+          description: SQLite taxonomy database (taxonomy.sqldb)
+          pattern: "*.sqldb"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+authors:
+  - "@juanu"

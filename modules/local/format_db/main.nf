@@ -77,6 +77,7 @@ process DOWNLOAD_DEEPARG_DB {
 
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
 
+    tag "download_deeparg_db"
     label 'process_download'
 
     output:
@@ -381,6 +382,7 @@ process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'
 
+    tag "sourmash_tax_prepare"
     label 'process_single'
 
     input:

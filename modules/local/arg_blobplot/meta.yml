@@ -1,0 +1,41 @@
+name: arg_blobplot
+description: Blob plot of all contigs (GC content vs log10 coverage, point size by contig length) coloured by the top nine DeepARG-predicted ARG classes, with a bar panel of the per-class contig percentages (bin/arg_blobplot.py)
+keywords:
+  - antimicrobial resistance
+  - blob plot
+  - contigs
+  - visualization
+tools:
+  - pandas:
+      description: Python data analysis library used by the plotting script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used to draw the two-panel figure
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+      doi: "10.1109/MCSE.2007.55"
+
+input:
+  - arg_contig_data:
+      type: file
+      description: Merged contig taxonomy and ARG table from ARG_CONTIG_LEVEL_REPORT (comma-separated despite the .tsv extension; the script reads it by this fixed name)
+      pattern: "Contig_tax_and_arg_prediction.tsv"
+
+output:
+  - plots:
+      type: file
+      description: Two-panel ARG blob plot (ARG_blob_plot.png); every class is 'None' when no contig carries an ARG prediction
+      pattern: "*.png"
+  - pickle:
+      type: file
+      description: Pickled matplotlib figure object (ARG_final_blobplot.pkl), the Python replacement for the legacy R RDS; not published
+      pattern: "*.pkl"
+  - versions:
+      type: file
+      description: Software versions (python, pandas, matplotlib)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

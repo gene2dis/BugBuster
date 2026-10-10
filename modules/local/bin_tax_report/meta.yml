@@ -1,0 +1,42 @@
+name: bin_tax_report
+description: Per-sample assembly mode MAG taxonomy report (bin/bin_tax_report.py) - parses GTDB-Tk classifications into ranks, writes a per-bin taxonomy table and plots bin counts by phylum; fails if every summary is empty
+keywords:
+  - binning
+  - taxonomy
+  - gtdb-tk
+  - report
+  - visualization
+tools:
+  - pandas:
+      description: Python data analysis library used to parse and combine the GTDB-Tk summaries
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used to draw the phylum bar plot
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+      doi: "10.1109/MCSE.2007.55"
+
+input:
+  - gtdbtk_tax:
+      type: file
+      description: Per-sample GTDB-Tk summaries from GTDB_TK_BATCH (<sample>_gtdbtk_bac120.tsv / <sample>_gtdbtk_ar53.tsv; the sample is parsed from the file name, header-only files are skipped)
+      pattern: "*_gtdbtk_*.tsv"
+
+output:
+  - gtdb_tax:
+      type: file
+      description: Bar plot of MAG counts per phylum (MAGs_tax_plot.png)
+      pattern: "*.png"
+  - mag_report:
+      type: file
+      description: Per-bin table with sample, bin_name, closest_genome_reference and Domain to Species ranks (MAGs_tax_summary.csv)
+      pattern: "*.csv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

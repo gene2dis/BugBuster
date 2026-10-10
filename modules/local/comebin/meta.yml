@@ -1,0 +1,40 @@
+name: comebin
+description: Metagenomic binning with COMEBin; skipped (SKIPPED.txt) below 10 contigs, contrastive-loss temperature set to 0.15 when contig N50 is below 10 kb, smaller batch and embedding sizes on each retry, and a run failure leaves FAILED.txt instead of failing the task
+keywords:
+  - binning
+  - metagenomics
+  - contrastive learning
+  - comebin
+tools:
+  - comebin:
+      description: Binning of metagenomic contigs using contrastive multi-view representation learning (run_comebin.sh)
+      homepage: https://github.com/ziyewang/COMEBin
+      documentation: https://github.com/ziyewang/COMEBin/blob/master/README.md
+      doi: "10.1038/s41467-023-44290-z"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - contigs:
+      type: file
+      description: Length-filtered contigs
+      pattern: "*_filtered_contigs.fa"
+  - bam:
+      type: file
+      description: Sorted reads-vs-contigs BAM file(s), read by COMEBin from the task directory (-p ./)
+      pattern: "*.bam"
+
+output:
+  - bins:
+      type: tuple
+      description: Tuple of meta and the COMEBin bin directory (bin FASTAs, or only SKIPPED.txt / FAILED.txt when binning was skipped or failed)
+      pattern: "*_comebin_bins/comebin_res/comebin_res_bins"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"
