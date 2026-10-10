@@ -32,12 +32,13 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: With MetaCerberus
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; see the container note under the feature toggles); MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
 ```
 Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
+                                            ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
                                             ↓
@@ -52,6 +53,8 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
                       Quality (CheckM2)
                               ↓
                       Taxonomy (GTDB-TK)
+                              ↓
+                      MAG Annotation (Bakta, optional)
 ```
 
 ---
@@ -74,6 +77,43 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
 | QC + Taxonomy + Assembly | 64 GB | 16 | 100 GB |
 | Full pipeline with binning | 128 GB | 16 | 200 GB |
 | Large datasets / co-assembly | 256 GB | 32 | 500 GB |
+
+#### Functional annotation branches
+
+The functional branches add a few memory-heavy steps. Peak memory (RSS) and run
+time observed on the pipeline's own validation runs:
+
+| Step | Branch | Peak memory | Run time | Data |
+|------|--------|-------------|----------|------|
+| `EGGNOG_MAPPER_SEARCH` | contig | **79.9 GB** | 2 h 50 min | real 5-sample co-assembly, 67,812 proteins |
+| `EGGNOG_MAPPER_SEARCH` | contig | 23–28 GB | 48–60 min | 2-sample test data (loading the eggNOG DIAMOND database dominates, so even tiny inputs take this long) |
+| `EGGNOG_MAPPER_ANNOTATE` | contig | 35.1 GB | 18 min | real co-assembly |
+| `RUN_DBCAN` | contig | 5.6 GB | 40 min | real co-assembly |
+| `WOLTKA_ALIGN` | read (woltka) | 64.8 GB | — | test data; the WoLr2 index alone needs ≥ 68 GB RAM |
+| `HUMANN` | read (humann) | 23.5 GB | ~9 min per sample | test data, full ChocoPhlAn |
+| `SUPERFOCUS` | read (superfocus) | ~16 GB | 66–93 min per sample | real samples, DIAMOND |
+| `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
+
+These are observations, not limits: needs grow with input size and community
+complexity. The eggNOG search requests `process_high` resources (16 CPUs,
+72 GB on the first attempt; an out-of-memory failure is retried with
+2 × 72 GB, capped at `--max_memory`, default 128 GB). The 79.9 GB peak above
+was measured under apptainer, which does not enforce task memory on a local
+machine. Where memory is enforced (docker, SLURM, cloud batch), a real
+co-assembly can exceed the first attempt and only finish on the retry, so make
+at least ~96 GB available to it. The annotate step (`process_medium`, 36 GB on
+the first attempt) peaked at 35.1 GB, close to that request, so on larger
+co-assemblies it may also need its retry.
+
+#### Contig taxonomy against NCBI nt
+
+The megablast search of `--contig_tax_and_arg` (`NT_BLASTN`) memory-maps the
+~434 GB NCBI nt database. How much memory it appears to use therefore depends
+on how much RAM the machine has: on a large machine the operating system keeps
+most of the database in memory, which counts toward the task's reported peak
+(close to 400 GB on a 2 TB machine), but those pages can be released again. It
+runs fastest when much of nt fits in RAM. No minimum has been measured; the task
+requests `process_high` resources (72 GB on the first attempt).
 
 ---
 
@@ -144,7 +184,15 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
-| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
+| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
+| **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
+| **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` |
+| **Bakta DB v6.0 full** | 31.9 GB download | MAG (bin) annotation | `mag_level_functional=true` |
+| **Bakta DB v6.0 light** | 1.3 GB download | MAG (bin) annotation, reduced annotation sources | `mag_level_functional=true` with `bakta_db='v6.0-light'` (explicit choice, recorded in provenance) |
+| **Web of Life WoLr2** | ~94 GB (Bowtie2 index 93.6 GB + coordinates/maps ~0.6 GB) | Read-level functional profiling (Woltka); alignment needs ≥ 68 GB RAM | `read_level_functional='woltka'` |
+| **SUPER-FOCUS DB_90** | ~0.74 GB download (~1.9 GB unpacked) for DIAMOND, or ~0.9 GB (~2.5 GB unpacked) for MMseqs2; only the selected aligner's archive | Read-level SEED subsystem profiling (SUPER-FOCUS) | `read_level_functional='superfocus'` |
+| **HUMAnN 4 databases + MetaPhlAn vOct22** | ~71 GB download with the full ChocoPhlAn (44.8 GB), ~33 GB with the EC-filtered one (6.9 GB); plus UniRef90 EC-filtered 0.94 GB, utility mapping 2.8 GB and MetaPhlAn `mpa_vOct22_CHOCOPhlAnSGB_202403` with its Bowtie2 index ~22.5 GB | Read-level profiling with HUMAnN 4.0.0a2 | `read_level_functional='humann'` (`humann_db='v4_alpha-full'` or `'v4_alpha-ec_filtered'`) |
 
 ### Manual Database Download
 
@@ -170,9 +218,65 @@ wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
 tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/
 
 # Download GTDB-TK (large download)
-wget -O /shared/databases/bugbuster/gtdbtk_r220.tar.gz \
-    https://data.gtdb.ecogenomic.org/releases/release220/220.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r220_data.tar.gz
-tar -xzf /shared/databases/bugbuster/gtdbtk_r220.tar.gz -C /shared/databases/bugbuster/
+wget -O /shared/databases/bugbuster/gtdbtk_r232.tar.gz \
+    https://data.gtdb.ecogenomic.org/releases/release232/232.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r232_data.tar.gz
+tar -xzf /shared/databases/bugbuster/gtdbtk_r232.tar.gz -C /shared/databases/bugbuster/
+
+# Download the Bakta database v6.0 (full, 31.9 GB; use db-light.tar.xz for
+# the 1.3 GB light DB — note the light DB changes annotation results)
+wget -P /shared/databases/bugbuster/bakta/ \
+    https://zenodo.org/record/14916843/files/db.tar.xz
+tar -xJf /shared/databases/bugbuster/bakta/db.tar.xz -C /shared/databases/bugbuster/bakta/
+
+# Download the Web of Life (WoLr2) subset the Woltka read-level backend uses
+# (~94 GB), keeping the FTP layout so the directory works as --custom_woltka_db.
+# The .md5 files are checksums of the UNCOMPRESSED content.
+BASE=https://ftp.microbio.me/pub/wol2
+DEST=/shared/databases/bugbuster/wol2
+get() { mkdir -p "$DEST/$(dirname "$1")"; wget -c --tries=10 -nv -O "$DEST/$1" "$BASE/$1"; }
+for f in WoLr2.1.bt2l WoLr2.2.bt2l WoLr2.3.bt2l WoLr2.4.bt2l WoLr2.rev.1.bt2l WoLr2.rev.2.bt2l; do
+    get databases/bowtie2/$f; done
+for f in coords.txt length.map; do get proteins/$f.xz; get proteins/$f.md5; done
+for f in orf-to-ko.map.xz orf-to-ko.map.md5 ko-to-ec.map ko-to-cog.map ko_name.txt; do get function/kegg/$f; done
+for f in orf-to-protein.map.xz orf-to-protein.map.md5 protein-to-enzrxn.map enzrxn-to-reaction.map \
+         reaction-to-pathway.map pathway_name.txt; do get function/metacyc/$f; done
+for f in orf-to-pfam.map.xz orf-to-pfam.map.md5 pfam_name.txt; do get function/pfam/$f; done
+for x in proteins/coords.txt proteins/length.map function/kegg/orf-to-ko.map \
+         function/metacyc/orf-to-protein.map function/pfam/orf-to-pfam.map; do
+    [ "$(xz -dc $DEST/$x.xz | md5sum | cut -d' ' -f1)" = "$(cut -d' ' -f1 $DEST/$x.md5)" ] \
+        && echo "OK  $x" || echo "BAD $x"; done
+
+# SUPER-FOCUS DB_90 for the SUPER-FOCUS read-level backend (figshare, CC0).
+# The database ROOT is the directory CONTAINING db/; pass it as
+# --custom_superfocus_db. DIAMOND archive shown (~0.74 GB); for
+# --superfocus_aligner mmseqs2 use file 44075237 into db/static/mmseqs2 instead.
+mkdir -p /shared/databases/bugbuster/superfocus/db/static/diamond
+wget -O db90.zip https://ndownloader.figshare.com/files/44075225
+unzip -j db90.zip -d /shared/databases/bugbuster/superfocus/db/static/diamond
+wget -O /shared/databases/bugbuster/superfocus/db/database_PKs.txt \
+    https://raw.githubusercontent.com/metageni/SUPER-FOCUS/739404db8816de967cd4ac3e0d9effcdab7f1489/superfocus_app/db/database_PKs.txt
+
+# HUMAnN 4.0.0a2 database ROOT for the HUMAnN read-level backend (~71 GB with
+# the full ChocoPhlAn; for the EC-filtered one use chocophlan_EC_FILTERED.v4_alpha.tar.gz).
+# Pass the root as --custom_humann_db. The MetaPhlAn database MUST be
+# mpa_vOct22_CHOCOPhlAnSGB_202403 (HUMAnN 4.0.0a2 refuses any other).
+H=https://huttenhower.sph.harvard.edu/humann_data
+M=https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases
+R=/shared/databases/bugbuster/humann
+mkdir -p $R/chocophlan $R/uniref $R/utility_mapping $R/metaphlan
+wget -O - $H/chocophlan/chocophlan.v4_alpha.tar.gz | tar -xz -C $R/chocophlan
+wget -O - $H/uniprot/uniref_ec_filtered/uniref90_annotated_v4_alpha_ec_filtered.tar.gz | tar -xz -C $R/uniref
+wget -O - $H/full_mapping_v4_alpha.tar.gz | tar -xz -C $R/utility_mapping
+for t in mpa_vOct22_CHOCOPhlAnSGB_202403 bowtie2_indexes/mpa_vOct22_CHOCOPhlAnSGB_202403_bt2; do
+    wget -O $(basename $t).tar $M/$t.tar && wget -O - $M/$t.md5 | md5sum -c - \
+        && tar -xf $(basename $t).tar -C $R/metaphlan; done
+# the .pkl and all six .bt2l files must sit directly in $R/metaphlan
+find $R/metaphlan -mindepth 2 -type f -exec mv -t $R/metaphlan {} +
+
+# NCBI COG 2024 definitions table (~410 KB; maps eggNOG's COG ids to COG
+# functional categories in the contig branch)
+wget -P /shared/databases/bugbuster/cog/ \
+    https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab
 
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
 # combined phiX + host Bowtie2 index from FASTA on first use
@@ -191,7 +295,12 @@ nextflow run main.nf \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_standard8 \
     --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
+    --custom_bakta_db /shared/databases/bugbuster/bakta/db \
+    --custom_woltka_db /shared/databases/bugbuster/wol2 \
+    --custom_superfocus_db /shared/databases/bugbuster/superfocus \
+    --custom_humann_db /shared/databases/bugbuster/humann \
+    --custom_cog_db /shared/databases/bugbuster/cog/cog-24.def.tab \
     -profile docker
 ```
 
@@ -277,7 +386,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|-------------|
 | `--input` | *required* | Path to samplesheet CSV file |
 | `--output` | *required* | Output directory for results |
-| `--publish_dir_mode` | `copy` | How to save results: `copy`, `symlink`, `link`, `move` |
+| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` |
 
 ### 6.2 Pipeline Execution Options
 
@@ -291,9 +400,136 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
+| `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
+| `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (with the contig or read functional branch; failure is non-fatal — affected samples get no CPGE: TPM-only in the contig tables, native read counts only in the read tables) |
+| `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
+| `--dbcan_consensus` | `recommended` | `recommended`, `any` | Which dbCAN calls feed the summary tables (`recommended` = supported by ≥2 tools; `any` = per-tool union) |
+| `--mag_level_functional` | `false` | `true`, `false` | MAG-level functional annotation: Bakta on every refined bin (requires `--include_binning` and ≥2 `--binners`; see the note below) |
+| `--read_level_functional` | `none` | `woltka`, `superfocus`, `humann`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
+| `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
+| `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
+
+> **Container note for `--contig_level_functional`:** the branch uses eggNOG-mapper
+> 3.0.0-beta6, whose authors publish only an Apptainer image. Under
+> `-profile singularity` or `-profile apptainer` the pipeline uses that official image;
+> under docker/podman and the docker-based cloud profiles (`aws`, `gcp`, `azure`) it
+> uses `ghcr.io/gene2dis/bugbuster-eggnog-mapper`, an image of the same beta6 built by
+> this pipeline from the authors' own recipe, with the same tool versions (both were
+> checked to give identical results). Both engines apply a run-time fix for an
+> eggNOG-mapper beta6 bug that cost some genes their COG category (upstream issue
+> #620; see troubleshooting). The pipeline will switch to the official bioconda image
+> once eggNOG-mapper v3.0.0 final is released.
+
+> **Note for `--mag_level_functional`:** Bakta annotates the refined bins, one task
+> per bin, publishing per-bin GFF3/GBFF/FAA/FNA/TSV/summary files under
+> `07_functional_annotation/mags/<sample>/`. It requires `--include_binning` **and at
+> least two `--binners`**: MetaWRAP refinement and its completeness/contamination
+> quality filter (defaults 50/10) only run when ≥2 binners are selected, and only
+> quality-filtered bins are annotated. Bins are expected to be **bacterial** — Bakta
+> is a bacterial annotator, and the pipeline does not detect or exclude
+> archaeal/eukaryotic/viral bins; interpret annotations of such bins with caution
+> (check the GTDB-Tk bin taxonomy report). This branch is independent of
+> `--contig_level_functional` and, unlike it, runs on any container engine
+> (docker included).
+
+> **Note for `--read_level_functional woltka`:** host-removed reads are aligned with
+> Bowtie2 to the Web of Life release 2 (WoLr2, 15,953 genomes) using the SHOGUN
+> multi-hit settings (`-k 16`, the WoL/Qiita standard), and Woltka assigns each read
+> to the WoLr2 ORF it overlaps (≥ 80 % of the read inside the ORF). Mates are counted
+> as separate reads, and a read whose reported alignments (up to 16 within the
+> score threshold) hit k ORFs contributes 1/k to each
+> (`--woltka_uniq` leaves such reads unassigned instead). ORF counts are then
+> summarized to KO, EC (via KO), COG functional categories (via KO), Pfam families
+> and MetaCyc pathways from the WoLr2 maps, using the contig branch's COG and Pfam
+> vocabularies (details below). **A read contributes its full weight once to each distinct
+> term its ORF carries** (an ORF with two KOs counts toward both; the same intentional
+> double counting as the contig branch). The branch runs on any container engine,
+> needs no assembly (it also works with `--assembly_mode none`), and its tables are
+> reported **separately** (`read_*` files). Woltka identifies reads by name, so input
+> reads must have unique names (normal for sequencer output; some simulated test
+> datasets reuse names, and Woltka then counts same-named reads once). Read-level
+> profiling recovers the unassembled fraction but over-predicts, so it is never
+> merged with the assembly-based tables. The WoLr2 database is ~94 GB and
+> alignment needs **≥ 68 GB RAM** per task; pre-download it once and pass
+> `--custom_woltka_db` (Section 4, Manual Database Download).
+
+> **Note for `--read_level_functional superfocus`:** each sample's host-removed R1, R2
+> and singleton reads are concatenated into one query (mates counted as separate
+> reads) and profiled with SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster
+> database, using DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner
+> mmseqs2`). For each read, its equal-best-e-value hits passing the SUPER-FOCUS
+> defaults (≥ 60 % identity, ≥ 15 aa alignment, e-value ≤ 1e-5; set in the
+> `SUPERFOCUS` `ext.args`) are counted, and **each read with a hit contributes
+> exactly 1**, divided 1/k across the k distinct SEED (subsystem, function)
+> assignments of its best hits. The pipeline sums these function-level counts to SEED
+> subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`;
+> accessions are path-qualified — `L1`, `L1 | L2`, `L1 | L2 | L3` — because the
+> level-2 placeholder `-` occurs under many level-1 categories). SEED is never
+> mapped to KO or EC, and the read tables are never merged with the contig branch.
+> **No copies per genome equivalent are produced:** a SEED hit carries no gene
+> length, so no RPK (and no CPGE) exists — `abundance_cpge` stays blank and
+> `cpge_status` is `not_applicable`; MicrobeCensus still runs and its AGS / genome
+> equivalents are reported in `read_sample_summary.tsv`. The cluster level is fixed
+> at DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, only the selected
+> aligner's archive). MMseqs2 builds its k-mer index for the database at every run
+> (~13 GB RAM, ~45 s on 16 CPUs), and in its fast mode its result for borderline
+> reads can vary slightly with the thread count; DIAMOND results are stable. In its
+> fast mode MMseqs2 was also somewhat less sensitive in a single spot check (one
+> 2,000-read test sample: DIAMOND 1,011 reads hit, MMseqs2 924). The branch runs on
+> any container engine (docker included) and needs no assembly.
+
+> **Note for `--read_level_functional humann`:** HUMAnN 4 is an **alpha** release;
+> the pipeline pins exactly HUMAnN 4.0.0a2 with MetaPhlAn 4.1.2 and the MetaPhlAn
+> database `mpa_vOct22_CHOCOPhlAnSGB_202403` (the only combination this HUMAnN
+> build accepts — an existing MetaPhlAn 4 database such as vJun23 is refused).
+> Each sample's host-removed R1, R2 and singleton reads are concatenated into one
+> input (mates counted as separate reads). HUMAnN prescreens the community with
+> MetaPhlAn, aligns the reads to the pangenomes of the detected species
+> (ChocoPhlAn, nucleotide search), then searches the remaining reads against
+> UniRef90 (translated search; HUMAnN 4 offers only the EC-filtered UniRef90
+> database). It runs with `--count-normalization RPKs`, so **`abundance_native` is
+> RPK** (`native_unit = rpk`) and copies per genome equivalent are computed as for
+> Woltka (`CPGE = RPK / genome_equivalents`, blank without MicrobeCensus). Three
+> ontologies are reported: `metacyc` (HUMAnN's MetaCyc pathway abundance), and
+> `ko` / `ec`, which the pipeline derives from HUMAnN's gene families with the
+> HUMAnN 4 mapping files — a gene family carrying several terms contributes its
+> full RPK to each (the same intentional double counting as the other branches).
+> HUMAnN 4 gene families are a mix of UniRef90 and UniClust90 clusters: only
+> UniRef90 families can map to a KO, while EC maps cover both, so KO coverage is
+> lower than EC coverage. **KO tables from this backend are sparse:** HUMAnN
+> 4.0.0a2's utility mapping ships a legacy UniRef90→KO map that does not cover
+> most HUMAnN 4 gene families — on the nf-core test reads only 17–18 % of the
+> gene-family abundance mapped to a KO, against 39–61 % for EC (UniClust90
+> families were only 3–4 % of the abundance, so they are not the cause). Check
+> the `ko` row of `read_annotated_fraction.tsv` for your data before relying on
+> HUMAnN KO tables; for KO profiles, the Woltka backend or the contig branch are
+> better sources. `read_annotated_fraction.tsv` reports, for HUMAnN, the
+> share of reads mapped by HUMAnN (`any` row: reads given minus `READS_UNMAPPED`)
+> and, per ontology, the share of the gene-family RPK that carries a term (blank
+> read columns; for `metacyc`, the share of pathway abundance outside `UNMAPPED` /
+> `UNINTEGRATED`). The raw HUMAnN tables (MetaPhlAn profile, gene families,
+> MetaCyc reactions, pathway abundance, log) are published per sample; HUMAnN
+> 4.0.0a2 writes no pathway-coverage table. Two defects of this alpha are worked
+> around: its own `humann_renorm_table` / `humann_regroup_table` mishandle the
+> `READS_UNMAPPED` row (the pipeline does its own regrouping — drop that row if you
+> post-process the raw tables), and a sample name containing `s__` or `t__`
+> crashes its MetaPhlAn-profile parsing, so such names are rejected at launch.
+> Database footprint: ~71 GB with the full ChocoPhlAn (`--humann_db
+> v4_alpha-full`, default) or ~33 GB with the EC-filtered one
+> (`v4_alpha-ec_filtered`: fewer gene families and KOs); the MetaPhlAn prescreen
+> loads a ~20 GB Bowtie2 index. The branch runs on any container engine and needs
+> no assembly.
+
+> **Combining the functional branches:** `--contig_level_functional`,
+> `--mag_level_functional` and `--read_level_functional` are independent and can
+> all be enabled in one launch (one read backend per run). MicrobeCensus then
+> runs once per sample and its genome equivalents feed both the contig and the
+> read tables; the read branch still writes only its own `read_*` files and
+> per-backend directories, never the contig-branch tables. With
+> `--contig_level_functional` on, all three read backends were verified alongside
+> the contig branch.
 
 ### 6.3 Database Selection Options
 
@@ -304,7 +540,14 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
-| `--gtdbtk_db` | `release_220` | `release_220` | GTDB-TK database release |
+| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
+| `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
+| `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
+| `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
+| `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
+| `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
+| `--humann_db` | `v4_alpha-full` | `v4_alpha-full`, `v4_alpha-ec_filtered` | HUMAnN 4 database set: full (44.8 GB) or EC-filtered (6.9 GB) ChocoPhlAn, plus UniRef90 EC-filtered, utility mapping and MetaPhlAn vOct22 (recorded in provenance) |
+| `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
 
 ### 6.4 Custom Database Paths
 
@@ -316,7 +559,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gtdbtk_db` | Path to GTDB-TK database directory |
+| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
@@ -324,6 +567,13 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kargva_db` | Path to KARGVA database FASTA file |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
+| `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
+| `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
+| `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
+| `--custom_woltka_db` | Path to a local WoLr2 mirror in the FTP layout (see `docs/parameters.md`) |
+| `--custom_superfocus_db` | Path to a SUPER-FOCUS database ROOT, the directory containing `db/` (see `docs/parameters.md`) |
+| `--custom_humann_db` | Path to a HUMAnN database ROOT with `chocophlan/`, `uniref/`, `utility_mapping/` and `metaphlan/` (see `docs/parameters.md`) |
+| `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
 ### 6.5 FastP Quality Filtering Options
 
@@ -431,19 +681,7 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.12 MetaCerberus Options
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--metacerberus_hmm` | `"KOFam_all, COG, VOG, PHROG, CAZy"` | HMM databases to use |
-| `--metacerberus_minscore` | `25` | Minimum HMM score |
-| `--metacerberus_evalue` | `1e-09` | Maximum E-value |
-
-**Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
-
-**Note:** the value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep embedded double quotes to stay a single argument. On the command line, wrap it in single quotes: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`.
-
-### 6.13 Taxonomy Visualization Options
+### 6.12 Taxonomy Visualization Options
 
 Control taxonomic output visualization and formatting:
 
@@ -455,7 +693,7 @@ Control taxonomic output visualization and formatting:
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
 
-### 6.14 Database Storage Options
+### 6.13 Database Storage Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -463,7 +701,7 @@ Control taxonomic output visualization and formatting:
 
 By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
 
-### 6.15 Resource Limit Options
+### 6.14 Resource Limit Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -505,8 +743,18 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
-| `low_disk` | Minimize disk usage: automatic work-dir cleanup (`cleanup = true`, disables `-resume`) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
+| `low_disk` | Deletes the work dir after a successful run (`cleanup = true`; does not lower peak usage during the run; a completed run cannot be resumed, an interrupted one can) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
+
+> **`low_disk` with the functional branches:** the profile only cleans the work
+> directory. It does nothing about the functional annotation databases, which
+> are stored at `--databases_dir` (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta up to
+> ~31.9 GB download, WoLr2 ~94 GB, HUMAnN up to ~71 GB — see Section 4). And
+> because the work directory is deleted when a `low_disk` run succeeds, the run
+> cannot be resumed afterwards: re-running with a changed or added option
+> repeats the multi-hour eggNOG-mapper and read-level steps from scratch. The
+> pipeline warns about this combination at launch; see
+> [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md).
 
 **Combine profiles as needed:**
 ```bash
@@ -568,13 +816,13 @@ results/
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
-├── 01_quality_control/                         # Quality control (if quality_control=true)
-│   ├── fastp/                                  # FastP reports per sample
+├── 01_quality_control/                         # Quality control
+│   ├── fastp/                                  # FastP reports per sample (if quality_control=true)
 │   │   └── {sample}/                           # Per-sample QC results
 │   │       ├── {sample}.fastp.html             # HTML report
 │   │       ├── {sample}.fastp.json             # JSON report
 │   │       └── {sample}.fastp.log              # Log file
-│   └── summary/                                # Aggregated QC statistics
+│   └── summary/                                # Aggregated read counts (also with quality_control=false)
 │       ├── Reads_report.csv                    # Read count summary
 │       └── *.png                               # QC plots
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
@@ -604,27 +852,29 @@ results/
 ├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
 │   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
 │   │   └── {sample}/
-│   │       ├── raw_bins/                       # Raw bins from 3 binners
+│   │       ├── raw_bins/                       # Raw bins, one folder per selected binner
 │   │       │   ├── metabat2/                   # MetaBAT2 bins
 │   │       │   ├── semibin/                    # SemiBin bins
 │   │       │   └── comebin/                    # COMEBin bins
-│   │       ├── refined_bins/                   # MetaWRAP refined bins
+│   │       ├── refined_bins/                   # MetaWRAP refined bins (if >= 2 binners)
 │   │       ├── quality/                        # CheckM2 quality reports
 │   │       │   └── checkm2/
 │   │       └── taxonomy/                       # GTDB-TK taxonomy
 │   │           └── gtdbtk/
 │   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
-│   │   ├── raw_bins/                           # Raw bins from 3 binners
-│   │   ├── refined_bins/                       # MetaWRAP refined bins
+│   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
+│   │   ├── refined_bins/                       # MetaWRAP refined bins (if >= 2 binners)
 │   │   ├── quality/                            # CheckM2 quality reports
+│   │   │   └── checkm2/
 │   │   ├── taxonomy/                           # GTDB-TK taxonomy
+│   │   │   └── gtdbtk/
 │   │   ├── coverage/                           # Bin coverage information
-│   │   └── summary/                            # Bin summary statistics
-│   ├── quality/                                # Aggregated quality reports
+│   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
+│   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')
 │   │   └── summary/
 │   │       ├── *.csv                           # Quality summary tables
 │   │       └── *.png                           # Quality plots
-│   └── taxonomy/                               # Aggregated taxonomy reports
+│   └── taxonomy/                               # Aggregated taxonomy reports (if assembly_mode='assembly')
 │       └── summary/
 │           ├── *.csv                           # Taxonomy summary tables
 │           └── *.png                           # Taxonomy plots
@@ -654,10 +904,8 @@ results/
 │   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
 │   │       └── *.csv
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
-│   │   ├── prodigal/                           # ORF predictions
-│   │   │   └── {sample}/
 │   │   ├── deeparg/                            # DeepARG predictions per sample
-│   │   │   └── {sample}/
+│   │   │   └── {sample}/                       # (coassembly/ under co-assembly)
 │   │   │       └── *_contigs_deep_arg.out.mapping.ARG
 │   │   ├── summary/                            # ARG summary reports
 │   │   │   └── Contig_tax_and_arg_prediction.tsv
@@ -665,19 +913,222 @@ results/
 │   │       └── *.png
 │   └── bin_level/                              # Bin-level ARG (if arg_bin_clustering=true)
 │       ├── proteins/                           # Prodigal ORF predictions
-│       │   └── {sample}/
+│       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       ├── deeparg/                            # DeepARG predictions per bin
-│       │   └── {sample}/
+│       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                                # BlobTools plots
 │       └── *.png
-└── 07_functional_annotation/                   # Functional annotation (if contig_level_metacerberus=true)
-    └── contigs/                                # Contig-level annotation
-        └── {sample}/
-            └── {sample}_annotation_results/
+└── 07_functional_annotation/                   # Functional annotation
+    ├── gene_calling/                           # Pyrodigal ORF predictions on contigs
+    │   └── {sample}/ or coassembly/            # (if contig_tax_and_arg=true or contig_level_functional=true)
+    │       ├── {sample}.faa.gz
+    │       ├── {sample}.fna.gz
+    │       ├── {sample}.gff.gz
+    │       └── {sample}.score.gz
+    ├── eggnog/                                 # eggNOG-mapper v3 functional annotation
+    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true)
+    │       ├── {sample}.emapper.seed_orthologs
+    │       └── {sample}.emapper.annotations
+    ├── dbcan/                                  # run_dbcan v5 CAZy annotation
+    │   └── {sample}/ or coassembly/            # (if contig_level_functional=true and functional_cazy=true)
+    │       ├── {sample}.overview.tsv           # per-gene CAZy calls with per-tool columns retained
+    │       ├── {sample}.dbCANsub_hmm_results.tsv  # dbCAN-sub results incl. substrate predictions
+    │       ├── {sample}.dbCAN_hmm_results.tsv  # raw dbCAN HMM results (provenance)
+    │       └── {sample}.diamond.out            # raw DIAMOND-vs-CAZy results (provenance)
+    ├── gene_abundance/                         # featureCounts per-gene read counts
+    │   └── {sample}/                           # (if contig_level_functional=true; per sample in both assembly modes)
+    │       ├── {sample}.featureCounts.txt      # Geneid, coordinates, Length, read count
+    │       └── {sample}.featureCounts.txt.summary  # assigned vs unassigned alignments
+    ├── microbecensus/                          # MicrobeCensus average genome size
+    │   └── {sample}/                           # (if microbecensus=true and contig_level_functional=true or read_level_functional != none;
+    │                                           #  per sample in both assembly modes)
+    │       ├── {sample}.ags.tsv                # AGS, genome equivalents, total bases
+    │       └── {sample}.microbecensus.txt      # raw MicrobeCensus output (provenance)
+    ├── summary/                                # study-level tables (if contig_level_functional=true)
+    │   ├── gene_annotations.tsv                # long format: one row per gene per functional term
+    │   ├── gene_abundance.tsv                  # per-gene counts + TPM + CPGE per sample
+    │   ├── function_abundance.tsv              # per-ontology TPM and CPGE (ko, cog, ec, pfam, cazy; backend column separates eggnog-mapper and run_dbcan rows)
+    │   ├── function_wide_{ontology}_tpm.tsv    # wide TPM matrix per ontology (rows terms, columns samples; ko/cog/ec/pfam/cazy from eggNOG, cazy_dbcan from run_dbcan)
+    │   ├── function_wide_{ontology}_cpge.tsv   # wide CPGE matrix per ontology (blank columns for samples without AGS)
+    │   ├── annotated_fraction.tsv              # per-sample annotated fraction by count and abundance
+    │   ├── ags_and_ge.tsv                      # per-sample AGS summary with status ok / unavailable
+    │   ├── read_function_abundance.tsv         # read branch (if read_level_functional != none): same schema, source=reads
+    │   ├── read_function_wide_{ontology}_native.tsv  # wide native matrix (woltka: ko, ec, cog, pfam, metacyc read counts; superfocus: seed_level1/2/3 read counts; humann: ko, ec, metacyc RPK)
+    │   ├── read_function_wide_{ontology}_cpge.tsv    # wide CPGE matrix (woltka and humann; blank columns for samples without AGS)
+    │   ├── read_annotated_fraction.tsv         # share annotated, per ontology (woltka: of ORF-assigned reads; superfocus: of all reads; humann: reads mapped + RPK share per ontology)
+    │   └── read_sample_summary.tsv             # reads assigned / ambiguous, AGS, CPGE status, tool + DB version
+    ├── reads/                                  # read-level functional profiling, one backend per run
+    │   ├── woltka/{sample}/                    # (if read_level_functional=woltka; needs no assembly)
+    │   │   ├── {sample}.bowtie2.log            # alignment summary against WoLr2
+    │   │   ├── {sample}.woltka_orf.tsv         # Woltka per-ORF read counts
+    │   │   ├── {sample}.woltka_functions.tsv   # per-function read counts and RPK
+    │   │   ├── {sample}.woltka_summary.tsv     # reads assigned / annotated per ontology
+    │   │   └── {sample}.woltka_unassigned.tsv  # reads left unassigned by --woltka_uniq
+    │   ├── superfocus/{sample}/                # (if read_level_functional=superfocus; needs no assembly)
+    │   │   ├── {sample}.superfocus_functions.tsv   # SEED level 1-3 read counts (seed_level1/2/3)
+    │   │   ├── {sample}.superfocus_summary.tsv     # reads given to SUPER-FOCUS / with an accepted hit
+    │   │   ├── {sample}.superfocus_all_levels_and_function.xls  # raw SUPER-FOCUS table (tab-separated)
+    │   │   ├── {sample}.superfocus_subsystem_level_{1,2,3}.xls  # raw SUPER-FOCUS per-level tables (not used, see note)
+    │   │   └── {sample}.superfocus.log         # SUPER-FOCUS run log
+    │   └── humann/{sample}/                    # (if read_level_functional=humann; needs no assembly)
+    │       ├── {sample}_1_metaphlan_profile.tsv    # MetaPhlAn 4.1.2 prescreen profile
+    │       ├── {sample}_2_genefamilies.tsv     # HUMAnN gene families (RPK; UniRef90 / UniClust90, stratified rows included)
+    │       ├── {sample}_3_reactions.tsv        # HUMAnN MetaCyc reactions (RPK)
+    │       ├── {sample}_4_pathabundance.tsv    # HUMAnN MetaCyc pathway abundance (RPK)
+    │       ├── {sample}_0.log                  # HUMAnN run log
+    │       ├── {sample}.humann_functions.tsv   # ko / ec / metacyc RPK composed by the pipeline
+    │       └── {sample}.humann_summary.tsv     # reads given / mapped, RPK share annotated per ontology
+    └── mags/                                   # Bakta MAG-level annotation, one file set per bin
+        └── {sample}/ or coassembly/            # (if mag_level_functional=true; requires binning with >= 2 binners)
+            ├── {sample}_{bin}.gff3             # annotation in GFF3 (coassembly_{bin}.* under co-assembly)
+            ├── {sample}_{bin}.gbff             # annotation in GenBank flat file
+            ├── {sample}_{bin}.faa              # protein sequences
+            ├── {sample}_{bin}.fna              # replicon/contig sequences
+            ├── {sample}_{bin}.tsv              # per-feature annotation table
+            ├── {sample}_{bin}.txt              # per-bin annotation summary
+            └── {sample}_{bin}.hypotheticals.tsv  # hypothetical-protein table (+ .hypotheticals.faa)
 ```
+
+> **Gene identifiers and assembly mode:** in the gene abundance tables, `Geneid`
+> is `<contig>_<n>`, matching the protein ids in `gene_calling/` and the query
+> ids in the eggNOG annotations. Under `--assembly_mode coassembly` every
+> sample is counted against the same co-assembly gene set, so gene ids are
+> shared across samples and gene-level comparisons between samples within the
+> run are valid. Under `--assembly_mode assembly` each sample has its own
+> assembly and gene set: gene ids are sample-specific, and only function-level
+> results (not per-gene rows) may be compared across samples. The directory
+> keys follow the same split: under co-assembly, `gene_calling/`, `eggnog/`,
+> `dbcan/` and `mags/` hold one set keyed `coassembly` (files named
+> `coassembly.*` / `coassembly_<bin>.*`), while `gene_abundance/` and
+> `microbecensus/` stay per sample in both modes. Counts are
+> read-level (each mate counted separately), not fragment-level; the
+> multi-mapping policy is set by `--featurecounts_multimap`.
+
+> **TPM normalization (`summary/` tables):**
+>
+> ```
+> RPK_i = count_i / (length_i / 1000)
+> TPM_i = RPK_i / (sum over all j of RPK_j) * 1e6
+> ```
+>
+> The share of the sample's functional pool attributable to that gene.
+> Compositional. Use for within-sample composition and for compositionally
+> aware differential testing. TPM sums to 1e6 per sample; a sample whose genes
+> attracted no reads at all has TPM 0 for every gene instead. In
+> `function_abundance.tsv`, a gene carrying two terms of the same ontology
+> contributes its full abundance to each — this double-counting is
+> intentional, so ontology-level TPM totals can exceed 1e6. The `description`
+> column is empty for eggNOG terms (eggNOG-mapper v3 dropped the Description
+> field). Pfam terms are Pfam family names (e.g. `BPD_transp_1`): eggNOG-mapper
+> v3 reports one value per domain hit with its coordinates appended
+> (`BPD_transp_1_210_403`), which the aggregation strips, so a gene with a
+> repeated domain counts once toward that family. COG terms are COG
+> functional categories (one letter, e.g. `P` = inorganic ion transport and
+> metabolism): eggNOG 7 reports most genes with a COG ortholog id instead of a
+> category (e.g. `COG1629`), which is mapped to its category letters with
+> NCBI's COG definitions table (`cog-24.def.tab`, downloaded with the branch);
+> a COG with several categories contributes to each. The table's name is
+> appended to `db_version` on the COG rows of `gene_annotations.tsv`.
+
+> **Two CAZy backends (`--functional_cazy`, on by default):** CAZy calls come
+> from both eggNOG-mapper (coarse, orthology-transferred) and run_dbcan v5
+> (dedicated CAZyme annotation with family/subfamily resolution). They are
+> reported **separately, never merged**: in the long tables the `db`
+> (`eggnog_cazy` vs `dbcan`) and `backend` (`eggnog-mapper` vs `run_dbcan`)
+> columns distinguish them, and the wide matrices are split into
+> `function_wide_cazy_*` (eggNOG) and `function_wide_cazy_dbcan_*`
+> (run_dbcan) — a merged matrix would double-count genes called by both
+> tools. For CAZy-focused analyses prefer the dbCAN matrices. Which dbCAN
+> calls feed the tables is set by `--dbcan_consensus` (`recommended` =
+> supported by ≥2 of DIAMOND / dbCAN HMM / dbCAN-sub, the default; `any` =
+> per-tool union); the published `overview.tsv` always retains the per-tool
+> columns. In `annotated_fraction.tsv` the `cazy` rows count a CAZy call
+> from either backend and the `cazy_dbcan` rows count run_dbcan alone. With
+> `--functional_cazy false` the `cazy_dbcan` outputs are still written but
+> empty. dbCAN rows carry no per-call e-value/score (the overview has no
+> single per-call value), and their `description` column is empty. dbCAN
+> accessions are kept exactly as the tool emits them: plain families
+> (`GH13`), CAZy subfamilies (`GH5_4`), and dbCAN-sub subfamily cluster ids
+> (`GH78_e118`) all occur.
+
+> **Copies per genome equivalent (`cpge` / `abundance_cpge` columns and the
+> `function_wide_*_cpge.tsv` matrices):**
+>
+> ```
+> genome_equivalents = total_bases_sampled / average_genome_size_bp   (from MicrobeCensus)
+> CPGE_i = RPK_i / genome_equivalents
+> ```
+>
+> Approximate average copies of that gene per community member. Not
+> compositional. Use when the question is whether an average cell carries the
+> function, and for comparing across communities of different composition.
+> TPM and CPGE answer different questions: they are not interchangeable and
+> neither replaces the other — the most common error in this kind of analysis
+> is treating one as the other.
+>
+> The genome-equivalents estimate comes from MicrobeCensus run on the
+> host-removed reads (on by default with the branch; disable with
+> `--microbecensus false`). MicrobeCensus failure is deliberately **non-fatal**:
+> if it fails for a sample (reads shorter than 50 bp, too few marker-gene
+> hits in very small datasets, or an estimate rejected by the module's
+> 0.5–20 Mb plausibility check), the run continues and that sample's `cpge`
+> fields stay empty (TPM-only fallback). `summary/ags_and_ge.tsv` records the
+> per-sample estimates, with `status = unavailable` marking exactly the
+> samples that fell back. Note MicrobeCensus estimates need a few hundred
+> thousand reads to be accurate — on very small datasets the value is
+> mechanical, not meaningful.
+
+> **Read-level tables (`read_*` files, `--read_level_functional`):** the read
+> branch uses the same long schema as `function_abundance.tsv` with
+> `source = reads` and `backend` naming the tool, but is written to its own
+> files and never merged with the contig branch. `abundance_native` is the
+> backend's own unit — for Woltka, reads assigned (mates counted separately;
+> fractional when a read is divided 1/k across its hit ORFs) with
+> `native_unit = reads`. `abundance_tpm` is empty (TPM is contig-branch only).
+> `abundance_cpge` uses the same definition as above, with RPK computed over the
+> WoLr2 reference ORF lengths: `CPGE = (reads / (ORF length / 1000)) /
+> genome_equivalents`, blank when MicrobeCensus is unavailable for the sample
+> (`read_sample_summary.tsv` then shows `cpge_status = unavailable`). Read-branch
+> and contig-branch values are **not directly comparable**: they count different
+> things (reads hitting reference genomes vs reads mapped back to the sample's own
+> assembled genes), and read-level profiling recovers the unassembled fraction
+> but over-predicts, while the assembly-based branch is more precise. The accession
+> vocabularies do match the contig branch's, so the same term can be looked up in
+> both: Woltka COG accessions are COG functional-category letters (the WoLr2 KO →
+> COG ortholog ids are mapped with the same NCBI `cog-24.def.tab` table, which is
+> downloaded for `--read_level_functional woltka` too; a COG with several categories
+> contributes to each, and a read counts once per category even when its ORF
+> reaches that category through several COGs). Nine WoLr2 `ko-to-cog` entries
+> cannot be mapped (five malformed ids in the release, e.g. `COG:1140`, and four
+> ids absent from COG 2024, e.g. `COG3632`); they are skipped with a warning in the
+> task log, and the KO's other COGs still count. Pfam accessions are Pfam family
+> names (`AAA`), with the versioned WoLr2 accession (`PF00004.32`) in
+> `description`. MetaCyc accessions are pathways (`PWY-5101`); EC numbers are
+> derived via KO.
+>
+> For SUPER-FOCUS, `abundance_native` is reads with an accepted SEED hit (mates
+> counted separately; each read contributes 1 in total, fractional when divided
+> 1/k across its best-hit assignments), summed per level into `seed_level1`,
+> `seed_level2` and `seed_level3` with path-qualified accessions (`L1`,
+> `L1 | L2`, `L1 | L2 | L3`) and the level's own name as `description`; every
+> level sums to the reads with a hit. `abundance_cpge` is always empty (a SEED
+> hit has no gene length, so no RPK) and `cpge_status = not_applicable`; only
+> the three `_native` wide matrices are written. The raw SUPER-FOCUS tables are
+> kept for provenance (tab-separated despite the `.xls` suffix), but their `%`
+> columns and per-level files are **not** used: SUPER-FOCUS's own level files
+> aggregate by level name, merging the level-2 placeholder `-` across 33
+> level-1 categories; the pipeline recomputes the levels from the
+> function-level counts.
+>
+> For HUMAnN, `abundance_native` is HUMAnN's RPK (`native_unit = rpk`;
+> `--count-normalization RPKs`), unstratified: `metacyc` is the pathway
+> abundance (accession = pathway id, description = its name; `UNMAPPED` /
+> `UNINTEGRATED` excluded), `ko` / `ec` the summed RPK of the gene families
+> carrying each term (`READS_UNMAPPED` excluded). `abundance_cpge` = RPK /
+> genome equivalents, blank when MicrobeCensus is unavailable for the sample.
 
 ### Database Storage Directory
 
@@ -693,7 +1144,14 @@ databases/                            # Database storage (configurable via --dat
 ├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
 ├── checkm2/                          # CheckM2 database
-└── gtdbtk/                           # GTDB-TK database
+├── gtdbtk/                           # GTDB-TK database
+├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
+├── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
+├── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
+├── bakta/                            # Bakta database v6.0 (full 31.9 GB / light 1.3 GB download)
+├── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
+├── superfocus/                       # SUPER-FOCUS DB_90 root for the selected aligner (~1.9-2.5 GB unpacked)
+└── humann/                           # HUMAnN 4 database root + MetaPhlAn vOct22 (~71 GB / ~33 GB EC-filtered)
 ```
 
 The KARGA and KARGVA reference FASTAs are small and staged directly into the work
@@ -705,7 +1163,8 @@ The following outputs are only generated when specific parameters are enabled:
 
 | Output Directory | Required Parameter | Description |
 |------------------|-------------------|-------------|
-| `01_quality_control/` | `quality_control=true` | Quality control and filtering results |
+| `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
+| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`, extended with taxonomy when a profiler runs) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
 | `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |
 | `03_assembly/` | `assembly_mode != 'none'` | Assembly results |
@@ -717,7 +1176,17 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
-| `07_functional_annotation/` | `contig_level_metacerberus=true` | Functional annotation results |
+| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
+| `07_functional_annotation/microbecensus/` | `microbecensus=true` and (`contig_level_functional=true` or `read_level_functional != 'none'`) | MicrobeCensus average genome size and genome equivalents (per sample in both assembly modes) |
+| `07_functional_annotation/summary/` | `contig_level_functional=true` | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology, annotated fraction, AGS summary |
+| `07_functional_annotation/mags/` | `mag_level_functional=true` (needs `include_binning=true` and ≥2 binners) | Bakta per-bin MAG annotation (GFF3, GBFF, FAA, FNA, TSV, summary per refined bin; under `coassembly/` with co-assembly binning) |
+| `07_functional_annotation/reads/woltka/` | `read_level_functional='woltka'` | Woltka read-level ORF and function tables per sample (no assembly needed) |
+| `07_functional_annotation/reads/superfocus/` | `read_level_functional='superfocus'` | SUPER-FOCUS SEED level 1-3 tables and raw SUPER-FOCUS outputs per sample (no assembly needed) |
+| `07_functional_annotation/reads/humann/` | `read_level_functional='humann'` | HUMAnN 4 raw tables (MetaPhlAn profile, gene families, reactions, pathway abundance) and the composed ko / ec / metacyc tables per sample (no assembly needed) |
+| `07_functional_annotation/summary/read_*.tsv` | `read_level_functional != 'none'` | Study-level read-branch tables (same schema, `source=reads`), reported separately from the contig branch |
 
 ---
 
@@ -881,7 +1350,7 @@ nextflow run main.nf \
     --custom_decontamination_index /shared/db/bowtie_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/db/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/db/release232 \
     -profile singularity
 ```
 
@@ -941,7 +1410,7 @@ nextflow run main.nf \
     --databases_dir /shared/databases/bugbuster \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_gtdb220 \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/databases/bugbuster/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --include_binning true \
     -profile singularity
 ```
@@ -964,8 +1433,15 @@ params {
     // Pre-downloaded databases
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
-    custom_gtdbtk_db              = '/shared/db/gtdbtk_r220'
+    custom_gtdbtk_db              = '/shared/db/release232'
     custom_decontamination_index  = '/shared/db/bowtie_index'
+}
+
+// The local executor's machine-wide pool is copied from max_cpus/max_memory
+// before a -c file is read, so a -c file that raises them sets the pool too
+executor {
+    cpus   = 32
+    memory = '256.GB'
 }
 
 singularity {
@@ -981,6 +1457,14 @@ nextflow run main.nf \
     -c my_config.config \
     -profile singularity
 ```
+
+> **Raising the resource limits.** `--max_cpus`, `--max_memory` and `--max_time` cap every
+> task, and with the local executor `max_cpus`/`max_memory` are also the run's machine-wide
+> pool. On the command line or in a `-params-file`, they set both. In a `-c` file, the
+> `params` values cap each task, but the pool keeps the profile's values unless the file also
+> has the `executor` block above. Without it, a task asking for more than the pool fails with
+> `Process requirement exceeds available CPUs` (or `memory`). This matters most on top of
+> `-profile test`, whose pool and caps are 2 CPUs / 6 GB / 6 h.
 
 ### 10.2 Institutional Profile
 
@@ -1158,4 +1642,4 @@ https://github.com/gene2dis/BugBuster
 
 ---
 
-*BugBuster v1.1.0dev - Built with Nextflow*
+*BugBuster v2.0.0dev - Built with Nextflow*

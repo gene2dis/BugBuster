@@ -1,0 +1,3 @@
+"FUNCTIONAL_ANNOTATION:RUN_DBCAN":
+    run_dbcan: 5.2.9
+    dbcan_db: db_v5-2-9_5-5-2026

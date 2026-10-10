@@ -10,6 +10,7 @@
 
 # Internal docs
 internal_docs
+internal_docs/*
 
 # claude files
 .claude
@@ -25,3 +26,8 @@ work/
 test_results/
 null/
 /databases/
+
+# Ad-hoc acceptance-run work dirs and outputs (e.g. work_t6_assembly/,
+# results_t6_assembly/ from real-run verification sessions)
+/work_*/
+/results_*/

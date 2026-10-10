@@ -1,6 +1,7 @@
 process PRODIGAL_BINS {
     container 'quay.io/biocontainers/prodigal:2.6.3--h031d066_8'
 
+    tag "${meta.id}"
     label 'process_medium'
 
     input:

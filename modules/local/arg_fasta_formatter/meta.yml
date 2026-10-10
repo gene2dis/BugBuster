@@ -1,0 +1,39 @@
+name: arg_fasta_formatter
+description: Extracts the protein sequences of DeepARG-predicted ARGs from the per-bin Prodigal proteins of one sample (extract_sequences.py run once per bin with hits), for bin-level ARG clustering
+keywords:
+  - antimicrobial resistance
+  - bins
+  - protein sequences
+  - fasta
+tools:
+  - biopython:
+      description: Python tools for computational molecular biology, used by the extract_sequences.py helper that ships inside the quay.io/ffuentessantander/biopython_utils:1.0 image (the helper is not in bin/)
+      homepage: https://biopython.org
+      documentation: https://biopython.org/wiki/Documentation
+      doi: "10.1093/bioinformatics/btp163"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - proteins:
+      type: directory
+      description: PRODIGAL_BINS output directory with one protein FASTA per refined bin (<sample>_<bin>_proteins.faa)
+      pattern: "*_bins_proteins"
+  - deeparg:
+      type: directory
+      description: DEEPARG_BINS output directory with one DeepARG mapping file per bin (<sample>_<bin>_deep_arg.out.mapping.ARG)
+      pattern: "*_deeparg_results"
+
+output:
+  - arg_reports:
+      type: file
+      description: ARG protein FASTA written by extract_sequences.py from the bin protein file and its DeepARG hit list (read id, ARG, class, best hit); bins without hits are skipped
+      pattern: "*_ARGs.faa"
+  - versions:
+      type: file
+      description: Software versions (python, biopython)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

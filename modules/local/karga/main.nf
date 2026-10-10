@@ -1,6 +1,7 @@
 process KARGA {
     container 'quay.io/ffuentessantander/karga:1.1'
 
+    tag "${meta.id}"
     label 'process_low'
 
     input:

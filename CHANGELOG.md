@@ -7,8 +7,298 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-The pipeline self-reports this state as `1.1.0dev` (manifest version) until the
+The pipeline self-reports this state as `2.0.0dev` (manifest version) until the
 next release is tagged.
+
+### Added
+
+- **Read-level functional profiling (`--read_level_functional woltka`)**
+  - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
+    with `--assembly_mode none`) and of the contig/MAG branches; one backend
+    per run, validated at launch
+  - Woltka 0.1.7 backend: Bowtie2 alignment of the host-removed reads against
+    the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit
+    settings (`WOLTKA_ALIGN`, trimmed SAM), Woltka ORF classification
+    (`WOLTKA_CLASSIFY`; mates counted separately, multi-hit reads divided 1/k,
+    or left unassigned with `--woltka_uniq`), and per-ORF composition to KO,
+    EC, COG-category, Pfam and MetaCyc pathway read counts — each ORF counted once per
+    distinct term (Woltka's own `collapse` was found to inflate counts through
+    duplicate map entries and chained maps, so it is not used)
+  - Study-level `AGGREGATE_READ_FUNCTIONS` writes `read_function_abundance.tsv`
+    (same schema as the contig branch, `source = reads`, native unit = reads,
+    copies per genome equivalent from MicrobeCensus), wide
+    `read_function_wide_<ontology>_{native,cpge}.tsv` matrices,
+    `read_annotated_fraction.tsv` and `read_sample_summary.tsv` to
+    `07_functional_annotation/summary/`; per-sample tables to
+    `07_functional_annotation/reads/woltka/<sample>/`. Reported separately
+    from, never merged with, the assembly-based tables. Inputs are collected
+    in a fixed (sorted) order, so resumed runs are fully cached
+  - Same `cog` / `pfam` vocabularies as the contig branch: WoLr2's COG ortholog
+    ids are mapped to COG functional categories with NCBI's `cog-24.def.tab`
+    (downloaded for `--read_level_functional woltka` too; letters counted once
+    per ORF), and Pfam families are reported by name, with the versioned
+    accession in `description`. Five malformed COG strings in the WoLr2
+    `ko-to-cog` map (e.g. `COG:1140`) and four ids absent from COG 2024 are
+    skipped with a warning; any other unmapped id fails loudly
+  - WoLr2 subset (~94 GB: Bowtie2 index + ORF coordinates + KEGG / MetaCyc /
+    Pfam maps) auto-downloaded from the official host with md5 verification
+    (`--woltka_db wolr2`), or a local mirror via `--custom_woltka_db`; the
+    alignment needs ≥ 68 GB RAM
+  - MicrobeCensus now also runs for the read branch (once per sample when both
+    branches are on)
+- **SUPER-FOCUS read-level backend (`--read_level_functional superfocus`)**
+  - SUPER-FOCUS 1.8 (`SUPERFOCUS`, pinned Seqera Containers image with
+    DIAMOND 2.2.1 and MMseqs2 18.8cc5c; docker works) against the DB_90 SEED
+    subsystem cluster database; search backend via `--superfocus_aligner
+    diamond|mmseqs2` (default `diamond`); R1, R2 and singleton reads
+    concatenated into one query (mates counted separately), each read with a
+    hit contributing 1, divided 1/k across its best-hit SEED assignments
+  - SEED subsystem levels 1-3 summed by the pipeline from the function-level
+    counts (ontologies `seed_level1`, `seed_level2`, `seed_level3`;
+    path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`) — SUPER-FOCUS's
+    own per-level files merge the level-2 `-` placeholder across level-1
+    categories and are kept only as raw outputs. SEED is never mapped to KO/EC
+  - No copies per genome equivalent for this backend (a SEED hit has no gene
+    length): `abundance_cpge` blank, `cpge_status = not_applicable`, only the
+    `read_function_wide_seed_level{1,2,3}_native.tsv` matrices; AGS/GE still
+    reported. Per-sample tables to `07_functional_annotation/reads/superfocus/<sample>/`
+  - DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB
+    MMseqs2, figshare CC0, md5-verified, plus `database_PKs.txt` from the
+    SUPER-FOCUS v1.8 tag; `FORMAT_SUPERFOCUS_DB`, `--superfocus_db db90`), or
+    a local database root via `--custom_superfocus_db`
+  - `bin/aggregate_read_functions.py` generalized to per-backend settings
+    (file suffixes, versions keys, verified versions, ontologies, CPGE
+    applicability); Woltka outputs unchanged (byte-identical on the fixtures)
+- **HUMAnN 4 read-level backend (`--read_level_functional humann`)**
+  - HUMAnN 4.0.0a2 (an alpha, pinned exactly) with MetaPhlAn 4.1.2 and the
+    MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` — the only
+    combination this HUMAnN build accepts — in a pinned Seqera Containers
+    image (`HUMANN`; no HUMAnN 4 conda package or biocontainer exists; docker
+    works). R1, R2 and singleton reads concatenated into one input; run with
+    `--count-normalization RPKs`
+  - Ontologies `metacyc` (pathway abundance), `ko` and `ec` (gene families
+    regrouped by the pipeline with the HUMAnN 4 mapping files; UniClust90
+    families reach EC but never KO; KO coverage is limited by HUMAnN 4.0.0a2's
+    legacy KO map, ~17-18 % of gene-family abundance on the test data vs
+    ~39-61 % for EC). `abundance_native` = RPK
+    (`native_unit = rpk`), CPGE = RPK / genome equivalents; six wide
+    matrices. Per-sample raw HUMAnN tables (MetaPhlAn profile, gene families,
+    reactions, pathway abundance, log) to `07_functional_annotation/reads/humann/<sample>/`
+  - Version-aware parsing (`bin/humann_function_profile.py`): the exact
+    4.0.0a2 table layout is required, anything else fails with an explanatory
+    error. Works around two 4.0.0a2 defects: its own regroup / renorm
+    utilities mishandle the `READS_UNMAPPED` row (the pipeline regroups
+    itself), and sample names containing `s__` or `t__` crash its
+    MetaPhlAn-profile parsing (rejected at launch)
+  - Databases (`FORMAT_HUMANN_DB`, `--humann_db v4_alpha-full` (default,
+    ChocoPhlAn 44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB), recorded in
+    provenance): ChocoPhlAn, UniRef90 EC-filtered (0.94 GB), the v4 utility
+    mapping (2.8 GB) and the MetaPhlAn database with its prebuilt Bowtie2
+    index (~22.5 GB, md5-verified) — ~71 GB / ~33 GB in total; or a local
+    database root via `--custom_humann_db`
+  - `bin/aggregate_read_functions.py`: per-backend native unit and
+    annotated-fraction mode; Woltka and SUPER-FOCUS outputs unchanged
+    (byte-identical on the fixtures)
+- **MAG-level functional annotation (`--mag_level_functional`)**
+  - Bakta 1.12.1 annotation of every MetaWRAP-refined bin, one task per bin
+    (nf-core `bakta/bakta` module, patched to emit `versions.yml`; per-bin
+    fan-out of the refined-bins directory), published to
+    `07_functional_annotation/mags/<sample>/` as `<sample>_<bin>.{gff3,gbff,faa,fna,tsv,txt,hypotheticals.tsv,hypotheticals.faa}`
+  - Requires `--include_binning` and at least two `--binners` (validated at
+    launch): the MetaWRAP completeness/contamination filter only runs with
+    ≥2 binners, and only quality-filtered bins are annotated. Bins are
+    expected to be bacterial; the pipeline does not exclude
+    archaeal/eukaryotic/viral bins (documented)
+  - Bakta database v6.0 (schema 6) auto-downloaded from the pinned Zenodo
+    release: `--bakta_db v6.0-full` (default, 31.9 GB download) or
+    `v6.0-light` (1.3 GB; explicit choice, recorded in provenance via the
+    `bakta_db` versions entry) / `--custom_bakta_db`. Provisioning refreshes
+    the bundled AMRFinderPlus database with `amrfinder_update` (~300 MB; the
+    official tarball's copy is too old for the AMRFinderPlus in the pinned
+    bakta container and would fail every annotation at the AMR expert step —
+    custom databases need the same one-time refresh, see troubleshooting)
+  - Independent of `--contig_level_functional`; runs on any container engine
+- **Contig-level functional annotation (`--contig_level_functional`)**
+  - Shared Pyrodigal gene calling on contigs (one pass feeds both DeepARG and
+    functional annotation), published to `07_functional_annotation/gene_calling/`
+  - Two-stage eggNOG-mapper v3 annotation (DIAMOND search + orthology-transfer
+    annotation) against the eggNOG 7 database (~44 GB, auto-downloaded;
+    `--eggnog_db` / `--custom_eggnog_db`), published to
+    `07_functional_annotation/eggnog/`
+  - Per-gene abundance quantification with featureCounts over the Pyrodigal
+    gene coordinates, with gene ids matching the annotated protein ids;
+    per-sample counts in both assembly modes (under co-assembly, dedicated
+    per-sample alignments against the co-assembly are added since the pooled
+    binning BAM cannot yield per-sample counts), published to
+    `07_functional_annotation/gene_abundance/`; multi-mapping policy via
+    `--featurecounts_multimap` (`primary`/`all`/`none`)
+  - Study-level aggregation (`bin/aggregate_functions.py`) into canonical
+    tables published to `07_functional_annotation/summary/`: per-gene
+    abundance with TPM and copies per genome equivalent (CPGE), long-format
+    gene annotations, per-ontology function abundance (KO, COG, EC, Pfam,
+    CAZy; intentional double-counting of multi-term genes), wide TPM and
+    CPGE matrices per ontology, a per-sample annotated-fraction report and
+    an AGS summary (`ags_and_ge.tsv`); the eggNOG annotations parser is
+    version-aware and fails loudly on layout drift. Inputs are collected in a
+    fixed (sorted) order, so resumed runs are fully cached
+  - COG and Pfam terms: eggNOG 7 writes a COG ortholog id (e.g. `COG1629`)
+    into `COG_category` for most genes (75-80 % on real data); these are
+    mapped to COG functional-category letters with NCBI's COG definitions
+    table (`cog-24.def.tab`, ~410 KB, auto-downloaded with md5 verification;
+    `--cog_db` / `--custom_cog_db`). eggNOG-mapper v3 writes `PFAMs` values as
+    `<pfam_name>_<start>_<end>`; the domain coordinates are stripped, so each
+    Pfam family is reported by name and counted once per gene (format
+    verified on all 73.9 M Pfam values of the eggNOG 7 database). An unknown
+    COG id or an unexpected `PFAMs` form fails loudly
+  - eggNOG-mapper 3.0.0-beta6 truncates OG names whose family part contains
+    `|` (upstream issue #620; ~2 % of eggNOG 7 OGs), which cost those genes
+    their COG category or gave them another OG's (1-4 % of annotated genes
+    on real data; KO, EC, Pfam and CAZy unaffected). The annotate step runs
+    through `bin/emapper_ogs_fix.py`, which applies the fix proposed on the
+    issue at run time and refuses to run on any eggNOG-mapper version other
+    than the beta6 it targets
+  - MicrobeCensus average genome size estimation on the host-removed reads
+    (`--microbecensus`, on by default with the branch), published to
+    `07_functional_annotation/microbecensus/`, enabling the CPGE
+    normalization. Failure is non-fatal by design: affected samples fall
+    back to TPM-only with empty `cpge` fields and `status = unavailable` in
+    `ags_and_ge.tsv`. Both published biocontainers of the unmaintained
+    upstream tool are broken (Python-3 build: unreleased upstream str/bytes
+    fix; Python-2 build: missing libstdc++ for the bundled RAPsearch2); the
+    pipeline pins the Python-3 image and routes the call through the
+    `bin/run_microbe_census_py3fix.py` shim that patches the one broken
+    function
+  - run_dbcan v5 CAZy annotation of the predicted proteins
+    (`--functional_cazy`, on by default with the branch): protein-mode
+    `CAZyme_annotation` (DIAMOND vs CAZy + pyHMMER vs dbCAN/dbCAN-sub HMMs)
+    against the pinned dbCAN database release (~7.4 GB, auto-downloaded;
+    `--dbcan_db` / `--custom_dbcan_db`), published to
+    `07_functional_annotation/dbcan/` with the per-tool overview columns and
+    the dbCAN-sub substrate predictions retained. The calls feed the summary
+    tables as `db = dbcan` / `backend = run_dbcan` rows alongside the
+    eggNOG-derived CAZy calls — reported separately, never merged — plus
+    dedicated `function_wide_cazy_dbcan_{tpm,cpge}.tsv` matrices and
+    `cazy_dbcan` annotated-fraction rows; the consensus policy is a
+    documented parameter (`--dbcan_consensus`: `recommended` = calls
+    supported by >= 2 tools, `any` = per-tool union), and the overview
+    parser is version-aware like the eggNOG one
+  - Runs on every container engine. eggNOG-mapper 3.0.0-beta6 is published
+    only as an Apptainer image, which singularity/apptainer use; docker/podman
+    and the cloud profiles use `ghcr.io/gene2dis/bugbuster-eggnog-mapper`, an
+    image of the same version built from the authors' recipe with the same
+    tool versions (`containers/eggnog-mapper/Dockerfile`, published by the
+    `eggnog-image` workflow; same annotations as the official image). It is
+    replaced by the bioconda image once v3.0.0 final is released
+  - `docs/WORKFLOW_DIAGRAM.md` refreshed to cover the functional annotation
+    branch (shared Pyrodigal gene calling, eggNOG/dbCAN database preparation,
+    per-sample co-assembly counting alignments, the FUNCTIONAL_ANNOTATION
+    subworkflow and its parameters)
+
+### Changed
+
+- **Breaking (Nextflow version)**: minimum Nextflow raised again, from
+  24.04.0 (v1.1) to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now
+  follows Nextflow's strict syntax, whose parser needs nf-schema >= 2.7.2,
+  which in turn needs Nextflow >= 25.10. nf-schema 2.8.0 needs Nextflow >= 26.04,
+  so the plugin stays pinned at 2.7.3
+- **Breaking (GTDB-Tk databases)**: GTDB-Tk re-pinned 2.5.2 → 2.7.2 and the
+  reference-data registry moved from GTDB R220 to **R232** (~61 GB download,
+  pinned release URL; default `--gtdbtk_db release_232`). GTDB-Tk 2.7.x
+  accepts only R232 data, so a `databases/gtdbtk/` directory cached by earlier
+  pipeline versions (R220) no longer works — delete it to re-download, or pass
+  an R232 directory with `--custom_gtdbtk_db`. The upstream-removed
+  `--skip_ani_screen` flag was dropped from the `classify_wf` invocation (the
+  ANI pre-screen now always runs, against the skani DB bundled in the R232
+  package), and the module's synthetic empty-report headers were updated to
+  the 2.7 column schema (`fastani_*` → `closest_genome_*`;
+  `bin_tax_report.py` already handled both namings)
+- **Breaking (output layout)**: contig gene calling switched from the nf-core
+  Prodigal module to a shared Pyrodigal step; its outputs moved from
+  `05_arg_prediction/contig_level/prodigal/` to
+  `07_functional_annotation/gene_calling/` (same predictions, gzipped, now
+  produced once for both DeepARG and functional annotation)
+- **Breaking (output layout)**: under `--assembly_mode coassembly`, the CheckM2
+  and GTDB-Tk reports moved from `04_binning/per_sample/coassembly/quality/`
+  and `.../taxonomy/` to `04_binning/coassembly/quality/checkm2/` and
+  `04_binning/coassembly/taxonomy/gtdbtk/`, next to the co-assembly bins; a
+  co-assembly run no longer creates `04_binning/per_sample/`. Per-sample mode
+  is unchanged
+
+### Removed
+
+- **Breaking**: the MetaCerberus contig annotation path —
+  `--contig_level_metacerberus`, `--metacerberus_hmm`,
+  `--metacerberus_minscore`, `--metacerberus_evalue` and its
+  `07_functional_annotation/contigs/` output. Superseded by the contig
+  functional branch (`--contig_level_functional`: eggNOG-mapper v3 +
+  run_dbcan, TPM / copies-per-genome-equivalent tables), which also runs under
+  `--assembly_mode coassembly`; one contig annotation backend is kept so the
+  results have a single threshold model and ontology mapping. Passing any of
+  these params aborts the run at startup
+
+### Fixed
+
+- **`low_disk` was described as freeing disk during the run**: the `--help` text, the
+  profile description, the launch warning, the README, the manual and
+  `docs/DISK_OPTIMIZATION.md` called its work-dir cleanup "progressive" and promised a
+  60-70 % lower peak. Nextflow's `cleanup = true` deletes the work directory only once the
+  run succeeds, and the in-task cleanup of temporary files runs in every profile, so peak
+  disk use is the same with or without `low_disk`. Behaviour is unchanged; the text now
+  says what happens: work dir deleted after a successful run (that run cannot be
+  resumed; an interrupted one can), task directories reused from the cache or left by
+  the interrupted run survive a resumed run's cleanup (delete `work/` once resuming is no
+  longer needed), and running out of disk mid-run calls for a
+  larger `-work-dir` filesystem or fewer concurrent tasks
+- **`max_*` set in a `-c` config file were ignored**: `process.resourceLimits` copied
+  `max_cpus`/`max_memory`/`max_time` while `nextflow.config` was parsed, so values from a
+  later `-c` file (the documented way in manual §10.1, and `-c conf/my_institution.config`)
+  never reached it. After `-profile test`, tasks stayed at 2 CPUs / 6 GB / 6 h. The limits are
+  now read at task time, so `-c`, `-params-file` and the command line all work. The local
+  executor's pool still follows only the command line and `-params-file` (executor settings
+  are fixed at parse time): a `-c` file that raises the limits must also set
+  `executor { cpus; memory }`. Otherwise the run fails with "Process requirement exceeds
+  available CPUs" and stops: a local task that never gets an exit status because it can
+  never be scheduled now ends the run (`terminate`) instead of the default `finish`, which waited forever for
+  queued tasks that could not run either (the same applies to the download labels, `RGI_BWT` and
+  `MICROBECENSUS`). Documented in the manual, parameters and troubleshooting; regression test
+  `tests/bin/test_resource_limits.sh`
+- **SUPER-FOCUS, HUMAnN and every database download under singularity/apptainer**: the
+  separately built singularity images of the SUPER-FOCUS and HUMAnN containers have no
+  `gzip`, so `SUPERFOCUS`/`HUMANN` failed at once (exit 127) under apptainer and singularity.
+  Under `-profile singularity`, the singularity image of the shared download container has
+  no `tar`, so the kraken, GTDB-Tk, CheckM2, BLAST nt, taxdump and HUMAnN downloads would
+  have failed. These processes now use the docker image for every engine (singularity and
+  apptainer convert it at pull time). Found by the end-to-end apptainer runs; CI is
+  docker-only
+- **`BLOBTOOLS` failed under singularity/apptainer**: `blobtools create` wrote its parsed
+  taxonomy into its own install directory, which is read-only in a singularity image. It
+  now writes `nodesDB.txt` in the task directory (`--db`); regression test
+  `tests/bin/test_blobtools_readonly.sh`
+- **`BLOBPLOT` / `ARG_BLOBPLOT` always failed**: saving the figure object (`.pkl`) failed on
+  its lambda tick formatters after the PNG had been written, so `--contig_tax_and_arg` runs
+  stopped there. The formatters are now named functions. PNGs are unchanged
+- **Steps that combine many samples re-ran on `-resume`**: the co-assembly (`MEGAHIT` and
+  the co-assembly read alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`,
+  `BIN_SUMMARY` and the report steps (reads, contig filtering, taxonomy, ARG, RGI, BlobTools,
+  ARG clustering, bin quality/taxonomy) received their inputs in task-completion order, so
+  their cache key could change between otherwise identical runs (observed: 2 of 8 resumes of
+  one configuration re-ran the CheckM2 or GTDB-Tk batch). Inputs are now ordered by sample
+  (pooled co-assembly reads keep each sample's R1/R2 together). An existing run may re-run
+  each of these steps once on its next `-resume`. MEGAHIT multi-threaded output is not
+  byte-reproducible regardless of input order, so a re-run co-assembly can differ slightly
+- **`--<option> false` turned options on with Nextflow 26.04**: Nextflow 26.04 (verified
+  26.04.4 and 26.04.6) passes every command-line parameter as text, so `--include_binning
+  false` was the truthy string `"false"`: the branch ran, or a launch check rejected a valid
+  run (e.g. `--assembly_mode none --include_binning false`), and a numeric
+  `--min_read_sample` crashed QC with `Cannot compare java.lang.Integer ... with
+  java.lang.String`. Every on/off option is now read through one helper
+  (`subworkflows/local/utils_params.nf`), and `min_read_sample` is converted before the
+  comparison. Nextflow 25.10 converted these values itself and was not affected. Also fixed
+  on every version: `--azure_delete_pools false` was turned back on by a `?: true` default
+- Test harness: the blast bad-md5 fixture could leave the checksum unchanged
+  (1-in-16 CI flake); it now always corrupts it
+
+## [1.1] - 2026-08-25
 
 ### Added
 
@@ -123,7 +413,7 @@ startup instead of being silently ignored. Update existing command lines and
 - **Module Improvements**
   - Fixed bash null checks using Groovy conditionals
   - Added `versions.yml` output to some modules (full coverage and aggregation
-    landed later, in [Unreleased])
+    landed later, in [1.1])
   - Added `stub` blocks for some modules (full coverage landed later)
   - Added `meta.yml` descriptors for key modules
 
@@ -158,6 +448,7 @@ startup instead of being silently ignored. Update existing command lines and
 - Quality assessment with CheckM2
 - Taxonomic classification with GTDB-TK
 
-[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/gene2dis/BugBuster/compare/v1.1...HEAD
+[1.1]: https://github.com/gene2dis/BugBuster/releases/tag/v1.1
 [1.0.0]: https://github.com/gene2dis/BugBuster/releases/tag/v1.0.0
 [0.1.0]: https://github.com/gene2dis/BugBuster/tree/v0.1.0

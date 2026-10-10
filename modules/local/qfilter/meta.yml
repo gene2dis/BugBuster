@@ -1,0 +1,42 @@
+name: qfilter
+description: Extracts before/after-filtering read totals from the fastp JSON reports (paired-end, plus the singleton run when present) into a per-sample read report and an after-filtering count file
+keywords:
+  - quality control
+  - fastp
+  - read counting
+  - report
+tools:
+  - bash:
+      description: GNU Bash; the counts are parsed from the fastp JSON with shell text tools (grep, sed, awk, cut, tr)
+      homepage: https://www.gnu.org/software/bash/
+      documentation: https://www.gnu.org/software/bash/manual/
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: fastp-filtered reads, passed through unchanged
+  - json:
+      type: file
+      description: fastp JSON reports; the paired-end report, plus the singleton run's report (*Singleton*.json) when present
+      pattern: "*.json"
+
+output:
+  - qfilter:
+      type: file
+      description: Tuple of meta, the reads and after_reads_fr.txt (paired-end total reads after filtering, an integer)
+      pattern: "after_reads_fr.txt"
+  - reads_report:
+      type: file
+      description: Per-sample read table (Id, Raw reads, Fastp, plus Raw singletons and Fastp singletons when a singleton report is present)
+      pattern: "*_fastp_report.tsv"
+  - versions:
+      type: file
+      description: Software versions (bash)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

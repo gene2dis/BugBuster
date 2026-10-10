@@ -52,6 +52,8 @@ nextflow_process {
 
     test("FASTP stub run") {
         options "-stub"
+        // local subset of the nf-core reads (tests/bin/make_test_read_fixtures.sh):
+        // a stub run needs no download
 
         when {
             process {
@@ -59,8 +61,8 @@ nextflow_process {
                 input[0] = [
                     [ id: 'test_sample', single_end: false ],
                     [
-                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_1.fastq.gz", checkIfExists: true),
-                        file("https://github.com/nf-core/test-datasets/raw/modules/data/genomics/prokaryotes/bacteroides_fragilis/illumina/fastq/test1_2.fastq.gz", checkIfExists: true)
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
                     ],
                     []
                 ]

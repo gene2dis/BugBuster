@@ -1,0 +1,40 @@
+name: count_reads
+description: Counts raw reads per sample when QC is skipped (R1 records x 2, plus singleton records when a third file is present) and passes the reads through unchanged
+keywords:
+  - read counting
+  - quality control
+  - report
+  - metagenomics
+tools:
+  - gzip:
+      description: GNU compression utility; zcat -f decompresses the reads (plain files pass through) for counting with wc
+      homepage: https://www.gnu.org/software/gzip/
+      documentation: https://www.gnu.org/software/gzip/manual/
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Raw reads [R1, R2] or [R1, R2, Singleton] (gzipped or plain)
+
+output:
+  - reads:
+      type: file
+      description: Tuple of meta and the input reads, unchanged
+  - reads_coassembly:
+      type: file
+      description: The input reads without meta, for co-assembly pooling
+  - reads_report:
+      type: file
+      description: Per-sample read count table (Id, Raw reads, and Raw reads singletons when present)
+      pattern: "*_fastp_report.tsv"
+  - versions:
+      type: file
+      description: Software versions (gzip)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

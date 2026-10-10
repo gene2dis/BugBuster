@@ -18,7 +18,7 @@ process PHYLOSEQ_CONVERTER {
     path("versions.yml"), emit: versions
     
     when:
-    params.create_phyloseq_rds
+    params.create_phyloseq_rds.toString().toBoolean()
     
     script:
     """

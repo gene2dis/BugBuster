@@ -1,0 +1,63 @@
+name: humann
+description: HUMAnN 4.0.0a2 read-level functional profiling (MetaPhlAn 4.1.2 prescreen, ChocoPhlAn nucleotide search, UniRef90 EC-filtered translated search) in RPK, then KO / EC regrouping of the gene families and MetaCyc pathway abundance with an exact version/layout guard (bin/humann_function_profile.py)
+keywords:
+  - functional profiling
+  - read-level
+  - humann
+  - metacyc
+  - metagenomics
+tools:
+  - humann:
+      description: HMP Unified Metabolic Analysis Network (HUMAnN 4, alpha), profiling of microbial pathways and gene families from metagenomes
+      homepage: https://github.com/biobakery/humann
+      documentation: https://github.com/biobakery/humann/blob/master/readme.md
+      doi: "10.7554/eLife.65088"
+      licence: ["MIT"]
+  - metaphlan:
+      description: MetaPhlAn 4 taxonomic profiler (HUMAnN's prescreen)
+      homepage: https://github.com/biobakery/MetaPhlAn
+      documentation: https://github.com/biobakery/MetaPhlAn/wiki
+      doi: "10.1038/s41587-023-01688-w"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name; must not contain 's__' or 't__', a HUMAnN 4.0.0a2 defect enforced at the input check)
+  - reads:
+      type: file
+      description: Host-removed reads (R1, R2 and optional singleton file; gzipped or plain FASTQ). Concatenated into one input, mates counted as separate reads
+      pattern: "*.{fastq,fq}{,.gz}"
+  - humann_db:
+      type: directory
+      description: HUMAnN database ROOT with chocophlan/, uniref/, utility_mapping/ (full_mapping_v4_alpha) and metaphlan/ (mpa_vOct22_CHOCOPhlAnSGB_202403.pkl + .bt2l index; exported as METAPHLAN_DB_DIR); optional DB_VERSION provenance file written by bin/humann_db_reformat.sh
+      pattern: "*"
+
+output:
+  - functions:
+      type: file
+      description: Per-function abundances in HUMAnN RPK (sample_id, ontology, accession, description, count, rpk; count = rpk) for ko and ec (gene families regrouped by the pipeline, READS_UNMAPPED excluded) and metacyc (unstratified pathway abundance)
+      pattern: "*.humann_functions.tsv"
+  - summary:
+      type: file
+      description: Reads given to HUMAnN and reads mapped (total minus READS_UNMAPPED) on the 'any' row; per-ontology rows carry the RPK share annotated (read columns blank)
+      pattern: "*.humann_summary.tsv"
+  - raw:
+      type: file
+      description: HUMAnN's own gene-family, reaction and pathway-abundance tables (RPK; stratified rows included). Absent for a sample without reads
+      pattern: "*_{2_genefamilies,3_reactions,4_pathabundance}.tsv"
+  - profile:
+      type: file
+      description: The MetaPhlAn 4.1.2 taxonomic profile HUMAnN's prescreen produced. Absent for a sample without reads or with --bypass-prescreen
+      pattern: "*_1_metaphlan_profile.tsv"
+  - log:
+      type: file
+      description: HUMAnN run log
+      pattern: "*_0.log"
+  - versions:
+      type: file
+      description: Software versions (live humann, MetaPhlAn, DIAMOND and Bowtie2 versions, and the database provenance from DB_VERSION or 'custom')
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -1,0 +1,198 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    AGGREGATE_READ_FUNCTIONS Module Test
+
+    Study-level read-branch aggregation (design doc Sections 4.6, 5.3;
+    task T8a). The aggregation logic and its guards are covered directly by
+    tests/bin/test_aggregate_read_functions.sh; these tests verify the module
+    wrapper: staging (incl. the backend_versions.yml rename and the optional
+    ags list), the script invocation and the declared outputs.
+
+    Fixtures: tests/data/woltka/wtest.woltka_*.tsv, woltka_versions.yml and
+    wtest.ags.tsv (GE 2.0), made by tests/bin/make_woltka_fixtures.sh.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test AGGREGATE_READ_FUNCTIONS Process"
+    script "../../modules/local/aggregate_read_functions/main.nf"
+    process "AGGREGATE_READ_FUNCTIONS"
+
+    test("aggregates a Woltka sample with AGS into the 5.3 schema") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = [ file("${projectDir}/tests/data/woltka/wtest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines()
+            assert rows[0] == 'sample_id\tsource\tbackend\tontology\taccession\tdescription\tabundance_tpm\tabundance_cpge\tabundance_native\tnative_unit'
+            // K00003: 8 reads over a 1.2 kb ORF -> RPK 6.666667, / GE 2.0
+            assert rows.contains('wtest\treads\twoltka\tko\tK00003\tfixture enzyme three\t\t3.333333\t8.000000\treads')
+            assert process.out.function_wide.get(0).size() == 10
+            assert path(process.out.annotated_fraction.get(0)).text.contains('wtest\twoltka\tany\t20.000000\t18.000000\t0.9000')
+            assert path(process.out.sample_summary.get(0)).text.contains('\tok')
+            assert path(process.out.versions.get(0)).text.contains('pandas:')
+        }
+    }
+
+    test("no AGS: CPGE blank, status unavailable") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.function_abundance.get(0)).readLines().drop(1).every { row -> row.split('\t', -1)[7] == '' }
+            assert path(process.out.sample_summary.get(0)).text.contains('unavailable')
+        }
+    }
+
+    test("aggregates a SUPER-FOCUS sample: SEED levels only, CPGE not applicable") {
+        // T8b (design doc 4.6.3, Q17): no --unassigned input, AGS still
+        // reported, only the three native wide matrices
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = [ file("${projectDir}/tests/data/superfocus/sftest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/superfocus/superfocus_versions.yml", checkIfExists: true)
+                input[5] = 'superfocus'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert rows.every { r -> r[2] == 'superfocus' && r[3].startsWith('seed_level') && r[6] == '' && r[7] == '' }
+            assert rows.any { r -> r[4] == 'Carbohydrates | Central carbohydrate metabolism | TCA cycle in plants' && r[8] == '7.000000' }
+            assert process.out.function_wide.get(0).collect { f -> file(f).name }.sort() ==
+                ['read_function_wide_seed_level1_native.tsv', 'read_function_wide_seed_level2_native.tsv',
+                 'read_function_wide_seed_level3_native.tsv']
+            def summary = path(process.out.sample_summary.get(0)).readLines()[1].split('\t', -1)
+            assert summary[8] == 'not_applicable' && summary[7] == '2.0' && summary[5] == ''
+        }
+    }
+
+    test("stub emits the superfocus wide-matrix set") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/superfocus/sftest.superfocus_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/superfocus/superfocus_versions.yml", checkIfExists: true)
+                input[5] = 'superfocus'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 3
+        }
+    }
+
+    test("aggregates a HUMAnN sample: RPK native unit, CPGE, ko/ec/metacyc") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/humann/htest.humann_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/humann/htest.humann_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = [ file("${projectDir}/tests/data/humann/htest.ags.tsv", checkIfExists: true) ]
+                input[4] = file("${projectDir}/tests/data/humann/humann_versions.yml", checkIfExists: true)
+                input[5] = 'humann'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.function_abundance.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert rows.every { r -> r[2] == 'humann' && r[3] in ['ko', 'ec', 'metacyc'] && r[6] == '' && r[9] == 'rpk' }
+            // CPGE = RPK / GE (GE 2.0 in the fixture AGS)
+            assert rows.every { r -> Math.abs(r[7].toDouble() - r[8].toDouble() / 2.0) < 1e-6 }
+            assert process.out.function_wide.get(0).collect { f -> file(f).name }.sort() ==
+                ['read_function_wide_ec_cpge.tsv', 'read_function_wide_ec_native.tsv',
+                 'read_function_wide_ko_cpge.tsv', 'read_function_wide_ko_native.tsv',
+                 'read_function_wide_metacyc_cpge.tsv', 'read_function_wide_metacyc_native.tsv']
+            def summary = path(process.out.sample_summary.get(0)).readLines()[1].split('\t', -1)
+            assert summary[2] == '4.0.0.alpha.2' && summary[8] == 'ok'
+            def fractions = path(process.out.annotated_fraction.get(0)).readLines().drop(1).collect { r -> r.split('\t', -1) }
+            assert fractions.find { r -> r[2] == 'ko' }[3] == ''
+        }
+    }
+
+    test("stub emits the humann wide-matrix set") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/humann/htest.humann_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/humann/htest.humann_summary.tsv", checkIfExists: true) ]
+                input[2] = []
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/humann/humann_versions.yml", checkIfExists: true)
+                input[5] = 'humann'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 6
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_functions.tsv", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_summary.tsv", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/woltka/wtest.woltka_unassigned.tsv", checkIfExists: true) ]
+                input[3] = []
+                input[4] = file("${projectDir}/tests/data/woltka/woltka_versions.yml", checkIfExists: true)
+                input[5] = 'woltka'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.function_wide.get(0).size() == 10
+            assert process.out.function_abundance.size() == 1
+            assert process.out.annotated_fraction.size() == 1
+            assert process.out.sample_summary.size() == 1
+        }
+    }
+}

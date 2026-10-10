@@ -1,6 +1,7 @@
 process RGI_LOAD {
     container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
     
+    tag "card_${card_version}"
     label 'process_download'
 
     input:

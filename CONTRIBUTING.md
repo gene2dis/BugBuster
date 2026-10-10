@@ -129,6 +129,42 @@ feat(modules): add DIAMOND module for protein alignment
 - Include `meta.yml` for new modules
 - Add `versions.yml` output for software tracking
 - Add `stub` blocks for dry-run testing
+- Read boolean parameters through `flagOn(params.x)` (include it from
+  `subworkflows/local/utils_params.nf`) in `main.nf` and subworkflows, or inline
+  `params.x.toString().toBoolean()` in modules and config files: on Nextflow >= 26.04 a
+  command-line value arrives as a String, so `--x false` would otherwise be the truthy
+  `"false"`. Convert numeric parameters with `as Integer` before comparing them or doing
+  arithmetic; interpolating them into a command line needs no conversion
+- When one task consumes the outputs of many tasks, give it a fixed input order: use
+  `.collect(sort: true)` for lists of files and `.toSortedList { a, b -> a[0].id <=> b[0].id }`
+  for `[meta, files]` tuples, and sort the grouped lists after `groupTuple`. Plain
+  `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
+  task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
+  directory path, which is stable while the upstream tasks are cached, not by sample name.)
+- Every `errorStrategy` in `nextflow.config` and `config/modules.config` must start with
+  `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
+  (then your own rule, e.g. `'retry'`). A local task with no exit status asked for more CPUs
+  or memory than the local executor's pool and can never be scheduled (a task killed while
+  running reports its signal status, e.g. 137, instead); with `'finish'`, `'retry'` or
+  `'ignore'` instead, the run can hang forever waiting for it. Profiles that switch to a
+  non-local executor (`conf/aws.config`, `conf/slurm.config`, ...) have no such pool and
+  are exempt
+- CI and nf-test run under docker only, so nothing automated exercises the image a process
+  gets under singularity/apptainer. A separately built singularity image (a Seqera
+  `oras://` variant, a depot.galaxyproject.org sif) can lack tools its docker twin has:
+  the Seqera singularity variants of the wget, SUPER-FOCUS and HUMAnN images have no
+  `gzip` or `tar`, and those processes now pin the docker URI for every engine (the engine
+  converts it at pull time). Before pinning a separate singularity image, check that it has
+  every command the script calls, and run the process once under apptainer. Also remember
+  that a singularity/apptainer image is read-only: a tool must not write inside its own
+  install directory
+- Upstream bugs are worked around in `bin/`, never by editing an image:
+  `bin/run_microbe_census_py3fix.py` and `bin/emapper_ogs_fix.py` replace one broken
+  function and then run the stock CLI with the same arguments, and `bin/ps` stands in for
+  the `ps` the eggNOG-mapper `.sif` lacks. A patching wrapper must check that the installed
+  code is the exact version it was written for and stop otherwise, so an upstream update
+  surfaces as an error instead of a silent double fix. Each one names its removal
+  condition (a fixed upstream release); remove it with the re-pin
 
 ### Process Structure
 
@@ -218,6 +254,15 @@ output:
 authors:
   - "@your_github_handle"
 ```
+
+`input:` lists the process inputs in order (a `meta` map plus one entry per `val`/`path`
+variable, using its name) and `output:` lists every `emit:` name (a `meta` entry for tuple
+outputs is optional). When one `main.nf` defines several processes (`format_db`,
+`deeparg`, `bowtie2_samtools`), keep a single `meta.yml` with `tools` once at the top and a
+`processes:` list instead of top-level `input`/`output`, each item with `name` (the process
+name), `description`, `input` and `output`. `tests/bin/test_module_meta.sh` (run in CI)
+checks every local module against these rules and that every process has a `tag` and a
+`label`.
 
 ## Testing
 

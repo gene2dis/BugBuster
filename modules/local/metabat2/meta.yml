@@ -1,0 +1,38 @@
+name: metabat2
+description: Metagenomic binning with MetaBAT2 from contigs and the CALCULATE_DEPTH depth table (extra flags from ext.args in config/modules.config)
+keywords:
+  - binning
+  - metagenomics
+  - metabat2
+tools:
+  - metabat2:
+      description: Adaptive binning algorithm for genome reconstruction from metagenome assemblies
+      homepage: https://bitbucket.org/berkeleylab/metabat
+      documentation: https://bitbucket.org/berkeleylab/metabat/src/master/README.md
+      doi: "10.7717/peerj.7359"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - contigs:
+      type: file
+      description: Length-filtered contigs
+      pattern: "*_filtered_contigs.fa"
+  - depth:
+      type: file
+      description: Contig depth table from jgi_summarize_bam_contig_depths (CALCULATE_DEPTH)
+      pattern: "*_depth.txt"
+
+output:
+  - bins:
+      type: tuple
+      description: Tuple of meta and the MetaBAT2 bin directory (bins named <sample>_metabat_bin.<n>.fa)
+      pattern: "*_metabat_bins"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

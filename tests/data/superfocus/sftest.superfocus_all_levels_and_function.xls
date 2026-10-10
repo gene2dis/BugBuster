@@ -1,0 +1,11 @@
+Query: ['sftest.fastq']
+Database used: 90
+Aligner used: diamond
+""
+Subsystem Level 1	Subsystem Level 2	Subsystem Level 3	Function	sftest.fastq	sftest.fastq %
+Amino Acids and Derivatives	-	Creatine and Creatinine Degradation	N-carbamoylsarcosine_amidase_(EC_3.5.1.59)	3	15.789473684210526
+Carbohydrates	-	Sugar utilization in Thermotogales	Predicted_aldo/keto_reductase_in_CelR_regulon,_COG4989	2	10.526315789473683
+Carbohydrates	Central carbohydrate metabolism	Dehydrogenase complexes	Transcriptional_activator_of_acetoin_dehydrogenase_operon_AcoR	4	21.052631578947366
+Carbohydrates	Central carbohydrate metabolism	TCA Cycle	Fumarate_hydratase_class_I_(EC_4.2.1.2)	3.0	15.789473684210526
+Carbohydrates	Central carbohydrate metabolism	TCA cycle in plants	Fumarate_hydratase_class_I_(EC_4.2.1.2)	3.0	15.789473684210526
+Carbohydrates	Central carbohydrate metabolism	TCA cycle in plants	Succinate_dehydrogenase_(ubiquinone)_flavoprotein_subunit_SDH1/SDHA_(EC_1.3.5.1)	4	21.052631578947366

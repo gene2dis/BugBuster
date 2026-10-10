@@ -1,0 +1,35 @@
+name: bin_summary
+description: Co-assembly bin summary table (bin/bin_summary.py) joining CheckM2 quality, GTDB-Tk taxonomy and per-sample bin coverage for each refined bin
+keywords:
+  - binning
+  - summary
+  - coverage
+  - taxonomy
+  - report
+tools:
+  - pandas:
+      description: Python data analysis library used to merge the bin reports
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - reports:
+      type: file
+      description: |
+        Mixed collection read by filename glob - BEDTOOLS bin coverage tables (*bin_depth.tsv),
+        GTDB-Tk bac120/ar53 summaries (*gtdbtk*.tsv) and CheckM2 refined-bin quality reports (*quality_report.tsv)
+      pattern: "*.tsv"
+
+output:
+  - summary:
+      type: file
+      description: One row per bin with CheckM2 completeness, contamination, N50, genome size and coding sequences, contig count, GTDB taxonomy split by rank (missing species filled as "<Genus> sp.") and one average-coverage column per sample (<sample>_avgcov)
+      pattern: "Bin_summary.csv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

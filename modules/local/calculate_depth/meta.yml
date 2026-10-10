@@ -1,0 +1,39 @@
+name: calculate_depth
+description: Per-contig read depth from reads-vs-contigs BAMs with jgi_summarize_bam_contig_depths, as the abundance input for MetaBAT2
+keywords:
+  - depth
+  - coverage
+  - binning
+  - metabat2
+tools:
+  - metabat2:
+      description: Metagenome binning tool; this module uses its jgi_summarize_bam_contig_depths utility
+      homepage: https://bitbucket.org/berkeleylab/metabat
+      documentation: https://bitbucket.org/berkeleylab/metabat/src/master/README.md
+      doi: "10.7717/peerj.7359"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - contigs:
+      type: file
+      description: Length-filtered contigs, passed through to the output for METABAT2
+      pattern: "*_filtered_contigs.fa"
+  - bam:
+      type: file
+      description: Sorted reads-vs-contigs BAM file(s)
+      pattern: "*.bam"
+
+output:
+  - depth:
+      type: tuple
+      description: Tuple of meta, the input contigs and the depth table (contigName, contigLen, totalAvgDepth, then mean depth and variance per BAM)
+      pattern: "*_depth.txt"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

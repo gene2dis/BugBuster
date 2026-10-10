@@ -297,6 +297,7 @@ process BOWTIE2_SAMTOOLS {
 process BOWTIE2_SAMTOOLS_DEPTH {
     container 'quay.io/sangerpathogens/bowtie2-samtools:1.1-c1'
 
+    tag "${meta.id}"
     label 'process_high'
 
     // BAM files are intermediate - don't publish to final output  

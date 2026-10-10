@@ -1,0 +1,2 @@
+Gene ID	EC#	dbCAN_hmm	dbCAN_sub	DIAMOND	#ofTools	Recommend Results	Substrate
+contig_1_1	3.2.1.4:2|-	GH5(1-95)+CBM6(100-140)	GH5_4(1-95)	GH5;CBM6	3	GH5_4|CBM6	xylan

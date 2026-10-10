@@ -1,0 +1,36 @@
+name: bedtools
+description: Per-bin read coverage under co-assembly binning - runs bedtools genomecov on each per-bin BAM and reports the bin's contig count and the mean of its per-contig average depths
+keywords:
+  - coverage
+  - depth
+  - bins
+  - bedtools
+tools:
+  - bedtools:
+      description: Toolset for genome arithmetic; this module uses genomeCoverageBed (bedtools genomecov) histogram output
+      homepage: https://bedtools.readthedocs.io/en/latest/
+      documentation: https://bedtools.readthedocs.io/en/latest/content/tools/genomecov.html
+      doi: "10.1093/bioinformatics/btq033"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
+  - bam_files:
+      type: file
+      description: Per-bin BAMs from BOWTIE2_SAMTOOLS_DEPTH, named <sample>_<bin>_all_reads.bam (the bin id is parsed from the file name)
+      pattern: "*_all_reads.bam"
+
+output:
+  - bin_depth:
+      type: file
+      description: TSV with columns sample, bin_id, Total_contigs and average_cov, one row per bin
+      pattern: "*_bin_depth.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

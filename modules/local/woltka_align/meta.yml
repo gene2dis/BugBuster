@@ -1,0 +1,45 @@
+name: woltka_align
+description: Bowtie2 alignment of host-removed reads against the Web of Life (WoLr2) genome database for the Woltka read-level functional backend; emits a trimmed, gzipped SAM (positions only)
+keywords:
+  - alignment
+  - functional profiling
+  - read-level
+  - web of life
+  - metagenomics
+tools:
+  - bowtie2:
+      description: Fast and sensitive gapped read aligner
+      homepage: https://bowtie-bio.sourceforge.net/bowtie2/
+      documentation: https://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
+      doi: "10.1038/nmeth.1923"
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads; [R1, R2] or [R1, R2, Singleton] (aligned paired with -1/-2, singletons with -U), or a single file (-U)
+      pattern: "*.{fastq,fq}.gz"
+  - wol_db:
+      type: directory
+      description: WoLr2 database in the FTP layout; the Bowtie2 index is read from databases/bowtie2/*.bt2l (or *.bt2)
+      pattern: "*"
+
+output:
+  - sam:
+      type: file
+      description: Alignments without header or unaligned reads, trimmed to columns 1-9 with SEQ/QUAL set to '*', gzipped
+      pattern: "*.wol.sam.gz"
+  - log:
+      type: file
+      description: Bowtie2 alignment summary (stderr)
+      pattern: "*.bowtie2.log"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

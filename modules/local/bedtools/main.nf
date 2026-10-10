@@ -1,6 +1,7 @@
 process BEDTOOLS {
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_1'
 
+    tag "${meta.id}"
     label 'process_single'
 
     input:

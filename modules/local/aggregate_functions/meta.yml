@@ -1,0 +1,87 @@
+name: aggregate_functions
+description: Study-level aggregation of gene counts, eggNOG-mapper v3 annotations, run_dbcan v5 CAZy calls, gene coordinates and MicrobeCensus AGS estimates into functional abundance tables with TPM and CPGE (bin/aggregate_functions.py)
+keywords:
+  - functional annotation
+  - aggregation
+  - tpm
+  - cpge
+  - metagenomics
+tools:
+  - pandas:
+      description: Python data analysis library used by the aggregation script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - counts:
+      type: file
+      description: featureCounts per-gene tables, one per sample (filename <sample>.featureCounts.txt carries the sample id, which equals meta.id via the ext.prefix convention)
+      pattern: "*.featureCounts.txt"
+  - annotations:
+      type: file
+      description: eggNOG-mapper v3 annotations - one per sample under assembly mode, a single coassembly file under coassembly mode
+      pattern: "*.emapper.annotations"
+  - gffs:
+      type: file
+      description: Pyrodigal gene GFFs (gzipped accepted) - one per sample under assembly mode, a single coassembly file under coassembly mode
+      pattern: "*.{gff,gff.gz}"
+  - ags:
+      type: file
+      description: MicrobeCensus <sample>.ags.tsv tables (optional - may cover a subset of samples or be absent entirely; missing samples fall back to TPM-only with empty cpge fields)
+      pattern: "*.ags.tsv"
+  - dbcan:
+      type: file
+      description: run_dbcan <sample>.overview.tsv files (optional as a set - absent entirely when --functional_cazy false; per sample under assembly mode, a single coassembly file under coassembly mode)
+      pattern: "*.overview.tsv"
+  - eggnog_versions:
+      type: file
+      description: versions.yml from EGGNOG_MAPPER_ANNOTATE, source of the pinned eggnog-mapper and eggnog_db versions for the version-aware layout guard and the provenance columns
+      pattern: "versions.yml"
+  - dbcan_versions:
+      type: file
+      description: versions.yml from RUN_DBCAN, source of the pinned run_dbcan and dbcan_db versions (absent exactly when dbcan is absent)
+      pattern: "versions.yml"
+  - cog_def:
+      type: file
+      description: NCBI COG definitions table (cog-24.def.tab layout) that maps the COG ids eggNOG 7 writes into COG_category to COG functional-category letters (design doc Q16)
+      pattern: "*.def.tab"
+  - assembly_mode:
+      type: string
+      description: "'assembly' or 'coassembly' - drives the join topology and the gene_abundance assembly_mode column"
+  - dbcan_consensus:
+      type: string
+      description: "'recommended' (the tool's >=2-tools Recommend Results column) or 'any' (union of the per-tool calls) - which dbCAN calls feed aggregation"
+
+output:
+  - gene_annotations:
+      type: file
+      description: Long-format gene annotation table (design doc Section 5.1, one row per gene per term)
+      pattern: "gene_annotations.tsv"
+  - gene_abundance:
+      type: file
+      description: Per-gene abundance with TPM and CPGE (Section 5.2; cpge empty for samples without a MicrobeCensus AGS estimate)
+      pattern: "gene_abundance.tsv"
+  - function_abundance:
+      type: file
+      description: Per-ontology function abundance (Section 5.3, intentional double-counting of multi-term genes)
+      pattern: "function_abundance.tsv"
+  - function_wide:
+      type: file
+      description: Wide TPM and CPGE matrices per ontology (rows accessions, columns samples; CPGE cells blank for samples without AGS; ko/cog/ec/pfam/cazy are eggNOG-derived, cazy_dbcan is run_dbcan-derived and header-only when dbcan input is absent)
+      pattern: "function_wide_*.tsv"
+  - annotated_fraction:
+      type: file
+      description: Per-sample annotated fraction by gene count and by TPM abundance, overall and per ontology
+      pattern: "annotated_fraction.tsv"
+  - ags_summary:
+      type: file
+      description: Per-sample MicrobeCensus AGS/genome-equivalents summary with status ok/unavailable (the recorded warning for the TPM-only fallback)
+      pattern: "ags_and_ge.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -1,0 +1,6 @@
+Primary key	Level 1	Level 2	Level 3/Subsystem Name
+615	Amino Acids and Derivatives	-	Creatine and Creatinine Degradation
+134	Carbohydrates	-	Sugar utilization in Thermotogales
+150	Carbohydrates	Central carbohydrate metabolism	TCA Cycle
+151	Carbohydrates	Central carbohydrate metabolism	TCA cycle in plants
+678	Carbohydrates	Central carbohydrate metabolism	Dehydrogenase complexes

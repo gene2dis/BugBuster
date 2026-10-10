@@ -1,0 +1,203 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SUPERFOCUS Module Test
+
+    SUPER-FOCUS read-level SEED profiling + per-level composition (design doc
+    Section 4.6.3, task T8b, Q17), on the REAL pinned SUPER-FOCUS image with
+    the committed fixture reads and DB_90 fixture database for both aligners
+    (tests/data/superfocus/, made by tests/bin/make_superfocus_fixtures.sh).
+    The level arithmetic and layout guards are covered in depth by
+    tests/bin/test_superfocus_scripts.sh; these tests pin the module wrapper:
+    gzipped R1/R2/singleton input concatenated into one query, the
+    --superfocus_aligner mapping, outputs, provenance, the no-reads
+    short-circuit and the database-root guards.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test SUPERFOCUS Process"
+    script "../../modules/local/superfocus/main.nf"
+    process "SUPERFOCUS"
+
+    test("profiles the fixture reads with diamond") {
+        when {
+            params {
+                superfocus_aligner = 'diamond'
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sftest' ],
+                    [
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/superfocus/sf_db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            // identical to the committed composer output (22 reads, 19 hit)
+            assert path(process.out.functions.get(0).get(1)).text ==
+                path("${projectDir}/tests/data/superfocus/sftest.superfocus_functions.tsv").text
+            assert path(process.out.summary.get(0).get(1)).text ==
+                path("${projectDir}/tests/data/superfocus/sftest.superfocus_summary.tsv").text
+            assert process.out.raw.get(0).get(1).size() == 4
+            assert path(process.out.log.get(0).get(1)).text.contains('Done')
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('superfocus: 1.8')
+            assert versions.contains('diamond: 2.2.1')
+            assert versions.contains('mmseqs2: 18.8cc5c')
+            assert versions.contains('superfocus_aligner: diamond')
+            assert versions.contains('superfocus_db: SUPER-FOCUS test fixture')
+        }
+    }
+
+    test("profiles the fixture reads with mmseqs2") {
+        when {
+            params {
+                superfocus_aligner = 'mmseqs2'
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sftest' ],
+                    [
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/superfocus/reads/sftest_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/superfocus/sf_db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            // MMseqs2's fast-mode (-s 1.0) prefilter result for the fixture's
+            // edge read depends on the thread count (verified on 18.8cc5c:
+            // 19 hit reads at -t 1, 18 at -t 2), so pin the structure, not
+            // the exact counts; tests/bin/test_superfocus_scripts.sh pins
+            // them at -t 1
+            def functions = path(process.out.functions.get(0).get(1)).readLines()
+            assert functions[0] == 'sample_id\tontology\taccession\tdescription\tcount\trpk'
+            assert functions.drop(1).collect { l -> l.split('\t')[1] }.unique().sort() ==
+                ['seed_level1', 'seed_level2', 'seed_level3']
+            assert functions.contains('sftest\tseed_level3\tCarbohydrates | Central carbohydrate metabolism | TCA Cycle\tTCA Cycle\t3\t')
+            def any = path(process.out.summary.get(0).get(1)).readLines()[1].split('\t')
+            assert any[2] == '22' && (any[3] as double) >= 18
+            def raw = process.out.raw.get(0).get(1).find { f -> f.toString().endsWith('all_levels_and_function.xls') }
+            assert path(raw).readLines()[2] == 'Aligner used: mmseqs'
+            assert path(process.out.versions.get(0)).text.contains('superfocus_aligner: mmseqs2')
+        }
+    }
+
+    test("a sample without reads short-circuits to zero tables") {
+        when {
+            params {
+                superfocus_aligner = 'diamond'
+            }
+            process {
+                """
+                def empty_fq = file("\${workDir}/empty_R1.fastq.gz")
+                def gz = new java.util.zip.GZIPOutputStream(new FileOutputStream(empty_fq.toFile()))
+                gz.close()
+                input[0] = [
+                    [ id: 'emptytest' ],
+                    [ empty_fq ],
+                    file("${projectDir}/tests/data/superfocus/sf_db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.functions.get(0).get(1)).readLines().size() == 1
+            assert path(process.out.summary.get(0).get(1)).readLines()[1] == 'emptytest\tany\t0\t0\t'
+            assert process.out.raw.size() == 0
+        }
+    }
+
+    test("a database without the selected aligner's files fails clearly") {
+        when {
+            params {
+                superfocus_aligner = 'mmseqs2'
+            }
+            process {
+                """
+                def root = file("\${workDir}/diamond_only_db")
+                root.resolve('db/static/diamond').mkdirs()
+                file("${projectDir}/tests/data/superfocus/sf_db/db/database_PKs.txt").copyTo(root.resolve('db/database_PKs.txt'))
+                file("${projectDir}/tests/data/superfocus/sf_db/db/static/diamond/90_clusters.db.dmnd").copyTo(root.resolve('db/static/diamond/90_clusters.db.dmnd'))
+                input[0] = [
+                    [ id: 'nodb' ],
+                    [ file("${projectDir}/tests/data/superfocus/reads/sftest_S.fastq.gz", checkIfExists: true) ],
+                    root
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains('has no mmseqs2 DB_90 files') }
+        }
+    }
+
+    test("pointing at the db/ folder instead of the root fails clearly") {
+        when {
+            params {
+                superfocus_aligner = 'diamond'
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'dbdb' ],
+                    [ file("${projectDir}/tests/data/superfocus/reads/sftest_S.fastq.gz", checkIfExists: true) ],
+                    file("${projectDir}/tests/data/superfocus/sf_db/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains('point --custom_superfocus_db at its PARENT') }
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            params {
+                superfocus_aligner = 'diamond'
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    [ file("${projectDir}/tests/data/superfocus/reads/sftest_R1.fastq.gz", checkIfExists: true) ],
+                    file("${projectDir}/tests/data/superfocus/sf_db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.functions.get(0).get(1).endsWith('stubtest.superfocus_functions.tsv')
+            assert process.out.summary.size() == 1
+            assert process.out.raw.get(0).get(1).size() == 4
+            assert process.out.log.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('superfocus: 1.8')
+        }
+    }
+}

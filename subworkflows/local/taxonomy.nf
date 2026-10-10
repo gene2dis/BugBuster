@@ -20,6 +20,7 @@ include { SOURMASH             } from '../../modules/local/sourmash/main'
 include { TAXONOMY_REPORT      } from '../../modules/local/taxonomy_report/main'
 include { TAXONOMY_PHYLOSEQ    } from '../../modules/local/taxonomy_phyloseq/main'
 include { PHYLOSEQ_CONVERTER   } from '../../modules/local/phyloseq_converter/main'
+include { flagOn               } from './utils_params'
 
 workflow TAXONOMY {
     take:
@@ -57,7 +58,7 @@ workflow TAXONOMY {
         
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
-            KRAKEN2.out.report.map { _meta, report -> report }.collect(),
+            KRAKEN2.out.report.map { _meta, report -> report }.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'kraken2',
             params.kraken2_db
@@ -66,7 +67,7 @@ workflow TAXONOMY {
         
         // Generate phyloseq-compatible tables and plots
         TAXONOMY_PHYLOSEQ(
-            BRACKEN.out.txt.map { _meta, report -> report }.collect(),
+            BRACKEN.out.txt.map { _meta, report -> report }.collect(sort: true),
             'kraken2',
             params.kraken2_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
@@ -75,7 +76,7 @@ workflow TAXONOMY {
         ch_versions = ch_versions.mix(TAXONOMY_PHYLOSEQ.out.versions)
         
         // Optional: Convert to R phyloseq object
-        if (params.create_phyloseq_rds) {
+        if (flagOn(params.create_phyloseq_rds)) {
             PHYLOSEQ_CONVERTER(
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
@@ -100,7 +101,7 @@ workflow TAXONOMY {
 
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
-            ch_sm_taxonomy.report.collect(),
+            ch_sm_taxonomy.report.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'sourmash',
             params.sourmash_db
@@ -109,7 +110,7 @@ workflow TAXONOMY {
         
         // Generate phyloseq-compatible tables and plots
         TAXONOMY_PHYLOSEQ(
-            ch_sm_taxonomy.sourmash_gather.collect(),
+            ch_sm_taxonomy.sourmash_gather.collect(sort: true),
             'sourmash',
             params.sourmash_db,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
@@ -118,7 +119,7 @@ workflow TAXONOMY {
         ch_versions = ch_versions.mix(TAXONOMY_PHYLOSEQ.out.versions)
         
         // Optional: Convert to R phyloseq object
-        if (params.create_phyloseq_rds) {
+        if (flagOn(params.create_phyloseq_rds)) {
             PHYLOSEQ_CONVERTER(
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,

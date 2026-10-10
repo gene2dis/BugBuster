@@ -1,0 +1,55 @@
+name: rgi_report
+description: Study-level RGI summary from the rgi bwt gene-mapping tables of all samples (per-sample AMR gene count, mapped reads, unique drug classes and AMR gene families) plus bar plots of the top gene families, drug classes, resistance mechanisms and per-sample gene counts; written as an inline Python script
+keywords:
+  - antimicrobial resistance
+  - rgi
+  - report
+  - visualization
+tools:
+  - pandas:
+      description: Python data analysis library used by the inline report script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used to draw the bar plots
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+      doi: "10.1109/MCSE.2007.55"
+  - seaborn:
+      description: Statistical data visualization library, used to set the plot style
+      homepage: https://seaborn.pydata.org
+      documentation: https://seaborn.pydata.org
+      doi: "10.21105/joss.03021"
+      licence: ["BSD-3-Clause"]
+
+input:
+  - allele_files:
+      type: file
+      description: Collected rgi bwt allele-mapping tables of all samples; only counted, not used in the summary or plots
+      pattern: "*.allele_mapping_data.txt"
+  - gene_files:
+      type: file
+      description: Collected rgi bwt gene-mapping tables of all samples (sample name from the <sample>_rgi_bwt prefix); the only data the summary and plots use
+      pattern: "*.gene_mapping_data.txt"
+  - kmer_files:
+      type: file
+      description: Collected RGI_KMER k-mer analysis JSON files; staged but not used (the script counts *mer_analysis.txt files, which this channel does not carry)
+      pattern: "*mer_analysis.json"
+
+output:
+  - summary:
+      type: file
+      description: Per-sample summary (Sample, Total_AMR_Genes, Total_Mapped_Reads, Unique_Drug_Classes, Unique_AMR_Families); header-only when no gene table could be read
+      pattern: "RGI_summary_report.csv"
+  - plots:
+      type: file
+      description: Bar plots RGI_amr_gene_family_distribution.png, RGI_drug_class_profile.png, RGI_resistance_mechanisms.png and RGI_sample_amr_counts.png (optional; a plot is skipped if its column is missing or plotting fails)
+      pattern: "RGI_*.png"
+  - versions:
+      type: file
+      description: Software versions (python, pandas, matplotlib)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

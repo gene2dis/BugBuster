@@ -271,7 +271,13 @@ For better performance, pre-download databases to shared storage:
 # Kraken2 Standard-8 (~7.5 GB)
 # Sourmash GTDB r220 (~17 GB)
 # CheckM2 (~2.9 GB)
-# GTDB-TK r220 (~109 GB)
+# GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.7.2)
+# eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
+# dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
+# Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
+# Web of Life WoLr2 subset (~94 GB, read-level Woltka branch; recipe in manual.md)
+# SUPER-FOCUS DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, read-level SUPER-FOCUS branch; recipe in manual.md)
+# HUMAnN 4 databases + MetaPhlAn vOct22 (~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered, read-level HUMAnN branch; layout in manual.md)
 ```
 
 Then specify paths:
@@ -280,9 +286,31 @@ Then specify paths:
 nextflow run main.nf \
     --custom_kraken_db /shared/db/kraken2/standard-8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
-    --custom_gtdbtk_db /shared/db/gtdbtk/release220 \
+    --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
+    --custom_eggnog_db /shared/db/eggnog/eggnog_db \
+    --custom_dbcan_db /shared/db/dbcan/dbcan_db \
+    --custom_bakta_db /shared/db/bakta/bakta_db \
+    --custom_woltka_db /shared/db/wol2 \
+    --custom_superfocus_db /shared/db/superfocus \
+    --custom_humann_db /shared/db/humann \
     ...
 ```
+
+> **Note — functional annotation branches on cloud executors:**
+> `--contig_level_functional` runs under the docker-based `aws`, `gcp` and
+> `azure` profiles using the pipeline-built eggNOG-mapper image
+> (`ghcr.io/gene2dis/bugbuster-eggnog-mapper`; see the container note in
+> [`manual.md`](manual.md)); its eggNOG-mapper search peaked at ~80 GB RAM on
+> a real 5-sample co-assembly, so size the instance type / queue for it. The
+> MAG branch (`--mag_level_functional`, Bakta) runs on any engine, and so
+> is the read-level branch (`--read_level_functional woltka`) — but note its
+> Bowtie2 alignment against WoLr2 needs ≥ 68 GB RAM per task, so size the
+> cloud instance type / queue accordingly. The SUPER-FOCUS read backend
+> (`--read_level_functional superfocus`) also runs on any engine; with
+> `--superfocus_aligner mmseqs2` each task builds a ~13 GB k-mer index of the
+> database in memory. The HUMAnN backend (`--read_level_functional humann`)
+> runs on any engine too; its MetaPhlAn prescreen loads a ~20 GB Bowtie2
+> index, so budget tens of GB of RAM per task (`process_high`).
 
 ---
 

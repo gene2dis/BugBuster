@@ -1,0 +1,50 @@
+name: rgi_kmer
+description: Pathogen-of-origin prediction for the CARD-mapped reads of one sample with rgi kmer_query --bwt on the rgi bwt BAM (k-mer size --rgi_kmer_size, default 61; minimum k-mer coverage --rgi_min_kmer_coverage, default 10)
+keywords:
+  - antimicrobial resistance
+  - pathogen of origin
+  - k-mer
+  - card
+tools:
+  - rgi:
+      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.3)
+      homepage: https://github.com/arpcard/rgi
+      documentation: https://github.com/arpcard/rgi/blob/master/README.rst
+      doi: "10.1093/nar/gkac920"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - bam:
+      type: file
+      description: Sorted rgi bwt alignment BAM
+      pattern: "*.sorted.length_100.bam"
+  - card_db:
+      type: directory
+      description: Database directory prepared by 'rgi load --local' (must contain localDB/, with the CARD k-mer data); its localDB files are symlinked into the task directory rather than copied
+
+output:
+  - kmer_json:
+      type: file
+      description: Tuple of meta and the k-mer analysis JSON ('{}' when rgi kmer_query writes none)
+      pattern: "*_${params.rgi_kmer_size ?: 61}mer_analysis.json"
+  - kmer_txt:
+      type: file
+      description: Tuple of meta and the k-mer analysis text summary ('No k-mer results' when the JSON was missing)
+      pattern: "*_${params.rgi_kmer_size ?: 61}mer_analysis.txt"
+  - allele_predictions:
+      type: file
+      description: Tuple of meta and the allele-level pathogen-of-origin predictions (optional)
+      pattern: "*.allele.txt"
+  - gene_predictions:
+      type: file
+      description: Tuple of meta and the gene-level pathogen-of-origin predictions (optional)
+      pattern: "*.gene.txt"
+  - versions:
+      type: file
+      description: Software versions (rgi)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

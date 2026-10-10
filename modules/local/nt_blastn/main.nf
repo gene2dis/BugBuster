@@ -3,6 +3,7 @@ process NT_BLASTN {
 
     // Full-nt megablast: memory-hungry (label scales memory/time by attempt
     // under the global retry-on-OOM errorStrategy)
+    tag "${meta.id}"
     label 'process_high'
 
     input:

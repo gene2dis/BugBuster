@@ -1,0 +1,6 @@
+"SUPERFOCUS":
+    superfocus: 1.8
+    diamond: 2.2.1
+    mmseqs2: 18.8cc5c
+    superfocus_aligner: diamond
+    superfocus_db: SUPER-FOCUS test fixture (tests/bin/make_superfocus_fixtures.sh)

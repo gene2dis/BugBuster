@@ -1,0 +1,88 @@
+name: bowtie2_samtools
+description: Bowtie2 read mapping with samtools sorting - reads against assembled contigs (BOWTIE2_SAMTOOLS) and, under co-assembly binning, reads against each refined bin (BOWTIE2_SAMTOOLS_DEPTH)
+keywords:
+  - alignment
+  - bowtie2
+  - samtools
+  - bam
+  - metagenomics
+tools:
+  - bowtie2:
+      description: Ultrafast and memory-efficient aligner of sequencing reads to long reference sequences (bowtie2-build, bowtie2)
+      homepage: http://bowtie-bio.sourceforge.net/bowtie2/index.shtml
+      documentation: http://bowtie-bio.sourceforge.net/bowtie2/manual.shtml
+      doi: "10.1038/nmeth.1923"
+      licence: ["GPL-3.0-or-later"]
+  - samtools:
+      description: Tools for manipulating SAM/BAM alignments (sort, merge, view)
+      homepage: http://www.htslib.org/
+      documentation: http://www.htslib.org/doc/samtools.html
+      doi: "10.1093/bioinformatics/btp352"
+      licence: ["MIT"]
+
+processes:
+  - name: BOWTIE2_SAMTOOLS
+    description: |
+      Builds a Bowtie2 index of the filtered contigs, maps paired reads (and singletons when present,
+      merged into the same BAM) and coordinate-sorts with samtools. When meta.id is 'coassembly' the
+      collected reads are split into R1/R2/singleton lists by file name. A contig file with no sequences
+      yields a header-only BAM plus an empty-contig report instead of failing.
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+      - reads:
+          type: file
+          description: |
+            Host-removed reads - R1, R2 and optional singleton for one sample, or all samples' reads
+            under co-assembly (classified by _R1_/_1., _R2_/_2. and singleton/unpaired in the file name)
+          pattern: "*.fastq.gz"
+      - contigs:
+          type: file
+          description: Length-filtered contigs from BBMAP
+          pattern: "*_filtered_contigs.fa"
+    output:
+      - contigs_and_bam:
+          type: tuple
+          description: Tuple of meta, the input contigs and the sorted BAM
+          pattern: "*_all_reads.bam"
+      - bam_only:
+          type: tuple
+          description: Tuple of meta and the sorted BAM (header-only when the contig file was empty)
+          pattern: "*_all_reads.bam"
+      - empty_contig_report:
+          type: file
+          description: Optional; written only when the contig file had no sequences (sample_id, stage, timestamp, action_taken); aggregated by CONTIG_FILTER_SUMMARY
+          pattern: "*_empty_contig_report.txt"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+  - name: BOWTIE2_SAMTOOLS_DEPTH
+    description: |
+      Co-assembly bin coverage - for each bin FASTA in the refined bin directory, builds a Bowtie2 index,
+      maps one sample's paired reads (and singletons when present, merged) and writes one sorted BAM per bin.
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample whose reads are mapped)
+      - reads:
+          type: file
+          description: Host-removed reads of one sample (R1, R2, optional singleton)
+          pattern: "*.fastq.gz"
+      - bins:
+          type: directory
+          description: Refined bin directory (bins as *.fa; the bin id is the FASTA basename)
+    output:
+      - reads:
+          type: tuple
+          description: Tuple of meta and the per-bin sorted BAMs, named <sample>_<bin>_all_reads.bam
+          pattern: "*_all_reads.bam"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+authors:
+  - "@juanu"

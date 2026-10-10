@@ -1,0 +1,36 @@
+name: contig_filter_summary
+description: Pipeline-level text report of contig filtering - tabulates the BBMAP filter reports and the BOWTIE2_SAMTOOLS empty-contig reports, and counts samples whose contigs were all filtered out
+keywords:
+  - contig filtering
+  - assembly
+  - report
+  - quality control
+tools:
+  - bash:
+      description: GNU Bourne-Again Shell, with coreutils/grep/find, used to parse the reports and write the summary
+      homepage: https://www.gnu.org/software/bash/
+      documentation: https://www.gnu.org/software/bash/manual/
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - filter_reports:
+      type: file
+      description: BBMAP per-sample filter reports (empty list when none)
+      pattern: "*_filter_report.txt"
+  - empty_reports:
+      type: file
+      description: BOWTIE2_SAMTOOLS empty-contig reports (empty list when no sample had an empty contig file)
+      pattern: "*_empty_contig_report.txt"
+
+output:
+  - summary_report:
+      type: file
+      description: Summary with BBMAP filtering statistics per sample, samples with empty contigs at the alignment stage, and totals (samples processed, samples with all contigs filtered and their integer percentage)
+      pattern: "contig_filtering_summary.txt"
+  - versions:
+      type: file
+      description: Software versions (bash)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

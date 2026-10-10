@@ -38,14 +38,21 @@ flowchart TD
     Binning --> RefinedBins["Refined Bins<br/>MetaWRAP (if ≥2 binners) + CheckM2 + GTDB-TK"]
     
     %% Contig-level Analysis Branch
-    Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy & ARG<br/>NT_BLASTN + BLOBTOOLS]
-    ContigTax --> ContigARG[PRODIGAL_CONTIGS → DEEPARG_CONTIGS]
+    Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy<br/>NT_BLASTN + BLOBTOOLS]
+    Contigs -->|"if contig_tax_and_arg<br/>or contig_level_functional"| Pyrodigal[PYRODIGAL<br/>Shared Gene Calling]
+    Pyrodigal -->|if contig_tax_and_arg| ContigARG[DEEPARG_CONTIGS]
+    ContigTax --> ARGContigReport
     ContigARG --> ARGContigReport[ARG_CONTIG_LEVEL_REPORT]
     ARGContigReport --> ARGBlobplot[ARG_BLOBPLOT]
-    
-    %% MetaCerberus Branch
-    Contigs -->|if assembly_mode==assembly<br/>& contig_level_metacerberus| MetaCerberus[METACERBERUS_CONTIGS<br/>Functional Annotation]
-    
+
+    %% Functional Annotation Branch
+    CleanReads -->|"if (contig_level_functional or read_level_functional)<br/>& microbecensus (default)"| MicrobeCensus[MICROBECENSUS<br/>Avg Genome Size / GE]
+    CleanReads -->|"if read_level_functional = woltka | superfocus | humann<br/>(no assembly needed)"| ReadFunctional["READ_FUNCTIONAL SUBWORKFLOW<br/>woltka: WOLTKA_ALIGN (Bowtie2 vs WoLr2)<br/>→ WOLTKA_CLASSIFY<br/>superfocus: SUPERFOCUS (DIAMOND/MMseqs2 vs DB_90)<br/>humann: HUMANN (HUMAnN 4.0.0a2 + MetaPhlAn 4.1.2)<br/>→ AGGREGATE_READ_FUNCTIONS<br/>(read_* tables, reported separately)"]
+    MicrobeCensus --> ReadFunctional
+    Pyrodigal -->|if contig_level_functional| Functional["FUNCTIONAL_ANNOTATION SUBWORKFLOW<br/>eggNOG-mapper v3 (search + annotate)<br/>+ RUN_DBCAN CAZy (if functional_cazy, default)<br/>+ FEATURECOUNTS_GENES → AGGREGATE_FUNCTIONS<br/>(TPM + CPGE tables)"]
+    MicrobeCensus --> Functional
+    RefinedBins -->|"if mag_level_functional<br/>(needs >= 2 binners)"| Bakta[BAKTA_BAKTA<br/>MAG annotation, per bin]
+
     %% Bin ARG Clustering Branch
     RefinedBins -->|if arg_bin_clustering| BinARG[PRODIGAL_BINS → DEEPARG_BINS]
     BinARG --> ARGFormat[ARG_FASTA_FORMATTER]
@@ -58,7 +65,9 @@ flowchart TD
     RGIReport --> End
     ARGBlobplot --> End
     Clustering --> End
-    MetaCerberus --> End
+    Functional --> End
+    ReadFunctional --> End
+    Bakta --> End
     RefinedBins --> End
 
     %% Styling
@@ -67,8 +76,8 @@ flowchart TD
     classDef decision fill:#f3e5f5,stroke:#7b1fa2,stroke-width:2px
     classDef database fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     
-    class InputCheck,QC,Taxonomy,Assembly,Binning subworkflow
-    class ReadARG,RGI,ContigTax,ContigARG,BinARG,MetaCerberus module
+    class InputCheck,QC,Taxonomy,Assembly,Binning,Functional subworkflow
+    class ReadARG,RGI,ContigTax,ContigARG,BinARG,Pyrodigal,MicrobeCensus module
     class CleanReads,Contigs decision
     class PrepDB database
 ```
@@ -98,8 +107,13 @@ flowchart TD
     Start --> QCdb{QC<br/>Enabled?}
     Start --> Bindb{Binning<br/>Enabled?}
     Start --> Contigdb{Contig Analysis<br/>Enabled?}
+    Start --> Funcdb{Functional<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
+    Start --> Magdb{mag_level_functional?}
+    Start --> Readfuncdb{"read_level_functional<br/>= woltka?"}
+    Start --> Sfdb{"read_level_functional<br/>= superfocus?"}
+    Start --> Hudb{"read_level_functional<br/>= humann?"}
     
     Kraken -->|Yes| KrakenDB[FORMAT_KRAKEN_DB]
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
@@ -109,13 +123,21 @@ flowchart TD
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
     Contigdb -->|Yes| BLAST[FORMAT_NT_BLAST_DB]
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
+    Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
+    Funcdb -->|Yes| CogDB[FORMAT_COG_DB]
+    Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
+    Magdb -->|Yes| BaktaDB[FORMAT_BAKTA_DB]
+    Readfuncdb -->|Yes| WoltkaDB[FORMAT_WOLTKA_DB]
+    Readfuncdb -->|"Yes (shared with the contig branch)"| CogDB
+    Sfdb -->|Yes| SuperfocusDB[FORMAT_SUPERFOCUS_DB]
+    Hudb -->|Yes| HumannDB[FORMAT_HUMANN_DB]
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `karga_db`, `kargva_db`, `rgi_card_db`
 
 ---
 
@@ -175,7 +197,7 @@ flowchart TD
     Mode -->|assembly| PerSample[Per-Sample Assembly]
     PerSample --> MEGAHIT1[MEGAHIT<br/>Assemble Each Sample]
     MEGAHIT1 --> BBMAP1[BBMAP<br/>Filter Contigs ≥1000bp]
-    BBMAP1 --> Align1{Binning or<br/>Contig Analysis?}
+    BBMAP1 --> Align1{Binning, contig analysis<br/>or functional?}
     Align1 -->|Yes| Bowtie1[BOWTIE2_SAMTOOLS<br/>Align Reads to Contigs]
     Bowtie1 --> Summary1[CONTIG_FILTER_SUMMARY]
     
@@ -183,7 +205,9 @@ flowchart TD
     CoAssembly --> MEGAHIT2[MEGAHIT<br/>Assemble All Reads Together]
     MEGAHIT2 --> BBMAP2[BBMAP<br/>Filter Contigs ≥1000bp]
     BBMAP2 --> Align2{Binning or<br/>Contig Analysis?}
-    Align2 -->|Yes| Bowtie2[BOWTIE2_SAMTOOLS<br/>Align All Reads to Contigs]
+    Align2 -->|Yes| Bowtie2[BOWTIE2_SAMTOOLS<br/>Align All Reads to Contigs<br/>one pooled BAM]
+    BBMAP2 --> AlignFunc{Functional<br/>enabled?}
+    AlignFunc -->|Yes| BowtiePS[BOWTIE2_SAMTOOLS_PER_SAMPLE<br/>Per-sample alignments vs co-assembly<br/>for gene counting]
     Bowtie2 --> Summary2[CONTIG_FILTER_SUMMARY]
 ```
 
@@ -192,6 +216,9 @@ flowchart TD
 - `contigs_meta`: `[meta, contigs]` for annotation
 - `bam`: `[meta, contigs, bam]` for depth analysis
 - `bam_meta`: `[meta, bam]` for indexing
+- `counting_bam`: `[meta, bam]` per sample in both modes, for featureCounts gene
+  quantification (the pooled co-assembly BAM has no read groups, so the
+  functional branch gets dedicated per-sample alignments under co-assembly)
 
 ---
 
@@ -270,13 +297,21 @@ flowchart TD
 |-----------|---------|-------------|
 | `quality_control` | `true` | Enable QC and host filtering |
 | `assembly_mode` | `'assembly'` | Assembly mode: 'assembly', 'coassembly', 'none' |
-| `taxonomic_profiler` | `'kraken2'` | Profiler: 'kraken2', 'sourmash', 'none' |
+| `taxonomic_profiler` | `'sourmash'` | Profiler: 'kraken2', 'sourmash', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
-| `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
+| `contig_level_functional` | `false` | Enable the contig functional annotation branch (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables) |
+| `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
+| `dbcan_consensus` | `'recommended'` | Which dbCAN calls feed aggregation: 'recommended' (≥2 tools) or 'any' |
+| `microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (non-fatal on failure) |
+| `read_level_functional` | `'none'` | Read-level functional profiling backend: 'woltka', 'superfocus', 'humann', 'none' (no assembly needed) |
+| `woltka_uniq` | `false` | Woltka: leave multi-hit reads unassigned instead of dividing them 1/k |
+| `superfocus_aligner` | `'diamond'` | SUPER-FOCUS search backend: 'diamond', 'mmseqs2' |
+| `humann_db` | `'v4_alpha-full'` | HUMAnN database set: 'v4_alpha-full' (ChocoPhlAn 44.8 GB) or 'v4_alpha-ec_filtered' (6.9 GB) |
+| `featurecounts_multimap` | `'primary'` | featureCounts multi-mapping policy: 'primary', 'all', 'none' |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
 
 ---
@@ -292,6 +327,7 @@ flowchart LR
     E --> F[Bins]
     E --> G[Contig Taxonomy]
     E --> H[Contig ARGs]
+    E --> L[Gene Functions<br/>TPM / CPGE tables]
     F --> I[Bin ARGs]
     F --> J[Bin Quality]
     F --> K[Bin Taxonomy]
@@ -319,7 +355,7 @@ flowchart LR
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
-- **Functional**: METACERBERUS, PRODIGAL
+- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level)
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
 - **Reporting**: custom report generators
 
@@ -336,6 +372,8 @@ flowchart LR
 | `TAXONOMY` | Taxonomic profiling with Kraken2 or Sourmash |
 | `ASSEMBLY` | Metagenome assembly (per-sample or co-assembly) |
 | `BINNING` | Unified binning workflow (mode-agnostic) |
+| `FUNCTIONAL_ANNOTATION` | Functional annotation, two independent branches: contig (eggNOG-mapper v3, run_dbcan CAZy, featureCounts gene abundance, study-level TPM/CPGE aggregation) and MAG (Bakta per refined bin) |
+| `READ_FUNCTIONAL` | Optional read-level functional profiling, one backend per run (Woltka vs WoLr2, SUPER-FOCUS vs its DB_90 SEED database, or HUMAnN 4.0.0a2 with a MetaPhlAn 4.1.2 prescreen); independent of assembly, tables reported separately |
 
 ### Quality Control (QC Subworkflow)
 | Module | Description |
@@ -391,10 +429,28 @@ flowchart LR
 | `NT_BLASTN` | Contig taxonomic assignment via megablast |
 | `SAMTOOLS_INDEX` | Index BAM files for BLOBTOOLS |
 | `BLOBTOOLS` / `BLOBPLOT` | Contig taxonomy tables and plots |
-| `PRODIGAL_CONTIGS` / `PRODIGAL_BINS` | ORF prediction on contigs / bins |
+| `PYRODIGAL` / `PRODIGAL_BINS` | ORF prediction on contigs (shared gene-calling step, feeds DeepARG and functional annotation) / on bins |
 | `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | Contig-level ARG report and visualization |
 | `ARG_FASTA_FORMATTER` / `CLUSTERING` | Bin-level ARG formatting and clustering |
-| `METACERBERUS_CONTIGS` | Functional annotation (per-sample assembly mode only) |
+
+### Functional Annotation (FUNCTIONAL_ANNOTATION Subworkflow)
+| Module | Condition | Description |
+|--------|-----------|-------------|
+| `EGGNOG_MAPPER_SEARCH` / `EGGNOG_MAPPER_ANNOTATE` | always in the branch | Two-stage eggNOG-mapper v3 (DIAMOND search + orthology-transfer annotation: KO, COG, EC, Pfam, CAZy) |
+| `RUN_DBCAN` | if `functional_cazy` (default) | run_dbcan v5 protein-mode CAZy annotation with per-tool calls and dbCAN-sub substrate predictions |
+| `FEATURECOUNTS_GENES` | always in the branch | Per-gene read counts over the Pyrodigal gene coordinates (per sample in both assembly modes) |
+| `MICROBECENSUS` | if `microbecensus` (default; runs outside the subworkflow, on clean reads) | Average genome size / genome equivalents for CPGE; failure is non-fatal |
+| `AGGREGATE_FUNCTIONS` | always in the branch | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology (eggNOG and dbCAN CAZy kept separate), annotated fraction, AGS summary |
+| `BAKTA_BAKTA` | if `mag_level_functional` (independent of the contig branch; needs binning with ≥2 binners) | Bakta annotation of every MetaWRAP-refined bin, one task per bin, published to `mags/<sample>/` (`mags/coassembly/` under co-assembly) |
+
+### Read-level Functional Profiling (READ_FUNCTIONAL Subworkflow)
+| Module | Condition | Description |
+|--------|-----------|-------------|
+| `WOLTKA_ALIGN` | if `read_level_functional = woltka` | Bowtie2 (SHOGUN multi-hit settings) of the clean reads against the WoLr2 genomes; trimmed SAM (≥ 68 GB RAM) |
+| `WOLTKA_CLASSIFY` | if `read_level_functional = woltka` | Woltka ORF classification, then per-ORF de-duplicated KO / EC / COG-category / Pfam-name / MetaCyc read counts and RPK (COG and Pfam in the contig branch's vocabularies, via the NCBI COG table) |
+| `SUPERFOCUS` | if `read_level_functional = superfocus` | SUPER-FOCUS 1.8 (DIAMOND or MMseqs2, `superfocus_aligner`) of the concatenated clean reads against DB_90, then SEED level 1-3 read counts summed from the function-level counts |
+| `HUMANN` | if `read_level_functional = humann` | HUMAnN 4.0.0a2 (MetaPhlAn 4.1.2 prescreen, ChocoPhlAn nucleotide search, UniRef90 EC-filtered translated search) of the concatenated clean reads in RPK, then KO / EC regrouping of the gene families and MetaCyc pathway abundance |
+| `AGGREGATE_READ_FUNCTIONS` | if `read_level_functional != none` | Study-level `read_*` tables (same schema, `source=reads`; native read counts + CPGE for woltka, native read counts only for superfocus, native RPK + CPGE for humann), never merged with the contig branch |
 
 ---
 
@@ -410,7 +466,11 @@ results/
 ├── 04_binning/                  # Raw/refined bins, quality, taxonomy
 ├── 05_arg_prediction/           # ARG results (read/contig/bin level)
 ├── 06_contig_taxonomy/          # BlobTools contig taxonomy plots
-└── 07_functional_annotation/    # MetaCerberus annotations
+└── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
+                                 # gene abundance, MicrobeCensus, TPM/CPGE
+                                 # summary tables, Bakta MAG annotations
+                                 # (mags/) and read-level Woltka / SUPER-FOCUS / HUMAnN
+                                 # tables (reads/ + summary/read_*)
 ```
 
 ---

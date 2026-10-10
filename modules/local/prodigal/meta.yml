@@ -1,0 +1,35 @@
+name: prodigal
+description: Gene prediction on each refined bin with Prodigal (single mode), run in parallel up to task.cpus bins at a time (process PRODIGAL_BINS); emits the per-bin protein FASTA directory
+keywords:
+  - gene prediction
+  - prodigal
+  - bins
+  - MAGs
+tools:
+  - prodigal:
+      description: Prokaryotic Dynamic Programming Genefinding Algorithm, a bacterial and archaeal gene finder (2.6.3)
+      homepage: https://github.com/hyattpd/Prodigal
+      documentation: https://github.com/hyattpd/prodigal/wiki
+      doi: "10.1186/1471-2105-11-119"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - metawrap:
+      type: directory
+      description: Refined bins directory from MetaWRAP (*.fa bins; may hold only a SKIPPED/FAILED marker, in which case no bins are processed)
+
+output:
+  - prodigal_bins:
+      type: directory
+      description: Tuple of meta and a directory with one <sample>_<bin>_proteins.faa per bin (the gene GFFs are written but not emitted)
+      pattern: "*_bins_proteins"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"
