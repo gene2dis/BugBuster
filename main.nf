@@ -71,7 +71,6 @@ def printHelp() {
       --read_level_functional       Read-level functional profiling backend: 'woltka', 'superfocus', 'humann', 'none' (default: ${params.read_level_functional})
       --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
-      --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
 
     \u001B[1;33mResource options:\u001B[0m
       --max_cpus                    Maximum CPUs per process (default: ${params.max_cpus})
@@ -118,8 +117,7 @@ include { READ_FUNCTIONAL    } from './subworkflows/local/read_functional'
 // Modules for functionality not covered by subworkflows
 
 	// FUNCTIONAL ANNOTATION
-include { METACERBERUS_CONTIGS } from './modules/local/metacerberus/main'
-include { MICROBECENSUS        } from './modules/local/microbecensus/main'
+include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { NT_BLASTN        } from './modules/local/nt_blastn/main'
@@ -249,9 +247,6 @@ workflow {
     def valid_superfocus_aligners = ['diamond', 'mmseqs2']
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
         error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
-    }
-    if (flagOn(params.contig_level_metacerberus) && params.assembly_mode != 'assembly') {
-        error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
     }
 
     // eggNOG-mapper v3 is a beta that ships only an Apptainer image (no
@@ -426,14 +421,6 @@ workflow {
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
-        }
-
-        //
-        // MetaCerberus annotation (per-sample assembly only)
-        //
-        if ( params.assembly_mode == "assembly" && flagOn(params.contig_level_metacerberus) ) {
-            METACERBERUS_CONTIGS(ch_contigs_meta)
-            ch_versions = ch_versions.mix(METACERBERUS_CONTIGS.out.versions.first())
         }
     }
 

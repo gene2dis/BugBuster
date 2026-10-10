@@ -247,6 +247,14 @@ startup instead of being silently ignored. Update existing command lines and
 - All eleven `--mmseqs_*` parameters — unused; clustering settings are fixed
   tiers in `modules/local/clustering`
 - Renamed: `--bbmap_lenght` → `--bbmap_length`
+- **Breaking**: the MetaCerberus contig annotation path —
+  `--contig_level_metacerberus`, `--metacerberus_hmm`,
+  `--metacerberus_minscore`, `--metacerberus_evalue` and its
+  `07_functional_annotation/contigs/` output. Superseded by the contig
+  functional branch (`--contig_level_functional`: eggNOG-mapper v3 +
+  run_dbcan, TPM / copies-per-genome-equivalent tables), which also runs under
+  `--assembly_mode coassembly`; one contig annotation backend is kept so the
+  results have a single threshold model and ontology mapping
 
 ### Fixed
 

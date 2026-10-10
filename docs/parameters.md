@@ -108,12 +108,6 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG. DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). The former `05_arg_prediction/contig_level/prodigal/` output no longer exists. The megablast search memory-maps the ~434 GB NCBI nt database and runs fastest when much of it fits in RAM; see [Contig taxonomy against NCBI nt](manual.md#contig-taxonomy-against-ncbi-nt)
 - **Example**: `--contig_tax_and_arg true`
 
-### `--contig_level_metacerberus`
-- **Type**: Boolean
-- **Default**: `false`
-- **Description**: Enable contig-level functional annotation with MetaCerberus
-- **Example**: `--contig_level_metacerberus true`
-
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
@@ -698,26 +692,6 @@ Override automatic downloads by providing custom database paths:
 ---
 
 ## Functional Annotation Parameters
-
-### `--metacerberus_hmm`
-- **Type**: String
-- **Default**: `'"KOFam_all, COG, VOG, PHROG, CAZy"'`
-- **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
-- **Description**: Comma-separated list of HMM databases to use for MetaCerberus
-- **Example**: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`
-- **Note**: The value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep the embedded double quotes (wrap them in single quotes on the shell command line) to remain a single argument.
-
-### `--metacerberus_minscore`
-- **Type**: Integer
-- **Default**: `25`
-- **Description**: Minimum HMM score for MetaCerberus
-- **Example**: `--metacerberus_minscore 30`
-
-### `--metacerberus_evalue`
-- **Type**: Number
-- **Default**: `1e-09`
-- **Description**: Maximum E-value for MetaCerberus
-- **Example**: `--metacerberus_evalue 1e-10`
 
 ### `--featurecounts_multimap`
 - **Type**: String

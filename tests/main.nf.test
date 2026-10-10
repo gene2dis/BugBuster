@@ -573,6 +573,30 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects the removed contig_level_metacerberus param") {
+        // The MetaCerberus path was removed in favour of the eggNOG-mapper
+        // branch (--contig_level_functional). An old command line must abort
+        // at startup on the unrecognised param, not run without annotation.
+        // Stub + per-sample assembly: a combination that ran successfully
+        // while the path existed, so only the param rejection can fail it.
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode = "assembly"
+                contig_level_metacerberus = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("contig_level_metacerberus")
+        }
+    }
+
     test("Stub run wires the read-level functional branch without an assembly") {
         // T8a (design doc Sections 3.4, 4.6.2): the read branch must run
         // with --assembly_mode none and nothing of the contig/MAG branches.

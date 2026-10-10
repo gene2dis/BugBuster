@@ -86,12 +86,6 @@
                     "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
                     "fa_icon": "fas fa-microscope"
                 },
-                "contig_level_metacerberus": {
-                    "type": "boolean",
-                    "default": false,
-                    "description": "Enable contig-level functional annotation with MetaCerberus.",
-                    "fa_icon": "fas fa-tags"
-                },
                 "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
@@ -894,32 +888,6 @@
                 }
             }
         },
-        "metacerberus_options": {
-            "title": "MetaCerberus options",
-            "type": "object",
-            "fa_icon": "fas fa-project-diagram",
-            "description": "Parameters for MetaCerberus functional annotation (used when --contig_level_metacerberus).",
-            "properties": {
-                "metacerberus_hmm": {
-                    "type": "string",
-                    "default": "KOFam_all, COG, VOG, PHROG, CAZy",
-                    "description": "HMM databases for MetaCerberus (quoted comma-separated list).",
-                    "fa_icon": "fas fa-list"
-                },
-                "metacerberus_minscore": {
-                    "type": "integer",
-                    "default": 25,
-                    "description": "Minimum HMM score for MetaCerberus annotations.",
-                    "fa_icon": "fas fa-sort-numeric-up"
-                },
-                "metacerberus_evalue": {
-                    "type": "number",
-                    "default": 1e-09,
-                    "description": "E-value threshold for MetaCerberus.",
-                    "fa_icon": "fas fa-calculator"
-                }
-            }
-        },
         "functional_annotation_options": {
             "title": "Functional annotation options",
             "type": "object",
@@ -1204,9 +1172,6 @@
         },
         {
             "$ref": "#/$defs/rgi_options"
-        },
-        {
-            "$ref": "#/$defs/metacerberus_options"
         },
         {
             "$ref": "#/$defs/functional_annotation_options"

@@ -53,9 +53,6 @@ flowchart TD
     MicrobeCensus --> Functional
     RefinedBins -->|"if mag_level_functional<br/>(needs >= 2 binners)"| Bakta[BAKTA_BAKTA<br/>MAG annotation, per bin]
 
-    %% MetaCerberus Branch
-    Contigs -->|if assembly_mode==assembly<br/>& contig_level_metacerberus| MetaCerberus[METACERBERUS_CONTIGS<br/>Functional Annotation]
-    
     %% Bin ARG Clustering Branch
     RefinedBins -->|if arg_bin_clustering| BinARG[PRODIGAL_BINS → DEEPARG_BINS]
     BinARG --> ARGFormat[ARG_FASTA_FORMATTER]
@@ -68,7 +65,6 @@ flowchart TD
     RGIReport --> End
     ARGBlobplot --> End
     Clustering --> End
-    MetaCerberus --> End
     Functional --> End
     ReadFunctional --> End
     Bakta --> End
@@ -81,7 +77,7 @@ flowchart TD
     classDef database fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     
     class InputCheck,QC,Taxonomy,Assembly,Binning,Functional subworkflow
-    class ReadARG,RGI,ContigTax,ContigARG,BinARG,MetaCerberus,Pyrodigal,MicrobeCensus module
+    class ReadARG,RGI,ContigTax,ContigARG,BinARG,Pyrodigal,MicrobeCensus module
     class CleanReads,Contigs decision
     class PrepDB database
 ```
@@ -316,7 +312,6 @@ flowchart TD
 | `superfocus_aligner` | `'diamond'` | SUPER-FOCUS search backend: 'diamond', 'mmseqs2' |
 | `humann_db` | `'v4_alpha-full'` | HUMAnN database set: 'v4_alpha-full' (ChocoPhlAn 44.8 GB) or 'v4_alpha-ec_filtered' (6.9 GB) |
 | `featurecounts_multimap` | `'primary'` | featureCounts multi-mapping policy: 'primary', 'all', 'none' |
-| `contig_level_metacerberus` | `false` | Enable MetaCerberus annotation |
 | `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
 
 ---
@@ -360,7 +355,7 @@ flowchart LR
 - **Bin-level**: DEEPARG_BINS
 
 ### Annotation & Reporting Modules
-- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level), METACERBERUS
+- **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level)
 - **Taxonomy**: NT_BLASTN, BLOBTOOLS
 - **Reporting**: custom report generators
 
@@ -437,7 +432,6 @@ flowchart LR
 | `PYRODIGAL` / `PRODIGAL_BINS` | ORF prediction on contigs (shared gene-calling step, feeds DeepARG and functional annotation) / on bins |
 | `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | Contig-level ARG report and visualization |
 | `ARG_FASTA_FORMATTER` / `CLUSTERING` | Bin-level ARG formatting and clustering |
-| `METACERBERUS_CONTIGS` | Functional annotation (per-sample assembly mode only) |
 
 ### Functional Annotation (FUNCTIONAL_ANNOTATION Subworkflow)
 | Module | Condition | Description |
@@ -475,9 +469,8 @@ results/
 └── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
                                  # gene abundance, MicrobeCensus, TPM/CPGE
                                  # summary tables, Bakta MAG annotations
-                                 # (mags/), read-level Woltka / SUPER-FOCUS / HUMAnN tables
-                                 # (reads/ + summary/read_*) and
-                                 # MetaCerberus contigs/
+                                 # (mags/) and read-level Woltka / SUPER-FOCUS / HUMAnN
+                                 # tables (reads/ + summary/read_*)
 ```
 
 ---

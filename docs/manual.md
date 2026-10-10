@@ -32,7 +32,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles), or with MetaCerberus; MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; requires singularity/apptainer, see the note under the feature toggles); MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
@@ -408,7 +408,6 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--read_level_functional` | `none` | `woltka`, `superfocus`, `humann`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
 | `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
-| `--contig_level_metacerberus` | `false` | `true`, `false` | Functional annotation with MetaCerberus |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
 
@@ -683,19 +682,7 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.12 MetaCerberus Options
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--metacerberus_hmm` | `"KOFam_all, COG, VOG, PHROG, CAZy"` | HMM databases to use |
-| `--metacerberus_minscore` | `25` | Minimum HMM score |
-| `--metacerberus_evalue` | `1e-09` | Maximum E-value |
-
-**Available HMM Databases:** `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
-
-**Note:** the value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep embedded double quotes to stay a single argument. On the command line, wrap it in single quotes: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`.
-
-### 6.13 Taxonomy Visualization Options
+### 6.12 Taxonomy Visualization Options
 
 Control taxonomic output visualization and formatting:
 
@@ -707,7 +694,7 @@ Control taxonomic output visualization and formatting:
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
 
-### 6.14 Database Storage Options
+### 6.13 Database Storage Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -715,7 +702,7 @@ Control taxonomic output visualization and formatting:
 
 By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
 
-### 6.15 Resource Limit Options
+### 6.14 Resource Limit Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -993,18 +980,15 @@ results/
     │       ├── {sample}_0.log                  # HUMAnN run log
     │       ├── {sample}.humann_functions.tsv   # ko / ec / metacyc RPK composed by the pipeline
     │       └── {sample}.humann_summary.tsv     # reads given / mapped, RPK share annotated per ontology
-    ├── mags/                                   # Bakta MAG-level annotation, one file set per bin
-    │   └── {sample}/ or coassembly/            # (if mag_level_functional=true; requires binning with >= 2 binners)
-    │       ├── {sample}_{bin}.gff3             # annotation in GFF3 (coassembly_{bin}.* under co-assembly)
-    │       ├── {sample}_{bin}.gbff             # annotation in GenBank flat file
-    │       ├── {sample}_{bin}.faa              # protein sequences
-    │       ├── {sample}_{bin}.fna              # replicon/contig sequences
-    │       ├── {sample}_{bin}.tsv              # per-feature annotation table
-    │       ├── {sample}_{bin}.txt              # per-bin annotation summary
-    │       └── {sample}_{bin}.hypotheticals.tsv  # hypothetical-protein table (+ .hypotheticals.faa)
-    └── contigs/                                # MetaCerberus contig-level annotation
-        └── {sample}/                           # (if contig_level_metacerberus=true)
-            └── {sample}_annotation_results/
+    └── mags/                                   # Bakta MAG-level annotation, one file set per bin
+        └── {sample}/ or coassembly/            # (if mag_level_functional=true; requires binning with >= 2 binners)
+            ├── {sample}_{bin}.gff3             # annotation in GFF3 (coassembly_{bin}.* under co-assembly)
+            ├── {sample}_{bin}.gbff             # annotation in GenBank flat file
+            ├── {sample}_{bin}.faa              # protein sequences
+            ├── {sample}_{bin}.fna              # replicon/contig sequences
+            ├── {sample}_{bin}.tsv              # per-feature annotation table
+            ├── {sample}_{bin}.txt              # per-bin annotation summary
+            └── {sample}_{bin}.hypotheticals.tsv  # hypothetical-protein table (+ .hypotheticals.faa)
 ```
 
 > **Gene identifiers and assembly mode:** in the gene abundance tables, `Geneid`
@@ -1201,7 +1185,6 @@ The following outputs are only generated when specific parameters are enabled:
 | `07_functional_annotation/reads/superfocus/` | `read_level_functional='superfocus'` | SUPER-FOCUS SEED level 1-3 tables and raw SUPER-FOCUS outputs per sample (no assembly needed) |
 | `07_functional_annotation/reads/humann/` | `read_level_functional='humann'` | HUMAnN 4 raw tables (MetaPhlAn profile, gene families, reactions, pathway abundance) and the composed ko / ec / metacyc tables per sample (no assembly needed) |
 | `07_functional_annotation/summary/read_*.tsv` | `read_level_functional != 'none'` | Study-level read-branch tables (same schema, `source=reads`), reported separately from the contig branch |
-| `07_functional_annotation/contigs/` | `contig_level_metacerberus=true` | MetaCerberus functional annotation results |
 
 ---
 
