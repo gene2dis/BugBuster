@@ -1,0 +1,16 @@
+## Sat Aug 29 07:21:06 2026
+## emapper-3.0.0-beta6
+## /usr/local/bin/emapper.py -m no_search --annotate_hits_table coassembly.emapper.seed_orthologs --cpu 8 --data_dir data --output coassembly
+##
+## applied filters:
+##   annot_evalue=0.001
+##   annot_score=null
+##   tax_scope=auto
+## annotation_confidence: one char per annotation field
+## confidence codes: h=high m=medium l=low -=not annotated
+## confidence field order: Preferred_name GOs EC KEGG_ko KEGG_Pathway KEGG_Module KEGG_Reaction KEGG_rclass BRITE KEGG_TC CAZy BiGG_Reaction PFAMs
+#query	seed_ortholog	evalue	score	eggNOG_OGs	tax_ceiling	farthest_donor_lineage	COG_category	Preferred_name	GOs	EC	KEGG_ko	KEGG_Pathway	KEGG_Module	KEGG_Reaction	KEGG_rclass	BRITE	KEGG_TC	CAZy	BiGG_Reaction	PFAMs	annotation_confidence
+contig_1_1	1234567.ABC123	2.5e-50	200.0	COG0001@1|root,COG0001@2|Bacteria	2|Bacteria	1|root	COG0001	mockA	-	-	K00001,K00002	-	-	-	-	-	-	GT2	-	MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60	h--h------h-h
+## 1 queries scanned
+## Total time (seconds): 1.0
+## Rate: 1.00 q/s

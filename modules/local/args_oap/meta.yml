@@ -1,0 +1,36 @@
+name: args_oap
+description: ARGs-OAP stage one on the host-removed reads of one sample, used here for its read, 16S and cell-number estimates that normalize the KARGA/KARGVA abundances
+keywords:
+  - antimicrobial resistance
+  - cell number
+  - normalization
+  - metagenomics
+tools:
+  - args_oap:
+      description: Online Analysis Pipeline for antibiotic resistance gene detection from metagenomic data using the SARG database (ARGs-OAP 3.2.4)
+      homepage: https://github.com/xinehc/args_oap
+      documentation: https://github.com/xinehc/args_oap/blob/main/README.md
+      doi: "10.1016/j.eng.2022.10.011"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2, optional singleton]; copied into a temporary input directory as <sample>_tmp_reads_{R1,R2,S}.fastq.gz
+      pattern: "*.fastq.gz"
+
+output:
+  - args_oap_s1:
+      type: directory
+      description: ARGs-OAP stage-one output directory (<sample>_args_oap_s1_out), including metadata.txt with per-file nRead, n16S and nCell
+      pattern: "*args_oap_s1_out"
+  - versions:
+      type: file
+      description: Software versions (args_oap from pip show, falling back to 3.2.4)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

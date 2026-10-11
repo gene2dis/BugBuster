@@ -1,0 +1,7 @@
+sample_id	ontology	reads_assigned	reads_annotated	fraction_annotated
+wtest	any	20	18	0.900000
+wtest	ko	20	14	0.700000
+wtest	ec	20	14	0.700000
+wtest	cog	20	14	0.700000
+wtest	pfam	20	15	0.750000
+wtest	metacyc	20	7	0.350000

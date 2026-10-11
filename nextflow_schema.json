@@ -86,11 +86,24 @@
                     "description": "Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG.",
                     "fa_icon": "fas fa-microscope"
                 },
-                "contig_level_metacerberus": {
+                "contig_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable contig-level functional annotation with MetaCerberus.",
-                    "fa_icon": "fas fa-tags"
+                    "description": "Enable the contig-level functional annotation branch (shared Pyrodigal gene calling + eggNOG-mapper v3 + run_dbcan v5 CAZy annotation + featureCounts gene abundance + MicrobeCensus average genome size + study-level TPM and CPGE summary tables). Requires an assembly.",
+                    "fa_icon": "fas fa-sitemap"
+                },
+                "mag_level_functional": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable MAG-level functional annotation: Bakta annotation of every refined bin (per-bin GFF3/GBFF/FAA/FNA/TSV). Requires --include_binning and at least two --binners, so that only MetaWRAP quality-filtered bins are annotated. Bins are expected to be bacterial.",
+                    "fa_icon": "fas fa-sitemap"
+                },
+                "read_level_functional": {
+                    "type": "string",
+                    "default": "none",
+                    "enum": ["woltka", "superfocus", "humann", "none"],
+                    "description": "Read-level functional profiling backend (optional branch; needs no assembly). 'woltka': Bowtie2 against the Web of Life (WoLr2) genomes, then Woltka ORF classification, aggregated to KO/EC/COG/Pfam/MetaCyc pathway read counts and copies per genome equivalent in separate read_* tables (never merged with the contig branch). The WoLr2 alignment needs >= 68 GB RAM. 'superfocus': SUPER-FOCUS translated search (DIAMOND or MMseqs2, --superfocus_aligner) against its DB_90 SEED cluster database, reported as SEED subsystem levels 1-3 read counts (seed_level1/2/3; no KO/EC mapping, no copies per genome equivalent) in the same separate read_* tables. 'humann': HUMAnN 4.0.0a2 (alpha) with MetaPhlAn 4.1.2 prescreen, nucleotide search against ChocoPhlAn then translated search against UniRef90 (EC-filtered), reported as MetaCyc pathway, KO and EC abundances in RPK plus copies per genome equivalent; sample ids must not contain 's__' or 't__' (a HUMAnN 4.0.0a2 defect).",
+                    "fa_icon": "fas fa-sitemap"
                 },
                 "arg_bin_clustering": {
                     "type": "boolean",
@@ -155,9 +168,94 @@
                 },
                 "gtdbtk_db": {
                     "type": "string",
-                    "default": "release_220",
-                    "description": "GTDB-TK database release version.",
+                    "default": "release_232",
+                    "description": "GTDB-TK database release version. The pinned GTDB-Tk 2.7.x accepts only GTDB R232 data (R220/R226 require GTDB-Tk <= 2.6.1).",
                     "fa_icon": "fas fa-database"
+                },
+                "eggnog_db": {
+                    "type": "string",
+                    "default": "emapper-3.0",
+                    "description": "Built-in eggNOG 7 data key for eggNOG-mapper v3 (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_eggnog_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom eggNOG 7 data directory in the emapper-3.0 layout: eggnog.db (plus .fieldpresence.bin and .taxids.bin caches), eggnog.taxa.db (plus .traverse.pkl), eggnog_proteins.dmnd, go-basic.obo.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "dbcan_db": {
+                    "type": "string",
+                    "default": "db_v5-2-9_5-5-2026",
+                    "description": "Built-in dbCAN database release key for run_dbcan v5 (see config/databases.config).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_dbcan_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom dbCAN database directory in the run_dbcan v5 layout: CAZy.dmnd, dbCAN.hmm, dbCAN-sub.hmm, fam-substrate-mapping.tsv.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "bakta_db": {
+                    "type": "string",
+                    "default": "v6.0-full",
+                    "description": "Built-in Bakta database key: v6.0-full (default) or v6.0-light (see config/databases.config). The light database changes annotation results; selecting it is recorded in provenance and never done automatically.",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_bakta_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to custom Bakta database directory (schema 6 layout: version.json, amrfinderplus-db/, and the Bakta annotation databases).",
+                    "fa_icon": "fas fa-folder"
+                },
+                "cog_db": {
+                    "type": "string",
+                    "default": "cog-24",
+                    "description": "Built-in NCBI COG definitions table used to map the COG ids eggNOG-mapper reports in COG_category (contig functional branch), and the COG ids of WoLr2's KO -> COG map (Woltka read backend), to COG functional-category letters: cog-24 (see config/databases.config; ~410 KB).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_cog_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a local NCBI COG definitions table (cog-24.def.tab layout: COG id, category letters, ...); skips the download. Must cover the COG ids of the eggNOG database in use (and, with --read_level_functional woltka, of WoLr2's ko-to-cog map).",
+                    "fa_icon": "fas fa-file"
+                },
+                "woltka_db": {
+                    "type": "string",
+                    "default": "wolr2",
+                    "description": "Built-in Web of Life database key for the Woltka read-level backend: wolr2 (see config/databases.config; ~94 GB download).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_woltka_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local WoLr2 mirror in the FTP layout (databases/bowtie2/WoLr2.*.bt2l, proteins/coords.txt.xz and length.map.xz, function/{kegg,metacyc,pfam}/ maps); skips the download.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "superfocus_db": {
+                    "type": "string",
+                    "default": "db90",
+                    "description": "Built-in SUPER-FOCUS database key: db90 (see config/databases.config; DB_90 for the --superfocus_aligner only: ~0.74 GB diamond / ~0.9 GB mmseqs2 download).",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_superfocus_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local SUPER-FOCUS database ROOT: the directory CONTAINING db/ (db/database_PKs.txt plus db/static/diamond/90_clusters.db.dmnd or db/static/mmseqs2/90_clusters.db*); skips the download.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "humann_db": {
+                    "type": "string",
+                    "default": "v4_alpha-full",
+                    "enum": ["v4_alpha-full", "v4_alpha-ec_filtered"],
+                    "description": "Built-in HUMAnN database set (see config/databases.config): v4_alpha-full (ChocoPhlAn full, 44.8 GB) or v4_alpha-ec_filtered (ChocoPhlAn EC-filtered, 6.9 GB). Both add UniRef90 EC-filtered (0.94 GB), the utility mapping (2.8 GB) and the MetaPhlAn vOct22_CHOCOPhlAnSGB_202403 database with its Bowtie2 index (~22.5 GB). The choice is recorded in provenance.",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_humann_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local HUMAnN database ROOT containing chocophlan/, uniref/, utility_mapping/ and metaphlan/ (mpa_vOct22_CHOCOPhlAnSGB_202403.pkl plus its .bt2l Bowtie2 index); skips the download.",
+                    "fa_icon": "fas fa-folder"
                 },
                 "custom_kraken_db": {
                     "type": "string",
@@ -790,29 +888,50 @@
                 }
             }
         },
-        "metacerberus_options": {
-            "title": "MetaCerberus options",
+        "functional_annotation_options": {
+            "title": "Functional annotation options",
             "type": "object",
-            "fa_icon": "fas fa-project-diagram",
-            "description": "Parameters for MetaCerberus functional annotation (used when --contig_level_metacerberus).",
+            "fa_icon": "fas fa-sitemap",
+            "description": "Parameters for the contig-level functional annotation branch (used when --contig_level_functional).",
             "properties": {
-                "metacerberus_hmm": {
+                "featurecounts_multimap": {
                     "type": "string",
-                    "default": "KOFam_all, COG, VOG, PHROG, CAZy",
-                    "description": "HMM databases for MetaCerberus (quoted comma-separated list).",
-                    "fa_icon": "fas fa-list"
+                    "default": "primary",
+                    "enum": ["primary", "all", "none"],
+                    "description": "featureCounts multi-mapping policy for gene quantification: 'primary' counts primary alignments only, 'all' counts every reported alignment (-M), 'none' excludes multi-mapping reads entirely.",
+                    "fa_icon": "fas fa-layer-group"
                 },
-                "metacerberus_minscore": {
-                    "type": "integer",
-                    "default": 25,
-                    "description": "Minimum HMM score for MetaCerberus annotations.",
-                    "fa_icon": "fas fa-sort-numeric-up"
+                "microbecensus": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run MicrobeCensus on host-removed reads to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization alongside TPM. Failure is non-fatal: affected samples fall back to TPM-only.",
+                    "fa_icon": "fas fa-balance-scale"
                 },
-                "metacerberus_evalue": {
-                    "type": "number",
-                    "default": 1e-09,
-                    "description": "E-value threshold for MetaCerberus.",
-                    "fa_icon": "fas fa-calculator"
+                "functional_cazy": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Run run_dbcan CAZy annotation on the predicted proteins when the contig functional branch is enabled. Adds db=dbcan rows to the gene/function tables and dedicated function_wide_cazy_dbcan_* matrices alongside the eggNOG-derived CAZy calls.",
+                    "fa_icon": "fas fa-cubes"
+                },
+                "dbcan_consensus": {
+                    "type": "string",
+                    "default": "recommended",
+                    "enum": ["recommended", "any"],
+                    "description": "Which dbCAN calls feed aggregation: 'recommended' uses the tool's Recommend Results column (calls supported by at least 2 of DIAMOND/dbCAN HMM/dbCAN-sub), 'any' uses the union of the per-tool calls.",
+                    "fa_icon": "fas fa-check-double"
+                },
+                "woltka_uniq": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Woltka backend multi-mapping policy. Default (false): a read whose reported alignments (up to 16 within the score threshold) overlap k ORFs is divided 1/k to each (reads are aligned with the SHOGUN multi-hit Bowtie2 settings). true: such ambiguous reads are left unassigned (woltka --uniq) and reported in read_sample_summary.tsv.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "superfocus_aligner": {
+                    "type": "string",
+                    "default": "diamond",
+                    "enum": ["diamond", "mmseqs2"],
+                    "description": "SUPER-FOCUS search backend: 'diamond' (DIAMOND blastx) or 'mmseqs2' (MMseqs2 easy-search). Selects which DB_90 archive is downloaded; a --custom_superfocus_db must contain that aligner's files.",
+                    "fa_icon": "fas fa-search"
                 }
             }
         },
@@ -1055,7 +1174,7 @@
             "$ref": "#/$defs/rgi_options"
         },
         {
-            "$ref": "#/$defs/metacerberus_options"
+            "$ref": "#/$defs/functional_annotation_options"
         },
         {
             "$ref": "#/$defs/bowtie2_options"

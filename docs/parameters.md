@@ -105,14 +105,30 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG
+- **Description**: Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG. DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). The former `05_arg_prediction/contig_level/prodigal/` output no longer exists. The megablast search memory-maps the ~434 GB NCBI nt database and runs fastest when much of it fits in RAM; see [Contig taxonomy against NCBI nt](manual.md#contig-taxonomy-against-ncbi-nt)
 - **Example**: `--contig_tax_and_arg true`
 
-### `--contig_level_metacerberus`
+### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level functional annotation with MetaCerberus
-- **Example**: `--contig_level_metacerberus true`
+- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), run_dbcan v5 CAZy annotation of the same proteins (on by default, `--functional_cazy`; published to `07_functional_annotation/dbcan/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — plus the dbCAN CAZy calls as a separate backend) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) and the dbCAN database (~7.4 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`). Runs on every container engine: singularity/apptainer use the official eggNOG-mapper 3.0.0-beta6 Apptainer image, docker/podman and the cloud profiles use the pipeline-built `ghcr.io/gene2dis/bugbuster-eggnog-mapper` image of the same version (see the container note in the manual). Memory: the eggNOG-mapper search peaked at ~80 GB on a real 5-sample co-assembly — see [Functional annotation branches](manual.md#functional-annotation-branches) in the manual for observed per-step requirements
+- **Example**: `--contig_level_functional true`
+
+### `--mag_level_functional`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Enable MAG-level functional annotation: Bakta annotates every refined bin, one task per bin, publishing GFF3, GBFF, FAA, FNA, TSV and a summary per bin to `07_functional_annotation/mags/<sample>/` (files named `<sample>_<bin>.*`). Requires `--include_binning` **and at least two `--binners`** — MetaWRAP refinement and its completeness/contamination quality filter only run with ≥2 binners, and only quality-filtered bins are annotated (both requirements are validated at launch). Downloads the Bakta database on first use (`--bakta_db`: full 31.9 GB or light 1.3 GB download). Bins are expected to be bacterial; the pipeline does not detect or exclude archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before interpreting annotations of non-bacterial bins. Independent of `--contig_level_functional`, and runs on any container engine (docker included)
+- **Example**: `--mag_level_functional true --include_binning --binners semibin,metabat2`
+
+### `--read_level_functional`
+- **Type**: String
+- **Default**: `none`
+- **Options**: `woltka`, `superfocus`, `humann`, `none`
+- **Description**: Optional read-level functional profiling of the host-removed reads, one backend per run (validated at launch). `woltka`: Bowtie2 alignment against the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit settings, Woltka ORF classification (a read is assigned to an ORF when ≥ 80 % of it lies inside; mates count separately; a read whose reported alignments — up to 16 within the score threshold — hit k ORFs counts 1/k toward each unless `--woltka_uniq`), then per-function read counts and RPK for KO, EC (via KO), COG functional categories (via KO; WoLr2's COG ids mapped with the `--cog_db` table, as in the contig branch), Pfam families (by name, as in the contig branch; the versioned accession is kept in `description`) and MetaCyc pathways — each read counted once toward each distinct term of its ORF. Per-sample tables go to `07_functional_annotation/reads/woltka/<sample>/`; study-level `read_function_abundance.tsv` (same schema as the contig branch, `source = reads`, native unit = reads, plus CPGE from MicrobeCensus), `read_function_wide_<ontology>_{native,cpge}.tsv`, `read_annotated_fraction.tsv` and `read_sample_summary.tsv` go to `07_functional_annotation/summary/`. Reported **separately** from the assembly-based tables, never merged (read-level profiling recovers the unassembled fraction but over-predicts). Needs no assembly (works with `--assembly_mode none`) and runs on any container engine. Downloads the WoLr2 subset (~94 GB, `--woltka_db`) on first use unless `--custom_woltka_db` is given; the alignment needs **≥ 68 GB RAM** per task (the WoLr2 index requirement)
+  `superfocus`: SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster database with DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner`). Each sample's R1, R2 and singleton reads are concatenated into one query (mates count separately); a read's equal-best-e-value hits passing the SUPER-FOCUS defaults (≥ 60 % identity, ≥ 15 aa, e-value ≤ 1e-5; `SUPERFOCUS` `ext.args`) are counted, each read with a hit contributing exactly 1, divided 1/k across the k distinct SEED (subsystem, function) assignments of its best hits. The pipeline sums these to SEED subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`, path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`); SEED is never mapped to KO or EC. Per-sample tables go to `07_functional_annotation/reads/superfocus/<sample>/`; the same `read_*` summary tables are written, with only the three `read_function_wide_seed_level{1,2,3}_native.tsv` matrices — **no CPGE** (a SEED hit has no gene length, so no RPK; `cpge_status = not_applicable`, AGS/GE still reported). Downloads the DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB MMseqs2, `--superfocus_db`) unless `--custom_superfocus_db` is given; runs on any container engine
+  `humann`: HUMAnN 4.0.0a2 (an **alpha** release, pinned exactly) with its MetaPhlAn 4.1.2 prescreen against the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` (the only one this HUMAnN version accepts), nucleotide search against the prescreened ChocoPhlAn pangenomes, then translated search of the remaining reads against UniRef90 (EC-filtered, the only protein database HUMAnN 4 offers). Each sample's R1, R2 and singleton reads are concatenated into one input (mates count separately). HUMAnN runs with `--count-normalization RPKs`; the pipeline reports MetaCyc pathway abundance (`metacyc`) and regroups the gene families to KO (`ko`, UniRef90 families only — UniClust90 families never map to a KO) and level-4 EC (`ec`) itself, a family carrying several terms contributing its full RPK to each. KO tables are sparse: HUMAnN 4.0.0a2 ships a legacy UniRef90→KO map, and on the nf-core test reads only 17–18 % of the gene-family abundance mapped to a KO (EC 39–61 %); the per-ontology share is reported in `read_annotated_fraction.tsv`. `abundance_native` is RPK (`native_unit = rpk`) and CPGE = RPK / genome equivalents. Per-sample HUMAnN tables (`_1_metaphlan_profile`, `_2_genefamilies`, `_3_reactions`, `_4_pathabundance`, log) go to `07_functional_annotation/reads/humann/<sample>/`, with the same `read_*` summary tables (six wide matrices: ko/ec/metacyc × native/cpge). Sample names must not contain `s__` or `t__` (a HUMAnN 4.0.0a2 defect; rejected at launch). Downloads ~71 GB (`--humann_db v4_alpha-full`) or ~33 GB (`v4_alpha-ec_filtered`) unless `--custom_humann_db` is given; runs on any container engine; the MetaPhlAn prescreen loads a ~20 GB Bowtie2 index (HUMAnN peaked at ~23.5 GB per sample on the test data; see [Functional annotation branches](manual.md#functional-annotation-branches))
+- **Note**: Independent of `--contig_level_functional` and `--mag_level_functional` — all three can be enabled in the same launch. MicrobeCensus then runs once per sample and feeds the CPGE of both the contig and the read tables, and the read tables stay in their own `read_*` files.
+- **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`; `--read_level_functional superfocus --custom_superfocus_db /shared/databases/superfocus`; `--read_level_functional humann --custom_humann_db /shared/databases/humann`
 
 ### `--arg_bin_clustering`
 - **Type**: Boolean
@@ -197,10 +213,64 @@ Complete reference for all BugBuster pipeline parameters.
 
 ### `--gtdbtk_db`
 - **Type**: String
-- **Default**: `release_220`
-- **Description**: GTDB-TK database release version
-- **Size**: 109 GB
-- **Example**: `--gtdbtk_db release_220`
+- **Default**: `release_232`
+- **Description**: GTDB-TK database release version. The pinned GTDB-Tk 2.7.2 accepts only GTDB R232 data (older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and no longer work)
+- **Size**: ~61 GB download
+- **Example**: `--gtdbtk_db release_232`
+
+### `--eggnog_db`
+- **Type**: String
+- **Default**: `emapper-3.0`
+- **Description**: eggNOG 7 data selection for eggNOG-mapper v3 (contig-level functional annotation). The whole emapper 3.0.x series reuses this data directory
+- **Size**: 44 GB (uncompressed)
+- **Example**: `--eggnog_db emapper-3.0`
+
+### `--dbcan_db`
+- **Type**: String
+- **Default**: `db_v5-2-9_5-5-2026`
+- **Description**: dbCAN database release selection for run_dbcan v5 CAZy annotation (`--contig_level_functional` branch with `--functional_cazy`, the default). Downloads the four protein-mode CAZyme files (`CAZy.dmnd`, `dbCAN.hmm`, `dbCAN-sub.hmm`, `fam-substrate-mapping.tsv`) from the pinned dbCAN S3 release
+- **Size**: 7.4 GB (uncompressed)
+- **Example**: `--dbcan_db db_v5-2-9_5-5-2026`
+
+### `--bakta_db`
+- **Type**: String
+- **Default**: `v6.0-full`
+- **Options**: `v6.0-full`, `v6.0-light`
+- **Description**: Bakta database flavor for MAG-level functional annotation (`--mag_level_functional`). Both are the pinned Zenodo v6.0 release (schema 6, required by Bakta 1.12.x). The light database has reduced annotation sources and **changes annotation results**: selecting it is always an explicit user choice and is recorded in provenance (the `bakta_db` entry in `pipeline_info/software_versions.yml`); no profile (including `low_disk`) ever switches it automatically
+- **Size**: full 31.9 GB download / light 1.3 GB download
+- **Example**: `--bakta_db v6.0-light`
+
+### `--cog_db`
+- **Type**: String
+- **Default**: `cog-24`
+- **Options**: `cog-24`
+- **Description**: NCBI COG definitions table for the contig functional branch (`--contig_level_functional`) and the Woltka read backend (`--read_level_functional woltka`, which maps the COG ids of WoLr2's KO → COG map the same way, so `cog` means COG functional categories in both branches). eggNOG-mapper v3 / eggNOG 7 reports most genes' `COG_category` as a COG ortholog id (e.g. `COG1629`) rather than a functional category; the pipeline maps each id to its COG functional-category letters with this table (a COG with several categories contributes to each). Downloaded from `https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab` and verified against the release's `checksums.md5`; it covers every COG id of the eggNOG 7 database
+- **Size**: ~410 KB
+- **Example**: `--cog_db cog-24`
+
+### `--woltka_db`
+- **Type**: String
+- **Default**: `wolr2`
+- **Options**: `wolr2`
+- **Description**: Web of Life release for the Woltka read-level backend (`--read_level_functional woltka`). Downloads, from the official public host (`https://ftp.microbio.me/pub/wol2`), only the files the backend reads, in the FTP layout: the Bowtie2 index (`databases/bowtie2/WoLr2.*.bt2l`, 93.6 GB), ORF coordinates and lengths (`proteins/`), and the KEGG / MetaCyc / Pfam function maps (`function/`). The published md5 checksums are verified; the pipeline bundles none of this data
+- **Size**: ~94 GB
+- **Example**: `--woltka_db wolr2`
+
+### `--superfocus_db`
+- **Type**: String
+- **Default**: `db90`
+- **Options**: `db90`
+- **Description**: SUPER-FOCUS database for the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`). Downloads the prebuilt DB_90 archive for the selected `--superfocus_aligner` only from figshare (open.flinders.edu.au, CC0): DIAMOND format 3 `90_clusters.db.dmnd` (zip ~0.74 GB, ~1.9 GB unpacked) or MMseqs2 `mmseqs_90.zip` (~0.9 GB, ~2.5 GB unpacked), plus `database_PKs.txt` (SEED subsystem levels per subsystem) from the SUPER-FOCUS v1.8 tag; both md5-verified. Stored as a database root at `<databases_dir>/superfocus/superfocus_db`. The cluster level is fixed at DB_90
+- **Size**: ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download
+- **Example**: `--superfocus_db db90`
+
+### `--humann_db`
+- **Type**: String
+- **Default**: `v4_alpha-full`
+- **Options**: `v4_alpha-full`, `v4_alpha-ec_filtered`
+- **Description**: HUMAnN database set for the HUMAnN read-level backend (`--read_level_functional humann`). Both keys download the HUMAnN v4_alpha UniRef90 EC-filtered DIAMOND database (0.94 GB), the v4 utility mapping (2.8 GB; KO / EC maps and the MetaCyc pathway files) and the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` with its prebuilt Bowtie2 index (~22.5 GB, md5-verified); they differ in the ChocoPhlAn pangenome database: `v4_alpha-full` (44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB, only EC-annotated genes — fewer gene families and KOs). The choice is recorded in provenance (`read_sample_summary.tsv`, `software_versions.yml`). Stored as a database root at `<databases_dir>/humann/humann_db`; HUMAnN publishes no checksums for its own archives, so those are checked for layout only
+- **Size**: ~71 GB (`v4_alpha-full`) / ~33 GB (`v4_alpha-ec_filtered`) download
+- **Example**: `--humann_db v4_alpha-ec_filtered`
 
 ### `--databases_dir`
 - **Type**: String (directory path)
@@ -261,8 +331,8 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_gtdbtk_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom GTDB-TK database directory
-- **Example**: `--custom_gtdbtk_db /path/to/gtdbtk_r220`
+- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.7.2, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
+- **Example**: `--custom_gtdbtk_db /path/to/release232`
 
 ### `--custom_deeparg_db`
 - **Type**: String (directory path)
@@ -301,6 +371,41 @@ Override automatic downloads by providing custom database paths:
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
 - **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
+
+### `--custom_dbcan_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom dbCAN database directory in the run_dbcan v5 layout: `CAZy.dmnd`, `dbCAN.hmm`, `dbCAN-sub.hmm` (hyphen — the tool's expected filename), `fam-substrate-mapping.tsv`. An optional `DB_VERSION` file (one line, the release string) feeds provenance; without it the recorded database version is `custom`
+- **Example**: `--custom_dbcan_db /path/to/dbcan_db`
+
+### `--custom_eggnog_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom eggNOG 7 data directory in the emapper-3.0 layout: `eggnog.db` (plus its `.fieldpresence.bin` and `.taxids.bin` caches), `eggnog.taxa.db` (plus `.traverse.pkl`), `eggnog_proteins.dmnd`, `go-basic.obo`. Must be eggNOG 7 data — eggNOG-mapper v3 rejects eggNOG 5 databases
+- **Example**: `--custom_eggnog_db /path/to/emapper-3.0/data`
+
+### `--custom_bakta_db`
+- **Type**: String (directory path)
+- **Description**: Path to custom Bakta database directory in the schema 6 layout (the content of an extracted `db.tar.xz`/`db-light.tar.xz`: `version.json`, `amrfinderplus-db/`, and the Bakta annotation databases). Must be schema 6 — Bakta 1.12.x rejects older schemas. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded database version is `custom`. **Note:** the official v6.0 tarball bundles an AMRFinderPlus database too old for the AMRFinderPlus in the pinned bakta container — refresh it once with `amrfinder_update --force_update --database <db>/amrfinderplus-db` (run inside the bakta container; see `docs/troubleshooting.md`), otherwise every annotation fails at the AMR expert step. The pipeline's auto-download path does this refresh automatically
+- **Example**: `--custom_bakta_db /path/to/bakta_db`
+
+### `--custom_cog_db`
+- **Type**: String (file path)
+- **Description**: Path to a local NCBI COG definitions table in the `cog-24.def.tab` layout (tab-separated, no header: COG id, functional-category letters, name, ...). It must cover every COG id the eggNOG database reports — an id missing from the table stops the aggregation with an error naming it — and, with `--read_level_functional woltka`, every COG id of the WoLr2 `function/kegg/ko-to-cog.map` (apart from nine known WoLr2 defects that are skipped; any other unmapped id stops `WOLTKA_CLASSIFY`)
+- **Example**: `--custom_cog_db /shared/databases/cog/cog-24.def.tab`
+
+### `--custom_woltka_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local Web of Life release 2 mirror in the FTP layout of `https://ftp.microbio.me/pub/wol2` — at least `databases/bowtie2/WoLr2.{1,2,3,4,rev.1,rev.2}.bt2l`, `proteins/coords.txt.xz`, `proteins/length.map.xz`, `function/kegg/{orf-to-ko.map.xz,ko-to-ec.map,ko-to-cog.map,ko_name.txt}`, `function/metacyc/{orf-to-protein.map.xz,protein-to-enzrxn.map,enzrxn-to-reaction.map,reaction-to-pathway.map,pathway_name.txt}` and `function/pfam/{orf-to-pfam.map.xz,pfam_name.txt}` (a download recipe is in `docs/manual.md`, Manual Database Download). The index and the coordinate/map files must come from the same release. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<index name>)`
+- **Example**: `--custom_woltka_db /shared/databases/wol2`
+
+### `--custom_superfocus_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local SUPER-FOCUS database **root** — the directory that CONTAINS `db/`: `db/database_PKs.txt` plus `db/static/diamond/90_clusters.db.dmnd` (for `--superfocus_aligner diamond`) or `db/static/mmseqs2/90_clusters.db*` (for `mmseqs2`). Pointing at the `db/` folder itself fails with an explicit message, as does a database without the selected aligner's DB_90 files. A database root from an existing SUPER-FOCUS install (e.g. made with an older SUPER-FOCUS version; DIAMOND format 3 `.dmnd`) works unmodified. A download recipe is in `docs/manual.md`, Manual Database Download. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom (<aligner> DB_90)`
+- **Example**: `--custom_superfocus_db /shared/databases/superfocus`
+
+### `--custom_humann_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local HUMAnN database **root** containing `chocophlan/` (ChocoPhlAn v4_alpha pangenomes), `uniref/` (the UniRef90 EC-filtered `.dmnd`), `utility_mapping/` (the `full_mapping_v4_alpha` files: `map_ko_uniref90.txt.gz`, `map_level4ec_uniclust90.txt.gz`, their name maps and the two MetaCyc pathway files) and `metaphlan/` (`mpa_vOct22_CHOCOPhlAnSGB_202403.pkl` plus its `.bt2l` Bowtie2 index — HUMAnN 4.0.0a2 refuses any other MetaPhlAn database, e.g. vJun23). This is the layout `humann_databases --download` produces for the three HUMAnN archives, plus the MetaPhlAn files in their own folder. An optional `DB_VERSION` file (one line) feeds provenance; without it the recorded version is `custom`
+- **Example**: `--custom_humann_db /shared/databases/humann`
 
 ---
 
@@ -588,25 +693,49 @@ Override automatic downloads by providing custom database paths:
 
 ## Functional Annotation Parameters
 
-### `--metacerberus_hmm`
+### `--featurecounts_multimap`
 - **Type**: String
-- **Default**: `'"KOFam_all, COG, VOG, PHROG, CAZy"'`
-- **Options**: `KOFam_all`, `KOFam_eukaryote`, `KOFam_prokaryote`, `COG`, `VOG`, `PHROG`, `CAZy`
-- **Description**: Comma-separated list of HMM databases to use for MetaCerberus
-- **Example**: `--metacerberus_hmm '"KOFam_prokaryote, COG, CAZy"'`
-- **Note**: The value is passed verbatim to MetaCerberus's `--hmm` flag, so it must keep the embedded double quotes (wrap them in single quotes on the shell command line) to remain a single argument.
+- **Default**: `primary`
+- **Options**: `primary`, `all`, `none`
+- **Description**: Multi-mapping policy for featureCounts gene quantification (`--contig_level_functional` branch, published to `07_functional_annotation/gene_abundance/`): `primary` counts primary alignments only, `all` counts every reported alignment (featureCounts `-M`), `none` excludes multi-mapping reads entirely. Counting is read-level (each mate counted separately), not fragment-level
+- **Example**: `--featurecounts_multimap all`
+- **Note**: With the pipeline's Bowtie2 defaults (one reported alignment per read) the three settings coincide in practice; the parameter makes the counting policy explicit
 
-### `--metacerberus_minscore`
-- **Type**: Integer
-- **Default**: `25`
-- **Description**: Minimum HMM score for MetaCerberus
-- **Example**: `--metacerberus_minscore 30`
+### `--microbecensus`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Run MicrobeCensus on the host-removed reads (when `--contig_level_functional` or `--read_level_functional` is enabled; published to `07_functional_annotation/microbecensus/`, once per sample even with both branches on) to estimate average genome size and genome equivalents, enabling copies-per-genome-equivalent (CPGE) normalization in the `07_functional_annotation/summary/` tables of both branches (the SUPER-FOCUS read backend has no CPGE — a SEED hit carries no gene length — so there its AGS/GE are only reported in `read_sample_summary.tsv`; the HUMAnN backend uses them for CPGE = RPK / GE)
+- **Example**: `--microbecensus false`
+- **Note**: Failure is non-fatal by design: a sample whose MicrobeCensus run fails (reads under 50 bp, too few marker-gene hits, or an estimate outside the 0.5–20 Mb plausibility window) falls back to TPM-only with empty `cpge` fields, recorded as `status = unavailable` in `summary/ags_and_ge.tsv`. Estimates need a few hundred thousand reads to be meaningful
 
-### `--metacerberus_evalue`
-- **Type**: Number
-- **Default**: `1e-09`
-- **Description**: Maximum E-value for MetaCerberus
-- **Example**: `--metacerberus_evalue 1e-10`
+### `--functional_cazy`
+- **Type**: Boolean
+- **Default**: `true`
+- **Options**: `true`, `false`
+- **Description**: Run run_dbcan v5 CAZy annotation on the predicted proteins (`--contig_level_functional` branch, published to `07_functional_annotation/dbcan/`): DIAMOND vs CAZy plus pyHMMER vs the dbCAN and dbCAN-sub HMM databases, consolidated into a per-gene `overview.tsv` with the per-tool calls retained, and dbCAN-sub substrate predictions in `dbCANsub_hmm_results.tsv`. The calls feed the summary tables as `db = dbcan` / `backend = run_dbcan` rows alongside the eggNOG-derived CAZy calls, plus dedicated `function_wide_cazy_dbcan_{tpm,cpge}.tsv` matrices (the two CAZy backends are never merged into one matrix — a gene called by both would double-count). Downloads the dbCAN database (~7.4 GB, `--dbcan_db`) on first use
+- **Example**: `--functional_cazy false`
+- **Note**: With `--functional_cazy false` the summary tables are eggNOG-only: the `cazy_dbcan` wide matrices are still written but header-only, and the `cazy_dbcan` rows in `annotated_fraction.tsv` read zero
+
+### `--dbcan_consensus`
+- **Type**: String
+- **Default**: `recommended`
+- **Options**: `recommended`, `any`
+- **Description**: Which dbCAN calls feed the summary tables: `recommended` uses the tool's `Recommend Results` column (calls supported by at least 2 of DIAMOND / dbCAN HMM / dbCAN-sub — the dbCAN authors' guidance), `any` uses the union of the per-tool calls. The published `overview.tsv` always retains all per-tool columns regardless of this setting
+- **Example**: `--dbcan_consensus any`
+
+### `--woltka_uniq`
+- **Type**: Boolean
+- **Default**: `false`
+- **Options**: `true`, `false`
+- **Description**: Multi-mapping policy of the Woltka read-level backend. Reads are aligned to WoLr2 with the SHOGUN multi-hit Bowtie2 settings (`--very-sensitive -k 16 --np 1 --mp 1,1 --rdg 0,1 --rfg 0,1 --score-min L,0,-0.05`, the WoL/Qiita standard). By default Woltka divides a read whose reported alignments (up to 16 within the score threshold) overlap k ORFs 1/k to each, so the read totals stay equal to the number of reads assigned. With `true` such ambiguous reads are left unassigned instead (Woltka `--uniq`); how many is reported per sample in `read_sample_summary.tsv` (`reads_unassigned_ambiguous`)
+- **Example**: `--woltka_uniq true`
+
+### `--superfocus_aligner`
+- **Type**: String
+- **Default**: `diamond`
+- **Options**: `diamond`, `mmseqs2`
+- **Description**: Search backend of the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`): `diamond` (DIAMOND 2.2.1 blastx) or `mmseqs2` (MMseqs2 18 easy-search). Selects which DB_90 archive is downloaded; a `--custom_superfocus_db` must contain that aligner's files. MMseqs2 builds its k-mer index for the database at every run (~13 GB RAM, ~45 s on 16 CPUs) and, in its fast mode, its result for borderline reads can vary slightly with the thread count; DIAMOND results are stable. In a single spot check MMseqs2's fast mode was also somewhat less sensitive (one 2,000-read test sample: DIAMOND 1,011 reads hit, MMseqs2 924). Identity / alignment-length / e-value thresholds are set in the `SUPERFOCUS` `ext.args` (`config/modules.config`), not as parameters
+- **Example**: `--superfocus_aligner mmseqs2`
 
 ---
 
@@ -666,16 +795,23 @@ Bowtie2 parameters for read alignment during host filtering:
 
 ## Resource Limit Parameters
 
+Every task's request is capped at these values. With the local executor, `max_cpus` and
+`max_memory` are also the run's machine-wide pool. Set them on the command line or in a
+`-params-file` to change both. A `-c` config file that sets them in `params {}` changes the
+per-task caps but not the pool, so it must also set `executor { cpus = ...; memory = ... }`.
+Otherwise a task asking for more than the pool fails with `Process requirement exceeds
+available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
+
 ### `--max_cpus`
 - **Type**: Integer
 - **Default**: `16`
-- **Description**: Maximum number of CPUs that can be requested for any single job
+- **Description**: Maximum number of CPUs that can be requested for any single job; also the local executor's CPU pool (and queue size)
 - **Example**: `--max_cpus 32`
 
 ### `--max_memory`
 - **Type**: String
 - **Default**: `128.GB`
-- **Description**: Maximum amount of memory that can be requested for any single job
+- **Description**: Maximum amount of memory that can be requested for any single job; also the local executor's memory pool
 - **Example**: `--max_memory 256.GB`
 
 ### `--max_time`
@@ -797,11 +933,11 @@ nextflow run main.nf \
     --output ./results \
     --custom_kraken_db /shared/db/kraken2 \
     --custom_checkm2_db /shared/db/checkm2.dmnd \
-    --custom_gtdbtk_db /shared/db/gtdbtk_r220 \
+    --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
     --databases_dir /shared/databases \
     -profile docker
 ```
 
 ---
 
-*BugBuster v1.1.0dev - Complete Parameter Reference*
+*BugBuster v2.0.0dev - Complete Parameter Reference*

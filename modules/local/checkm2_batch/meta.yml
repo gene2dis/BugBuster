@@ -1,0 +1,47 @@
+name: checkm2_batch
+description: Batched CheckM2 bin quality assessment - pools every sample's bins per binner into one CheckM2 run (the database is loaded once per binner, not per sample) and splits the result back into per-sample, per-binner reports
+keywords:
+  - binning
+  - bin quality
+  - completeness
+  - contamination
+  - checkm2
+tools:
+  - checkm2:
+      description: Rapid, scalable assessment of microbial genome completeness and contamination using machine learning
+      homepage: https://github.com/chklovski/CheckM2
+      documentation: https://github.com/chklovski/CheckM2/blob/main/README.md
+      doi: "10.1038/s41592-023-01940-w"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta_list:
+      type: list of maps
+      description: Metadata of every sample in the batch (the meta.id values name the per-sample reports)
+  - all_bins:
+      type: directory
+      description: |
+        Bin directories from every binner and sample (staged as bin_?/), recognised by name with
+        bin/identify_bin_dir.sh (<sample>_metabat_bins, <sample>_semibin_output_bins, COMEBin and
+        <sample>_metawrap_<completeness>_<contamination>_bins); bins are *.fa, *.fasta or *.fna files
+  - checkm_db:
+      type: file
+      description: CheckM2 DIAMOND database (downloaded by FORMAT_CHECKM2_DB or --custom_checkm2_db), passed to --database_path
+      pattern: "*.dmnd"
+
+output:
+  - all_reports:
+      type: tuple
+      description: Tuple of meta_list and the per-sample, per-binner CheckM2 reports (<sample>_<binner>_quality_report.tsv, sample prefix stripped from bin names; header-only for a binner with no bins); the glob also matches the MetaWRAP reports
+      pattern: "*_*_quality_report.tsv"
+  - metawrap_report:
+      type: tuple
+      description: Optional; tuple of meta_list and the per-sample reports for MetaWRAP-refined bins, present only when MetaWRAP ran
+      pattern: "*_metawrap_quality_report.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

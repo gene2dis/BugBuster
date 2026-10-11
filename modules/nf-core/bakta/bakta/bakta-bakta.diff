@@ -1,0 +1,45 @@
+Changes in component 'nf-core/bakta/bakta'
+Changes in 'bakta/bakta/main.nf':
+--- modules/nf-core/bakta/bakta/main.nf
++++ modules/nf-core/bakta/bakta/main.nf
+@@ -27,7 +27,7 @@
+     tuple val(meta), path("${prefix}.tsv"), emit: tsv
+     tuple val(meta), path("${prefix}.txt"), emit: txt
+     tuple val(meta), path("${prefix}.json"), emit: json
+-    tuple val("${task.process}"), val('bakta'), eval("bakta --version 2>&1 | sed 's/.*bakta //'"), emit: versions_bakta, topic: versions
++    path "versions.yml", emit: versions
+ 
+     when:
+     task.ext.when == null || task.ext.when
+@@ -55,6 +55,12 @@
+         ${regions_opt} \\
+         ${hmms_opt} \\
+         --db ${db}
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        bakta: \$(bakta --version 2>&1 | sed 's/.*bakta //')
++        bakta_db: \$(cat ${db}/DB_VERSION 2>/dev/null || echo custom)
++    END_VERSIONS
+     """
+ 
+     stub:
+@@ -78,5 +84,11 @@
+     touch ${prefix}.tsv
+     touch ${prefix}.txt
+     touch ${prefix}.json
++
++    cat <<-END_VERSIONS > versions.yml
++    "${task.process}":
++        bakta: \$(bakta --version 2>&1 | sed 's/.*bakta //')
++        bakta_db: stub
++    END_VERSIONS
+     """
+ }
+
+'modules/nf-core/bakta/bakta/environment.yml' is unchanged
+'modules/nf-core/bakta/bakta/meta.yml' is unchanged
+'modules/nf-core/bakta/bakta/tests/main.nf.test' is unchanged
+'modules/nf-core/bakta/bakta/tests/main.nf.test.snap' is unchanged
+'modules/nf-core/bakta/bakta/tests/nextflow.config' is unchanged
+************************************************************

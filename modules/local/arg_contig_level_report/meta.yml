@@ -1,0 +1,33 @@
+name: arg_contig_level_report
+description: Left-joins the BlobTools contig tables (length, GC, coverage, taxonomy from superkingdom to species) of all samples with the DeepARG contig predictions into one study-level contig taxonomy and ARG table (bin/arg_contig_level_report.py)
+keywords:
+  - antimicrobial resistance
+  - contig taxonomy
+  - deeparg
+  - blobtools
+  - report
+tools:
+  - pandas:
+      description: Python data analysis library used by the report script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - arg_contig_data:
+      type: file
+      description: Collected DeepARG contig mapping files (<sample>_contigs_deep_arg.out.mapping.ARG) and BlobTools tables (<sample>_Blob_table*) of every sample; the sample name is taken from the file name and the script exits with an error if either set is missing
+      pattern: "{*_contigs_deep_arg.out.mapping.ARG,*Blob_table*}"
+
+output:
+  - arg_reports:
+      type: file
+      description: One row per contig (or per contig and ARG hit) with Sample, contig_name, contig_length, GC, coverage, taxonomy ranks and the DeepARG columns (ARG_gene, predicted_ARG_class, best_hit, probability, identity, alignment_evalue, counts; empty for contigs without an ARG); written comma-separated despite the .tsv extension
+      pattern: "Contig_tax_and_arg_prediction.tsv"
+  - versions:
+      type: file
+      description: Software versions (python, pandas)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

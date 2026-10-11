@@ -37,6 +37,10 @@ output:
       type: tuple
       description: Tuple containing meta, reads, and assembled contigs
       pattern: "*_contigs.fa"
+  - contigs_only:
+      type: tuple
+      description: Tuple containing meta and the assembled contigs
+      pattern: "*_contigs.fa"
   - versions:
       type: file
       description: File containing software versions

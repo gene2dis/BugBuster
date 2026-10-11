@@ -1,0 +1,35 @@
+name: metawrap
+description: MetaWRAP bin_refinement of the bins from two or three binners (MetaBAT2, SemiBin, COMEBin) at params.metawrap_completeness / params.metawrap_contamination; when no binner produced bins the output directory holds only SKIPPED.txt
+keywords:
+  - binning
+  - bin refinement
+  - metawrap
+  - metagenomics
+tools:
+  - metawrap:
+      description: Flexible pipeline for genome-resolved metagenomic data analysis; this module uses its bin_refinement module
+      homepage: https://github.com/bxlab/metaWRAP
+      documentation: https://github.com/bxlab/metaWRAP/blob/master/README.md
+      doi: "10.1186/s40168-018-0541-1"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - bin_dirs:
+      type: directory
+      description: Two or three binner output directories for this sample, passed to bin_refinement as -A/-B/-C (gzipped MetaBAT2 bins are decompressed first)
+
+output:
+  - bins:
+      type: tuple
+      description: Tuple of meta and the refined bin directory
+      pattern: "*_metawrap_*_*_bins"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

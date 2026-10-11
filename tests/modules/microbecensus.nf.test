@@ -1,0 +1,77 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MICROBECENSUS Module Test
+
+    Average genome size estimation (design doc Section 4.7, task T5).
+
+    A successful estimate needs enough marker-gene-bearing reads, which no
+    committed fixture can reasonably provide, so the success path is covered
+    by the real-run acceptance evidence in the design doc (Q4/T5 rows). What
+    IS testable here:
+      - the stub contract (CI runs -stub)
+      - the Section 4.7 non-fatal-failure contract: on the 10-read fixture
+        MicrobeCensus exits with its explicit "No hits to marker proteins"
+        error, and the withName errorStrategy in config/modules.config
+        (loaded via nf-test's configFile) turns that into an ignored task —
+        the run succeeds with no ags output, which is exactly the shape
+        AGGREGATE_FUNCTIONS' TPM-only fallback consumes. This also exercises
+        the pinned container and the bin/run_microbe_census_py3fix.py shim
+        under docker.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test MICROBECENSUS Process"
+    script "../../modules/local/microbecensus/main.nf"
+    process "MICROBECENSUS"
+
+    test("fails non-fatally on marker-free input (TPM-only fallback shape)") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'mctest' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            // errorStrategy 'ignore' (config/modules.config): the failed task
+            // must not fail the run, and must contribute no ags output
+            assert process.success
+            assert process.out.ags.size() == 0
+            assert process.out.versions.size() == 0
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'mctest' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.ags.size() == 1
+            assert process.out.raw.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('microbecensus: 1.1.1')
+        }
+    }
+}

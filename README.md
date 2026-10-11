@@ -30,24 +30,27 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
 6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
-7. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
-8. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
-9. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
-10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
-11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
-13. Functional assignation of contigs with MetaCerberus. [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-14. ORF prediction in contigs with Prodigal. [`Prodigal`](https://github.com/hyattpd/Prodigal)
-15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
-16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-17. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
-18. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
-19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
-20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-21. Bin reports.
-22. If requested functional annotation of Bins **(work in progress)** [`MetaCerberus`](https://github.com/raw-lab/MetaCerberus)
-23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Assembly modes: "coassembly", "assembly", "none"
+7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
+   - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
+   - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
+8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
+9. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
+10. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
+11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+12. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+13. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+14. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
+15. If requested contig-level functional annotation with eggNOG-mapper, CAZy annotation with run_dbcan, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — with the eggNOG and dbCAN CAZy calls reported separately). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`run_dbcan`](https://github.com/bcb-unl/run_dbcan), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
+16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+19. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+22. Bin reports.
+23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only MetaWRAP quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
+24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -93,7 +96,7 @@ nextflow run main.nf \
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
-| `low_disk` | Progressive work-dir cleanup for limited disk space (runs are not resumable) |
+| `low_disk` | Deletes the work dir after a successful run, for limited disk space (completed runs are not resumable; interrupted ones are) |
 | `test` | Run with minimal test data |
 
 Combine profiles as needed: `-profile slurm,singularity` or `-profile aws,docker`
@@ -141,7 +144,14 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
-| **GTDB-TK r220** | 109 GB | Bin taxonomic classification | `include_binning=true` | `--custom_gtdbtk_db` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
+| **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
+| **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
+| **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |
+| **NCBI COG 2024 definitions** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` | `--custom_cog_db` |
+| **Web of Life WoLr2** | ~94 GB | Read-level functional profiling with Woltka (alignment needs ≥ 68 GB RAM) | `read_level_functional='woltka'` | `--custom_woltka_db` |
+| **SUPER-FOCUS DB_90** | ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download, selected aligner only | Read-level SEED subsystem profiling with SUPER-FOCUS | `read_level_functional='superfocus'` | `--custom_superfocus_db` |
+| **HUMAnN 4 databases + MetaPhlAn vOct22** | ~71 GB (full ChocoPhlAn 44.8 GB) or ~33 GB (EC-filtered ChocoPhlAn 6.9 GB), plus UniRef90 EC-filtered 0.94 GB, utility mapping 2.8 GB and the MetaPhlAn database with its Bowtie2 index ~22.5 GB | Read-level profiling with HUMAnN 4.0.0a2 | `read_level_functional='humann'` | `--custom_humann_db` |
 
 ### Database Sources
 
@@ -157,6 +167,12 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
+- **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
+- **dbcan_db**: [`dbCAN S3 release db_v5-2-9_5-5-2026`](https://dbcan.s3.us-west-2.amazonaws.com/db_v5-2-9_5-5-2026/)
+- **woltka_db**: [`Web of Life release 2 (WoLr2)`](https://ftp.microbio.me/pub/wol2/)
+- **superfocus_db**: [`SUPER-FOCUS DB_90 (figshare, CC0): DIAMOND`](https://doi.org/10.25451/flinders.25009748.v2) / [`MMseqs2`](https://doi.org/10.25451/flinders.25009751.v2)
+- **humann_db**: [`HUMAnN v4_alpha databases`](https://github.com/biobakery/humann) (ChocoPhlAn, UniRef90 EC-filtered, utility mapping) + [`MetaPhlAn mpa_vOct22_CHOCOPhlAnSGB_202403`](https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/)
+- **cog_db**: [`NCBI COG 2024 definitions (cog-24.def.tab)`](https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/)
 
 ## Samplesheet Format
 
@@ -198,7 +214,11 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
-| `--contig_level_metacerberus` | `false` | Functional annotation with MetaCerberus |
+| `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
+| `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
+| `--read_level_functional` | `none` | Read-level functional profiling: `woltka`, `superfocus`, `humann` or `none` (needs no assembly) |
+| `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |
+| `--functional_cazy` | `true` | run_dbcan CAZy annotation in the contig functional branch |
 | `--arg_bin_clustering` | `false` | Bin-level ARG prediction and clustering |
 
 ### Database Selection
@@ -289,7 +309,7 @@ The pipeline generates organized output with numbered prefixes:
 results/
 ├── pipeline_info/              # Execution reports, logs, contig filtering summary
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
-├── 01_quality_control/         # QC results (if quality_control=true)
+├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports
 │   └── summary/                # Aggregated statistics
 ├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
@@ -302,15 +322,10 @@ results/
 │   ├── per_sample/             # Per-sample assemblies
 │   └── coassembly/             # Co-assembly results
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/{sample}/ or coassembly/
-│   │   ├── raw_bins/           # MetaBAT2, SemiBin, COMEBin
-│   │   ├── refined_bins/       # MetaWRAP refined bins
-│   │   ├── quality/            # CheckM2 reports
-│   │   └── taxonomy/           # GTDB-TK classifications
-│   ├── coassembly/coverage/    # Per-bin coverage (coassembly mode)
-│   ├── coassembly/summary/     # Bin summary (coassembly mode)
-│   ├── quality/summary/        # Aggregated quality reports
-│   └── taxonomy/summary/       # Aggregated taxonomy reports
+│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK)
+│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/
+│   ├── quality/summary/        # Aggregated quality reports (assembly mode)
+│   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
 │   ├── read_level/             # Read-level predictions
 │   │   ├── karga/              # KARGA results (if read_arg_prediction=true)
@@ -321,8 +336,7 @@ results/
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
-│   │   ├── deeparg/            # Per-sample DeepARG predictions
-│   │   ├── prodigal/           # Per-sample contig ORFs
+│   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/; coassembly/ under co-assembly)
 │   │   ├── summary/            # Combined tax + ARG report
 │   │   └── figures/            # ARG scatter plots
 │   └── bin_level/              # Bin-level ARG (if arg_bin_clustering=true)
@@ -331,8 +345,17 @@ results/
 │       └── clustering/         # MMseqs2 ARG clusters
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
 │   └── figures/                # BlobTools plots
-└── 07_functional_annotation/   # MetaCerberus (if contig_level_metacerberus=true)
-    └── contigs/{sample}/       # Per-sample contig annotation results
+└── 07_functional_annotation/   # Functional annotation
+    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional; coassembly/ under co-assembly)
+    ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true; coassembly/ under co-assembly)
+    ├── dbcan/{sample}/         # run_dbcan CAZy calls + substrates (if contig_level_functional=true and functional_cazy=true; coassembly/ under co-assembly)
+    ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true; per sample in both assembly modes)
+    ├── microbecensus/{sample}/ # MicrobeCensus average genome size (if microbecensus=true and contig_level_functional=true or read_level_functional != none; per sample in both assembly modes)
+    ├── summary/                # Study-level TPM/CPGE tables + annotated fraction + AGS summary (if contig_level_functional=true); read_* tables (if read_level_functional != none)
+    ├── mags/{sample}/          # Bakta per-bin MAG annotation (if mag_level_functional=true; needs binning with >= 2 binners; coassembly/ under co-assembly)
+    ├── reads/woltka/{sample}/  # Woltka read-level ORF and function tables (if read_level_functional=woltka)
+    ├── reads/superfocus/{sample}/ # SUPER-FOCUS SEED level 1-3 tables + raw outputs (if read_level_functional=superfocus)
+    └── reads/humann/{sample}/  # HUMAnN gene families / reactions / pathways (RPK), MetaPhlAn profile, KO/EC/MetaCyc tables (if read_level_functional=humann)
 ```
 
 **Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).

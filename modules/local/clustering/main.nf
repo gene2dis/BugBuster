@@ -4,6 +4,7 @@
 process CLUSTERING {
     container 'quay.io/biocontainers/mmseqs2:15.6f452--pl5321h6a68c12_1'
 
+    tag "arg_clustering"
     label 'process_high'
 
     input:

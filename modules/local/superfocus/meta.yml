@@ -1,0 +1,53 @@
+name: superfocus
+description: SUPER-FOCUS read-level SEED subsystem profiling (DIAMOND blastx or MMseqs2 against the DB_90 cluster database), then per-level composition of SEED subsystem levels 1-3 read counts (bin/superfocus_function_profile.py)
+keywords:
+  - functional profiling
+  - read-level
+  - superfocus
+  - seed subsystems
+  - metagenomics
+tools:
+  - superfocus:
+      description: SUPER-FOCUS, a tool for agile functional analysis of shotgun metagenomic data (SEED subsystems)
+      homepage: https://github.com/metageni/SUPER-FOCUS
+      documentation: https://github.com/metageni/SUPER-FOCUS/blob/master/README.md
+      doi: "10.1093/bioinformatics/btv584"
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads (R1, R2 and optional singleton file; gzipped or plain FASTQ). Concatenated into one query, mates counted as separate reads
+      pattern: "*.{fastq,fq}{,.gz}"
+  - sf_db:
+      type: directory
+      description: SUPER-FOCUS database ROOT containing db/database_PKs.txt and db/static/{diamond,mmseqs2}/90_clusters.db* (optional DB_VERSION provenance file written by bin/superfocus_db_reformat.sh)
+      pattern: "*"
+
+output:
+  - functions:
+      type: file
+      description: Per-level SEED read counts (sample_id, ontology, accession, description, count, rpk) for seed_level1, seed_level2 and seed_level3; accessions are path-qualified ('L1', 'L1 | L2', 'L1 | L2 | L3'); rpk is always blank (no gene length, CPGE not computable)
+      pattern: "*.superfocus_functions.tsv"
+  - summary:
+      type: file
+      description: Reads given to SUPER-FOCUS and reads with an accepted hit, overall ('any') and per level
+      pattern: "*.superfocus_summary.tsv"
+  - raw:
+      type: file
+      description: SUPER-FOCUS's own all-levels-and-function and per-level tables (tab-separated despite the .xls suffix; 4 metadata lines before the header). Absent for a sample without reads. Their '%' columns and the per-level name-merged rows are NOT used by the pipeline
+      pattern: "*.superfocus_{all_levels_and_function,subsystem_level_*}.xls"
+  - log:
+      type: file
+      description: SUPER-FOCUS run log
+      pattern: "*.superfocus.log"
+  - versions:
+      type: file
+      description: Software versions (live SUPER-FOCUS, DIAMOND and MMseqs2 versions, the aligner used, and the database provenance from DB_VERSION or 'custom (<aligner> DB_90)')
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

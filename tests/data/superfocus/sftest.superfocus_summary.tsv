@@ -1,0 +1,5 @@
+sample_id	ontology	reads_assigned	reads_annotated	fraction_annotated
+sftest	any	22	19	0.863636
+sftest	seed_level1	22	19	0.863636
+sftest	seed_level2	22	19	0.863636
+sftest	seed_level3	22	19	0.863636

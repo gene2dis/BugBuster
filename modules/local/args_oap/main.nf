@@ -2,6 +2,7 @@ process ARGS_OAP {
 
     container 'quay.io/ffuentessantander/args_oap:3.2.4'
 
+    tag "${meta.id}"
     label 'process_low'
 
     input:

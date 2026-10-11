@@ -1,0 +1,50 @@
+name: bbmap
+description: Length-filter assembled contigs with BBMap reformat.sh (minimum length from ext.min_length, else params.bbmap_length, else 1000 bp), and write a per-sample filter report and stats.sh assembly statistics
+keywords:
+  - contig filtering
+  - assembly
+  - bbmap
+  - metagenomics
+tools:
+  - bbmap:
+      description: BBTools suite of short-read tools; this module uses reformat.sh (length filtering) and stats.sh (assembly statistics)
+      homepage: https://sourceforge.net/projects/bbmap/
+      documentation: https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - reads:
+      type: file
+      description: Host-removed reads used for the assembly, passed through unchanged to the contigs_with_reads output
+      pattern: "*.fastq.gz"
+  - contigs:
+      type: file
+      description: MEGAHIT contigs (gzipped accepted)
+      pattern: "*_contigs.fa"
+
+output:
+  - contigs_with_reads:
+      type: tuple
+      description: Tuple of meta, the input reads and the length-filtered contigs
+      pattern: "*_filtered_contigs.fa"
+  - contigs_only:
+      type: tuple
+      description: Tuple of meta and the length-filtered contigs (may contain no sequences if every contig was shorter than the threshold)
+      pattern: "*_filtered_contigs.fa"
+  - stats:
+      type: file
+      description: BBMap stats.sh assembly statistics, computed on the unfiltered input contigs
+      pattern: "*_contig.stats"
+  - filter_report:
+      type: file
+      description: Key/value TSV with sample_id, contigs_before_filter, contigs_after_filter, min_length_threshold and all_contigs_filtered (TRUE/FALSE); aggregated by CONTIG_FILTER_SUMMARY
+      pattern: "*_filter_report.txt"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

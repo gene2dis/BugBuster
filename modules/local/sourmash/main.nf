@@ -2,6 +2,7 @@ process SOURMASH {
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'
 
     maxForks 24
+    tag "${meta.id}"
     label 'process_single'
 
     input:

@@ -1,0 +1,77 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RUN_DBCAN Module Test
+
+    CAZy annotation with run_dbcan v5 (design doc Section 4.3, task T6).
+
+    A real annotation run needs the ~7.4 GB dbCAN database, which is not
+    CI-feasible; the Section 10.2 acceptance check (overview with per-tool
+    columns on a test protein set) is a manual run against the real database.
+    What IS testable here:
+      - the stub contract (CI runs -stub)
+      - the empty-gene-set short-circuit on the REAL pinned container: a
+        zero-sequence FAA must produce a header-only overview.tsv with the
+        exact v5 7-column header (so the AGGREGATE_FUNCTIONS layout guard
+        passes) without invoking the tool's annotation path — no database
+        needed, and the live `run_dbcan version` capture is exercised. The
+        db-dir input has no DB_VERSION file, pinning the 'custom' fallback.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RUN_DBCAN Process"
+    script "../../modules/local/run_dbcan/main.nf"
+    process "RUN_DBCAN"
+
+    test("empty gene set short-circuits to a header-only overview") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'emptytest' ],
+                    file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.overview.size() == 1
+            def overview = path(process.out.overview.get(0).get(1)).readLines()
+            assert overview == ['Gene ID\tEC#\tdbCAN_hmm\tdbCAN_sub\tDIAMOND\t#ofTools\tRecommend Results\tSubstrate']
+            assert process.out.substrates.size() == 1
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('run_dbcan: 5.2.9')
+            assert versions.contains('dbcan_db: custom')
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.overview.size() == 1
+            assert process.out.overview.get(0).get(1).endsWith('stubtest.overview.tsv')
+            assert process.out.substrates.size() == 1
+            assert process.out.hmm_raw.size() == 1
+            assert process.out.diamond_raw.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('run_dbcan: 5.2.9')
+        }
+    }
+}

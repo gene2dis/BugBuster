@@ -11,6 +11,9 @@
 #   - test_bin.3_all_reads.bam  no reference sequences at all (empty bin FASTA
 #     upstream) -> genomeCoverageBed emits nothing, which crashed the old awk
 #     chain with "Division by zero"
+#   - test_bin.4_all_reads.bam  two contigs: 1 kb with two reads, 100 bp with
+#     none (per-contig mean 0.05); genomeCoverageBed's "genome" summary rows
+#     must not count as a third contig or enter the mean
 #
 # Filenames follow the BOWTIE2_SAMTOOLS_DEPTH per-bin naming that the BEDTOOLS
 # module's sed chain expects ({sample}_bin.N_all_reads.bam -> bin.N).
@@ -51,12 +54,22 @@ cat > "${TMP_DIR}/bin3.sam" <<EOF
 @HD	VN:1.6	SO:coordinate
 EOF
 
+# Bin 4: two contigs of different length, reads on the first only
+cat > "${TMP_DIR}/bin4.sam" <<EOF
+@HD	VN:1.6	SO:coordinate
+@SQ	SN:contig_a	LN:1000
+@SQ	SN:contig_b	LN:100
+read_1	0	contig_a	1	60	50M	*	0	0	${READ_SEQ}	${READ_QUAL}
+read_2	0	contig_a	101	60	50M	*	0	0	${READ_SEQ}	${READ_QUAL}
+EOF
+
 docker run --rm -u "$(id -u):$(id -g)" \
     -v "${TMP_DIR}:/work" -w /work \
     "${SAMTOOLS_IMG}" sh -c '
         samtools view -b bin1.sam > test_bin.1_all_reads.bam
         samtools view -b bin2.sam > test_bin.2_all_reads.bam
         samtools view -b bin3.sam > test_bin.3_all_reads.bam
+        samtools view -b bin4.sam > test_bin.4_all_reads.bam
     '
 
 mv "${TMP_DIR}"/test_bin.*_all_reads.bam "${OUT_DIR}/"

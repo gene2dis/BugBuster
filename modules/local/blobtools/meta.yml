@@ -1,0 +1,53 @@
+name: blobtools
+description: Builds a BlobTools v1 BlobDB from contigs, their megablast hits against nt, read mappings and the NCBI taxdump, then tabulates it at all taxonomic ranks (blobtools create + view)
+keywords:
+  - contig taxonomy
+  - blobtools
+  - taxonomic assignment
+  - metagenomics
+tools:
+  - blobtools:
+      description: Interrogation of genome assemblies via taxon-annotated GC-coverage plots (BlobTools v1, 1.1.1)
+      homepage: https://github.com/DRL/blobtools
+      documentation: https://blobtools.readme.io/docs
+      doi: "10.12688/f1000research.12232.1"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - contigs:
+      type: file
+      description: Assembled contigs
+  - blastn_hits:
+      type: file
+      description: Megablast hits of the contigs against nt in BlobTools hits format (qseqid staxids bitscore ...)
+      pattern: "*_megablast.out"
+  - bam:
+      type: file
+      description: Reads mapped back to the contigs, used for coverage
+      pattern: "*.bam"
+  - bam_bai:
+      type: file
+      description: Index of the BAM file
+      pattern: "*.bai"
+  - tax_files:
+      type: file
+      description: NCBI taxdump nodes.dmp and names.dmp, staged as loose files (FORMAT_TAXDUMP_FILES) or as a directory (--custom_taxdump_files); located with find either way
+
+output:
+  - blob_table:
+      type: file
+      description: Tuple of meta and the BlobTools view table (<sample>_Blob_table.*), all ranks
+      pattern: "*_Blob_tabl*"
+  - only_blob:
+      type: file
+      description: The same BlobTools view table without meta, collected for BLOBPLOT
+      pattern: "*_Blob_tabl*"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

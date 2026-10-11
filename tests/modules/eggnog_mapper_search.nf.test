@@ -1,0 +1,44 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    EGGNOG_MAPPER_SEARCH Module Test
+
+    Stage 1 of the two-stage eggNOG-mapper v3 run (design doc Section 4.2,
+    task T2). Stub-mode only: a real run needs the ~44 GB eggNOG 7 database,
+    which is not CI-feasible. Under the suite's docker profile the stub runs in
+    the pipeline-built eggNOG-mapper image (ghcr.io/gene2dis/
+    bugbuster-eggnog-mapper, design doc Q11 interim). The Section 10.2
+    acceptance check (non-empty annotations on a test protein set) is a manual
+    run against a real database.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test EGGNOG_MAPPER_SEARCH Process"
+    script "../../modules/local/eggnog_mapper_search/main.nf"
+    process "EGGNOG_MAPPER_SEARCH"
+
+    test("stub emits seed orthologs and versions") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.seed_orthologs.size() == 1
+            assert process.out.seed_orthologs.get(0).get(1).endsWith('stubtest.emapper.seed_orthologs')
+            assert process.out.versions.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('eggnog-mapper:')
+        }
+    }
+}

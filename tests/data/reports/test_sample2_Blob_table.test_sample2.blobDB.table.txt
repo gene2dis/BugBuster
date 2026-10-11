@@ -1,0 +1,39 @@
+## 1.1.1
+## assembly	: test_sample2_filtered_contigs.fa
+## coverage	 bam0 - test_sample2_all_reads.bam
+## taxonomy	 tax0 - test_sample2_assembly_vs_nt_megablast.out
+## nodesDB	: nodesDB.txt
+## taxrule	: bestsum
+## min_score	: 0.0
+## min_diff	: 0.0
+## tax_collision_random	: False
+##
+# name	length	GC	N	bam0	superkingdom.t.6%s	superkingdom.s.7%s	superkingdom.c.8	phylum.t.9%s	phylum.s.10%s	phylum.c.11	order.t.12%s	order.s.13%s	order.c.14	family.t.15%s	family.s.16%s	family.c.17	genus.t.18%s	genus.s.19%s	genus.c.20	species.t.21%s	species.s.22%s	species.c.23
+k141_0	1196	0.4005	0	3.7229	Bacteria	2198.0	0	Pseudomonadota	2198.0	0	Moraxellales	2198.0	0	Moraxellaceae	2198.0	0	Acinetobacter	2198.0	0	Acinetobacter baumannii	2198.0	0
+k141_820	1015	0.4138	0	1.9009	Bacteria	1869.0	0	Pseudomonadota	1869.0	0	Moraxellales	1869.0	0	Moraxellaceae	1869.0	0	Acinetobacter	1869.0	0	Acinetobacter baumannii	1869.0	0
+k141_231	1018	0.4155	0	2.7701	Bacteria	1869.0	0	Pseudomonadota	1869.0	0	Moraxellales	1869.0	0	Moraxellaceae	1869.0	0	Acinetobacter	1869.0	0	Acinetobacter baumannii	1869.0	0
+k141_456	1035	0.3005	0	2.151	Bacteria	1901.0	0	Pseudomonadota	1901.0	0	Moraxellales	1901.0	0	Moraxellaceae	1901.0	0	Acinetobacter	1901.0	0	Acinetobacter baumannii	1901.0	0
+k141_537	1511	0.3693	0	18.9575	Bacteria	2588.0	0	Pseudomonadota	2588.0	0	Moraxellales	2588.0	0	Moraxellaceae	2588.0	0	Acinetobacter	2588.0	0	Acinetobacter baumannii	2588.0	0
+k141_977	1363	0.4277	0	3.3756	Bacteria	2440.0	0	Pseudomonadota	2440.0	0	Moraxellales	2440.0	0	Moraxellaceae	2440.0	0	Acinetobacter	2440.0	0	Acinetobacter baumannii	2440.0	0
+k141_389	1395	0.3806	0	7.022	Bacteria	2327.0	0	Pseudomonadota	2327.0	0	Moraxellales	2327.0	0	Moraxellaceae	2327.0	0	Acinetobacter	2327.0	0	Acinetobacter baumannii	2327.0	0
+k141_912	1248	0.3902	0	3.3299	Bacteria	2305.0	0	Pseudomonadota	2305.0	0	Moraxellales	2305.0	0	Moraxellaceae	2305.0	0	Acinetobacter	2305.0	0	Acinetobacter baumannii	2305.0	0
+k141_548	1336	0.3892	0	2.444	Bacteria	2451.0	0	Pseudomonadota	2451.0	0	Moraxellales	2451.0	0	Moraxellaceae	2451.0	0	Acinetobacter	2451.0	0	Acinetobacter baumannii	2451.0	0
+k141_467	2715	0.4578	0	6.9426	Bacteria	5009.0	0	Pseudomonadota	5009.0	0	Moraxellales	5009.0	0	Moraxellaceae	5009.0	0	Acinetobacter	5009.0	0	Acinetobacter baumannii	5009.0	0
+k141_469	1683	0.4046	0	2.4692	Bacteria	3097.0	0	Pseudomonadota	3097.0	0	Moraxellales	3097.0	0	Moraxellaceae	3097.0	0	Acinetobacter	3097.0	0	Acinetobacter baumannii	3097.0	0
+k141_851	1235	0.4016	0	3.4851	Bacteria	2276.0	0	Pseudomonadota	2276.0	0	Moraxellales	2276.0	0	Moraxellaceae	2276.0	0	Acinetobacter	2276.0	0	Acinetobacter baumannii	2276.0	0
+k141_1068	1055	0.4161	0	3.9391	Bacteria	1949.0	0	Pseudomonadota	1949.0	0	Moraxellales	1949.0	0	Moraxellaceae	1949.0	0	Acinetobacter	1949.0	0	Acinetobacter baumannii	1949.0	0
+k141_698	1395	0.4251	0	2.8726	Bacteria	2566.0	0	Pseudomonadota	2566.0	0	Moraxellales	2566.0	0	Moraxellaceae	2566.0	0	Acinetobacter	2566.0	0	Acinetobacter baumannii	2566.0	0
+k141_264	1547	0.4376	0	4.0295	Bacteria	2835.0	0	Pseudomonadota	2835.0	0	Moraxellales	2835.0	0	Moraxellaceae	2835.0	0	Acinetobacter	2835.0	0	Acinetobacter baumannii	2835.0	0
+k141_565	1094	0.4059	0	2.1707	Bacteria	1164.0	0	Pseudomonadota	1164.0	0	Moraxellales	1164.0	0	Moraxellaceae	1164.0	0	Acinetobacter	1164.0	0	Acinetobacter baumannii	1164.0	0
+k141_181	4205	0.4064	0	3.7766	Bacteria	7564.0	0	Pseudomonadota	7564.0	0	Moraxellales	7564.0	0	Moraxellaceae	7564.0	0	Acinetobacter	7564.0	0	Acinetobacter baumannii	7564.0	0
+k141_637	1267	0.4088	0	2.5771	Bacteria	2335.0	0	Pseudomonadota	2335.0	0	Moraxellales	2335.0	0	Moraxellaceae	2335.0	0	Acinetobacter	2335.0	0	Acinetobacter baumannii	2335.0	0
+k141_1077	1373	0.4283	0	2.5944	Bacteria	2536.0	0	Pseudomonadota	2536.0	0	Moraxellales	2536.0	0	Moraxellaceae	2536.0	0	Acinetobacter	2536.0	0	Acinetobacter baumannii	2536.0	0
+k141_483	1311	0.3547	0	2.0378	Bacteria	2414.0	0	Pseudomonadota	2414.0	0	Moraxellales	2414.0	0	Moraxellaceae	2414.0	0	Acinetobacter	2414.0	0	Acinetobacter baumannii	2414.0	0
+k141_641	1184	0.3894	0	2.7578	Bacteria	2176.0	0	Pseudomonadota	2176.0	0	Moraxellales	2176.0	0	Moraxellaceae	2176.0	0	Acinetobacter	2176.0	0	Acinetobacter baumannii	2176.0	0
+k141_939	1673	0.3102	0	38.147	Bacteria	2091.0	0	Pseudomonadota	2091.0	0	Moraxellales	2091.0	0	Moraxellaceae	2091.0	0	Acinetobacter	2091.0	0	Acinetobacter baumannii	2091.0	0
+k141_707	3750	0.4763	0	5.9367	Bacteria	6909.0	0	Pseudomonadota	6909.0	0	Moraxellales	6909.0	0	Moraxellaceae	6909.0	0	Acinetobacter	6909.0	0	Acinetobacter baumannii	6909.0	0
+k141_1085	1847	0.3904	0	5.9464	Bacteria	3267.0	0	Pseudomonadota	3267.0	0	Moraxellales	3267.0	0	Moraxellaceae	3267.0	0	Acinetobacter	3267.0	0	Acinetobacter baumannii	3267.0	0
+k141_1013	1546	0.3907	0	2.784	Bacteria	2615.0	0	Pseudomonadota	2615.0	0	Moraxellales	2615.0	0	Moraxellaceae	2615.0	0	Acinetobacter	2615.0	0	Acinetobacter baumannii	2615.0	0
+k141_518	1071	0.3697	0	2.0787	Bacteria	1973.0	0	Pseudomonadota	1973.0	0	Moraxellales	1973.0	0	Moraxellaceae	1973.0	0	Acinetobacter	1973.0	0	Acinetobacter baumannii	1973.0	0
+k141_964	3247	0.3998	0	4.6167	Bacteria	5707.0	0	Pseudomonadota	5707.0	0	Moraxellales	5707.0	0	Moraxellaceae	5707.0	0	Acinetobacter	5707.0	0	Acinetobacter baumannii	5707.0	0
+k141_1108	1032	0.4331	0	3.0201	Bacteria	1895.0	0	Pseudomonadota	1895.0	0	Moraxellales	1895.0	0	Moraxellaceae	1895.0	0	Acinetobacter	1895.0	0	Acinetobacter baumannii	1895.0	0

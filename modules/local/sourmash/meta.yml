@@ -1,0 +1,54 @@
+name: sourmash
+description: Read-level taxonomic profiling with sourmash - sketches the reads (k=21/31/51 for genus/species/strain, scaled=1000, abund), runs gather against the reference k-mer database and annotates matches with lineages, plus a classified/unclassified fraction report
+keywords:
+  - taxonomy
+  - taxonomic profiling
+  - k-mer
+  - sourmash
+  - metagenomics
+tools:
+  - sourmash:
+      description: Compute and compare FracMinHash signatures for DNA data sets (4.8.11)
+      homepage: https://sourmash.readthedocs.io/
+      documentation: https://sourmash.readthedocs.io/
+      doi: "10.21105/joss.00027"
+      licence: ["BSD-3-Clause"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2] or [R1, R2, Singleton] (gzipped; streamed together with zcat into one sketch)
+      pattern: "*.fastq.gz"
+  - db:
+      type: file
+      description: sourmash k-mer reference database (the registry default is the GTDB reps k31 zip)
+  - tax_db:
+      type: file
+      description: Taxonomy lineage database prepared by SOURMASH_TAX_PREPARE
+      pattern: "*.sqldb"
+  - db_name:
+      type: value
+      description: Database name, used in output file names and the report
+  - sourmash_rank:
+      type: value
+      description: Taxonomic rank (genus, species or strain) selecting the k-mer size (21, 31, 51; 31 otherwise)
+
+output:
+  - sourmash_gather:
+      type: file
+      description: gather results annotated with lineages (header-only, in the sourmash 4.8 column layout, when there is no match)
+      pattern: "*.with-lineages.csv"
+  - report:
+      type: file
+      description: Per-sample report (Id, Sourmash DB, Unclassified, Classified), Classified being the sum of f_unique_weighted over the gather matches
+      pattern: "*_report.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

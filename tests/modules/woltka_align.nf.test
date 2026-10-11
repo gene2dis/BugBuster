@@ -1,0 +1,81 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    WOLTKA_ALIGN Module Test
+
+    Bowtie2 vs Web of Life for the Woltka read-level backend (design doc
+    Section 4.6.2, task T8a). Runs the REAL pinned bowtie2 container against
+    the committed WoLr2-layout fixture (tests/data/woltka/, made by
+    tests/bin/make_woltka_fixtures.sh): two 4 kb genomes sharing their first
+    1.5 kb, a .bt2l large index under databases/bowtie2/, and 10 read pairs +
+    2 singletons. The SHOGUN ext.args from config/modules.config apply.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test WOLTKA_ALIGN Process"
+    script "../../modules/local/woltka_align/main.nf"
+    process "WOLTKA_ALIGN"
+
+    test("aligns paired + singleton reads to the WoLr2-layout index, trimmed SAM") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'wtest' ],
+                    [
+                        file("${projectDir}/tests/data/woltka/reads/wtest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/woltka/reads/wtest_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/woltka/reads/wtest_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def sam = path(process.out.sam.get(0).get(1)).linesGzip
+            // 7 unique pairs + 3 ambiguous pairs reported on both genomes
+            // (-k 16 multi-hit) + 2 singletons = 14 + 12 + 2 records
+            assert sam.size() == 28
+            // trimmed: 11 columns, SEQ and QUAL replaced by '*', no header
+            assert sam.every { line -> line.split('\t').size() == 11 && line.endsWith('\t*\t*') }
+            assert !sam.any { line -> line.startsWith('@') }
+            // mates keep their pair flags (Woltka separates mates by flag)
+            assert sam.any { line -> line.split('\t')[1] == '99' }
+            assert sam.any { line -> line.split('\t')[1] == '147' }
+            def mapped_to = sam.collect { line -> line.split('\t')[2] }.unique().sort()
+            assert mapped_to == ['G000000001', 'G000000002']
+            assert path(process.out.log.get(0).get(1)).text.contains('overall alignment rate')
+            assert path(process.out.versions.get(0)).text.contains('bowtie2: 2.5.3')
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    [
+                        file("${projectDir}/tests/data/woltka/reads/wtest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/woltka/reads/wtest_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/woltka/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.sam.get(0).get(1).endsWith('stubtest.wol.sam.gz')
+            assert process.out.log.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('bowtie2: 2.5.3')
+        }
+    }
+}

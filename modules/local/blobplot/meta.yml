@@ -1,0 +1,40 @@
+name: blobplot
+description: Multi-panel phylum blob plot (contig GC vs coverage, coloured by phylum) across all samples from the BlobTools tables, drawn by bin/blobplot.py
+keywords:
+  - blob plot
+  - contig taxonomy
+  - visualization
+  - metagenomics
+tools:
+  - pandas:
+      description: Python data analysis library used by bin/blobplot.py to read the BlobTools tables
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used by bin/blobplot.py to draw and pickle the figure
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+
+input:
+  - blob_data:
+      type: file
+      description: BlobTools view tables of all samples (collected); the sample name is the file name prefix before '_Blob_table'
+      pattern: "*Blob_table*"
+
+output:
+  - plots:
+      type: file
+      description: Phylum blob plot (Phylum_blob_plot.png, 300 dpi)
+      pattern: "*.png"
+  - pickle:
+      type: file
+      description: Pickled matplotlib figure of the same plot (Phylum_final_blobplot.pkl)
+      pattern: "*.pkl"
+  - versions:
+      type: file
+      description: Software versions (python, pandas, matplotlib)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

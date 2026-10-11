@@ -55,6 +55,14 @@ def validate_input(row) {
         error "Invalid sample name '${meta.id}': use only letters, digits, underscore, dot or hyphen, starting with a letter or digit"
     }
 
+    // HUMAnN 4.0.0a2 parses every MetaPhlAn profile line containing both
+    // 's__' and 't__' as a species row - including the header lines that carry
+    // the sample name - and crashes with an IndexError (design doc Q2 bug 2,
+    // fixed only in unreleased upstream code)
+    if (params.read_level_functional == 'humann' && (meta.id.contains('s__') || meta.id.contains('t__'))) {
+        error "Invalid sample name '${meta.id}' for --read_level_functional humann: sample names must not contain 's__' or 't__' (HUMAnN 4.0.0a2 misreads them as MetaPhlAn taxon labels and crashes); rename the sample"
+    }
+
     // Check file existence
     def r1_file = file(row.r1.toString().trim(), checkIfExists: true)
     def r2_file = file(row.r2.toString().trim(), checkIfExists: true)

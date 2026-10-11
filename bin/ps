@@ -1,0 +1,48 @@
+#!/bin/sh
+#
+# ps shim. The pipeline's bin/ directory is placed on PATH inside every task
+# container, so this shim is what a task may resolve as `ps`. Behavior:
+#
+#   1. Delegate to the container's real ps whenever one exists (every
+#      container in this pipeline except one — full fidelity, all flags).
+#   2. Fallback: the upstream eggNOG-mapper v3 Apptainer image
+#      (python:3.12-slim base) ships no procps, which makes Nextflow's task
+#      wrapper abort with "Command 'ps' required by nextflow to collect task
+#      metrics cannot be found". In that container the only ps caller is the
+#      wrapper itself, invoking exactly `ps -e -o pid= -o ppid=`; emulate that
+#      one output from /proc.
+#
+# Only the official .sif used under singularity/apptainer needs this: the
+# pipeline-built docker image (containers/eggnog-mapper) includes procps.
+# Delete this shim when eggNOG-mapper v3 ships an image with procps
+# (tracked as design doc Q11 alongside the container re-pin).
+#
+self_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
+
+old_ifs="$IFS"
+IFS=:
+for d in $PATH; do
+    [ -n "$d" ] || continue
+    d_abs=$(CDPATH='' cd -- "$d" 2>/dev/null && pwd -P) || continue
+    [ "$d_abs" = "$self_dir" ] && continue
+    if [ -f "$d_abs/ps" ] && [ -x "$d_abs/ps" ]; then
+        IFS="$old_ifs"
+        exec "$d_abs/ps" "$@"
+    fi
+done
+IFS="$old_ifs"
+
+# No real ps in this container: emit "pid ppid" per process, matching
+# `ps -e -o pid= -o ppid=`. In /proc/<pid>/stat the comm field (2) may
+# contain spaces, so split after its closing paren: the remainder starts
+# with state (3), ppid (4).
+for stat_file in /proc/[0-9]*/stat; do
+    [ -r "$stat_file" ] || continue
+    read -r stat_line < "$stat_file" 2>/dev/null || continue
+    pid=${stat_line%% *}
+    rest=${stat_line##*) }
+    # shellcheck disable=SC2086
+    set -- $rest
+    printf '%7s %7s\n' "$pid" "$2"
+done
+exit 0

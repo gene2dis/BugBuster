@@ -1,0 +1,43 @@
+name: kargva
+description: k-mer-based detection of resistance-conferring gene variants with KARGVA (k = 17) on the concatenated host-removed reads of one sample
+keywords:
+  - antimicrobial resistance
+  - gene variants
+  - k-mer
+  - reads
+tools:
+  - kargva:
+      description: K-mer-based antibiotic resistance gene variant analyzer (KARGVA 1.0, run as a bare Java class)
+      homepage: https://github.com/DataIntellSystLab/KARGVA
+      documentation: https://github.com/DataIntellSystLab/KARGVA/blob/main/README.md
+      doi: "10.3389/fmicb.2023.1060891"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2, optional singleton], concatenated into one <sample>_all_reads.fastq.gz before the run
+      pattern: "*.fastq.gz"
+  - kargva_db:
+      type: file
+      description: KARGVA reference FASTA (KARGVA database v5 by default, or --custom_kargva_db)
+
+output:
+  - kargva_reads:
+      type: file
+      description: Tuple of meta, the KARGVA mapped-genes table and the input reads, passed on to KARGA
+      pattern: "*_all_reads_KARGVA_mappedGenes.csv"
+  - kargva_reports:
+      type: file
+      description: KARGVA per-variant table (GeneIdx, KmerSNPHits, PercentGeneCovered, AverageKMerDepth); a single NA row when KARGVA writes no table. The per-read table is deleted
+      pattern: "*_all_reads_KARGVA_mappedGenes.csv"
+  - versions:
+      type: file
+      description: Software versions (kargva hardcoded from the container tag, as the class has no version flag; java)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

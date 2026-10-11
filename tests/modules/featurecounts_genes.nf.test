@@ -1,0 +1,153 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FEATURECOUNTS_GENES Module Test
+
+    Gene quantification (design doc Section 4.4, task T3). Verifies the
+    Section 10.2 acceptance criteria reachable at module level:
+      - number of features counted equals the number of predicted genes
+      - assigned plus unassigned equals total alignments in the summary
+      - gene Length column present and non-zero for all features
+    plus the GeneID rewrite to the FAA-matching <contig>_<genenum> form (the
+    T4 join precondition) and the empty-gene-set short-circuit (header-only
+    BAM from an empty-contig sample must not crash counting).
+
+    Fixtures: tests/data/bam/test_bin.{1,2,3}_all_reads.bam (see
+    tests/bin/make_bam_fixtures.sh) and tests/data/gff/*.gff.gz (see
+    tests/bin/make_gff_fixtures.sh). The fixture reads carry single-end flags,
+    so these tests also exercise the module's single-end fallback after the
+    paired-first featureCounts attempt; the paired/mixed-BAM path was verified
+    directly on the pinned container (design doc Section 4.4).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test FEATURECOUNTS_GENES Process"
+    script "../../modules/local/featurecounts_genes/main.nf"
+    process "FEATURECOUNTS_GENES"
+
+    test("counts reads per gene with FAA-matching gene ids") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'fctest' ],
+                    file("${projectDir}/tests/data/bam/test_bin.1_all_reads.bam", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff/test_contig1_genes.gff.gz", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def counts_lines = path(process.out.counts.get(0).get(1)).readLines()
+            def data_rows = counts_lines.findAll { line ->
+                !line.startsWith('#') && !line.startsWith('Geneid')
+            }
+
+            // Acceptance 10.2: features counted == predicted genes (2 CDS in the fixture GFF)
+            assert data_rows.size() == 2
+
+            // GeneID rewrite: Prodigal ID=1_N becomes <contig>_N, matching the FAA headers
+            def gene_ids = data_rows.collect { row -> row.split('\t')[0] }
+            assert gene_ids == ['contig_1_1', 'contig_1_2']
+
+            // Acceptance 10.2: Length column (col 6) present and non-zero for all features
+            assert data_rows.every { row -> row.split('\t')[5].toInteger() > 0 }
+
+            // Both fixture reads (positions 1-50 and 101-150) fall in gene 1 (1-300)
+            assert data_rows[0].split('\t')[6].toInteger() == 2
+            assert data_rows[1].split('\t')[6].toInteger() == 0
+
+            // Acceptance 10.2: assigned + unassigned == total alignments (2 in the fixture BAM)
+            def summary_rows = path(process.out.summary.get(0).get(1)).readLines()
+                .findAll { line -> !line.startsWith('Status') }
+            def total = summary_rows.sum { row -> row.split('\t')[1].toInteger() }
+            assert total == 2
+
+            // Module contract: versions.yml emitted with the pinned tool version
+            assert process.out.versions.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('subread:')
+        }
+    }
+
+    test("zero counts on a BAM with no aligned reads") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'fczero' ],
+                    file("${projectDir}/tests/data/bam/test_bin.2_all_reads.bam", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff/test_contig1_genes.gff.gz", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def data_rows = path(process.out.counts.get(0).get(1)).readLines().findAll { line ->
+                !line.startsWith('#') && !line.startsWith('Geneid')
+            }
+            assert data_rows.size() == 2
+            assert data_rows.every { row -> row.split('\t')[6].toInteger() == 0 }
+        }
+    }
+
+    test("empty gene set short-circuits without crashing") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'fcempty' ],
+                    file("${projectDir}/tests/data/bam/test_bin.3_all_reads.bam", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff/test_empty_genes.gff.gz", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // Header-only count table (comment + column header, no data rows)
+            def counts_lines = path(process.out.counts.get(0).get(1)).readLines()
+            assert counts_lines.any { line -> line.startsWith('Geneid') }
+            assert counts_lines.findAll { line ->
+                !line.startsWith('#') && !line.startsWith('Geneid')
+            }.isEmpty()
+
+            // All-zero summary in the featureCounts layout
+            def summary_rows = path(process.out.summary.get(0).get(1)).readLines()
+                .findAll { line -> !line.startsWith('Status') }
+            assert summary_rows.size() == 14
+            assert summary_rows.every { row -> row.split('\t')[1] == '0' }
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/bam/test_bin.1_all_reads.bam", checkIfExists: true),
+                    file("${projectDir}/tests/data/gff/test_contig1_genes.gff.gz", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.counts.size() == 1
+            assert process.out.summary.size() == 1
+            assert process.out.versions.size() == 1
+        }
+    }
+}

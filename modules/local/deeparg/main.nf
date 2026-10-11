@@ -1,6 +1,7 @@
 process DEEPARG_BINS {
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
         
+    tag "${meta.id}"
     label 'process_medium'
 
     input:
@@ -80,6 +81,7 @@ process DEEPARG_BINS {
 process DEEPARG_CONTIGS {
     container 'quay.io/ffuentessantander/deeparg:1.0.4'
 
+    tag "${meta.id}"
     label 'process_medium'
 
     input:

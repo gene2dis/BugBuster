@@ -1,0 +1,63 @@
+name: rgi_bwt
+description: Read-level AMR gene detection with rgi bwt, aligning the paired host-removed reads of one sample to the CARD (and WildCARD, if loaded) reference alleles; singleton reads are excluded, and a sample without mapping results gets NA placeholder tables and no BAM
+keywords:
+  - antimicrobial resistance
+  - card
+  - read mapping
+  - metagenomics
+tools:
+  - rgi:
+      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.3)
+      homepage: https://github.com/arpcard/rgi
+      documentation: https://github.com/arpcard/rgi/blob/master/README.rst
+      doi: "10.1093/nar/gkac920"
+  - kma:
+      description: k-mer alignment of raw reads against redundant databases; the default rgi bwt aligner (--rgi_aligner selects kma, bowtie2 or bwa)
+      homepage: https://bitbucket.org/genomicepidemiology/kma
+      documentation: https://bitbucket.org/genomicepidemiology/kma
+      doi: "10.1186/s12859-018-2336-6"
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2, optional singleton]; only R1 and R2 are passed to rgi bwt (--read_one/--read_two)
+      pattern: "*.fastq.gz"
+  - card_db:
+      type: directory
+      description: Database directory prepared by 'rgi load --local' (must contain localDB/); its localDB files are symlinked into the task directory rather than copied
+
+output:
+  - allele_mapping:
+      type: file
+      description: Tuple of meta and the allele-level mapping table (NA row placeholder for low-coverage samples)
+      pattern: "*.allele_mapping_data.txt"
+  - gene_mapping:
+      type: file
+      description: Tuple of meta and the gene-level mapping table (NA row placeholder for low-coverage samples)
+      pattern: "*.gene_mapping_data.txt"
+  - bam:
+      type: file
+      description: Tuple of meta and the sorted alignment BAM filtered to length 100 (optional; absent for low-coverage samples, which then skip RGI_KMER)
+      pattern: "*.sorted.length_100.bam"
+  - overall_stats:
+      type: file
+      description: Overall mapping statistics (placeholder text for low-coverage samples)
+      pattern: "*.overall_mapping_stats.txt"
+  - reference_stats:
+      type: file
+      description: Per-reference mapping statistics (placeholder text for low-coverage samples)
+      pattern: "*.reference_mapping_stats.txt"
+  - artifacts_stats:
+      type: file
+      description: Mapping statistics of artifact references (optional)
+      pattern: "*.artifacts_mapping_stats.txt"
+  - versions:
+      type: file
+      description: Software versions (rgi and the selected aligner)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

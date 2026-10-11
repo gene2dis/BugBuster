@@ -1,0 +1,48 @@
+name: reads_report
+description: Merges the per-sample read count tables into a single reads report (bin/report_unify.py), with a read-count box plot when filtering was performed
+keywords:
+  - quality control
+  - read counting
+  - report
+  - visualization
+tools:
+  - pandas:
+      description: Python data analysis library used by bin/report_unify.py to merge the tables
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - seaborn:
+      description: Python statistical plotting library used by bin/report_unify.py for the box plot
+      homepage: https://seaborn.pydata.org
+      documentation: https://seaborn.pydata.org/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used by bin/report_unify.py to render the box plot
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+
+input:
+  - reports:
+      type: file
+      description: Per-sample read tables (collected) - QFILTER *_fastp_report.tsv plus BOWTIE2_DECONTAMINATE *_decontamination_report.tsv, or COUNT_READS *_fastp_report.tsv when QC is skipped
+      pattern: "*.tsv"
+  - args:
+      type: value
+      description: Filtering step label(s) passed to report_unify.py ('contaminants' after decontamination; 'none' when QC is skipped, which writes only the CSV)
+
+output:
+  - report:
+      type: file
+      description: Merged reads report
+      pattern: "Reads_report.csv"
+  - plot:
+      type: file
+      description: Box plot of read counts per step (optional; not produced in 'none' mode)
+      pattern: "Box_plot_reads.png"
+  - versions:
+      type: file
+      description: Software versions (python, pandas)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

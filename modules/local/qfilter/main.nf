@@ -1,5 +1,6 @@
 process QFILTER {
 
+    tag "${meta.id}"
     label 'process_single'
 
     container 'ubuntu:22.04'

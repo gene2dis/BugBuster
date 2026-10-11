@@ -1,0 +1,86 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    PYRODIGAL Module Test
+
+    Shared contig gene-calling step (design doc Q9, task T1). Verifies the
+    Section 10.2 acceptance criteria for gene calling:
+      - protein count in the FAA equals the CDS count in the GFF
+      - GFF sequence identifiers resolve against the input contigs
+    The metagenome-mode flag (-p meta) comes from config/modules.config via
+    ext.args, exercised here because nf-test loads nextflow.config.
+    Fixture: tests/data/bins/real_bins/bin.1.fa (a real >= 20 kb sequence;
+    the synthetic contig fixtures are low-complexity repeats with no genes).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test PYRODIGAL Process"
+    script "../../modules/nf-core/pyrodigal/main.nf"
+    process "PYRODIGAL"
+
+    test("predicts genes on contigs in metagenome mode") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'ptest' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]
+                input[1] = "gff"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def faa_lines = path(process.out.faa.get(0).get(1)).linesGzip
+            def gff_lines = path(process.out.annotations.get(0).get(1)).linesGzip
+
+            // Acceptance 10.2: FAA protein count == GFF CDS count, both non-zero
+            def n_proteins = faa_lines.count { line -> line.startsWith('>') }
+            def cds_rows = gff_lines.findAll { line ->
+                !line.startsWith('#') && line.split('\t').size() >= 8 && line.split('\t')[2] == 'CDS'
+            }
+            assert n_proteins > 0
+            assert n_proteins == cds_rows.size()
+
+            // Acceptance 10.2: GFF sequence ids resolve against the input contigs
+            def contig_ids = file("${projectDir}/tests/data/bins/real_bins/bin.1.fa")
+                .readLines()
+                .findAll { line -> line.startsWith('>') }
+                .collect { line -> line.substring(1).tokenize(' ')[0] }
+            def gff_seq_ids = cds_rows.collect { row -> row.split('\t')[0] }.unique()
+            assert contig_ids.containsAll(gff_seq_ids)
+
+            // Module contract: versions.yml emitted with the pinned tool version
+            assert process.out.versions.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('pyrodigal:')
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]
+                input[1] = "gff"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.faa.size() == 1
+            assert process.out.annotations.size() == 1
+            assert process.out.fna.size() == 1
+            assert process.out.versions.size() == 1
+        }
+    }
+}

@@ -63,7 +63,14 @@ def printHelp() {
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
-      --contig_level_metacerberus   Enable MetaCerberus annotation (default: ${params.contig_level_metacerberus})
+      --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
+      --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
+      --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
+      --dbcan_consensus             dbCAN calls feeding the summary tables: recommended | any (default: ${params.dbcan_consensus})
+      --mag_level_functional        Bakta annotation of refined bins; needs --include_binning and >= 2 --binners (default: ${params.mag_level_functional})
+      --read_level_functional       Read-level functional profiling backend: 'woltka', 'superfocus', 'humann', 'none' (default: ${params.read_level_functional})
+      --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
+      --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
 
     \u001B[1;33mResource options:\u001B[0m
       --max_cpus                    Maximum CPUs per process (default: ${params.max_cpus})
@@ -80,7 +87,7 @@ def printHelp() {
       -profile aws                  Run on AWS Batch (combine: aws,docker)
       -profile gcp                  Run on Google Cloud Batch (combine: gcp,docker)
       -profile azure                Run on Azure Batch (combine: azure,docker)
-      -profile low_disk             Progressive work-dir cleanup (runs not resumable)
+      -profile low_disk             Delete the work dir after a successful run (completed runs not resumable)
       -profile test                 Run with minimal test dataset
 
     \u001B[1;33mOther options:\u001B[0m
@@ -104,11 +111,13 @@ include { QC                 } from './subworkflows/local/qc'
 include { TAXONOMY           } from './subworkflows/local/taxonomy'
 include { ASSEMBLY           } from './subworkflows/local/assembly'
 include { BINNING            } from './subworkflows/local/binning'
+include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotation'
+include { READ_FUNCTIONAL    } from './subworkflows/local/read_functional'
 
 // Modules for functionality not covered by subworkflows
 
 	// FUNCTIONAL ANNOTATION
-include { METACERBERUS_CONTIGS } from './modules/local/metacerberus/main'
+include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { NT_BLASTN        } from './modules/local/nt_blastn/main'
@@ -117,8 +126,11 @@ include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samt
 include { BLOBPLOT         } from './modules/local/blobplot/main'
 
 	// ORF PREDICTION IN CONTIGS AND BINS
+	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
+	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
+	// (contig_level_functional)
 include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
-include { PRODIGAL as PRODIGAL_CONTIGS } from './modules/nf-core/prodigal/main'
+include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
 include { KARGVA           } from './modules/local/kargva/main'
@@ -137,6 +149,7 @@ include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
+include { flagOn                   } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
 /*
@@ -153,7 +166,7 @@ workflow {
     //
 
     // Show help message
-    if (params.help) {
+    if (flagOn(params.help)) {
         printHelp()
         System.exit(0)
     }
@@ -206,17 +219,43 @@ workflow {
     }
 
     // Reject contradictory feature combinations instead of silently skipping stages
-    if (params.include_binning && params.assembly_mode == 'none') {
+    if (flagOn(params.include_binning) && params.assembly_mode == 'none') {
         error("--include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
-    if (params.contig_tax_and_arg && params.assembly_mode == 'none') {
+    if (flagOn(params.contig_tax_and_arg) && params.assembly_mode == 'none') {
         error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
-    if (params.arg_bin_clustering && !params.include_binning) {
+    if (flagOn(params.contig_level_functional) && params.assembly_mode == 'none') {
+        error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
+    if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
-    if (params.contig_level_metacerberus && params.assembly_mode != 'assembly') {
-        error("--contig_level_metacerberus requires --assembly_mode assembly (per-sample contigs), but --assembly_mode is '${params.assembly_mode}'")
+    if (flagOn(params.mag_level_functional) && !flagOn(params.include_binning)) {
+        error("--mag_level_functional requires --include_binning (Bakta annotates the refined bins)")
+    }
+    if (flagOn(params.mag_level_functional) && binners_list.size() < 2) {
+        error("--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
+    }
+    // Read-level functional backend (design doc Section 7: unknown values
+    // are rejected at launch). The schema enum already enforces this; kept
+    // here so the accepted set lives next to the other launch validations
+    def valid_read_functional = ['woltka', 'superfocus', 'humann', 'none']
+    if (!(params.read_level_functional in valid_read_functional)) {
+        error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
+    }
+    def valid_superfocus_aligners = ['diamond', 'mmseqs2']
+    if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
+        error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
+    }
+
+    // low_disk deletes the work dir when the run succeeds, so a completed run
+    // cannot be resumed or extended with -resume (an interrupted one can) — a bad
+    // pairing with the long functional annotation runs and their large
+    // databases, where -resume matters most (design doc Q10: warn, stay
+    // results-neutral)
+    if (workflow.profile.tokenize(',').contains('low_disk') && (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional) || params.read_level_functional != 'none')) {
+        log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
     // Print run configuration
@@ -232,6 +271,11 @@ workflow {
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+    log.info "  Contig functional    : ${params.contig_level_functional}"
+    log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
+    log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : params.read_level_functional == 'humann' ? " (${params.custom_humann_db ? 'custom database' : params.humann_db})" : ''}"
+    log.info "  MicrobeCensus        : ${params.microbecensus}"
+    log.info "  dbCAN CAZy           : ${params.functional_cazy}"
     log.info ""
 
     //
@@ -280,7 +324,7 @@ workflow {
     //
     // ARG PREDICTION IN READS
     //
-    if ( params.read_arg_prediction ) {
+    if ( flagOn(params.read_arg_prediction) ) {
         ARGS_OAP(ch_clean_reads)
         ch_args_oap = ARGS_OAP.out.args_oap_s1
         ch_argv_prediction = KARGVA(ch_clean_reads.combine(PREPARE_DATABASES.out.kargva_db))
@@ -290,7 +334,7 @@ workflow {
             ch_arg_prediction
                 .concat(ch_argv_prediction.kargva_reports)
                 .concat(ch_args_oap)
-                .collect()
+                .collect(sort: true)
         )
         ch_versions = ch_versions.mix(
             ARGS_OAP.out.versions.first(),
@@ -303,7 +347,7 @@ workflow {
     //
     // RGI AMR PREDICTION IN READS
     //
-    if ( params.rgi_prediction ) {
+    if ( flagOn(params.rgi_prediction) ) {
         // Store rgi_card_db to allow reuse
         ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
             .ifEmpty { error "ERROR: RGI database is empty. Ensure params.rgi_prediction is enabled and a valid CARD database is configured." }
@@ -322,9 +366,9 @@ workflow {
         
         // Generate summary report
         RGI_REPORT(
-            ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(),
-            ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(),
-            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect()
+            ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(sort: true),
+            ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(sort: true),
+            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect(sort: true)
         )
         ch_versions = ch_versions.mix(
             ch_rgi_bwt.versions.first(),
@@ -336,23 +380,25 @@ workflow {
     //
     // SUBWORKFLOW: Assembly
     //
-    ch_contigs_meta = channel.empty()
-    ch_bam_meta     = channel.empty()
-    ch_refined_bins = channel.empty()
-    
+    ch_contigs_meta  = channel.empty()
+    ch_bam_meta      = channel.empty()
+    ch_counting_bam  = channel.empty()
+    ch_refined_bins  = channel.empty()
+
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
             ch_clean_reads
         )
-        
+
         ch_contigs_meta = ASSEMBLY.out.contigs_meta
         ch_bam_meta     = ASSEMBLY.out.bam_meta
+        ch_counting_bam = ASSEMBLY.out.counting_bam
         ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
 
         //
         // SUBWORKFLOW: Binning
         //
-        if ( params.include_binning ) {
+        if ( flagOn(params.include_binning) ) {
             BINNING(
                 ASSEMBLY.out.bam,
                 PREPARE_DATABASES.out.checkm2_db
@@ -364,20 +410,124 @@ workflow {
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
         }
+    }
 
+    //
+    // SHARED GENE CALLING ON CONTIGS
+    // One Pyrodigal pass (metagenome mode, both assembly modes) whose FAA feeds
+    // DeepARG and whose FAA/GFF feed the functional annotation branch (Q9).
+    //
+    ch_contig_proteins  = channel.empty()
+    ch_contig_genes_gff = channel.empty()
+
+    if ( (flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
-        // MetaCerberus annotation (per-sample assembly only)
+        // Run nf-core PYRODIGAL for contig ORF prediction
+        // nf-core PYRODIGAL signature:
+        //   input:  tuple val(meta), path(fasta) + val(output_format)
+        //   output: tuple val(meta), path("*.faa.gz"), emit: faa
+        //           tuple val(meta), path("*.gff.gz"), emit: annotations
         //
-        if ( params.assembly_mode == "assembly" && params.contig_level_metacerberus ) {
-            METACERBERUS_CONTIGS(ch_contigs_meta)
-            ch_versions = ch_versions.mix(METACERBERUS_CONTIGS.out.versions.first())
-        }
+        PYRODIGAL(
+            ch_contigs_meta,
+            "gff"  // output_format
+        )
+        ch_contig_proteins  = PYRODIGAL.out.faa
+        ch_contig_genes_gff = PYRODIGAL.out.annotations
+        ch_versions = ch_versions.mix(PYRODIGAL.out.versions.first())
+    }
+
+    //
+    // MODULE: MicrobeCensus average genome size on host-removed reads
+    // (design doc Section 4.7). Sits outside the branch subworkflows because
+    // both the contig and the read branch (T8) consume its output; the read
+    // branch needs no assembly.
+    // Failure is non-fatal (errorStrategy in config/modules.config): a failed
+    // sample emits nothing here and falls back to TPM-only in aggregation.
+    def run_microbecensus = flagOn(params.microbecensus)
+    ch_ags = channel.empty()
+    def run_contig_functional = flagOn(params.contig_level_functional) && params.assembly_mode != "none"
+    def run_read_functional   = params.read_level_functional != "none"
+    if ( run_microbecensus && (run_contig_functional || run_read_functional) ) {
+        MICROBECENSUS(ch_clean_reads)
+        ch_ags = MICROBECENSUS.out.ags
+        ch_versions = ch_versions.mix(MICROBECENSUS.out.versions.first())
+    }
+
+    //
+    // SUBWORKFLOW: Functional annotation — contig branch (eggNOG-mapper +
+    // run_dbcan CAZy + featureCounts gene quantification) and/or MAG branch
+    // (Bakta on refined bins). The branches are independent; each DB channel
+    // is only demanded (.ifEmpty error) when its branch is on
+    //
+    if ( (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional)) && params.assembly_mode != "none" ) {
+        // With functional_cazy off the dbCAN DB channel is legitimately empty
+        // and the subworkflow never consumes it
+        def run_functional_cazy = flagOn(params.contig_level_functional) && flagOn(params.functional_cazy)
+        ch_dbcan_db = run_functional_cazy
+            ? PREPARE_DATABASES.out.dbcan_db
+                .ifEmpty { error "ERROR: dbCAN database is empty. Ensure params.functional_cazy is enabled and a valid dbCAN database is configured." }
+            : channel.empty()
+        ch_eggnog_db = flagOn(params.contig_level_functional)
+            ? PREPARE_DATABASES.out.eggnog_db
+                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
+            : channel.empty()
+        ch_cog_def = flagOn(params.contig_level_functional)
+            ? PREPARE_DATABASES.out.cog_def
+                .ifEmpty { error "ERROR: COG definitions table is empty. --contig_level_functional (and --read_level_functional woltka) need a valid COG table (--cog_db, or --custom_cog_db)." }
+            : channel.empty()
+        ch_bakta_db = flagOn(params.mag_level_functional)
+            ? PREPARE_DATABASES.out.bakta_db
+                .ifEmpty { error "ERROR: Bakta database is empty. Ensure params.mag_level_functional is enabled and a valid Bakta database is configured." }
+            : channel.empty()
+        FUNCTIONAL_ANNOTATION(
+            ch_contig_proteins,
+            ch_eggnog_db,
+            ch_dbcan_db,
+            ch_contig_genes_gff,
+            ch_counting_bam,
+            ch_ags,
+            ch_refined_bins,
+            ch_bakta_db,
+            ch_cog_def
+        )
+        ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
+    }
+
+    //
+    // SUBWORKFLOW: Read-level functional profiling (design doc Section 4.6),
+    // one backend per run, independent of assembly; its read_* tables are
+    // reported separately from the contig branch's
+    //
+    if ( run_read_functional ) {
+        // the selected backend's database (only that one is provisioned)
+        def ch_read_db = params.read_level_functional == 'woltka' ?
+            PREPARE_DATABASES.out.woltka_db
+                .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." } :
+            params.read_level_functional == 'humann' ?
+            PREPARE_DATABASES.out.humann_db
+                .ifEmpty { error "ERROR: HUMAnN database is empty. Ensure --read_level_functional humann is set and a valid HUMAnN database root is configured (--custom_humann_db: chocophlan/, uniref/, utility_mapping/, metaphlan/)." } :
+            PREPARE_DATABASES.out.superfocus_db
+                .ifEmpty { error "ERROR: SUPER-FOCUS database is empty. Ensure --read_level_functional superfocus is set and a valid SUPER-FOCUS database root is configured (--custom_superfocus_db, the directory containing db/)." }
+        // the woltka backend maps WoLr2 COG ids to categories with the
+        // contig branch's NCBI COG table (design doc Q14)
+        def ch_read_cog_def = params.read_level_functional == 'woltka' ?
+            PREPARE_DATABASES.out.cog_def
+                .ifEmpty { error "ERROR: COG definitions table is empty. --read_level_functional woltka needs a valid COG table (--cog_db, or --custom_cog_db)." } :
+            channel.empty()
+        READ_FUNCTIONAL(
+            ch_clean_reads,
+            ch_read_db,
+            ch_ags,
+            ch_read_cog_def
+        )
+        ch_versions = ch_versions.mix(READ_FUNCTIONAL.out.versions)
     }
 
     //
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
-    if ( params.contig_tax_and_arg && params.assembly_mode != "none" ) {
+    if ( flagOn(params.contig_tax_and_arg) && params.assembly_mode != "none" ) {
         // The list wrap keeps a multi-file BLAST DB as ONE tuple element
         // (path(nt_db)) instead of flattening it into the tuple, which staged
         // only the first DB file into NT_BLASTN
@@ -405,25 +555,15 @@ workflow {
                 .join(ch_index_bam)
                 .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
         )
-        BLOBPLOT(ch_blob_table.only_blob.collect())
+        BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
-        //
-        // Run nf-core PRODIGAL for contig ORF prediction
-        // nf-core PRODIGAL signature:
-        //   input:  tuple val(meta), path(genome) + val(output_format)
-        //   output: tuple val(meta), path("*.faa.gz"), emit: amino_acid_fasta
-        //
-        PRODIGAL_CONTIGS(
-            ch_contigs_meta,
-            "gff"  // output_format
-        )
-        ch_contig_proteins = PRODIGAL_CONTIGS.out.amino_acid_fasta
+        // Contig proteins come from the shared PYRODIGAL step above
         ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
             .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
             ch_contig_args.only_deeparg
                 .concat(ch_blob_table.only_blob)
-                .collect()
+                .collect(sort: true)
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
 
@@ -432,7 +572,6 @@ workflow {
             NFCORE_SAMTOOLS_INDEX.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
-            PRODIGAL_CONTIGS.out.versions.first(),
             DEEPARG_CONTIGS.out.versions.first(),
             ARG_CONTIG_LEVEL_REPORT.out.versions,
             ARG_BLOBPLOT.out.versions
@@ -442,7 +581,7 @@ workflow {
     //
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
-    if ( params.arg_bin_clustering && params.include_binning ) {
+    if ( flagOn(params.arg_bin_clustering) && flagOn(params.include_binning) ) {
         PRODIGAL_BINS(ch_refined_bins)
         ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
         DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
@@ -450,7 +589,7 @@ workflow {
         ch_deeparg = DEEPARG_BINS.out.deeparg_bins
         ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
-        CLUSTERING(ch_arg_fasta.collect())
+        CLUSTERING(ch_arg_fasta.collect(sort: true))
 
         ch_versions = ch_versions.mix(
             PRODIGAL_BINS.out.versions.first(),

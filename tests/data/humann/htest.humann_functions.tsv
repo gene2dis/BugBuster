@@ -1,0 +1,33 @@
+sample_id	ontology	accession	description	count	rpk
+htest	ko	K00001	alcohol dehydrogenase [EC:1.1.1.1]	2.2075055188	2.2075055188
+htest	ko	K00002	alcohol dehydrogenase (NADP+) [EC:1.1.1.2]	4.3554778575	4.3554778575
+htest	ko	K00003	homoserine dehydrogenase [EC:1.1.1.3]	1.4947683109	1.4947683109
+htest	ec	1.1.1.1	Alcohol dehydrogenase	2.2075055188	2.2075055188
+htest	ec	2.7.7.7	DNA-directed DNA polymerase	3.3506087562	3.3506087562
+htest	ec	3.1.1.1	Carboxylesterase	1.3717421125	1.3717421125
+htest	metacyc	ARO-PWY	chorismate biosynthesis I	1.1308929853	1.1308929853
+htest	metacyc	DTDPRHAMSYN-PWY	dTDP-&beta;-L-rhamnose biosynthesis	1.5016185682	1.5016185682
+htest	metacyc	GLYCOCAT-PWY	glycogen degradation I	1.1240957241	1.1240957241
+htest	metacyc	P108-PWY	pyruvate fermentation to propanoate I	0.9190269262	0.9190269262
+htest	metacyc	PPGPPMET-PWY	ppGpp metabolism	0.5302789267	0.5302789267
+htest	metacyc	PWY-1042	glycolysis IV	2.398772817	2.398772817
+htest	metacyc	PWY-5097	L-lysine biosynthesis VI	1.1928594018	1.1928594018
+htest	metacyc	PWY-5130	2-oxobutanoate degradation I	2.0574390586	2.0574390586
+htest	metacyc	PWY-5941	glycogen degradation II	1.2972704558	1.2972704558
+htest	metacyc	PWY-6125	superpathway of guanosine nucleotides de novo biosynthesis II	0.8385603845	0.8385603845
+htest	metacyc	PWY-6163	chorismate biosynthesis from 3-dehydroquinate	1.0877134848	1.0877134848
+htest	metacyc	PWY-6387	UDP-N-acetylmuramoyl-pentapeptide biosynthesis I (meso-diaminopimelate containing)	1.3225024548	1.3225024548
+htest	metacyc	PWY-6572	chondroitin sulfate degradation I (bacterial)	0.407000407	0.407000407
+htest	metacyc	PWY-6703	preQ0 biosynthesis	2.1059703696	2.1059703696
+htest	metacyc	PWY-6731	starch degradation III	1.1628303459	1.1628303459
+htest	metacyc	PWY-6807	xyloglucan degradation II (exoglucanase)	0.9768278557	0.9768278557
+htest	metacyc	PWY-6892	thiazole component of thiamine diphosphate biosynthesis I	1.0654457663	1.0654457663
+htest	metacyc	PWY-7220	adenosine deoxyribonucleotides de novo biosynthesis II	0.5425935974	0.5425935974
+htest	metacyc	PWY-7221	guanosine ribonucleotides de novo biosynthesis	2.097931713	2.097931713
+htest	metacyc	PWY-7222	guanosine deoxyribonucleotides de novo biosynthesis II	0.5425935974	0.5425935974
+htest	metacyc	PWY-7228	superpathway of guanosine nucleotides de novo biosynthesis I	1.2598055518	1.2598055518
+htest	metacyc	PWY-7238	sucrose biosynthesis II	0.9143872016	0.9143872016
+htest	metacyc	PWY-7791	UMP biosynthesis III	1.3872884241	1.3872884241
+htest	metacyc	PWY0-1586	peptidoglycan maturation (meso-diaminopimelate containing)	0.6121824304	0.6121824304
+htest	metacyc	RHAMCAT-PWY	L-rhamnose degradation I	1.1010794387	1.1010794387
+htest	metacyc	VALSYN-PWY	L-valine biosynthesis	0.7600228007	0.7600228007

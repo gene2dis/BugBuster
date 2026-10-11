@@ -1,0 +1,140 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    HUMANN Module Test
+
+    HUMAnN 4.0.0a2 read-level profiling + KO/EC/MetaCyc composition (design
+    doc Section 4.6.1, task T8c, Q2), on the REAL pinned HUMAnN image with the
+    committed fixture reads and database (tests/data/humann/, made by
+    tests/bin/make_humann_fixtures.sh from HUMAnN's bundled demo data). There
+    is no MetaPhlAn database in CI, so the fixture arguments in humann.config
+    bypass the prescreen. The composition arithmetic and the version-aware
+    layout guards are covered in depth by tests/bin/test_humann_scripts.sh;
+    these tests pin the module wrapper: gzipped R1/R2 concatenated into one
+    input, the database flags, outputs, provenance, the no-reads
+    short-circuit and the database-root guards.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test HUMANN Process"
+    script "../../modules/local/humann/main.nf"
+    process "HUMANN"
+    config "./humann.config"
+
+    test("profiles the fixture reads") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'htest' ],
+                    [
+                        file("${projectDir}/tests/data/humann/reads/htest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/humann/reads/htest_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/humann/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            // identical to the committed composer output and raw tables
+            assert path(process.out.functions.get(0).get(1)).text ==
+                path("${projectDir}/tests/data/humann/htest.humann_functions.tsv").text
+            assert path(process.out.summary.get(0).get(1)).text ==
+                path("${projectDir}/tests/data/humann/htest.humann_summary.tsv").text
+            assert process.out.raw.get(0).get(1).size() == 3
+            def raw = process.out.raw.get(0).get(1).find { f -> f.toString().endsWith('htest_2_genefamilies.tsv') }
+            assert path(raw).text == path("${projectDir}/tests/data/humann/htest_2_genefamilies.tsv").text
+            // --bypass-prescreen: no MetaPhlAn profile
+            assert process.out.profile.size() == 0
+            assert process.out.log.size() == 1
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('humann: 4.0.0.alpha.2')
+            assert versions.contains('metaphlan: 4.1.2')
+            assert versions.contains('diamond: 2.1.24')
+            assert versions.contains('bowtie2: 2.5.5')
+            assert versions.contains('humann_db: fixture: HUMAnN 4.0.0a2 bundled demo databases')
+        }
+    }
+
+    test("a sample without reads short-circuits to empty tables") {
+        when {
+            process {
+                """
+                def empty_r1 = file("\${workDir}/empty_R1.fastq.gz")
+                def gz = new java.util.zip.GZIPOutputStream(new FileOutputStream(empty_r1.toFile()))
+                gz.close()
+                def empty_r2 = file("\${workDir}/empty_R2.fastq.gz")
+                def gz2 = new java.util.zip.GZIPOutputStream(new FileOutputStream(empty_r2.toFile()))
+                gz2.close()
+                input[0] = [
+                    [ id: 'emptytest' ],
+                    [ empty_r1, empty_r2 ],
+                    file("${projectDir}/tests/data/humann/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.functions.get(0).get(1)).readLines().size() == 1
+            def summary = path(process.out.summary.get(0).get(1)).readLines()
+            assert summary.size() == 5
+            assert summary[1] == 'emptytest\tany\t0\t0\t'
+            assert process.out.raw.size() == 0
+        }
+    }
+
+    test("a directory that is not a HUMAnN database root fails with a clear message") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'nodb' ],
+                    [
+                        file("${projectDir}/tests/data/humann/reads/htest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/humann/reads/htest_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/humann/db/chocophlan", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains('not a HUMAnN database root') }
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    [
+                        file("${projectDir}/tests/data/humann/reads/htest_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/humann/reads/htest_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/humann/db", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.functions.get(0).get(1).endsWith('stubtest.humann_functions.tsv')
+            assert process.out.summary.size() == 1
+            assert process.out.raw.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('humann: 4.0.0.alpha.2')
+        }
+    }
+}

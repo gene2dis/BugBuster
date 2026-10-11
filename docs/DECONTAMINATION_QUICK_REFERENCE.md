@@ -73,6 +73,9 @@ nextflow run main.nf \
 ```
 
 ### 4. Low Disk Space
+Deletes the work directory after a successful run and keeps the clean reads in the output
+dir. It does not lower peak usage during the run, and a completed run cannot be resumed
+(see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md)).
 ```bash
 nextflow run main.nf \
   --input samples.csv \
@@ -124,7 +127,7 @@ results/01_quality_control/summary/Reads_report.csv
 
 1. **Pre-build index** for multiple runs
 2. **Use `--store_clean_reads true`** to keep clean reads in the output dir (`-resume` remains the task cache)
-3. **Use `-profile low_disk`** on constrained systems
+3. **Use `-profile low_disk`** to free the work directory after a successful run (it does not lower peak usage; put `-work-dir` on a large filesystem)
 4. **Share `--databases_dir`** across projects
 
 ---

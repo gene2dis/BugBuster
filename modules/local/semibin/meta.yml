@@ -1,0 +1,39 @@
+name: semibin
+description: Metagenomic binning with SemiBin2 - single_easy_bin with a pre-trained environment model per sample, or generate_sequence_features_single + train_self + bin_short for the co-assembly; skipped (SKIPPED.txt marker) when no contig is at least 1000 bp
+keywords:
+  - binning
+  - semibin
+  - MAGs
+  - metagenomics
+tools:
+  - semibin:
+      description: Metagenomic binning with semi-supervised siamese neural networks (SemiBin2 commands, 2.1.0)
+      homepage: https://github.com/BigDataBiology/SemiBin
+      documentation: https://semibin.readthedocs.io/en/latest/
+      doi: "10.1038/s41467-022-29843-y"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly', which selects the co-assembly workflow)
+  - contigs:
+      type: file
+      description: Assembled contigs
+  - bam:
+      type: file
+      description: Reads mapped back to the contigs
+      pattern: "*.bam"
+
+output:
+  - bins:
+      type: directory
+      description: Tuple of meta and the uncompressed bin FASTA directory (or a directory holding only SKIPPED.txt)
+      pattern: "*_semibin_output_bins"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

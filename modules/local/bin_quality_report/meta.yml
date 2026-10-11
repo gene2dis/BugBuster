@@ -1,0 +1,42 @@
+name: bin_quality_report
+description: Per-sample assembly mode bin quality report (bin/bin_quality_report.py) - classifies CheckM2-assessed bins as High, Mid or Low quality, plots completeness vs contamination for raw and MetaWRAP-refined bins, and writes summary tables
+keywords:
+  - binning
+  - bin quality
+  - checkm2
+  - report
+  - visualization
+tools:
+  - pandas:
+      description: Python data analysis library used to read and summarise the quality reports
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Python plotting library used to draw the quality scatter plots
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+      doi: "10.1109/MCSE.2007.55"
+
+input:
+  - reports:
+      type: file
+      description: CheckM2 per-sample, per-binner quality reports from CHECKM2_BATCH, named <sample>_<binner>_quality_report.tsv (sample and binner are parsed from the file name; header-only reports are skipped)
+      pattern: "*_quality_report.tsv"
+
+output:
+  - plots:
+      type: file
+      description: Completeness vs contamination scatter plot, raw and refined (MetaWRAP) panels (Total_bins_quality_plot.png)
+      pattern: "*.png"
+  - tables:
+      type: file
+      description: Bin counts per binner and quality class (Mag_quality_summary.csv), all bins (All_Mag_quality_table.csv) and MetaWRAP-refined bins only (Refined_Mag_quality_table.csv)
+      pattern: "*.csv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

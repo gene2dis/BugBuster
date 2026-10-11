@@ -1,0 +1,37 @@
+# Pathway HUMAnN v4.0.0.alpha.2	htest_Abundance
+UNMAPPED	310.4383535166
+UNINTEGRATED	268.0591233808
+UNINTEGRATED|unclassified.t__SGB1871	98.2325977888
+PWY-1042: glycolysis IV	2.3987728170
+PWY-6703: preQ0 biosynthesis	2.1059703696
+PWY-7221: guanosine ribonucleotides de novo biosynthesis	2.0979317130
+PWY-7221: guanosine ribonucleotides de novo biosynthesis|unclassified.t__SGB1871	1.5649452269
+PWY-5130: 2-oxobutanoate degradation I	2.0574390586
+DTDPRHAMSYN-PWY: dTDP-&beta;-L-rhamnose biosynthesis	1.5016185682
+DTDPRHAMSYN-PWY: dTDP-&beta;-L-rhamnose biosynthesis|unclassified.t__SGB1871	1.1065006916
+PWY-7791: UMP biosynthesis III	1.3872884241
+PWY-6387: UDP-N-acetylmuramoyl-pentapeptide biosynthesis I (meso-diaminopimelate containing)	1.3225024548
+PWY-5941: glycogen degradation II	1.2972704558
+PWY-5941: glycogen degradation II|unclassified.t__SGB1871	1.1693268159
+PWY-7228: superpathway of guanosine nucleotides de novo biosynthesis I	1.2598055518
+PWY-5097: L-lysine biosynthesis VI	1.1928594018
+PWY-6731: starch degradation III	1.1628303459
+PWY-6731: starch degradation III|unclassified.t__SGB1871	1.0589694524
+ARO-PWY: chorismate biosynthesis I	1.1308929853
+GLYCOCAT-PWY: glycogen degradation I	1.1240957241
+RHAMCAT-PWY: L-rhamnose degradation I	1.1010794387
+PWY-6163: chorismate biosynthesis from 3-dehydroquinate	1.0877134848
+PWY-6892: thiazole component of thiamine diphosphate biosynthesis I	1.0654457663
+PWY-6807: xyloglucan degradation II (exoglucanase)	0.9768278557
+PWY-6807: xyloglucan degradation II (exoglucanase)|unclassified.t__SGB1871	0.9607831164
+P108-PWY: pyruvate fermentation to propanoate I	0.9190269262
+PWY-7238: sucrose biosynthesis II	0.9143872016
+PWY-6125: superpathway of guanosine nucleotides de novo biosynthesis II	0.8385603845
+VALSYN-PWY: L-valine biosynthesis	0.7600228007
+PWY0-1586: peptidoglycan maturation (meso-diaminopimelate containing)	0.6121824304
+PWY-7220: adenosine deoxyribonucleotides de novo biosynthesis II	0.5425935974
+PWY-7222: guanosine deoxyribonucleotides de novo biosynthesis II	0.5425935974
+PPGPPMET-PWY: ppGpp metabolism	0.5302789267
+PPGPPMET-PWY: ppGpp metabolism|unclassified.t__SGB1871	0.5302789267
+PWY-6572: chondroitin sulfate degradation I (bacterial)	0.4070004070
+PWY-6572: chondroitin sulfate degradation I (bacterial)|unclassified.t__SGB1871	0.4070004070

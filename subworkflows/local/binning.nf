@@ -93,11 +93,14 @@ workflow BINNING {
 
     // Refine bins with MetaWRAP when >=2 binners are selected
     if (use_metawrap) {
-        // Group binner outputs by sample for MetaWRAP
+        // Group binner outputs by sample for MetaWRAP. groupTuple lists the
+        // bins in binner-completion order; sort them by directory name so the
+        // task hash (and -resume) does not depend on which binner finished
+        // first (design doc Q19)
         ch_bins_grouped = ch_binner_bins
             .map { meta, bins -> [meta.id, meta, bins] }
             .groupTuple(by: 0, size: num_binners)
-            .map { _id, metas, bins_list -> [metas[0], bins_list] }
+            .map { _id, metas, bins_list -> [metas[0], bins_list.sort(false) { b -> b.name }] }
 
         METAWRAP(ch_bins_grouped)
         ch_refined_bins = METAWRAP.out.bins
@@ -111,9 +114,11 @@ workflow BINNING {
         ch_all_bins_for_checkm = ch_binner_bins
     }
 
-    // Collect all bins for batched CHECKM2 processing
+    // Collect all bins for batched CHECKM2 processing, sorted by sample and
+    // bin directory so the batch input does not follow task completion order
+    // (which changed the task hash and defeated -resume; design doc Q19)
     ch_all_sample_bins = ch_all_bins_for_checkm
-        .toList()
+        .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
         .map { items ->
             def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
             def all_paths = items.collect { item -> item[1] }
@@ -192,10 +197,10 @@ workflow BINNING {
         ch_checkm_refined = ch_checkm_all_reports
     }
     
-    // Collect refined bins for batched GTDB-Tk
+    // Collect refined bins for batched GTDB-Tk (sorted, as for CHECKM2 above)
     ch_all_refined_bins = ch_refined_bins
         .filter { _meta, bins -> bins != null }
-        .toList()
+        .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
         .map { items ->
             def meta_list = items.collect { item -> item[0] }
             def all_paths = items.collect { item -> item[1] }
@@ -244,8 +249,8 @@ workflow BINNING {
     //
     if ( params.assembly_mode == "assembly" ) {
         // Per-sample mode: simple quality and taxonomy reports
-        BIN_QUALITY_REPORT(ch_checkm_all_reports.map { _meta, reports -> reports }.collect())
-        BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
+        BIN_QUALITY_REPORT(ch_checkm_all_reports.map { _meta, reports -> reports }.collect(sort: true))
+        BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
@@ -258,9 +263,9 @@ workflow BINNING {
         ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
 
         BIN_SUMMARY(
-            ch_bin_cov.collect()
-                .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect())
-                .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect())
+            ch_bin_cov.collect(sort: true)
+                .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
+                .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect(sort: true))
         )
         ch_versions = ch_versions.mix(BIN_SUMMARY.out.versions)
     }

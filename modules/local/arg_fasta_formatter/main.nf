@@ -2,6 +2,7 @@ process ARG_FASTA_FORMATTER {
 
     container 'quay.io/ffuentessantander/biopython_utils:1.0'
 
+    tag "${meta.id}"
     label 'process_single'
 
     input:

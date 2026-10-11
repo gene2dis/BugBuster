@@ -1,0 +1,68 @@
+name: deeparg
+description: Antimicrobial resistance gene prediction on predicted proteins with DeepARG (predict, LS model, protein mode) - per refined bin (DEEPARG_BINS) or per contig set (DEEPARG_CONTIGS)
+keywords:
+  - antimicrobial resistance
+  - ARG
+  - deeparg
+  - deep learning
+tools:
+  - deeparg:
+      description: A deep learning based approach to predict antibiotic resistance genes (ARGs) from metagenomes (1.0.4)
+      homepage: https://github.com/gaarangoa/deeparg
+      documentation: https://github.com/gaarangoa/deeparg
+      doi: "10.1186/s40168-018-0401-z"
+      licence: ["MIT"]
+
+processes:
+  - name: DEEPARG_BINS
+    description: Runs deeparg predict on each bin's protein FASTA, in parallel up to task.cpus bins at a time, and collects the *.mapping.ARG files into one directory (empty when the proteins directory holds no *.faa)
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample name, or 'coassembly')
+      - prodigal_bins:
+          type: directory
+          description: Per-bin protein FASTA directory from PRODIGAL_BINS (<sample>_<bin>_proteins.faa)
+          pattern: "*_bins_proteins"
+      - deeparg_db:
+          type: directory
+          description: DeepARG data directory (DOWNLOAD_DEEPARG_DB or a custom path)
+    output:
+      - deeparg_bins:
+          type: directory
+          description: Tuple of meta and a directory holding one <bin>_deep_arg.out.mapping.ARG per bin
+          pattern: "*_deeparg_results"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+  - name: DEEPARG_CONTIGS
+    description: Decompresses the shared Pyrodigal proteins (gzip -cdf; plain FASTA passes through) and runs deeparg predict on them
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample name, or 'coassembly')
+      - prodigal_contigs:
+          type: file
+          description: Predicted contig proteins from the shared Pyrodigal gene-calling step (gzipped accepted)
+          pattern: "*.{faa,faa.gz}"
+      - deeparg_db:
+          type: directory
+          description: DeepARG data directory (DOWNLOAD_DEEPARG_DB or a custom path)
+    output:
+      - deeparg:
+          type: file
+          description: Tuple of meta and the DeepARG predictions (<sample>_contigs_deep_arg.out.mapping.ARG)
+          pattern: "*.ARG"
+      - only_deeparg:
+          type: file
+          description: The same DeepARG predictions without meta
+          pattern: "*.ARG"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+authors:
+  - "@juanu"

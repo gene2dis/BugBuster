@@ -1,0 +1,4 @@
+# Program:featureCounts v2.1.1; Command:"featureCounts" "-F" "SAF" "-a" "sampleB_genes.saf" "-T" "2" "-p" "--primary" "-o" "sampleB.featureCounts.txt" "sampleB_all_reads.bam"
+Geneid	Chr	Start	End	Strand	Length	sampleB_all_reads.bam
+contig_1_1	contig_1	1	300	+	300	0
+contig_1_2	contig_1	601	900	-	300	50

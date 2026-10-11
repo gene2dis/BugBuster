@@ -1,0 +1,45 @@
+name: gtdb_tk_batch
+description: Batched GTDB-Tk taxonomic classification - pools every sample's bins into one classify_wf run (the database is loaded once, not per sample) and splits the bac120 and ar53 summaries back into per-sample files
+keywords:
+  - binning
+  - taxonomy
+  - classification
+  - gtdb
+  - gtdb-tk
+tools:
+  - gtdbtk:
+      description: Toolkit to assign objective taxonomic classifications to bacterial and archaeal genomes based on the Genome Taxonomy Database (GTDB)
+      homepage: https://github.com/Ecogenomics/GTDBTk
+      documentation: https://ecogenomics.github.io/GTDBTk/
+      doi: "10.1093/bioinformatics/btac672"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta_list:
+      type: list of maps
+      description: Metadata of every sample in the batch (the meta.id values name the per-sample summaries)
+  - all_bins:
+      type: directory
+      description: |
+        Bin directories to classify (staged as bin_?/) - single-binner outputs or MetaWRAP-refined
+        directories, recognised by name with bin/identify_bin_dir.sh; bins are *.fa, *.fasta or *.fna files
+  - gtdbtk_db:
+      type: directory
+      description: GTDB-Tk reference data package (R232 for the pinned GTDB-Tk 2.7.2), exported as GTDBTK_DATA_PATH
+
+output:
+  - gtdb_tk:
+      type: tuple
+      description: Tuple of meta_list and the per-sample GTDB-Tk summaries (<sample>_gtdbtk_bac120.tsv and <sample>_gtdbtk_ar53.tsv, sample prefix stripped from bin names; header-only when there were no bins or no archaea)
+      pattern: "*_gtdbtk_*"
+  - report:
+      type: tuple
+      description: Same files as gtdb_tk (duplicate emit; this one is regrouped per sample by the BINNING subworkflow)
+      pattern: "*_gtdbtk_*"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"
