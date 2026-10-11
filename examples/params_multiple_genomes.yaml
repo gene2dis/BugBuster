@@ -121,5 +121,6 @@ taxonomic_profiler: "sourmash"  # Options: "kraken2", "sourmash", "none"
 # Feature toggles
 read_arg_prediction: false
 rgi_prediction: false
+kmarvel_prediction: false
 contig_tax_and_arg: false
 include_binning: false

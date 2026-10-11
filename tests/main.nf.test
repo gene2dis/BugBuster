@@ -485,6 +485,40 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the read-level K-MARVEL path") {
+        // K-MARVEL runs on the clean reads with --assembly_mode none. No
+        // --custom_kmarvel_db: pins the FORMAT_KMARVEL_DB provisioning path,
+        // the KMARVEL -> KMARVEL_REPORT chain and the published layout.
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                kmarvel_prediction = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL_REPORT") } == 1
+
+            assert path("${outputDir}/05_arg_prediction/read_level/kmarvel/test_sample1/test_sample1_kmarvel.tsv").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/kmarvel/test_sample1/test_sample1_kmarvel.json").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_supporting_reads_matrix.tsv").exists()
+            assert path("${outputDir}/../databases/kmarvel/kmarvel_db/DB_VERSION").exists()
+        }
+    }
+
     test("Rejects samplesheet where r1 and r2 are the same file") {
         tag "samplesheet_validation"
         // Samplesheet-content validation (deferred from audit #15): a
@@ -719,6 +753,7 @@ nextflow_pipeline {
                 mag_level_functional    = "false"
                 read_arg_prediction     = "false"
                 rgi_prediction          = "false"
+                kmarvel_prediction      = "false"
                 microbecensus           = "false"
                 functional_cazy         = "false"
                 woltka_uniq             = "false"
@@ -739,6 +774,7 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("KARGA") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_CHECKM2_DB") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_DBCAN_DB") } == 0

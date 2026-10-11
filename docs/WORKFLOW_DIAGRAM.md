@@ -27,6 +27,10 @@ flowchart TD
     %% RGI Branch
     CleanReads -->|if rgi_prediction| RGI[RGI AMR Prediction<br/>RGI_BWT → RGI_KMER]
     RGI --> RGIReport[RGI_REPORT]
+
+    %% K-MARVEL Branch
+    CleanReads -->|if kmarvel_prediction| KMARVEL[K-MARVEL ARG Assembly<br/>KMARVEL]
+    KMARVEL --> KMARVELReport[KMARVEL_REPORT]
     
     %% Assembly Branch
     CleanReads -->|if assembly_mode != none| Assembly[ASSEMBLY SUBWORKFLOW<br/>MEGAHIT Assembly]
@@ -63,6 +67,7 @@ flowchart TD
     Taxonomy --> End
     ARGNorm --> End
     RGIReport --> End
+    KMARVELReport --> End
     ARGBlobplot --> End
     Clustering --> End
     Functional --> End
@@ -77,7 +82,7 @@ flowchart TD
     classDef database fill:#e8f5e9,stroke:#388e3c,stroke-width:2px
     
     class InputCheck,QC,Taxonomy,Assembly,Binning,Functional subworkflow
-    class ReadARG,RGI,ContigTax,ContigARG,BinARG,Pyrodigal,MicrobeCensus module
+    class ReadARG,RGI,KMARVEL,ContigTax,ContigARG,BinARG,Pyrodigal,MicrobeCensus module
     class CleanReads,Contigs decision
     class PrepDB database
 ```
@@ -110,6 +115,7 @@ flowchart TD
     Start --> Funcdb{Functional<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
+    Start --> KMARVELdb{K-MARVEL<br/>Enabled?}
     Start --> Magdb{mag_level_functional?}
     Start --> Readfuncdb{"read_level_functional<br/>= woltka?"}
     Start --> Sfdb{"read_level_functional<br/>= superfocus?"}
@@ -134,10 +140,11 @@ flowchart TD
     ReadARGdb -->|Yes| KARGA[KARGA_DB]
     ReadARGdb -->|Yes| KARGVA[KARGVA_DB]
     RGIdb -->|Yes| RGILoad[RGI_LOAD /<br/>RGI_LOAD_WILDCARD]
+    KMARVELdb -->|Yes| KMARVELDB[FORMAT_KMARVEL_DB]
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `karga_db`, `kargva_db`, `rgi_card_db`
+- `kraken_db`, `sourmash_db`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `karga_db`, `kargva_db`, `rgi_card_db`, `kmarvel_db`
 
 ---
 
@@ -302,6 +309,7 @@ flowchart TD
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
+| `kmarvel_prediction` | `false` | Enable K-MARVEL read-level ARG assembly against CARD |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
 | `contig_level_functional` | `false` | Enable the contig functional annotation branch (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables) |
 | `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
@@ -350,7 +358,7 @@ flowchart LR
 - **Quality Assessment**: CHECKM2, GTDB-TK
 
 ### ARG Prediction Modules
-- **Read-level**: KARGVA, KARGA, ARGS_OAP, RGI_BWT, RGI_KMER, RGI_REPORT
+- **Read-level**: KARGVA, KARGA, ARGS_OAP, RGI_BWT, RGI_KMER, RGI_REPORT, KMARVEL, KMARVEL_REPORT
 - **Contig-level**: DEEPARG_CONTIGS
 - **Bin-level**: DEEPARG_BINS
 
@@ -421,6 +429,7 @@ flowchart LR
 | `ARGS_OAP` | Read-level ARG detection and normalization factors |
 | `ARG_NORM_REPORT` | Normalized read-level ARG summary |
 | `RGI_BWT` / `RGI_KMER` / `RGI_REPORT` | CARD-based AMR prediction with pathogen-of-origin |
+| `KMARVEL` / `KMARVEL_REPORT` | K-MARVEL read-level CARD ARG assembly (blastp-confirmed) and its summary matrices |
 | `DEEPARG_CONTIGS` / `DEEPARG_BINS` | ARG prediction on contigs / bins |
 
 ### Contig Analysis

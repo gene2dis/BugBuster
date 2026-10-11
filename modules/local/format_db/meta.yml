@@ -23,6 +23,12 @@ tools:
       documentation: https://github.com/ncbi/amr/wiki
       doi: "10.1038/s41598-021-91456-0"
       licence: ["Public Domain"]
+  - kmarvel:
+      description: K-MARVEL image (containers/kmarvel), whose GNU wget and bzip2 FORMAT_KMARVEL_DB uses to fetch and unpack the CARD data
+      homepage: https://bitbucket.org/amr-avengers/k-marvel
+      documentation: https://bitbucket.org/amr-avengers/k-marvel/src/main/README.md
+      doi: "10.1101/2025.10.08.681127"
+      licence: ["GPL-3.0"]
   - sourmash:
       description: FracMinHash sketching and comparison toolkit; sourmash tax prepare converts the lineage CSV into a SQLite taxonomy database (4.8.11)
       homepage: https://sourmash.readthedocs.io/
@@ -138,6 +144,14 @@ processes:
       - aligner:
           type: value
           description: SUPER-FOCUS aligner (diamond or mmseqs2; params.superfocus_aligner); only that aligner's archive is downloaded
+    output: []
+
+  - name: FORMAT_KMARVEL_DB
+    description: Runs bin/kmarvel_db_reformat.sh in the K-MARVEL image - downloads and md5-verifies the CARD data tarball, concatenates the protein homolog, overexpression and variant model FASTAs into kmarvel_db/CARD_protein_all.fasta, keeps aro_index.tsv as metadata.tsv and snps.txt, and writes DB_VERSION (no BLAST index; KMARVEL indexes per task)
+    input:
+      - key:
+          type: value
+          description: K-MARVEL database registry key (params.kmarvel_db)
     output: []
 
   - name: SOURMASH_TAX_PREPARE

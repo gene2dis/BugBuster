@@ -1,0 +1,49 @@
+name: kmarvel
+description: Read-level ARG detection with K-MARVEL on the concatenated host-removed reads of one sample - translated k-mer search against the CARD protein models, gene-centric protein assembly, chimera removal, SNP-aware variant-model filtering and a blastp check of each assembled ARG
+keywords:
+  - antimicrobial resistance
+  - card
+  - k-mer
+  - protein assembly
+  - reads
+tools:
+  - kmarvel:
+      description: K-Mer based Antimicrobial Resistance Virtual Exploration Lab (K-MARVEL 1.0.0, commit 7108d2d), run in the pipeline-built image (containers/kmarvel) with BLAST+ 2.17.0
+      homepage: https://bitbucket.org/amr-avengers/k-marvel
+      documentation: https://bitbucket.org/amr-avengers/k-marvel/src/main/README.md
+      doi: "10.1101/2025.10.08.681127"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2, optional singletons], decompressed into one plain FASTQ (K-MARVEL reads only the first member of a multi-member gzip) and run with --data-type sr; -k/-e are fixed by the data type and not exposed
+      pattern: "*.fastq.gz"
+  - kmarvel_db:
+      type: directory
+      description: CARD reference directory with CARD_protein_all.fasta, metadata.tsv and snps.txt (FORMAT_KMARVEL_DB or --custom_kmarvel_db); the FASTA is copied into the task and indexed with makeblastdb there
+      pattern: "*"
+
+output:
+  - tsv:
+      type: file
+      description: Tuple of meta and the per-sample ARG table (one row per assembled ARG, K-MARVEL's flat columns incl. blast_*); header-only when no ARG was found
+      pattern: "*_kmarvel.tsv"
+  - json:
+      type: file
+      description: K-MARVEL JSON result (ARO id -> assembled gene record)
+      pattern: "*_kmarvel.json"
+  - log:
+      type: file
+      description: K-MARVEL stdout/stderr, parsed by bin/kmarvel_check_output.sh (fails the task when blastp failed with ARGs found)
+      pattern: "*_kmarvel.log"
+  - versions:
+      type: file
+      description: Software versions (kmarvel, blast, card from the database DB_VERSION or 'custom')
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

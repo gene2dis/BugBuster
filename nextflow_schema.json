@@ -123,6 +123,12 @@
                     "default": false,
                     "description": "Enable RGI AMR gene prediction with pathogen-of-origin analysis.",
                     "fa_icon": "fas fa-dna"
+                },
+                "kmarvel_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable K-MARVEL read-level ARG detection: CARD protein ARGs assembled from each sample's reads, chimera-filtered and checked with blastp.",
+                    "fa_icon": "fas fa-dna"
                 }
             }
         },
@@ -363,6 +369,21 @@
                     "description": "Path to a WildCARD variants archive to combine with the CARD database.",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
+                },
+                "kmarvel_db": {
+                    "type": "string",
+                    "default": "card_v4.0.1",
+                    "description": "Built-in K-MARVEL database key: card_v4.0.1 (see config/databases.config; CARD 4.0.1 protein models, ~4.6 MB download).",
+                    "enum": [
+                        "card_v4.0.1"
+                    ],
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_kmarvel_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local K-MARVEL database directory with CARD_protein_all.fasta, metadata.tsv (CARD aro_index.tsv) and snps.txt (CARD snps.txt); skips the download. A BLAST index is not needed (built per task).",
+                    "fa_icon": "fas fa-folder"
                 }
             }
         },
@@ -888,6 +909,38 @@
                 }
             }
         },
+        "kmarvel_options": {
+            "title": "K-MARVEL options",
+            "type": "object",
+            "fa_icon": "fas fa-shield-virus",
+            "description": "Parameters for K-MARVEL read-level ARG detection (used when --kmarvel_prediction). K-MARVEL runs in short-read mode, whose k-mer and extension sizes are fixed by the tool.",
+            "properties": {
+                "kmarvel_min_coverage": {
+                    "type": "integer",
+                    "default": 90,
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Minimum coverage (%) of the CARD reference protein by an assembled ARG.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "kmarvel_min_identity": {
+                    "type": "integer",
+                    "default": 90,
+                    "minimum": 1,
+                    "maximum": 100,
+                    "description": "Minimum identity (%) of an assembled ARG to its CARD reference protein.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "kmarvel_min_read_length": {
+                    "type": "integer",
+                    "default": 100,
+                    "minimum": 1,
+                    "maximum": 199,
+                    "description": "Minimum read length (bp); shorter reads (e.g. after fastp trimming) are ignored. Must be below 200 in short-read mode.",
+                    "fa_icon": "fas fa-ruler"
+                }
+            }
+        },
         "functional_annotation_options": {
             "title": "Functional annotation options",
             "type": "object",
@@ -1172,6 +1225,9 @@
         },
         {
             "$ref": "#/$defs/rgi_options"
+        },
+        {
+            "$ref": "#/$defs/kmarvel_options"
         },
         {
             "$ref": "#/$defs/functional_annotation_options"

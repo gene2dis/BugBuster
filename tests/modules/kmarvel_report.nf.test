@@ -1,0 +1,55 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    KMARVEL_REPORT Module Test
+
+    Fixtures in tests/data/kmarvel/ are real K-MARVEL 1.0.0 tables from the
+    pipeline image (CARD 4.0.1): sampleA from simulated reads of TEM-1,
+    CTX-M-15 and tet(A) (two ARGs called), sampleB from random reads (zero
+    ARGs: the header-only table bin/kmarvel_check_output.sh writes). The
+    zero-ARG sample must stay in the matrices as an all-zero column.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test KMARVEL_REPORT Process"
+    script "../../modules/local/kmarvel_report/main.nf"
+    process "KMARVEL_REPORT"
+
+    test("merges ARG and zero-ARG samples into matrices") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/kmarvel/sampleA_kmarvel.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/kmarvel/sampleB_kmarvel.tsv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def reports = process.out.reports.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert reports.keySet() == [
+                "KMARVEL_summary_long.tsv",
+                "KMARVEL_supporting_reads_matrix.tsv",
+                "KMARVEL_drug_class_matrix.tsv"
+            ] as Set
+
+            def reads = reports["KMARVEL_supporting_reads_matrix.tsv"]
+            assert reads[0] == "aro_id\taro_full_name\tsampleA\tsampleB"
+            assert reads.contains("ARO:3000980\tTEM-117\t60\t0")
+            assert reads.contains("ARO:3001967\tCTX-M-107\t60\t0")
+
+            def drug = reports["KMARVEL_drug_class_matrix.tsv"]
+            assert drug[0] == "drug_class\tsampleA\tsampleB"
+            assert drug.contains("cephalosporin\t2\t0")
+
+            def summary = reports["KMARVEL_summary_long.tsv"]
+            assert summary.size() == 3
+            assert summary.drop(1).every { line -> line.startsWith("sampleA\t") }
+        }
+    }
+}

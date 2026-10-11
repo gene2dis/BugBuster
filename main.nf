@@ -62,6 +62,7 @@ def printHelp() {
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
+      --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
@@ -142,6 +143,10 @@ include { ARG_NORM_REPORT  } from './modules/local/arg_norm_report/main'
 include { RGI_BWT          } from './modules/local/rgi_bwt/main'
 include { RGI_KMER         } from './modules/local/rgi_kmer/main'
 include { RGI_REPORT       } from './modules/local/rgi_report/main'
+
+	// K-MARVEL AMR PREDICTION
+include { KMARVEL          } from './modules/local/kmarvel/main'
+include { KMARVEL_REPORT   } from './modules/local/kmarvel_report/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
 include { DEEPARG_BINS             } from './modules/local/deeparg/main'
@@ -270,6 +275,7 @@ workflow {
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
+    log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
@@ -374,6 +380,29 @@ workflow {
             ch_rgi_bwt.versions.first(),
             ch_rgi_kmer.versions.first(),
             RGI_REPORT.out.versions
+        )
+    }
+
+    //
+    // K-MARVEL AMR PREDICTION IN READS
+    //
+    if ( flagOn(params.kmarvel_prediction) ) {
+        ch_kmarvel_db = PREPARE_DATABASES.out.kmarvel_db
+            .ifEmpty { error "ERROR: K-MARVEL database is empty. Ensure params.kmarvel_prediction is enabled and a valid CARD database is configured." }
+
+        // Assemble CARD ARGs from each sample's reads
+        KMARVEL(
+            ch_clean_reads,
+            ch_kmarvel_db.collect()
+        )
+
+        // Merge the per-sample tables into study-level matrices
+        KMARVEL_REPORT(
+            KMARVEL.out.tsv.map { _meta, file -> file }.collect(sort: true)
+        )
+        ch_versions = ch_versions.mix(
+            KMARVEL.out.versions.first(),
+            KMARVEL_REPORT.out.versions
         )
     }
 
