@@ -1,0 +1,45 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RGI_REPORT Module Test
+
+    Regression test for the k-mer input glob: main.nf passes RGI_KMER's
+    *_<k>mer_analysis.json files, but the script looked for
+    *mer_analysis.txt (which rgi kmer_query --bwt never writes), so it always
+    logged "Found 0 k-mer files". Fixtures in tests/data/rgi/ are a minimal
+    rgi bwt gene/allele table pair for one sample plus a k-mer JSON.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RGI_REPORT Process"
+    script "../../modules/local/rgi_report/main.nf"
+    process "RGI_REPORT"
+
+    test("summarises gene tables and finds the k-mer JSON") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.allele_mapping_data.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true) ]
+                input[2] = [ file("${projectDir}/tests/data/rgi/s1_rgi_kmer_61mer_analysis.json", checkIfExists: true) ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def summary = path(process.out.summary.get(0))
+            // the task's own stdout (process.stdout is Nextflow's)
+            def log = summary.resolveSibling(".command.out").readLines()
+            assert log.contains("Found 1 allele files")
+            assert log.contains("Found 1 gene files")
+            assert log.contains("Found 1 k-mer files")
+
+            def lines = summary.readLines()
+            assert lines[0] == "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families"
+            assert lines[1] == "s1,2,17,2,2"
+        }
+    }
+}

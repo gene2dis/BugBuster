@@ -1,0 +1,2 @@
+Reference Sequence	ARO Term	All Mapped Reads
+ARO:3000191|tet(Q)	tet(Q)	12

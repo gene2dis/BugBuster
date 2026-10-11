@@ -302,6 +302,11 @@ next release is tagged.
   genome-wide mean depth was averaged in with the per-contig means in `average_cov`. On a
   real co-assembly the averages moved by up to 1.6 % (e.g. 39.04 → 39.67). Regression case
   in `tests/modules/bedtools.nf.test`
+- **`RGI_REPORT` never found the k-mer results**: it is given `RGI_KMER`'s
+  `*_<k>mer_analysis.json` files but looked for `*mer_analysis.txt`, so its log always
+  said "Found 0 k-mer files". It now counts the JSON files. The k-mer results are still
+  not part of the summary or plots (they never were); the report output is unchanged.
+  New test `tests/modules/rgi_report.nf.test`
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
 

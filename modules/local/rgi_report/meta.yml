@@ -34,7 +34,7 @@ input:
       pattern: "*.gene_mapping_data.txt"
   - kmer_files:
       type: file
-      description: Collected RGI_KMER k-mer analysis JSON files; staged but not used (the script counts *mer_analysis.txt files, which this channel does not carry)
+      description: Collected RGI_KMER k-mer analysis JSON files; only counted (in the task log), not used in the summary or plots
       pattern: "*mer_analysis.json"
 
 output:

@@ -37,7 +37,9 @@ process RGI_REPORT {
         # Collect all allele mapping files
         allele_files = [f for f in Path('.').glob('*.allele_mapping_data.txt')]
         gene_files = [f for f in Path('.').glob('*.gene_mapping_data.txt')]
-        kmer_files = [f for f in Path('.').glob('*mer_analysis.txt')]
+        # RGI_KMER's k-mer JSON (rgi kmer_query --bwt writes no *mer_analysis.txt);
+        # counted for the log only, the summary and plots use the gene tables
+        kmer_files = [f for f in Path('.').glob('*mer_analysis.json')]
         
         print(f"Found {len(allele_files)} allele files")
         print(f"Found {len(gene_files)} gene files")
