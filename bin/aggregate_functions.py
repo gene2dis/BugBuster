@@ -755,6 +755,20 @@ def main():
         dbcan_exploded_for = {sample: shared_dbcan_exploded
                               for sample in sample_ids}
 
+    # eggNOG exploded frames, once per annotations unit and fanned out per
+    # sample the same way (under coassembly every sample shares one table)
+    exploded_by_id = {
+        unit: explode_annotations(table)
+        for unit, table in annotations_by_id.items()
+    }
+    if args.assembly_mode == 'assembly':
+        eggnog_exploded_for = {sample: exploded_by_id[sample]
+                               for sample in sample_ids}
+    else:
+        shared_eggnog_exploded = next(iter(exploded_by_id.values()))
+        eggnog_exploded_for = {sample: shared_eggnog_exploded
+                               for sample in sample_ids}
+
     # Cross-checks: mis-paired inputs must fail, not silently misjoin
     for sample in sample_ids:
         counted = counts_by_sample[sample]
@@ -813,10 +827,6 @@ def main():
 
     # --- Section 5.1: gene annotations (long, per annotations unit; eggNOG
     #     and dbCAN parts carry their own per-row tool provenance) ---
-    exploded_by_id = {
-        unit: explode_annotations(table)
-        for unit, table in annotations_by_id.items()
-    }
     annotation_parts = []
     for unit in sorted(set(exploded_by_id) | set(dbcan_exploded_by_id)):
         # Under coassembly the single annotations unit pairs with the single
@@ -870,7 +880,7 @@ def main():
         sample_abundance = abundance.loc[abundance['sample_id'] == sample,
                                          ['gene_id', 'tpm', 'cpge_num']]
         for exploded, backend in [
-                (explode_annotations(annotations_for[sample]), 'eggnog-mapper'),
+                (eggnog_exploded_for[sample], 'eggnog-mapper'),
                 (dbcan_exploded_for[sample], 'run_dbcan')]:
             if exploded.empty:
                 continue
@@ -960,7 +970,7 @@ def main():
         genes_total = len(sample_genes)
         tpm_total = sample_genes['tpm'].sum()
         exploded_dbcan = dbcan_exploded_for[sample]
-        exploded = pd.concat([explode_annotations(annotations_for[sample]),
+        exploded = pd.concat([eggnog_exploded_for[sample],
                               exploded_dbcan], ignore_index=True)
         # 'cazy' counts a CAZy call from either backend; 'cazy_dbcan' counts
         # run_dbcan alone (always present, 0 when --dbcan is absent)
