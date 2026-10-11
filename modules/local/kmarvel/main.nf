@@ -42,8 +42,8 @@
 
 process KMARVEL {
     tag "${meta.id}"
-    // TODO: pin by digest once the image is pushed to GHCR
-    container 'ghcr.io/gene2dis/bugbuster-kmarvel:1.0.0'
+    // 1.0.0-0fd49c9 (containers/kmarvel); re-pin after a rebuild
+    container 'ghcr.io/gene2dis/bugbuster-kmarvel@sha256:0fd49c9a1665d63541913f090ebc8cbaa75d4e60753addaf6ff34f5e2747b5a5'
 
     label 'process_medium'
 
