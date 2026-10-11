@@ -15,6 +15,7 @@ internal_docs/*
 # claude files
 .claude
 CLAUDE.md
+.claude/worktrees/
 
 # Editor config
 .vscode/
@@ -31,3 +32,4 @@ null/
 # results_t6_assembly/ from real-run verification sessions)
 /work_*/
 /results_*/
+
