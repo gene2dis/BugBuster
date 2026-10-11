@@ -295,6 +295,13 @@ next release is tagged.
   (`subworkflows/local/utils_params.nf`), and `min_read_sample` is converted before the
   comparison. Nextflow 25.10 converted these values itself and was not affected. Also fixed
   on every version: `--azure_delete_pools false` was turned back on by a `?: true` default
+- **Co-assembly bin coverage counted one contig too many**: `BEDTOOLS` treated the
+  whole-genome summary rows of `genomeCoverageBed` (chrom `genome`) as one more contig, so
+  `Total_contigs` in `04_binning/coassembly/coverage/*_bin_depth.tsv` and
+  `04_binning/coassembly/summary/Bin_summary.csv` was one too high for every bin, and the
+  genome-wide mean depth was averaged in with the per-contig means in `average_cov`. On a
+  real co-assembly the averages moved by up to 1.6 % (e.g. 39.04 → 39.67). Regression case
+  in `tests/modules/bedtools.nf.test`
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
 

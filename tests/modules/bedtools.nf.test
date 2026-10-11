@@ -10,6 +10,11 @@
       - test_bin.1_all_reads.bam  two reads on a 1 kb contig (avg cov 0.1)
       - test_bin.2_all_reads.bam  @SQ header, no aligned reads (zero-depth rows)
       - test_bin.3_all_reads.bam  no reference sequences (the crash case)
+      - test_bin.4_all_reads.bam  1 kb contig with two reads + 100 bp contig
+                                  with none (per-contig mean 0.05)
+
+    Also covers the contig count: genomeCoverageBed's "genome" summary rows
+    were counted as one more contig and averaged in with the real contigs.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -28,7 +33,8 @@ nextflow_process {
                     [
                         file("${projectDir}/tests/data/bam/test_bin.1_all_reads.bam", checkIfExists: true),
                         file("${projectDir}/tests/data/bam/test_bin.2_all_reads.bam", checkIfExists: true),
-                        file("${projectDir}/tests/data/bam/test_bin.3_all_reads.bam", checkIfExists: true)
+                        file("${projectDir}/tests/data/bam/test_bin.3_all_reads.bam", checkIfExists: true),
+                        file("${projectDir}/tests/data/bam/test_bin.4_all_reads.bam", checkIfExists: true)
                     ]
                 ]
                 """
@@ -42,11 +48,13 @@ nextflow_process {
             def lines = depth_file.readLines()
             assert lines[0] == "sample\tbin_id\tTotal_contigs\taverage_cov"
 
-            // One row per bin (contig count includes genomeCoverageBed's
-            // "genome" pseudo-row — pre-existing behavior)
-            assert lines.size() == 4
-            assert lines[1] == "test\tbin.1\t 2 \t 0.1"
-            assert lines[2] == "test\tbin.2\t 2 \t 0"
+            // One row per bin; the "genome" summary rows are not a contig
+            assert lines.size() == 5
+            assert lines[1] == "test\tbin.1\t 1 \t 0.1"
+            assert lines[2] == "test\tbin.2\t 1 \t 0"
+            // Mean of the per-contig means (0.1 and 0); with the "genome"
+            // row this was 3 contigs and 0.0636364
+            assert lines[4] == "test\tbin.4\t 2 \t 0.05"
 
             // Audit #27: module must report its tool version
             assert path(process.out.versions.get(0)).text.contains("bedtools:")
