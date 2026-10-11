@@ -1,11 +1,12 @@
 name: taxonomy_phyloseq
-description: Generate phyloseq-compatible tables and visualizations from Kraken2/Bracken or Sourmash taxonomy data
+description: Generate phyloseq-compatible tables and visualizations from Kraken2/Bracken, Sourmash or Sylph taxonomy data
 keywords:
   - taxonomy
   - phyloseq
   - kraken2
   - bracken
   - sourmash
+  - sylph
   - abundance
   - visualization
 tools:
@@ -19,11 +20,11 @@ tools:
 input:
   - input_files:
       type: file
-      description: Input files - BIOM files for Kraken2/Bracken or gather CSV files for Sourmash
-      pattern: "*.{biom,csv,report}"
+      description: Input files - kraken-style Bracken reports for Kraken2, gather CSV files with lineages for Sourmash, or sylph-tax .sylphmpa profiles plus the SYLPH_PROFILE per-sample report TSVs (for the read-pair counts) for Sylph
+      pattern: "*.{txt,csv,sylphmpa,tsv}"
   - profiler:
       type: value
-      description: Taxonomic profiler used ('kraken2' or 'sourmash')
+      description: Taxonomic profiler used ('kraken2', 'sourmash' or 'sylph')
   - db_name:
       type: value
       description: Database name for labeling outputs
@@ -55,10 +56,14 @@ output:
       type: file
       description: Phyloseq data in HDF5 format for Python analysis
       pattern: "*_phyloseq_data.h5"
+  - read_counts:
+      type: file
+      description: Sylph only - estimated read pairs per genome (taxa × samples, same rows as the OTU table, which holds relative abundance), sequence_abundance / 100 × the sample's read pairs
+      pattern: "*_read_counts.tsv"
   - plots:
       type: file
       description: Relative abundance plots at various taxonomic levels
-      pattern: "plots/*.png"
+      pattern: "*.png"
 
 authors:
   - "@ffuentessantander"

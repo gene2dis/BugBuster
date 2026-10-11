@@ -2,13 +2,14 @@
 """
 Phyloseq-Compatible Table Generator for BugBuster Pipeline
 
-Generates phyloseq-compatible tables and visualizations from Kraken2/Bracken and Sourmash outputs.
+Generates phyloseq-compatible tables and visualizations from Kraken2/Bracken, Sourmash and Sylph outputs.
 Replaces Tax_kraken_to_phyloseq.R, Tax_sourmash_to_phyloseq.R, and eliminates KRAKEN_BIOM process.
 
 Outputs:
 - OTU/abundance tables (TSV)
 - Taxonomy tables (TSV)
 - Sample metadata (TSV)
+- Sylph only: estimated read pairs per genome (TSV, <prefix>_read_counts.tsv)
 - HDF5 format for Python analysis
 - Abundance plots at multiple taxonomic levels
 
@@ -32,6 +33,8 @@ rcParams['font.size'] = 20
 rcParams['axes.linewidth'] = 1.5
 rcParams['figure.dpi'] = 300
 
+PROFILERS = ['kraken2', 'sourmash', 'sylph']
+
 
 class PhyloseqTableGenerator:
     """Generate phyloseq-compatible tables from taxonomy profiling data."""
@@ -48,7 +51,7 @@ class PhyloseqTableGenerator:
         Initialize the phyloseq table generator.
         
         Args:
-            profiler: Taxonomic profiler ('kraken2' or 'sourmash')
+            profiler: Taxonomic profiler ('kraken2', 'sourmash' or 'sylph')
             db_name: Database name for labeling
             output_dir: Output directory
             plot_levels: Taxonomic levels to plot
@@ -62,8 +65,8 @@ class PhyloseqTableGenerator:
         
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        if self.profiler not in ['kraken2', 'sourmash']:
-            raise ValueError(f"Profiler must be 'kraken2' or 'sourmash', got '{profiler}'")
+        if self.profiler not in PROFILERS:
+            raise ValueError(f"Profiler must be one of {', '.join(PROFILERS)}, got '{profiler}'")
         
         self.tax_ranks = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
     
@@ -255,6 +258,133 @@ class PhyloseqTableGenerator:
         
         return otu_table, tax_table
     
+    # sylph-tax lineage prefixes mapped to phyloseq ranks. GTDB lineages start
+    # at d__ (domain); viral taxonomies use r__ (realm) and k__ (kingdom), so
+    # k__ fills Kingdom when there is no d__. t__ (the genome) is the OTU id.
+    SYLPH_RANK_MAP = {
+        'd': 'Kingdom', 'k': 'Kingdom', 'p': 'Phylum', 'c': 'Class',
+        'o': 'Order', 'f': 'Family', 'g': 'Genus', 's': 'Species',
+    }
+
+    def parse_sylph(
+        self,
+        input_files: List[Path]
+    ) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """
+        Parse sylph-tax profiles plus the SYLPH_PROFILE per-sample reports.
+
+        <id>_sylph_<db>.sylphmpa: '#SampleID ...' line, header line, then one
+        row per clade at every rank; only the genome rows (last lineage
+        component t__<accession>) are used, so no abundance is counted twice.
+        <id>_sylph_<db>_report.tsv: Id, Sylph DB, Unclassified, Classified,
+        Read pairs.
+
+        Args:
+            input_files: .sylphmpa files and the matching *_report.tsv files
+
+        Returns:
+            Tuple of (otu_table of relative_abundance, taxonomy_table,
+            read_counts): read_counts holds the estimated read pairs per
+            genome, sequence_abundance / 100 x the sample's read pairs (sylph
+            runs with -u, so sequence_abundance is the genome's share of all
+            input reads, unknown included)
+        """
+        profiles = sorted(f for f in input_files if f.name.endswith('.sylphmpa'))
+        reports = [f for f in input_files if f.name.endswith('_report.tsv')]
+        if not profiles:
+            raise ValueError("No .sylphmpa files among the sylph inputs")
+
+        read_pairs = {}
+        for report_file in reports:
+            df = pd.read_csv(report_file, sep='\t', dtype={'Id': str})
+            if not {'Id', 'Read pairs'} <= set(df.columns):
+                raise ValueError(f"{report_file} is missing the Id / Read pairs columns of a SYLPH_PROFILE report")
+            for sample_id, pairs in zip(df['Id'], df['Read pairs']):
+                read_pairs[sample_id] = int(pairs)
+
+        required = {'clade_name', 'relative_abundance', 'sequence_abundance'}
+        all_data = []
+        tax_rows = {}
+
+        for profile in profiles:
+            sample_name = profile.name.rsplit('_sylph_', 1)[0]
+            with open(profile) as fh:
+                first = fh.readline()
+            if not first.startswith('#SampleID'):
+                raise ValueError(f"{profile} is not a sylph-tax profile (no #SampleID line)")
+            try:
+                df = pd.read_csv(profile, sep='\t', skiprows=1)
+            except Exception as e:
+                raise ValueError(f"Failed to parse sylph-tax profile {profile}: {e}")
+
+            missing = required - set(df.columns)
+            if missing:
+                raise ValueError(f"{profile} is missing expected sylph-tax columns: {sorted(missing)}")
+
+            # Header-only profile: the SYLPH_TAXPROF no-hit fallback
+            if df.empty:
+                print(
+                    f"Warning: no sylph genomes for sample {sample_name} - "
+                    "excluded from phyloseq tables",
+                    file=sys.stderr
+                )
+                continue
+
+            leaves = df[df['clade_name'].str.split('|').str[-1].str.startswith('t__')].copy()
+            if leaves.empty:
+                raise ValueError(f"{profile} has clade rows but no t__ genome rows")
+            if sample_name not in read_pairs:
+                raise ValueError(f"No SYLPH_PROFILE report (Read pairs) for sample {sample_name}")
+
+            leaves['taxon_id'] = leaves['clade_name'].str.split('|').str[-1].str[3:]
+            leaves['sample_id'] = sample_name
+            leaves['read_pairs'] = (
+                leaves['sequence_abundance'] / 100.0 * read_pairs[sample_name]
+            ).round().astype(int)
+            all_data.append(leaves)
+
+            for taxon_id, clade in leaves[['taxon_id', 'clade_name']].values:
+                if taxon_id in tax_rows:
+                    continue
+                row = {'taxon_id': taxon_id, **{rank: '' for rank in self.tax_ranks}}
+                for part in clade.split('|'):
+                    prefix, sep, value = part.partition('__')
+                    rank = self.SYLPH_RANK_MAP.get(prefix)
+                    if sep and rank and not row[rank]:
+                        row[rank] = value
+                tax_rows[taxon_id] = row
+
+        if not all_data:
+            raise ValueError(
+                "No sylph genomes in any sample; phyloseq tables cannot be built. "
+                "Check the sylph database (the classification report from "
+                "TAXONOMY_REPORT shows per-sample classified fractions), "
+                "or rerun with --taxonomic_profiler none."
+            )
+
+        combined = pd.concat(all_data, ignore_index=True)
+        # sylph-tax writes one t__ row per genome; a duplicate would be
+        # averaged by one pivot and summed by the other
+        duplicated = combined.duplicated(['taxon_id', 'sample_id'])
+        if duplicated.any():
+            dup = combined.loc[duplicated, ['sample_id', 'taxon_id']].iloc[0]
+            raise ValueError(
+                f"Genome {dup['taxon_id']} appears twice in the sylph-tax profile of sample {dup['sample_id']}"
+            )
+        otu_table = combined.pivot_table(
+            index='taxon_id', columns='sample_id',
+            values='relative_abundance', fill_value=0
+        )
+        read_counts = combined.pivot_table(
+            index='taxon_id', columns='sample_id',
+            values='read_pairs', fill_value=0, aggfunc='sum'
+        ).reindex(index=otu_table.index, columns=otu_table.columns).fillna(0).astype(int)
+
+        tax_table = pd.DataFrame(list(tax_rows.values())).set_index('taxon_id')
+        tax_table = tax_table.reindex(otu_table.index).fillna('')
+
+        return otu_table, tax_table, read_counts
+
     def create_sample_metadata(
         self,
         otu_table: pd.DataFrame
@@ -292,7 +422,8 @@ class PhyloseqTableGenerator:
         otu_table: pd.DataFrame,
         tax_table: pd.DataFrame,
         sample_metadata: pd.DataFrame,
-        save_hdf5: bool = True
+        save_hdf5: bool = True,
+        extra_tables: Optional[Dict[str, pd.DataFrame]] = None
     ) -> Dict[str, Path]:
         """
         Save phyloseq-compatible tables.
@@ -302,6 +433,9 @@ class PhyloseqTableGenerator:
             tax_table: Taxonomy table
             sample_metadata: Sample metadata
             save_hdf5: Whether to save HDF5 format
+            extra_tables: Further taxa x samples tables, written as
+                <prefix>_<name>.tsv (sylph: read_counts); the names must not
+                end in otu_table, which the module's otu_table output globs
             
         Returns:
             Dictionary of output file paths
@@ -325,6 +459,12 @@ class PhyloseqTableGenerator:
         sample_metadata.to_csv(metadata_path, sep='\t')
         output_files['sample_metadata'] = metadata_path
         print(f"Saved sample metadata: {metadata_path}")
+
+        for name, table in (extra_tables or {}).items():
+            extra_path = self.output_dir / f"{prefix}_{name}.tsv"
+            table.to_csv(extra_path, sep='\t')
+            output_files[name] = extra_path
+            print(f"Saved {name} table: {extra_path}")
         
         # Save HDF5 format
         if save_hdf5:
@@ -491,7 +631,8 @@ class PhyloseqTableGenerator:
         Main processing pipeline.
         
         Args:
-            input_files: List of input files (kraken-style bracken reports or Sourmash gather)
+            input_files: List of input files (kraken-style bracken reports, Sourmash
+                gather, or sylph-tax profiles plus SYLPH_PROFILE reports)
             output_format: 'tables', 'hdf5', or 'both'
             
         Returns:
@@ -500,9 +641,15 @@ class PhyloseqTableGenerator:
         print(f"Processing {len(input_files)} input files with {self.profiler} profiler")
         
         # Parse input files based on profiler
+        extra_tables = None
         if self.profiler == 'kraken2':
             # For Kraken2, we expect per-sample kraken-style bracken reports
             otu_table, tax_table = self.parse_kraken_reports(input_files)
+        elif self.profiler == 'sylph':
+            # For Sylph: relative abundance in the OTU table, estimated read
+            # pairs per genome in a separate table
+            otu_table, tax_table, read_counts = self.parse_sylph(input_files)
+            extra_tables = {'read_counts': read_counts}
         else:
             # For Sourmash, parse gather CSV files
             otu_table, tax_table = self.parse_sourmash_gather(input_files)
@@ -518,7 +665,8 @@ class PhyloseqTableGenerator:
             otu_table,
             tax_table,
             sample_metadata,
-            save_hdf5=save_hdf5
+            save_hdf5=save_hdf5,
+            extra_tables=extra_tables
         )
         
         # Generate plots
@@ -549,13 +697,18 @@ Examples:
   taxonomy_phyloseq.py --profiler sourmash --input-files *_smgather*.csv \\
       --db-name gtdb --output-dir . --format both \\
       --plot-levels Phylum,Family,Genus
+
+  # sylph-tax profiles plus the SYLPH_PROFILE per-sample reports
+  taxonomy_phyloseq.py --profiler sylph --input-files *.sylphmpa *_report.tsv \\
+      --db-name gtdb_r232 --output-dir . --format both \\
+      --plot-levels Phylum,Family,Genus,Species
         """
     )
     
     parser.add_argument(
         '--profiler',
         required=True,
-        choices=['kraken2', 'sourmash'],
+        choices=PROFILERS,
         help='Taxonomic profiler used'
     )
     

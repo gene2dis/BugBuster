@@ -752,6 +752,34 @@ directly contains `markers/`, `skani/`, `taxonomy/`, ...).
 
 ---
 
+### Sylph: Classified is 1.0, or TAXONOMY_PHYLOSEQ fails with "No sylph genomes in any sample"
+
+**Symptom (a):** with `--taxonomic_profiler sylph`, the `Classified` column of
+`Reads_report.csv` is 1.0 (or close) for samples that surely hold organisms
+missing from the database, and the estimated read pairs in
+`sylph_<db>_read_counts.tsv` add up to every read pair.
+
+**Cause:** the classified fraction is the sum of sylph's `Sequence_abundance`
+under `-u`, which rests on sylph's estimate of the read accuracy. Reads from
+genomes absent from the database can lower that estimate, so sylph
+overestimates coverage and caps the explained fraction at 100% (seen on
+simulated data; sylph itself warns that `-u` has caveats for complex
+communities). The relative abundance table is not affected.
+
+**Solution:** set the read identity explicitly with `--sylph_read_seq_id`
+(Illumina: about 99.5) and rerun with `-resume`, which re-runs only the sylph
+profiling and the steps after it.
+
+**Symptom (b):** `TAXONOMY_PHYLOSEQ` fails with *No sylph genomes in any
+sample*. No genome passed sylph's detection threshold in any sample (each
+skipped sample is warned about first): very shallow samples, or a database that
+does not cover the community. Check the per-sample `.tsv` profiles in
+`02_taxonomy/sylph/` and the `Classified` column, and use a database that fits
+the samples (`--sylph_db`, or `--custom_sylph_db` together with its
+`--custom_sylph_taxonomy`), or rerun with `--taxonomic_profiler none`.
+
+---
+
 ## Decontamination Issues
 
 ### Process BOWTIE2_BUILD_COMBINED failed

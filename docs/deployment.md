@@ -270,6 +270,7 @@ For better performance, pre-download databases to shared storage:
 ```bash
 # Kraken2 Standard-8 (~7.5 GB)
 # Sourmash GTDB r220 (~17 GB)
+# Sylph GTDB r232 .syl2db (~19 GB) + sylph-tax metadata (~5.5 MB; recipe in manual.md)
 # CheckM2 (~2.9 GB)
 # GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.7.2)
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)

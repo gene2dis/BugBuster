@@ -9,6 +9,11 @@
 #   - the sourmash branch must strip module filename decorations from sample
 #     ids, skip a no-match sample (the SOURMASH module's header-only fallback
 #     CSV), and fail loudly when no sample has any match (#12).
+#   - the sylph branch must merge only the four standard report columns into
+#     Reads_report.csv, build the relative-abundance OTU table from the t__
+#     genome rows of the .sylphmpa profiles, the estimated read pairs table
+#     from sequence_abundance x the report's Read pairs, skip a no-hit sample
+#     (SYLPH_TAXPROF's header-only fallback) and fail loudly otherwise.
 #
 # The scripts run inside the same pinned image the report processes use,
 # against the committed fixtures in tests/data/taxonomy/.
@@ -279,6 +284,104 @@ printf 'query_filename,match_name,average_abund,lineage\nx.fq,GCA_1 Test,1.0,d__
 NEXT_WORKDIR="${SMPH_BADHDR}"
 expect_fail "sourmash phyloseq: malformed gather CSV fails" taxonomy_phyloseq.py --profiler sourmash \
     --input-files sampleC_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+
+#
+# taxonomy_report.py — sylph branch
+#
+echo "--- taxonomy_report.py (sylph) ---"
+SY_WORK="${WORK}/taxonomy_report_sylph"
+mkdir -p "${SY_WORK}"
+cp "${FIXTURES}/sample1_sylph_gtdb_report.tsv" "${SY_WORK}/"
+cp "${FIXTURES}/Reads_report_fixture.csv" "${SY_WORK}/input_reads_report.csv"
+NEXT_WORKDIR="${SY_WORK}"
+expect_pass "sylph report: SYLPH_PROFILE report parsed" taxonomy_report.py --profiler sylph \
+    --reports sample1_sylph_gtdb_report.tsv \
+    --reads-report input_reads_report.csv --db-name gtdb --output-dir .
+check_grep "sylph report: Sylph DB column in header" "Reads_report.csv" ",Sylph DB,Unclassified,Classified$"
+check_grep "sylph report: classified fraction merged, Read pairs dropped" "Reads_report.csv" "^sample1,.*,gtdb,0.2404,0.7596$"
+check_file "sylph report: classification plot created" "sylph_tax_classified_reads.png"
+
+#
+# taxonomy_phyloseq.py — sylph branch
+#
+echo "--- taxonomy_phyloseq.py (sylph) ---"
+
+# The no-hit fallback header comes from the module, so the committed
+# header-only fixture cannot drift from what SYLPH_TAXPROF writes
+SY_HEADER=$(grep -o "def header = '[^']*'" "${REPO_DIR}/modules/local/sylph_taxprof/main.nf" \
+    | sed "s/^def header = '//; s/'\$//; s/\\\\\\\\t/\t/g")
+if [ "$(sed -n 2p "${FIXTURES}/sampleB_sylph_gtdb.sylphmpa")" = "${SY_HEADER}" ] \
+    && [ "$(sed -n 2p "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa")" = "${SY_HEADER}" ]; then
+    echo "✓ sylph phyloseq: fixture headers match the SYLPH_TAXPROF fallback header"
+    PASS=$((PASS + 1))
+else
+    echo "✗ sylph phyloseq: .sylphmpa fixture header drifted from modules/local/sylph_taxprof/main.nf"
+    FAIL=$((FAIL + 1))
+fi
+
+SYPH_WORK="${WORK}/taxonomy_phyloseq_sylph"
+mkdir -p "${SYPH_WORK}"
+cp "${FIXTURES}"/sample[AB]_sylph_gtdb.sylphmpa "${FIXTURES}"/sample[AB]_sylph_gtdb_report.tsv "${SYPH_WORK}/"
+NEXT_WORKDIR="${SYPH_WORK}"
+expect_pass "sylph phyloseq: hit + no-hit samples parsed" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleA_sylph_gtdb.sylphmpa sampleA_sylph_gtdb_report.tsv \
+        sampleB_sylph_gtdb.sylphmpa sampleB_sylph_gtdb_report.tsv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Phylum,Species --top-n 10
+check_grep "sylph phyloseq: OTU table keyed by t__ accession, sample id from file name" "sylph_gtdb_otu_table.tsv" \
+    "^taxon_id	sampleA$"
+check_grep "sylph phyloseq: OTU table holds relative_abundance" "sylph_gtdb_otu_table.tsv" \
+    "^GCF_000009045.1	22.3376$"
+check_grep "sylph phyloseq: only genome rows (3 genomes + header)" "sylph_gtdb_otu_table.tsv" \
+    "^GCA_047199095.1	37.8619$"
+if [ "$(wc -l < "${SYPH_WORK}/sylph_gtdb_otu_table.tsv" 2>/dev/null)" = "4" ]; then
+    echo "✓ sylph phyloseq: higher-rank rows not counted as taxa"
+    PASS=$((PASS + 1))
+else
+    echo "✗ sylph phyloseq: OTU table should have 3 genome rows"
+    FAIL=$((FAIL + 1))
+fi
+check_grep "sylph phyloseq: read pairs = sequence_abundance x Read pairs" "sylph_gtdb_read_counts.tsv" \
+    "^GCA_047199115.1	24465$"
+check_grep "sylph phyloseq: read pairs for B. subtilis" "sylph_gtdb_read_counts.tsv" \
+    "^GCF_000009045.1	12507$"
+check_grep "sylph phyloseq: lineage split by rank prefix" "sylph_gtdb_tax_table.tsv" \
+    "^GCF_000009045.1	Bacteria	Bacillota	Bacilli	Bacillales	Bacillaceae	Bacillus	Bacillus subtilis$"
+check_grep "sylph phyloseq: no-hit sample warned and skipped" "../taxonomy_phyloseq_sylph.log" \
+    "no sylph genomes for sample sampleB"
+
+# All samples without hits: loud failure
+SYPH_EMPTY="${WORK}/taxonomy_phyloseq_sylph_empty"
+mkdir -p "${SYPH_EMPTY}"
+cp "${FIXTURES}/sampleB_sylph_gtdb.sylphmpa" "${FIXTURES}/sampleB_sylph_gtdb_report.tsv" "${SYPH_EMPTY}/"
+NEXT_WORKDIR="${SYPH_EMPTY}"
+expect_fail "sylph phyloseq: all-samples-no-hit fails" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleB_sylph_gtdb.sylphmpa sampleB_sylph_gtdb_report.tsv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+check_grep "sylph phyloseq: no-hit failure message is actionable" "../taxonomy_phyloseq_sylph_empty.log" \
+    "No sylph genomes in any sample"
+
+# A profile with hits but no matching report (no Read pairs) must fail
+SYPH_NOREP="${WORK}/taxonomy_phyloseq_sylph_noreport"
+mkdir -p "${SYPH_NOREP}"
+cp "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa" "${SYPH_NOREP}/"
+NEXT_WORKDIR="${SYPH_NOREP}"
+expect_fail "sylph phyloseq: profile without its report fails" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleA_sylph_gtdb.sylphmpa \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+
+# Not a sylph-tax profile (no #SampleID line) must fail
+SYPH_BAD="${WORK}/taxonomy_phyloseq_sylph_bad"
+mkdir -p "${SYPH_BAD}"
+printf 'clade_name\trelative_abundance\nd__Bacteria\t100\n' > "${SYPH_BAD}/sampleC_sylph_gtdb.sylphmpa"
+cp "${FIXTURES}/sampleA_sylph_gtdb_report.tsv" "${SYPH_BAD}/sampleC_sylph_gtdb_report.tsv"
+NEXT_WORKDIR="${SYPH_BAD}"
+expect_fail "sylph phyloseq: malformed profile fails" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleC_sylph_gtdb.sylphmpa sampleC_sylph_gtdb_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
 

@@ -57,6 +57,33 @@ nextflow_process {
         }
     }
 
+    test("merges SYLPH_PROFILE reports without their Read pairs column") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1_sylph_gtdb_report.tsv", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/taxonomy/Reads_report_fixture.csv", checkIfExists: true)
+                input[2] = 'sylph'
+                input[3] = 'gtdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.report.get(0)).readLines()
+            assert lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed),Sylph DB,Unclassified,Classified"
+            assert lines.contains("sample1,120000,110000,100000,gtdb,0.2404,0.7596")
+            assert file(process.out.plots.get(0)).name == "sylph_tax_classified_reads.png"
+        }
+    }
+
     test("stub emits the reads report") {
         options "-stub"
 

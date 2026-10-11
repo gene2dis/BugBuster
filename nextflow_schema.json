@@ -63,6 +63,7 @@
                     "enum": [
                         "kraken2",
                         "sourmash",
+                        "sylph",
                         "none"
                     ],
                     "description": "Software for taxonomic profiling at read level.",
@@ -158,6 +159,18 @@
                     "type": "string",
                     "default": "gtdb_220_k31",
                     "description": "Sourmash database selection.",
+                    "fa_icon": "fas fa-database"
+                },
+                "sylph_db": {
+                    "type": "string",
+                    "default": "gtdb_r232",
+                    "enum": [
+                        "gtdb_r232",
+                        "gtdb_r226",
+                        "gtdb_r220"
+                    ],
+                    "description": "Sylph database selection (GTDB representative genomes, c200 builds, downloaded with the matching sylph-tax taxonomy metadata).",
+                    "help_text": "'gtdb_r232' is the two-stage .syl2db build (19 GB, needs sylph >= 1.0.0, the pinned version); 'gtdb_r226' (18 GB) and 'gtdb_r220' (13.1 GB) are single-stage .syldb builds.",
                     "fa_icon": "fas fa-database"
                 },
                 "checkm2_db": {
@@ -267,6 +280,19 @@
                     "type": "array",
                     "description": "Paths to custom Sourmash database files [kmer_file, lineages_file].",
                     "fa_icon": "fas fa-folder"
+                },
+                "custom_sylph_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a local sylph genome database (.syldb or .syl2db); given together with --custom_sylph_taxonomy, skips both downloads.",
+                    "help_text": "Any sylph database build works (sylph reconciles its c with the reads' default -c 200). Requires --custom_sylph_taxonomy (the sylph-tax metadata of the same release), so a custom database is never paired with the registry's taxonomy.",
+                    "fa_icon": "fas fa-file"
+                },
+                "custom_sylph_taxonomy": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a local sylph-tax taxonomy metadata file matching --custom_sylph_db (genome accession <TAB> d__...;s__... lineage; .tsv or .tsv.gz, e.g. gtdb_r232_metadata.tsv.gz); the two are given together.",
+                    "fa_icon": "fas fa-file"
                 },
                 "custom_checkm2_db": {
                     "type": "string",
@@ -463,6 +489,14 @@
                     ],
                     "description": "Taxonomic rank for Sourmash classification.",
                     "fa_icon": "fas fa-layer-group"
+                },
+                "sylph_read_seq_id": {
+                    "type": "number",
+                    "exclusiveMinimum": 0,
+                    "maximum": 100,
+                    "description": "Sylph read sequence identity in percent (sylph profile --read-seq-id), e.g. 99.5 for Illumina; unset = sylph's automatic estimate.",
+                    "help_text": "Drives sylph's unknown-fraction estimate (-u), i.e. the Classified column of Reads_report.csv and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified, so set it when Classified looks too high.",
+                    "fa_icon": "fas fa-percent"
                 }
             }
         },

@@ -1111,6 +1111,121 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires the sylph taxonomic profiler with the registry database") {
+        // No --custom_sylph_*: pins the FORMAT_SYLPH_DB / FORMAT_SYLPH_TAXONOMY
+        // provisioning path for the default gtdb_r232 entry (stubbed, so
+        // nothing is downloaded)
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "sylph"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SYLPH_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SYLPH_TAXONOMY") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_PROFILE (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_TAXPROF (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_REPORT") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_PHYLOSEQ") } == 1
+            // One profiler per run
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("KRAKEN2") } == 0
+
+            def tax = "${outputDir}/02_taxonomy"
+            assert path("${tax}/sylph/test_sample1_sylph_gtdb_r232.tsv").exists()
+            assert path("${tax}/sylph/test_sample2_sylph_gtdb_r232.sylphmpa").exists()
+            // per-sample report TSVs feed the aggregation only
+            assert !path("${tax}/sylph/test_sample1_sylph_gtdb_r232_report.tsv").exists()
+            assert path("${tax}/tables/sylph_gtdb_r232_otu_table.tsv").exists()
+            assert path("${tax}/tables/sylph_gtdb_r232_read_counts.tsv").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("sylph: 1.0.0")
+            assert vtext.contains("sylph_db: gtdb-r232-c200-dbv2.syl2db")
+            assert vtext.contains("sylph-tax: 1.9.2")
+            assert vtext.contains("sylph_taxonomy: gtdb_r232_metadata.tsv.gz")
+        }
+    }
+
+    test("Stub run wires sylph with custom database and taxonomy files (no download)") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control       = true
+                assembly_mode         = "none"
+                taxonomic_profiler    = "sylph"
+                custom_sylph_db       = "${projectDir}/tests/data/sylph/sylph_test_db.syldb"
+                custom_sylph_taxonomy = "${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SYLPH") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_PROFILE (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_TAXPROF (") } == 2
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("sylph_db: sylph_test_db.syldb")
+            assert vtext.contains("sylph_taxonomy: sylph_tax_fixture.tsv.gz")
+        }
+    }
+
+    test("Rejects --custom_sylph_db without --custom_sylph_taxonomy") {
+        // A custom database with the registry's metadata would get wrong or
+        // default lineages from sylph-tax without failing: rejected at launch
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                taxonomic_profiler = "sylph"
+                custom_sylph_db    = "${projectDir}/tests/data/sylph/sylph_test_db.syldb"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--custom_sylph_db and --custom_sylph_taxonomy must be given together")
+        }
+    }
+
+    test("Rejects --custom_sylph_taxonomy without --custom_sylph_db") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                taxonomic_profiler    = "sylph"
+                custom_sylph_taxonomy = "${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--custom_sylph_db and --custom_sylph_taxonomy must be given together")
+        }
+    }
+
     test("Run with stub mode") {
         options "-stub"
 
