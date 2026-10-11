@@ -1,0 +1,93 @@
+name: K-MARVEL image
+
+# Builds the docker image of K-MARVEL 1.0.0 (commit 7108d2d) with BLAST+
+# 2.17.0 from containers/kmarvel/Dockerfile and publishes it to GHCR.
+# K-MARVEL has no bioconda/biocontainer package. The pipeline pins the image
+# by digest in modules/local/kmarvel and modules/local/format_db
+# (FORMAT_KMARVEL_DB); a rebuild pushes a new digest, which must be re-pinned
+# there.
+#
+# Pull requests that touch the image only build and test it. Publishing is
+# manual (Actions > K-MARVEL image > Run workflow), so merging a branch never
+# rebuilds the image or moves its tags. Each published image gets a permanent
+# tag, <version>-<first 7 digest characters>, so the digest the modules pin
+# keeps a tag after the <version> tag moves to a newer build.
+#
+# After the first publish, make the GHCR package public (Package settings >
+# Change visibility): CI and users pull it anonymously.
+
+on:
+  pull_request:
+    paths:
+      - "containers/kmarvel/**"
+      - ".github/workflows/kmarvel-image.yml"
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/gene2dis/bugbuster-kmarvel
+  TAG: 1.0.0
+
+jobs:
+  build:
+    name: Build, test and push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Check out pipeline code
+        uses: actions/checkout@v4
+
+      - name: Build image
+        run: docker build -t "${IMAGE}:${TAG}" containers/kmarvel
+
+      - name: Build the CARD database and run K-MARVEL as the pipeline does
+        # The FORMAT_KMARVEL_DB script on the pinned CARD release, then the
+        # KMARVEL module's steps on the committed test reads (random-ish
+        # nf-core reads: the zero-ARG path, so the output check writes the
+        # header-only table)
+        run: |
+          url=$(sed -n "/kmarvel_ref_db/,/^    }/s/^ *url = \"\(.*\)\"/\1/p" config/databases.config)
+          md5=$(sed -n "/kmarvel_ref_db/,/^    }/s/^ *md5 = \"\(.*\)\"/\1/p" config/databases.config)
+          work=$(mktemp -d)
+          cp tests/data/reads/test_sample1_R1.fastq.gz tests/data/reads/test_sample1_R2.fastq.gz "${work}/"
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp \
+            -v "${PWD}/bin:/pipeline_bin:ro" -v "${work}:/w" -w /w \
+            -e PATH=/pipeline_bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            "${IMAGE}:${TAG}" bash -euo pipefail -c "
+              kmarvel_db_reformat.sh '${url}' '${md5}' 'CARD (image test)'
+              cp kmarvel_db/CARD_protein_all.fasta .
+              makeblastdb -in CARD_protein_all.fasta -dbtype prot -blastdb_version 5 -out CARD_protein_all.fasta > /dev/null
+              zcat test_sample1_R1.fastq.gz test_sample1_R2.fastq.gz > reads.fastq
+              kmarvel --filename reads.fastq --output kmarvel.json --data-type sr \
+                --reference CARD_protein_all.fasta --metadata kmarvel_db/metadata.tsv \
+                --snpdata kmarvel_db/snps.txt --threads 2 2>&1 | tee kmarvel.log
+              kmarvel_check_output.sh kmarvel.log kmarvel.tsv
+              head -1 kmarvel.tsv | grep -q blast_e_value
+            "
+
+      - name: Log in to GHCR
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+
+      - name: Push image
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          docker push "${IMAGE}:${TAG}"
+          digest=$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${TAG}")
+          digest=${digest#*@}
+          permanent="${TAG}-${digest#sha256:}"
+          permanent=${permanent:0:$(( ${#TAG} + 8 ))}
+          docker tag "${IMAGE}:${TAG}" "${IMAGE}:${permanent}"
+          docker push "${IMAGE}:${permanent}"
+          token=$(curl -fsS "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull" | jq -r .token)
+          tagged=$(curl -fsSI -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/${IMAGE#ghcr.io/}/manifests/${permanent}" \
+            | tr -d '\r' | awk -F': ' 'tolower($1) == "docker-content-digest" {print $2}')
+          if [ "${tagged}" != "${digest}" ]; then
+            echo "ERROR: ${permanent} resolves to ${tagged}, expected ${digest}"
+            exit 1
+          fi
+          echo "Pushed ${IMAGE}@${digest} as ${TAG} and ${permanent}"
+          echo "Pushed \`${IMAGE}@${digest}\` as \`${TAG}\` and \`${permanent}\`" >> "${GITHUB_STEP_SUMMARY}"
