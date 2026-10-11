@@ -313,6 +313,23 @@ next release is tagged.
   removed (nothing used it), and the manual's output tree lists the real files. Stub runs
   never showed this, because the stub created the missing file. (With the default `kma`
   the task hung before reaching this check, a separate bug)
+- **`RGI_KMER` hung forever with the default `--rgi_aligner kma`, or when a worker ran
+  out of memory**: RGI 6.0.3's `kmer_query` read KMA BAMs from the wrong SAM columns (the
+  reference name as the flag, base qualities as the sequence), so every worker stopped
+  with "failed to parse BAM file". Separately, a worker killed for exceeding the task
+  memory (the default 8 workers needed more than 32 GB on the test data) never reported
+  back. In both cases the parent process waited forever: the task sat idle until its 24 h
+  limit, then was retried at 48 h and 72 h. `RGI_KMER` now runs `kmer_query` through
+  `bin/rgi_kmer_kma_fix.py`, which reads every BAM with the standard columns, fails as soon
+  as a worker dies (exit 137 for an out-of-memory kill, so Nextflow retries with more
+  memory), and stops a run that takes longer than 2 h (`ext.time_limit`, exit 124). The
+  patch is version-guarded to RGI 6.0.3. `RGI_KMER` now uses 2 CPUs (2 workers): on the
+  test data it used 21 GB, within its 36 GB. Tests: `tests/bin/test_rgi_kmer_kma_fix.sh`
+- **`RGI_BWT` / `RGI_KMER` could not run `bin/` scripts**: the RGI image's
+  `/usr/local/env-execute`, which both modules source, resets `PATH`, dropping the
+  pipeline's `bin/`. `RGI_BWT`'s low-coverage fallback (`rgi_bwt_lowcov_fallback.sh`)
+  would have failed with "command not found" exactly when it was needed. The pipeline's
+  `PATH` entries are now kept
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
 

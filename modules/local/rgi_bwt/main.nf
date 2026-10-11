@@ -36,7 +36,10 @@ process RGI_BWT {
         """
         set +u
         if [ -f /usr/local/env-execute ]; then
+            # env-execute resets PATH; keep the pipeline's bin/ on it
+            pipeline_path="\$PATH"
             source /usr/local/env-execute
+            export PATH="\$PATH:\$pipeline_path"
         fi
         set -u
 

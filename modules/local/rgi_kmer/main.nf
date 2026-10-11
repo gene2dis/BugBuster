@@ -24,11 +24,16 @@ process RGI_KMER {
         def prefix = "${meta.id}"
         def kmer_size = params.rgi_kmer_size ?: 61
         def minimum = params.rgi_min_kmer_coverage ?: 10
+        // Wall-clock cap enforced by the wrapper (modules.config ext.time_limit)
+        def time_limit = ((task.ext.time_limit ?: 2.h) as Duration).toSeconds()
         
         """
         set +u
         if [ -f /usr/local/env-execute ]; then
+            # env-execute resets PATH; keep the pipeline's bin/ on it
+            pipeline_path="\$PATH"
             source /usr/local/env-execute
+            export PATH="\$PATH:\$pipeline_path"
         fi
         set -u
 
@@ -44,8 +49,13 @@ process RGI_KMER {
         mkdir localDB
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
-        # Run RGI kmer_query for pathogen-of-origin prediction
-        rgi kmer_query \\
+        # Run RGI kmer_query for pathogen-of-origin prediction, through
+        # bin/rgi_kmer_kma_fix.py: RGI 6.0.3 misreads KMA BAMs and waits
+        # forever on a worker that died (e.g. out of memory); the wrapper fixes
+        # both and stops the run after ${time_limit} s. Remove at the RGI re-pin.
+        # Every worker is a fork of the process holding the k-mer database, so
+        # memory grows with -n (task.cpus, set low in modules.config).
+        rgi_kmer_kma_fix.py --time-limit ${time_limit} kmer_query \\
             --bwt \\
             -i ${bam} \\
             -k ${kmer_size} \\

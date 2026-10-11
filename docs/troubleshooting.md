@@ -339,6 +339,47 @@ eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
 check whether issue #620 is fixed in the new version and update or remove
 `bin/emapper_ogs_fix.py` accordingly.
 
+### RGI_KMER fails: "worker was killed", "did not finish within", or "not the 6.0.3 method"
+
+`RGI_KMER` runs `rgi kmer_query` through `bin/rgi_kmer_kma_fix.py`. That wrapper
+fixes two RGI 6.0.3 bugs that made the task hang forever: KMA BAMs (the default
+`--rgi_aligner kma`) were read from the wrong columns, and the run waited forever
+for a worker that had died. It also stops a run that takes too long. Its messages:
+
+- **"an rgi kmer_query worker was killed by signal 9 (out of memory?)" (exit 137):**
+  a worker ran out of memory. Each worker is a copy of the process holding the
+  ~17 GB k-mer database, so memory grows with the number of workers. Nextflow
+  retries the task with more memory (36 GB, then 72 GB, then 108 GB) automatically.
+  If every attempt fails, raise the memory, or keep the worker count low (the
+  default is 2 CPUs = 2 workers):
+
+  ```groovy
+  // custom.config, used with -c custom.config
+  process {
+      withName: 'RGI_KMER' {
+          memory = 96.GB
+      }
+  }
+  ```
+
+- **"rgi did not finish within 7200 s" (exit 124):** the run hit the 2 h limit
+  (not retried). On the test data `kmer_query` takes about 3.5 minutes; a very
+  large sample can take longer. Raise the limit in a config file:
+
+  ```groovy
+  process {
+      withName: 'RGI_KMER' {
+          ext.time_limit = 8.h
+      }
+  }
+  ```
+
+- **"the installed RGI CARDkmers.<method> is not the 6.0.3 method this patch
+  targets":** the RGI container was changed (a `process.container` override, or a
+  pipeline update to a newer RGI). Use the pinned image, or, when updating RGI,
+  check whether the new version still needs the fixes, then update or remove
+  `bin/rgi_kmer_kma_fix.py`.
+
 ### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
 
 **Error:**
