@@ -4,9 +4,15 @@ name: eggNOG-mapper image
 # containers/eggnog-mapper/Dockerfile and publishes it to GHCR (design doc
 # Q11 interim). The pipeline pins it by digest in modules/local/eggnog_mapper_*;
 # a rebuild pushes a new digest, which must be re-pinned there.
+#
+# Pull requests that touch the image only build and test it. Publishing is
+# manual (Actions > eggNOG-mapper image > Run workflow), so merging a branch
+# never rebuilds the image or moves its tags. Each published image gets a
+# permanent tag, <version>-<first 7 digest characters>, so the digest the
+# modules pin keeps a tag after the <version> tag moves to a newer build.
 
 on:
-  push:
+  pull_request:
     paths:
       - "containers/eggnog-mapper/**"
       - ".github/workflows/eggnog-image.yml"
@@ -37,11 +43,28 @@ jobs:
             tests/bin/test_emapper_ogs_fix.sh
 
       - name: Log in to GHCR
+        if: github.event_name == 'workflow_dispatch'
         run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Push image
+        if: github.event_name == 'workflow_dispatch'
         run: |
           docker push "${IMAGE}:${TAG}"
           digest=$(docker inspect --format '{{index .RepoDigests 0}}' "${IMAGE}:${TAG}")
-          echo "Pushed ${digest}"
-          echo "Pushed \`${digest}\`" >> "${GITHUB_STEP_SUMMARY}"
+          digest=${digest#*@}
+          permanent="${TAG}-${digest#sha256:}"
+          permanent=${permanent:0:$(( ${#TAG} + 8 ))}
+          docker tag "${IMAGE}:${TAG}" "${IMAGE}:${permanent}"
+          docker push "${IMAGE}:${permanent}"
+          # The permanent tag must name the same manifest, not a re-pushed copy
+          token=$(curl -fsS "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull" | jq -r .token)
+          tagged=$(curl -fsSI -H "Authorization: Bearer ${token}" \
+            -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
+            "https://ghcr.io/v2/${IMAGE#ghcr.io/}/manifests/${permanent}" \
+            | tr -d '\r' | awk -F': ' 'tolower($1) == "docker-content-digest" {print $2}')
+          if [ "${tagged}" != "${digest}" ]; then
+            echo "ERROR: ${permanent} resolves to ${tagged}, expected ${digest}"
+            exit 1
+          fi
+          echo "Pushed ${IMAGE}@${digest} as ${TAG} and ${permanent}"
+          echo "Pushed \`${IMAGE}@${digest}\` as \`${TAG}\` and \`${permanent}\`" >> "${GITHUB_STEP_SUMMARY}"
