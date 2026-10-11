@@ -10,8 +10,8 @@ process RGI_KMER {
         path(card_db)
 
     output:
+        // rgi kmer_query --bwt writes <out>_<k>mer_analysis.{json,allele.txt,gene.txt}
         tuple val(meta), path("*_${params.rgi_kmer_size ?: 61}mer_analysis.json"), emit: kmer_json
-        tuple val(meta), path("*_${params.rgi_kmer_size ?: 61}mer_analysis.txt"), emit: kmer_txt
         tuple val(meta), path("*.allele.txt"), emit: allele_predictions, optional: true
         tuple val(meta), path("*.gene.txt"), emit: gene_predictions, optional: true
         path("versions.yml"), emit: versions
@@ -60,7 +60,6 @@ process RGI_KMER {
             echo "WARNING: RGI kmer_query did not produce expected JSON output"
             # Create empty output to prevent pipeline failure
             echo '{}' > ${prefix}_rgi_kmer_${kmer_size}mer_analysis.json
-            echo "No k-mer results" > ${prefix}_rgi_kmer_${kmer_size}mer_analysis.txt
         fi
 
         # Create versions file
@@ -75,9 +74,8 @@ process RGI_KMER {
         def kmer_size = params.rgi_kmer_size ?: 61
         """
         touch ${prefix}_rgi_kmer_${kmer_size}mer_analysis.json
-        touch ${prefix}_rgi_kmer_${kmer_size}mer_analysis.txt
-        touch ${prefix}_rgi_kmer.allele.txt
-        touch ${prefix}_rgi_kmer.gene.txt
+        touch ${prefix}_rgi_kmer_${kmer_size}mer_analysis.allele.txt
+        touch ${prefix}_rgi_kmer_${kmer_size}mer_analysis.gene.txt
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

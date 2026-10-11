@@ -894,7 +894,8 @@ results/
 │   │   ├── rgi_kmer/                           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   │   └── {sample}/
 │   │   │       ├── *_61mer_analysis.json
-│   │   │       └── *_61mer_analysis.txt
+│   │   │       ├── *_61mer_analysis.allele.txt
+│   │   │       └── *_61mer_analysis.gene.txt
 │   │   ├── rgi_summary/                        # RGI aggregated reports (if rgi_prediction=true)
 │   │   │   ├── RGI_summary_report.csv
 │   │   │   ├── RGI_amr_gene_family_distribution.png

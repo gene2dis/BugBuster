@@ -307,6 +307,12 @@ next release is tagged.
   said "Found 0 k-mer files". It now counts the JSON files. The k-mer results are still
   not part of the summary or plots (they never were); the report output is unchanged.
   New test `tests/modules/rgi_report.nf.test`
+- **`RGI_KMER` failed with `--rgi_aligner bowtie2` or `bwa`**: the module required a
+  `*_<k>mer_analysis.txt` output that `rgi kmer_query --bwt` (RGI 6.0.3) never writes. It
+  writes `_<k>mer_analysis.json`, `.allele.txt` and `.gene.txt`. The required output is
+  removed (nothing used it), and the manual's output tree lists the real files. Stub runs
+  never showed this, because the stub created the missing file. (With the default `kma`
+  the task hung before reaching this check, a separate bug)
 - Test harness: the blast bad-md5 fixture could leave the checksum unchanged
   (1-in-16 CI flake); it now always corrupts it
 

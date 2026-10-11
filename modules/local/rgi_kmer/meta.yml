@@ -29,17 +29,13 @@ output:
       type: file
       description: Tuple of meta and the k-mer analysis JSON ('{}' when rgi kmer_query writes none)
       pattern: "*_${params.rgi_kmer_size ?: 61}mer_analysis.json"
-  - kmer_txt:
-      type: file
-      description: Tuple of meta and the k-mer analysis text summary ('No k-mer results' when the JSON was missing)
-      pattern: "*_${params.rgi_kmer_size ?: 61}mer_analysis.txt"
   - allele_predictions:
       type: file
-      description: Tuple of meta and the allele-level pathogen-of-origin predictions (optional)
+      description: Tuple of meta and the allele-level pathogen-of-origin predictions, <sample>_rgi_kmer_<k>mer_analysis.allele.txt (optional)
       pattern: "*.allele.txt"
   - gene_predictions:
       type: file
-      description: Tuple of meta and the gene-level pathogen-of-origin predictions (optional)
+      description: Tuple of meta and the gene-level pathogen-of-origin predictions, <sample>_rgi_kmer_<k>mer_analysis.gene.txt (optional)
       pattern: "*.gene.txt"
   - versions:
       type: file
