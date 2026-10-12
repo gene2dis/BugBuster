@@ -98,6 +98,33 @@ nextflow_process {
         }
     }
 
+    test("counts uncompressed reads and handles a sample without hits") {
+        // --quality_control false passes plain .fastq through to sylph: the
+        // read-pair count must use zcat -f. These 10 non-host pairs hit
+        // neither fixture genome, so the profile is header-only
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'syplain' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.profile.get(0).get(1)).readLines().size() == 1
+            assert path(process.out.report.get(0)).readLines()[1] == "syplain\ttestdb\t1.000000\t0.000000\t10"
+        }
+    }
+
     test("stub emits a header-only profile and a zero report") {
         options "-stub"
 

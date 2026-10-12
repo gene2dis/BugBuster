@@ -46,6 +46,21 @@ if [ ! -s "sylph_db/${name}" ]; then
     exit 1
 fi
 
+if [ "${kind}" = "db" ]; then
+    # sylph databases are binary (NUL bytes within the first 4 KB of both the
+    # .syldb and .syl2db formats); a server error or maintenance page saved
+    # under the database name is text and would otherwise be published
+    if [ "$(head -c 4096 "sylph_db/${name}" | tr -dc '\000' | wc -c)" -eq 0 ]; then
+        echo "ERROR: sylph_db/${name} is text, not a sylph database - the server returned a page instead of the file" >&2
+        exit 1
+    fi
+    # the two-stage format starts with the magic bytes SY2D
+    if [ "${name##*.}" = "syl2db" ] && [ "$(head -c 4 "sylph_db/${name}")" != "SY2D" ]; then
+        echo "ERROR: sylph_db/${name} does not start with the SY2D magic of a two-stage sylph database" >&2
+        exit 1
+    fi
+fi
+
 if [ "${kind}" = "taxonomy" ]; then
     if ! gzip -t "sylph_db/${name}" 2>/dev/null; then
         echo "ERROR: sylph_db/${name} is not a valid gzip file - corrupt or truncated download" >&2

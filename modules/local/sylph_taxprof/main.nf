@@ -41,12 +41,14 @@ process SYLPH_TAXPROF {
 
             # One profile holds one sample, so exactly one .sylphmpa
             # (<prefix><basename of the sample's R1>.sylphmpa)
-            set -- ${prefix}_tmp_*.sylphmpa
-            if [ "\$#" -ne 1 ] || [ ! -f "\$1" ]; then
-                echo "ERROR: expected one .sylphmpa from sylph-tax, found \$#" >&2
+            shopt -s nullglob
+            outputs=( ${prefix}_tmp_*.sylphmpa )
+            shopt -u nullglob
+            if [ "\${#outputs[@]}" -ne 1 ]; then
+                echo "ERROR: expected one .sylphmpa from sylph-tax, found \${#outputs[@]}" >&2
                 exit 1
             fi
-            mv "\$1" ${prefix}_sylph_${db_name}.sylphmpa
+            mv "\${outputs[0]}" ${prefix}_sylph_${db_name}.sylphmpa
         fi
 
         cat <<-END_VERSIONS > versions.yml

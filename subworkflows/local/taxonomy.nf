@@ -22,7 +22,7 @@ include { SYLPH_TAXPROF        } from '../../modules/local/sylph_taxprof/main'
 include { TAXONOMY_REPORT      } from '../../modules/local/taxonomy_report/main'
 include { TAXONOMY_PHYLOSEQ    } from '../../modules/local/taxonomy_phyloseq/main'
 include { PHYLOSEQ_CONVERTER   } from '../../modules/local/phyloseq_converter/main'
-include { flagOn               } from './utils_params'
+include { flagOn; sylphDbLabel } from './utils_params'
 
 workflow TAXONOMY {
     take:
@@ -138,11 +138,8 @@ workflow TAXONOMY {
     // Sylph taxonomic profiling
     //
     if ( params.taxonomic_profiler == "sylph" ) {
-        // Database label for file names, the Sylph DB column and plots: the
-        // registry key, or a custom database's file name without extension
-        // (gtdb-r232-c200-dbv2), so a custom release is never shown as the
-        // --sylph_db default
-        def sylph_db_name = params.custom_sylph_db ? file(params.custom_sylph_db).baseName : params.sylph_db
+        // Database label for file names, the Sylph DB column and plots
+        def sylph_db_name = sylphDbLabel()
 
         // Paired reads only, as for kraken2: sylph profiles every -r file as
         // a separate sample, so a singleton cannot join its pair

@@ -116,7 +116,9 @@ class TaxonomyReportGenerator:
         
         Expected format: Id, <Tool> DB, Unclassified, Classified (fractions);
         any further column (SYLPH_PROFILE's 'Read pairs', used by
-        taxonomy_phyloseq.py) is dropped so it does not reach Reads_report.csv
+        taxonomy_phyloseq.py) is dropped so it does not reach Reads_report.csv.
+        A report missing one of the four columns raises: skipping it would
+        leave that sample's classification blank in Reads_report.csv
         
         Args:
             report_files: List of per-sample report TSV files
@@ -140,10 +142,13 @@ class TaxonomyReportGenerator:
                         'Classified': float
                     }
                 )
-                all_reports.append(df[columns])
             except Exception as e:
                 print(f"Warning: Failed to parse {report_file}: {e}", file=sys.stderr)
                 continue
+            missing = [c for c in columns if c not in df.columns]
+            if missing:
+                raise ValueError(f"{report_file} is missing report columns {missing} (expected {columns})")
+            all_reports.append(df[columns])
         
         if not all_reports:
             raise ValueError(f"No valid {label} reports found")

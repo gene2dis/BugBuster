@@ -39,7 +39,18 @@ process SYLPH_PROFILE {
             ${args} \\
             -o ${prefix}_sylph_${db_name}.tsv
 
-        read_pairs=\$(zcat ${reads[0]} | awk 'END { print NR / 4 }')
+        # Uncompressed .fastq/.fq reach this step with --quality_control
+        # false; the image's busybox zcat has no -f passthrough, so pick the
+        # reader from the gzip magic. A line count that is not a multiple of 4
+        # is a truncated or malformed FASTQ, not a read count
+        if [ "\$(head -c 2 ${reads[0]} | od -An -tx1 | tr -d ' \\n')" = "1f8b" ]; then
+            reader=zcat
+        else
+            reader=cat
+        fi
+        read_pairs=\$(\${reader} ${reads[0]} | awk '
+            END { if (NR % 4) { print "ERROR: " NR " lines in ${reads[0]}, not a multiple of 4 (truncated or malformed FASTQ)" > "/dev/stderr"; exit 1 }
+                  printf "%.0f", NR / 4 }')
 
         classified=\$(awk -F'\\t' '
             NR == 1 { for (i = 1; i <= NF; i++) if (\$i == "Sequence_abundance") col = i

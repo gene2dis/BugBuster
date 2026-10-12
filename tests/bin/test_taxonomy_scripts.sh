@@ -303,6 +303,19 @@ check_grep "sylph report: Sylph DB column in header" "Reads_report.csv" ",Sylph 
 check_grep "sylph report: classified fraction merged, Read pairs dropped" "Reads_report.csv" "^sample1,.*,gtdb,0.2404,0.7596$"
 check_file "sylph report: classification plot created" "sylph_tax_classified_reads.png"
 
+# A per-sample report missing a standard column must fail, not leave the
+# sample's classification blank in Reads_report.csv
+SY_BADREP="${WORK}/taxonomy_report_sylph_badcols"
+mkdir -p "${SY_BADREP}"
+printf 'Id\tSylph DB\tClassified\nsample1\tgtdb\t0.75\n' > "${SY_BADREP}/sample1_sylph_gtdb_report.tsv"
+cp "${FIXTURES}/Reads_report_fixture.csv" "${SY_BADREP}/input_reads_report.csv"
+NEXT_WORKDIR="${SY_BADREP}"
+expect_fail "sylph report: report missing a column fails" taxonomy_report.py --profiler sylph \
+    --reports sample1_sylph_gtdb_report.tsv \
+    --reads-report input_reads_report.csv --db-name gtdb --output-dir .
+check_grep "sylph report: missing-column failure names the column" "../taxonomy_report_sylph_badcols.log" \
+    "missing report columns \['Unclassified'\]"
+
 #
 # taxonomy_phyloseq.py — sylph branch
 #
@@ -370,6 +383,19 @@ check_grep "sylph phyloseq: sample id is the name minus the exact suffix" "sylph
 NEXT_WORKDIR="${SYPH_LABEL}"
 expect_fail "sylph phyloseq: profile of another database label fails" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleA_sylph_my_sylph_db.sylphmpa sampleA_sylph_my_sylph_db_report.tsv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+
+# A non-integer Read pairs value (e.g. awk's 1.23457e+07) must fail, not be
+# truncated into a wrong count
+SYPH_BADPAIRS="${WORK}/taxonomy_phyloseq_sylph_badpairs"
+mkdir -p "${SYPH_BADPAIRS}"
+cp "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa" "${SYPH_BADPAIRS}/"
+printf 'Id\tSylph DB\tUnclassified\tClassified\tRead pairs\nsampleA\tgtdb\t0.000000\t1.000000\t1.23457e+07\n' \
+    > "${SYPH_BADPAIRS}/sampleA_sylph_gtdb_report.tsv"
+NEXT_WORKDIR="${SYPH_BADPAIRS}"
+expect_fail "sylph phyloseq: non-integer Read pairs fails" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleA_sylph_gtdb.sylphmpa sampleA_sylph_gtdb_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
 

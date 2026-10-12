@@ -299,10 +299,14 @@ class PhyloseqTableGenerator:
 
         read_pairs = {}
         for report_file in reports:
-            df = pd.read_csv(report_file, sep='\t', dtype={'Id': str})
+            df = pd.read_csv(report_file, sep='\t', dtype={'Id': str, 'Read pairs': str})
             if not {'Id', 'Read pairs'} <= set(df.columns):
                 raise ValueError(f"{report_file} is missing the Id / Read pairs columns of a SYLPH_PROFILE report")
             for sample_id, pairs in zip(df['Id'], df['Read pairs']):
+                # a plain non-negative integer only: '1.23457e+07' would be a
+                # rounded count
+                if not str(pairs).isdigit():
+                    raise ValueError(f"{report_file}: Read pairs '{pairs}' for {sample_id} is not a whole number")
                 read_pairs[sample_id] = int(pairs)
 
         required = {'clade_name', 'relative_abundance', 'sequence_abundance'}

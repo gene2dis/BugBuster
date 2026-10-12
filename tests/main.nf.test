@@ -1219,6 +1219,32 @@ nextflow_pipeline {
         }
     }
 
+    test("Ignores a lone --custom_sylph_db when sylph is not the profiler") {
+        // The paired-path check only applies to --taxonomic_profiler sylph, so
+        // a shared config setting one sylph path cannot abort other runs
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_sylph_db    = "${projectDir}/tests/data/sylph/sylph_test_db.syldb"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH") } == 0
+        }
+    }
+
     test("Rejects --custom_sylph_taxonomy without --custom_sylph_db") {
         when {
             params {
