@@ -138,6 +138,12 @@ workflow TAXONOMY {
     // Sylph taxonomic profiling
     //
     if ( params.taxonomic_profiler == "sylph" ) {
+        // Database label for file names, the Sylph DB column and plots: the
+        // registry key, or a custom database's file name without extension
+        // (gtdb-r232-c200-dbv2), so a custom release is never shown as the
+        // --sylph_db default
+        def sylph_db_name = params.custom_sylph_db ? file(params.custom_sylph_db).baseName : params.sylph_db
+
         // Paired reads only, as for kraken2: sylph profiles every -r file as
         // a separate sample, so a singleton cannot join its pair
         SYLPH_PROFILE(
@@ -145,7 +151,7 @@ workflow TAXONOMY {
                 [ meta, reads_files.size() > 2 ? reads_files[0..1] : reads_files ]
             },
             sylph_db.first(),
-            params.sylph_db
+            sylph_db_name
         )
         ch_versions = ch_versions.mix(SYLPH_PROFILE.out.versions.first())
 
@@ -153,7 +159,7 @@ workflow TAXONOMY {
         SYLPH_TAXPROF(
             SYLPH_PROFILE.out.profile,
             sylph_taxonomy.first(),
-            params.sylph_db
+            sylph_db_name
         )
         ch_versions = ch_versions.mix(SYLPH_TAXPROF.out.versions.first())
 
@@ -162,7 +168,7 @@ workflow TAXONOMY {
             SYLPH_PROFILE.out.report.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'sylph',
-            params.sylph_db
+            sylph_db_name
         )
         ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
 
@@ -174,7 +180,7 @@ workflow TAXONOMY {
                 .mix(SYLPH_PROFILE.out.report)
                 .collect(sort: true),
             'sylph',
-            params.sylph_db,
+            sylph_db_name,
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
             params.taxonomy_top_n_taxa ?: 10
         )
@@ -186,7 +192,7 @@ workflow TAXONOMY {
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
                 TAXONOMY_PHYLOSEQ.out.sample_metadata,
-                params.sylph_db
+                sylph_db_name
             )
             ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
         }

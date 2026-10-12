@@ -333,7 +333,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_sylph_db`
 - **Type**: String (file path)
-- **Description**: Path to a local sylph genome database (`.syldb` or `.syl2db`, e.g. a [pre-built database](https://sylph-docs.github.io/pre%E2%80%90built-databases/) or one made with `sylph sketch`). Must be given together with `--custom_sylph_taxonomy` (checked at launch), so a custom database is never paired with the registry's taxonomy; the two skip both downloads
+- **Description**: Path to a local sylph genome database (`.syldb` or `.syl2db`, e.g. a [pre-built database](https://sylph-docs.github.io/pre%E2%80%90built-databases/) or one made with `sylph sketch`). Must be given together with `--custom_sylph_taxonomy` (checked at launch), so a custom database is never paired with the registry's taxonomy; the two skip both downloads. Outputs are then labelled with the database's file name without extension (e.g. `sylph_gtdb-r232-c200-dbv2_otu_table.tsv` and `gtdb-r232-c200-dbv2` in the `Sylph DB` column) instead of the `--sylph_db` key
 - **Example**: `--custom_sylph_db /path/to/gtdb-r232-c200-dbv2.syl2db`
 
 ### `--custom_sylph_taxonomy`

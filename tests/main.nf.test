@@ -1184,6 +1184,16 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_PROFILE (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_TAXPROF (") } == 2
 
+            // Outputs are labelled by the custom database's file name, not the
+            // --sylph_db default (gtdb_r232)
+            def tax = "${outputDir}/02_taxonomy"
+            assert path("${tax}/sylph/test_sample1_sylph_sylph_test_db.tsv").exists()
+            assert path("${tax}/sylph/test_sample2_sylph_sylph_test_db.sylphmpa").exists()
+            assert !path("${tax}/sylph/test_sample1_sylph_sylph_test_db_report.tsv").exists()
+            assert path("${tax}/tables/sylph_sylph_test_db_otu_table.tsv").exists()
+            assert path("${tax}/tables/sylph_sylph_test_db_read_counts.tsv").exists()
+            assert !path("${tax}/tables/sylph_gtdb_r232_otu_table.tsv").exists()
+
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
             assert vtext.contains("sylph_db: sylph_test_db.syldb")
             assert vtext.contains("sylph_taxonomy: sylph_tax_fixture.tsv.gz")

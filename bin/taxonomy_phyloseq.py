@@ -273,7 +273,9 @@ class PhyloseqTableGenerator:
         """
         Parse sylph-tax profiles plus the SYLPH_PROFILE per-sample reports.
 
-        <id>_sylph_<db>.sylphmpa: '#SampleID ...' line, header line, then one
+        <id>_sylph_<db>.sylphmpa (<db> = --db-name, stripped as an exact
+        suffix: a custom database label may itself contain 'sylph'):
+        '#SampleID ...' line, header line, then one
         row per clade at every rank; only the genome rows (last lineage
         component t__<accession>) are used, so no abundance is counted twice.
         <id>_sylph_<db>_report.tsv: Id, Sylph DB, Unclassified, Classified,
@@ -289,6 +291,7 @@ class PhyloseqTableGenerator:
             runs with -u, so sequence_abundance is the genome's share of all
             input reads, unknown included)
         """
+        profile_suffix = f"_sylph_{self.db_name}.sylphmpa"
         profiles = sorted(f for f in input_files if f.name.endswith('.sylphmpa'))
         reports = [f for f in input_files if f.name.endswith('_report.tsv')]
         if not profiles:
@@ -307,7 +310,9 @@ class PhyloseqTableGenerator:
         tax_rows = {}
 
         for profile in profiles:
-            sample_name = profile.name.rsplit('_sylph_', 1)[0]
+            if not profile.name.endswith(profile_suffix) or profile.name == profile_suffix:
+                raise ValueError(f"{profile} is not named <sample>{profile_suffix}")
+            sample_name = profile.name[:-len(profile_suffix)]
             with open(profile) as fh:
                 first = fh.readline()
             if not first.startswith('#SampleID'):

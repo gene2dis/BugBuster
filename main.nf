@@ -271,7 +271,7 @@ workflow {
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
     log.info "  Assembly mode        : ${params.assembly_mode}"
-    log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database' : params.sylph_db})" : ''}"
+    log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? "custom database: ${file(params.custom_sylph_db).baseName}" : params.sylph_db})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"

@@ -24,7 +24,8 @@ next release is tagged.
     (`bin/sylph_db_reformat.sh`) into `<databases_dir>/sylph/`;
     `--custom_sylph_db` and `--custom_sylph_taxonomy` (required together,
     checked at launch, so a database is never paired with another release's
-    taxonomy) skip both downloads
+    taxonomy) skip both downloads; outputs are then labelled with the custom
+    database's file name (e.g. `gtdb-r232-c200-dbv2`), not the `--sylph_db` key
   - `--sylph_read_seq_id` passes `--read-seq-id` to sylph: its automatic
     read-accuracy estimate, which drives the unknown fraction (Classified and
     the estimated read pairs), is skewed by reads from genomes absent from the

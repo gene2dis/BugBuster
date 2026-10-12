@@ -352,6 +352,27 @@ check_grep "sylph phyloseq: lineage split by rank prefix" "sylph_gtdb_tax_table.
 check_grep "sylph phyloseq: no-hit sample warned and skipped" "../taxonomy_phyloseq_sylph.log" \
     "no sylph genomes for sample sampleB"
 
+# A custom database label (its file name) may itself contain 'sylph': the
+# sample id is the file name minus the exact _sylph_<db>.sylphmpa suffix
+SYPH_LABEL="${WORK}/taxonomy_phyloseq_sylph_label"
+mkdir -p "${SYPH_LABEL}"
+cp "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa" "${SYPH_LABEL}/sampleA_sylph_my_sylph_db.sylphmpa"
+cp "${FIXTURES}/sampleA_sylph_gtdb_report.tsv" "${SYPH_LABEL}/sampleA_sylph_my_sylph_db_report.tsv"
+NEXT_WORKDIR="${SYPH_LABEL}"
+expect_pass "sylph phyloseq: database label containing 'sylph' parsed" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleA_sylph_my_sylph_db.sylphmpa sampleA_sylph_my_sylph_db_report.tsv \
+    --db-name my_sylph_db --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+check_grep "sylph phyloseq: sample id is the name minus the exact suffix" "sylph_my_sylph_db_otu_table.tsv" \
+    "^taxon_id	sampleA$"
+
+# A profile not named for the --db-name database must fail, not be mislabelled
+NEXT_WORKDIR="${SYPH_LABEL}"
+expect_fail "sylph phyloseq: profile of another database label fails" taxonomy_phyloseq.py --profiler sylph \
+    --input-files sampleA_sylph_my_sylph_db.sylphmpa sampleA_sylph_my_sylph_db_report.tsv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+
 # All samples without hits: loud failure
 SYPH_EMPTY="${WORK}/taxonomy_phyloseq_sylph_empty"
 mkdir -p "${SYPH_EMPTY}"
