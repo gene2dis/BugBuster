@@ -14,7 +14,8 @@ name: K-MARVEL image
 # keeps a tag after the <version> tag moves to a newer build.
 #
 # After the first publish, make the GHCR package public (Package settings >
-# Change visibility): CI and users pull it anonymously.
+# Change visibility): CI and users pull it anonymously. The post-push tag
+# check authenticates, so it also passes while the package is still private.
 
 on:
   pull_request:
@@ -83,7 +84,10 @@ jobs:
           permanent=${permanent:0:$(( ${#TAG} + 8 ))}
           docker tag "${IMAGE}:${TAG}" "${IMAGE}:${permanent}"
           docker push "${IMAGE}:${permanent}"
-          token=$(curl -fsS "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull" | jq -r .token)
+          # Authenticated: a newly created package is private until its
+          # visibility is changed by hand, so an anonymous token cannot read it
+          token=$(curl -fsS -u "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            "https://ghcr.io/token?scope=repository:${IMAGE#ghcr.io/}:pull" | jq -r .token)
           tagged=$(curl -fsSI -H "Authorization: Bearer ${token}" \
             -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.v2+json" \
             "https://ghcr.io/v2/${IMAGE#ghcr.io/}/manifests/${permanent}" \

@@ -20,8 +20,8 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - reads:
       type: file
-      description: Host-removed reads [R1, R2, optional singletons], decompressed together into a named pipe that K-MARVEL reads as one FASTQ (it reads only the first member of a multi-member gzip, so the .gz files are not concatenated; no uncompressed copy is written to disk) and run with --data-type sr; -k/-e are fixed by the data type and not exposed
-      pattern: "*.fastq.gz"
+      description: Host-removed reads [R1, R2, optional singletons; gzipped or plain FASTQ, as raw inputs arrive unchanged with --quality_control false], decompressed together (zcat -f) into a named pipe in a local temp dir that K-MARVEL reads as one FASTQ (it reads only the first member of a multi-member gzip, so the .gz files are not concatenated; no uncompressed copy is written to disk) and run with --data-type sr; -k/-e are fixed by the data type and not exposed
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
   - kmarvel_db:
       type: directory
       description: CARD reference directory with CARD_protein_all.fasta, metadata.tsv and snps.txt (FORMAT_KMARVEL_DB or --custom_kmarvel_db); the FASTA is copied into the task and indexed with makeblastdb there

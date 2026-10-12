@@ -56,11 +56,14 @@ def main(paths):
     for path in paths:
         sample = sample_name(path)
         samples.append(sample)
-        df = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
-        missing = [c for c in LONG_COLUMNS if c not in df.columns]
+        # Check the header first, then read only the columns used: the
+        # read_data, sequence and CIGAR columns grow with read depth
+        header = pd.read_csv(path, sep="\t", nrows=0).columns
+        missing = [c for c in LONG_COLUMNS if c not in header]
         if missing:
             sys.exit(f"ERROR: {path} lacks columns: {', '.join(missing)}")
-        df = df[LONG_COLUMNS].copy()
+        df = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False,
+                         usecols=LONG_COLUMNS)[LONG_COLUMNS].copy()
         df.insert(0, "sample", sample)
         tables.append(df)
 

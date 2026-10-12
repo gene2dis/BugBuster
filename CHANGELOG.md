@@ -38,9 +38,10 @@ next release is tagged.
     published to `ghcr.io/gene2dis/bugbuster-kmarvel` by the manual
     `.github/workflows/kmarvel-image.yml`
   - Works around three K-MARVEL 1.0.0 behaviours: it reads only the first
-    member of a multi-member gzip (the reads are streamed decompressed
-    through a named pipe instead of concatenating `.gz` files; no
-    uncompressed copy on disk), it exits 0 when its blastp step
+    member of a multi-member gzip (the reads, gzipped or plain, are
+    streamed through a named pipe in a local temp dir instead of
+    concatenating `.gz` files; no uncompressed copy on disk, and a task
+    whose reads K-MARVEL never consumed fails instead of hanging), it exits 0 when its blastp step
     fails and writes a header-less table for zero ARGs
     (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
     and it cuts output names at the first `.` (it runs on fixed file names)
