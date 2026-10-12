@@ -34,7 +34,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
    - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
-8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
+8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/), [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html) or [`Sylph`](https://github.com/bluenote-1577/sylph) (+ [`sylph-tax`](https://github.com/bluenote-1577/sylph-tax))
 9. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
 10. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
 11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
@@ -138,6 +138,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
+| **Sylph GTDB r232 (c200, two-stage .syl2db)** + sylph-tax metadata | 19 GB + 5.5 MB (`gtdb_r226` 18 GB, `gtdb_r220` 13.1 GB) | Taxonomic profiling | `taxonomic_profiler='sylph'` | `--custom_sylph_db`, `--custom_sylph_taxonomy` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
@@ -161,6 +162,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **host_db**: [`T2T-CHM13v2.0 genome (chm13v2.0.fa.gz)`](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz)
 - **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
 - **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
+- **sylph_db**: [`sylph pre-built databases`](https://sylph-docs.github.io/pre%E2%80%90built-databases/) + [`sylph-tax metadata`](https://github.com/bluenote-1577/sylph-tax)
 - **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 - **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
 - **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
@@ -205,7 +207,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--output` | *required* | Output directory |
 | `--quality_control` | `true` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, or `none` |
 | `--include_binning` | `false` | Enable binning and refinement |
 | `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
 | `--min_read_sample` | `0` | Minimum reads required after QC |
@@ -231,6 +233,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 |-----------|---------|---------|-------------|
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--databases_dir` | `<output>/../databases` | Path | Database storage location |
 
 ### Quality Control Options
@@ -248,6 +251,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
 | `--bracken_tax_level` | `S` | Bracken level: D, P, C, O, F, G, S |
 | `--sourmash_tax_rank` | `species` | Sourmash rank: genus, species, strain |
+| `--sylph_read_seq_id` | unset | Sylph read identity (%), e.g. 99.5; corrects the unknown fraction when Classified looks too high |
 | `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Taxonomic levels to plot |
 | `--taxonomy_top_n_taxa` | `10` | Number of top taxa in plots |
 | `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files |
@@ -320,9 +324,9 @@ results/
 │   ├── fastp/                  # Per-sample FastP reports
 │   └── summary/                # Aggregated statistics
 ├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
-│   ├── kraken2/ or sourmash/   # Per-sample profiler results
+│   ├── kraken2/, sourmash/ or sylph/  # Per-sample profiler results (sylph: profile .tsv + sylph-tax .sylphmpa)
 │   ├── bracken/                # Bracken abundance estimates (kraken2 only)
-│   ├── tables/                 # Abundance tables
+│   ├── tables/                 # Abundance tables (sylph: relative-abundance OTU table + estimated read pairs per genome)
 │   ├── phyloseq/               # Phyloseq objects (*.h5, *.RDS)
 │   └── figures/                # Taxonomy plots
 ├── 03_assembly/                # Genome assembly (if assembly_mode != 'none')

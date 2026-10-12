@@ -57,7 +57,7 @@ def printHelp() {
     \u001B[1;33mPipeline options:\u001B[0m
       --quality_control             Enable QC and host filtering (default: ${params.quality_control})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
-      --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'none' (default: ${params.taxonomic_profiler})
+      --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
       --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
@@ -154,7 +154,7 @@ include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn                   } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
 /*
@@ -249,6 +249,12 @@ workflow {
     if (!(params.read_level_functional in valid_read_functional)) {
         error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
     }
+    // A sylph database and its sylph-tax metadata must come from the same
+    // release: a custom database with the registry's metadata (or the reverse)
+    // would get wrong or default lineages from sylph-tax without failing
+    if (params.taxonomic_profiler == 'sylph' && (params.custom_sylph_db as boolean) != (params.custom_sylph_taxonomy as boolean)) {
+        error("--custom_sylph_db and --custom_sylph_taxonomy must be given together: a sylph database and the sylph-tax metadata of the same release (e.g. gtdb-r232-c200-dbv2.syl2db with gtdb_r232_metadata.tsv.gz). Pass both, or neither to download the --sylph_db entry")
+    }
     def valid_superfocus_aligners = ['diamond', 'mmseqs2']
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
         error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
@@ -270,7 +276,7 @@ workflow {
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
     log.info "  Assembly mode        : ${params.assembly_mode}"
-    log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}"
+    log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
@@ -322,7 +328,9 @@ workflow {
             ch_clean_reads,
             ch_reads_report,
             PREPARE_DATABASES.out.kraken_db,
-            PREPARE_DATABASES.out.sourmash_db
+            PREPARE_DATABASES.out.sourmash_db,
+            PREPARE_DATABASES.out.sylph_db,
+            PREPARE_DATABASES.out.sylph_taxonomy
         )
         ch_versions = ch_versions.mix(TAXONOMY.out.versions)
     }

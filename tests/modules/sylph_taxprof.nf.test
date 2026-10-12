@@ -1,0 +1,98 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SYLPH_TAXPROF Module Test
+
+    sylph-tax taxprof on the REAL pinned sylph-tax image with the committed
+    sylph profiles and metadata (tests/data/sylph/, made by
+    tests/bin/make_sylph_fixtures.sh). Pins the module wrapper: --no-config
+    with the staged metadata file (no ~/.config, no taxonomy download), the
+    rename to <id>_sylph_<db>.sylphmpa, and the header-only profile written
+    for a sample without genomes (sylph-tax itself writes no file then).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test SYLPH_TAXPROF Process"
+    script "../../modules/local/sylph_taxprof/main.nf"
+    process "SYLPH_TAXPROF"
+
+    test("converts a sylph profile into a lineage profile") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sytest' ],
+                    file("${projectDir}/tests/data/sylph/sylph_profile_hit.tsv", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def mpa = file(process.out.sylphmpa.get(0).get(1))
+            assert mpa.name == "sytest_sylph_testdb.sylphmpa"
+            def lines = mpa.readLines()
+            assert lines[0].startsWith("#SampleID\t")
+            assert lines[1] == "clade_name\trelative_abundance\tsequence_abundance\tANI (if strain-level)\tCoverage (if strain-level)"
+            // every rank down to the genome, which carries ANI and coverage
+            assert lines.any { it.startsWith("d__Viruses\t") }
+            def genome = lines.find { it.split('\t')[0].endsWith('|t__GCF_000840245.1') }
+            assert genome != null
+            assert genome.startsWith("d__Viruses|p__Uroviricota|c__Caudoviricetes|o__Caudovirales|f__Lambdaviridae|g__Lambdavirus|s__Lambdavirus lambda|t__GCF_000840245.1\t100")
+            assert genome.split('\t')[3] != 'NA'
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('sylph-tax: 1.9.2')
+            assert versions.contains('sylph_taxonomy: sylph_tax_fixture.tsv.gz')
+        }
+    }
+
+    test("writes a header-only profile when sylph found no genome") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'syempty' ],
+                    file("${projectDir}/tests/data/sylph/sylph_profile_empty.tsv", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.sylphmpa.get(0).get(1)).readLines()
+            assert lines.size() == 2
+            assert lines[0] == "#SampleID\tsyempty\tTaxonomies_used:['sylph_tax_fixture.tsv.gz']"
+            assert lines[1] == "clade_name\trelative_abundance\tsequence_abundance\tANI (if strain-level)\tCoverage (if strain-level)"
+        }
+    }
+
+    test("stub emits a header-only profile") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sytest' ],
+                    file("${projectDir}/tests/data/sylph/sylph_profile_hit.tsv", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.sylphmpa.get(0).get(1)).name == "sytest_sylph_testdb.sylphmpa"
+        }
+    }
+}

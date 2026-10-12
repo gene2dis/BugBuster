@@ -116,6 +116,49 @@ nextflow_process {
         }
     }
 
+    test("builds sylph relative-abundance and read-pair tables, skipping a no-hit sample") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sampleA_sylph_gtdb.sylphmpa", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sampleA_sylph_gtdb_report.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sampleB_sylph_gtdb.sylphmpa", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sampleB_sylph_gtdb_report.tsv", checkIfExists: true)
+                ]
+                input[1] = 'sylph'
+                input[2] = 'gtdb'
+                input[3] = 'Phylum,Species'
+                input[4] = 10
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            // genome (t__) rows only, relative abundance
+            def otu = path(process.out.otu_table.get(0)).readLines()
+            assert otu[0] == "taxon_id\tsampleA"
+            assert otu.size() == 4
+            assert otu.contains("GCF_000009045.1\t22.3376")
+
+            // estimated read pairs: sequence_abundance / 100 x 60000 read pairs
+            assert file(process.out.read_counts.get(0)).name == "sylph_gtdb_read_counts.tsv"
+            def counts = path(process.out.read_counts.get(0)).readLines()
+            assert counts[0] == "taxon_id\tsampleA"
+            assert counts.contains("GCA_047199115.1\t24465")
+            assert counts.contains("GCA_047199095.1\t23028")
+            assert counts.contains("GCF_000009045.1\t12507")
+
+            def tax = path(process.out.tax_table.get(0)).readLines()
+            assert tax.contains("GCF_000009045.1\tBacteria\tBacillota\tBacilli\tBacillales\tBacillaceae\tBacillus\tBacillus subtilis")
+        }
+    }
+
     test("stub emits tables with the real filename prefix") {
         options "-stub"
 

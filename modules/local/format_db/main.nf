@@ -27,6 +27,54 @@ process FORMAT_KRAKEN_DB {
         """
 }
 
+process FORMAT_SYLPH_DB {
+    tag "format_sylph_db"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("sylph_db/*.syl*db"), emit: db
+
+    script:
+        """
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db
+        """
+
+    stub:
+        """
+        mkdir sylph_db
+        touch sylph_db/${db.tokenize('/')[-1]}
+        """
+}
+
+process FORMAT_SYLPH_TAXONOMY {
+    tag "format_sylph_taxonomy"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download'
+
+    input:
+        val(taxonomy)
+
+    output:
+        path("sylph_db/*.tsv.gz"), emit: taxonomy
+
+    script:
+        """
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} taxonomy $taxonomy
+        """
+
+    stub:
+        """
+        mkdir sylph_db
+        printf 'GCF_000000001.1\\td__Bacteria;p__P;c__C;o__O;f__F;g__G;s__G species\\n' | gzip > sylph_db/${taxonomy.tokenize('/')[-1]}
+        """
+}
+
 process FORMAT_NT_BLAST_DB {
     tag "format_blast_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'

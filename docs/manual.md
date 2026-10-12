@@ -25,7 +25,7 @@
 BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysis and antimicrobial resistance gene (ARG) prediction. Built following bioinformatics best practices, it provides:
 
 - **Read Quality Control**: Filtering, trimming, and host decontamination
-- **Taxonomic Profiling**: Species identification using Kraken2 or Sourmash
+- **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
 - **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
 - **Metagenomic Binning**: MAG recovery with MetaBAT2, SemiBin, and COMEBin
 - **Bin Refinement**: Quality improvement with MetaWRAP
@@ -37,7 +37,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 ### Pipeline Workflow
 
 ```
-Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
+Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/Sylph)
                                             ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
@@ -177,6 +177,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
+| **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` |
@@ -212,6 +213,14 @@ wget -P /shared/databases/bugbuster/sourmash/ \
     https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/gtdb-reps-rs220-k31.zip
 wget -P /shared/databases/bugbuster/sourmash/ \
     https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/gtdb-rs220.lineages.reps.csv
+
+# Download Sylph GTDB r232 (19 GB) + its sylph-tax taxonomy metadata (5.5 MB)
+# -> --custom_sylph_db .../gtdb-r232-c200-dbv2.syl2db
+#    --custom_sylph_taxonomy .../gtdb_r232_metadata.tsv.gz
+wget -P /shared/databases/bugbuster/sylph/ \
+    https://faust.compbio.cs.cmu.edu/sylph-stuff/gtdb-r232-c200-dbv2.syl2db
+wget -P /shared/databases/bugbuster/sylph/ \
+    https://zenodo.org/records/19646381/files/gtdb_r232_metadata.tsv.gz
 
 # Download CheckM2
 wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
@@ -354,10 +363,11 @@ alongside the paired reads, and carried into downstream assembly/profiling
 steps that accept them. A few caveats: the `--min_read_sample` threshold counts
 paired reads only; Kraken2 profiles the paired reads only (it runs in
 `--paired` mode); and read-level RGI ARG prediction (`--rgi_prediction`) also
-uses the paired reads only (`rgi bwt` accepts a single read pair). Sourmash,
-K-MARVEL (`--kmarvel_prediction`, which pools R1, R2 and singletons into one
-read set, as upstream asks for paired-end data) and assembly use singletons
-as well.
+uses the paired reads only (`rgi bwt` accepts a single read pair); Sylph
+profiles the paired reads only too (sylph would treat a singleton file as a
+separate sample). Sourmash, K-MARVEL (`--kmarvel_prediction`, which pools R1,
+R2 and singletons into one read set, as upstream asks for paired-end data) and
+assembly use singletons as well.
 
 ### Input Requirements
 
@@ -397,7 +407,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|---------|-------------|
 | `--quality_control` | `true` | `true`, `false` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `none` | Taxonomic profiling tool |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables MetaWRAP |
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
@@ -543,6 +553,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--host_db` | `human` | `human` | Host genome for read removal |
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
 | `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
@@ -563,6 +574,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
+| `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
+| `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
 | `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
@@ -601,6 +614,10 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--bracken_read_len` | `150` | Read length for Bracken estimation |
 | `--bracken_tax_level` | `S` | Taxonomic level: D, P, C, O, F, G, S |
 | `--sourmash_tax_rank` | `species` | Rank: `genus`, `species`, `strain` |
+| `--sylph_read_seq_id` | unset (automatic) | Sylph read identity (%), e.g. `99.5`; corrects the unknown fraction (Classified, estimated read pairs) |
+
+Sylph runs with its defaults plus `-u`; its abundance tables are described in
+`docs/parameters.md` (*Sylph outputs*).
 
 ### 6.7 Assembly Options
 
@@ -872,8 +889,12 @@ results/
 │   │   └── {sample}_*.bracken                  # Per-sample Bracken results
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
+│   ├── sylph/                                  # Sylph results (if taxonomic_profiler='sylph')
+│   │   ├── {sample}_sylph_{db}.tsv             # Per-sample sylph genome profile (sylph profile -u)
+│   │   └── {sample}_sylph_{db}.sylphmpa        # Per-sample lineage profile (sylph-tax, every rank down to t__ genome)
 │   ├── tables/                                 # Taxonomy tables
-│   │   └── *.tsv                               # Abundance tables
+│   │   ├── *.tsv                               # Abundance tables (OTU = relative abundance for sylph)
+│   │   └── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
 │   ├── phyloseq/                               # Phyloseq objects
 │   │   ├── *.h5                                # HDF5 format
 │   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
@@ -1190,6 +1211,7 @@ databases/                            # Database storage (configurable via --dat
 ├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
 ├── kraken/                           # Kraken2 database (selected via --kraken2_db)
 ├── sourmash/                         # Sourmash database
+├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
 ├── taxdump/                          # NCBI taxonomy dump
 ├── blast/                            # NCBI NT BLAST database
 ├── deeparg_db/                       # DeepARG database

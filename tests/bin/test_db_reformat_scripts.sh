@@ -1,6 +1,7 @@
 #!/bin/bash
 #
-# Regression tests for audit items #3 and #10:
+# Regression tests for audit items #3 and #10 (plus the reformat scripts
+# added since, e.g. sylph_db_reformat.sh):
 #   - the pinned download container must contain every tool the bin/ DB
 #     reformat scripts need (item #3), and
 #   - the reformat scripts must fail loudly on partial/corrupt downloads
@@ -174,6 +175,21 @@ build_fixtures() {
     # A corrupt (truncated) gzip tarball, and an xz twin for the Bakta script
     head -c 100 /dev/urandom > "${f}/corrupt.tar.gz"
     head -c 100 /dev/urandom > "${f}/corrupt.tar.xz"
+
+    # sylph: the committed two-genome module fixture database and its
+    # sylph-tax metadata, an empty database, a corrupt gzip metadata file and
+    # a valid gzip that is not sylph-tax metadata
+    cp "${REPO_DIR}/tests/data/sylph/sylph_test_db.syldb" "${f}/mini-c200.syldb"
+    : > "${f}/empty-c200.syldb"
+    cp "${REPO_DIR}/tests/data/sylph/sylph_tax_fixture.tsv.gz" "${f}/mini_metadata.tsv.gz"
+    head -c 100 /dev/urandom > "${f}/corrupt_metadata.tsv.gz"
+    printf 'just some text\n' | gzip -n > "${f}/plain_metadata.tsv.gz"
+    # an HTML error page saved under each database name, a two-stage
+    # database stand-in with the SY2D magic, and binary data without it
+    printf '<!DOCTYPE html><html><body>503 Service Unavailable</body></html>\n' > "${f}/html-c200.syldb"
+    cp "${f}/html-c200.syldb" "${f}/html-c200.syl2db"
+    { printf 'SY2D'; head -c 2048 /dev/zero; } > "${f}/mini-c200.syl2db"
+    { printf 'XXXX'; head -c 2048 /dev/zero; } > "${f}/nomagic-c200.syl2db"
 }
 build_fixtures
 
@@ -366,6 +382,25 @@ check_file "kraken: taxo.k2d extracted" "k2_ref_db/taxo.k2d"
 expect_fail "kraken: corrupt tarball fails" kraken_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
 expect_fail "kraken: 404 URL fails" kraken_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
 expect_fail "kraken: tarball without k2d files fails" kraken_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+
+#
+# sylph_db_reformat.sh
+#
+echo "--- sylph_db_reformat.sh ---"
+expect_pass "sylph: valid database" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syldb"
+check_file "sylph: database saved under its URL name" "sylph_db/mini-c200.syldb"
+expect_pass "sylph: valid taxonomy metadata" sylph_db_reformat.sh taxonomy "${BASE_URL}/mini_metadata.tsv.gz"
+check_file "sylph: metadata saved under its URL name" "sylph_db/mini_metadata.tsv.gz"
+expect_fail "sylph: empty database fails" sylph_db_reformat.sh db "${BASE_URL}/empty-c200.syldb"
+expect_pass "sylph: two-stage database with SY2D magic" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syl2db"
+expect_fail "sylph: HTML page saved as .syldb fails" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syldb"
+expect_fail "sylph: HTML page saved as .syl2db fails" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syl2db"
+expect_fail "sylph: .syl2db without SY2D magic fails" sylph_db_reformat.sh db "${BASE_URL}/nomagic-c200.syl2db"
+expect_fail "sylph: 404 database URL fails" sylph_db_reformat.sh db "${BASE_URL}/no_such.syl2db"
+expect_fail "sylph: non-sylph database name fails" sylph_db_reformat.sh db "${BASE_URL}/k2_mini.tar.gz"
+expect_fail "sylph: corrupt metadata gzip fails" sylph_db_reformat.sh taxonomy "${BASE_URL}/corrupt_metadata.tsv.gz"
+expect_fail "sylph: gzip without accession/lineage layout fails" sylph_db_reformat.sh taxonomy "${BASE_URL}/plain_metadata.tsv.gz"
+expect_fail "sylph: unknown mode fails" sylph_db_reformat.sh index "${BASE_URL}/mini-c200.syldb"
 
 #
 # tax_files_reformat.sh

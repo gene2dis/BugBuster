@@ -12,6 +12,40 @@ next release is tagged.
 
 ### Added
 
+- **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
+  - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by
+    containment ANI against a sylph database with `-u` (unknown-fraction
+    estimation); `SYLPH_TAXPROF` (sylph-tax 1.9.2, `--no-config` with the
+    staged metadata file) turns each genome profile into a lineage profile
+    (`.sylphmpa`), writing a header-only profile for a sample without genomes
+  - New `--sylph_db` registry (`gtdb_r232` default: GTDB r232 c200 two-stage
+    `.syl2db`, 19 GB; `gtdb_r226`, `gtdb_r220`), each downloaded with its
+    sylph-tax metadata by `FORMAT_SYLPH_DB` / `FORMAT_SYLPH_TAXONOMY`
+    (`bin/sylph_db_reformat.sh`) into `<databases_dir>/sylph/`;
+    `--custom_sylph_db` and `--custom_sylph_taxonomy` (required together,
+    checked at launch, so a database is never paired with another release's
+    taxonomy) skip both downloads; outputs are then labelled with the custom
+    database's file name (e.g. `gtdb-r232-c200-dbv2`), not the `--sylph_db` key
+  - `--sylph_read_seq_id` passes `--read-seq-id` to sylph: its automatic
+    read-accuracy estimate, which drives the unknown fraction (Classified and
+    the estimated read pairs), is skewed by reads from genomes absent from the
+    database (simulated 1/3 unknown: 100% classified automatically, 66.1%
+    with the identity set, truth 66.7%)
+  - `SYLPH_PROFILE` requests 12 GB with a two-stage `.syl2db` (GTDB r232:
+    ~4.3 GB peak measured, it loads only the sparse first-stage index) and
+    36 GB with a single-stage `.syldb`, doubling on an OOM retry; the read-pair
+    count runs concurrently with sylph
+  - Outputs: per-sample profiles in `02_taxonomy/sylph/`; the phyloseq tables
+    hold sylph's relative (taxonomic) abundance per genome, and a new
+    `sylph_<db>_read_counts.tsv` holds the estimated read pairs per genome
+    (`sequence_abundance` × the read pairs given to sylph); `Reads_report.csv`
+    gains the `Sylph DB` / classified fraction columns. `TAXONOMY_PHYLOSEQ`
+    gains an optional `read_counts` output
+  - Tests: real-container nf-tests for both modules on a committed two-genome
+    database and simulated reads (`tests/bin/make_sylph_fixtures.sh`), sylph
+    cases in the report / phyloseq / DB reformat script harnesses and two
+    pipeline stub runs (registry and custom databases)
+
 - **Read-level ARG detection with K-MARVEL (`--kmarvel_prediction`)**
   - New optional read-level step, independent of assembly and of
     `--read_arg_prediction` / `--rgi_prediction`: `KMARVEL` runs

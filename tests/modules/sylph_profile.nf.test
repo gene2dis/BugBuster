@@ -1,0 +1,178 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SYLPH_PROFILE Module Test
+
+    sylph read-level profiling on the REAL pinned sylph image with the
+    committed two-genome database and simulated reads (tests/data/sylph/,
+    made by tests/bin/make_sylph_fixtures.sh: 1,000 lambda pairs + 500 random
+    pairs). Pins the module wrapper: paired -1/-2 input with -u, the profile
+    and per-sample report (Classified = sum of Sequence_abundance / 100, the
+    read-pair count used for the estimated read pairs per genome) and the
+    database provenance.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test SYLPH_PROFILE Process"
+    script "../../modules/local/sylph_profile/main.nf"
+    process "SYLPH_PROFILE"
+
+    test("profiles the fixture reads against the fixture database") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sytest' ],
+                    [
+                        file("${projectDir}/tests/data/sylph/sylph_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/sylph/sylph_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def profile = file(process.out.profile.get(0).get(1))
+            assert profile.name == "sytest_sylph_testdb.tsv"
+            def rows = profile.readLines()
+            assert rows[0].startsWith("Sample_file\tGenome_file\tTaxonomic_abundance\tSequence_abundance")
+            // -u replaces Eff_cov by True_cov
+            assert rows[0].split('\t').contains('True_cov')
+            // lambda detected, phiX (no reads) not
+            assert rows.size() == 2
+            assert rows[1].split('\t')[1] == 'GCF_000840245.1_genomic.fna'
+
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[0] == "Id\tSylph DB\tUnclassified\tClassified\tRead pairs"
+            def fields = report[1].split('\t')
+            assert fields[0] == 'sytest'
+            assert fields[1] == 'testdb'
+            assert fields[4] == '1500'
+            def classified = fields[3] as double
+            def seqAbund = rows[1].split('\t')[3] as double
+            assert Math.abs(classified - Math.min(seqAbund / 100, 1.0)) < 1e-6
+            assert Math.abs((fields[2] as double) + classified - 1.0) < 1e-6
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('sylph: 1.0.0')
+            assert versions.contains('sylph_db: sylph_test_db.syldb')
+        }
+    }
+
+    test("--sylph_read_seq_id reaches sylph and corrects the unknown fraction") {
+        // The fixture is 1,000 lambda pairs + 500 random pairs (2/3 known).
+        // sylph's automatic read-accuracy estimate is skewed by the random
+        // reads and reports 100% classified; --read-seq-id 100 (the simulated
+        // reads are near error-free) gives 66.1% (sylph 1.0.0)
+        when {
+            params {
+                sylph_read_seq_id = 100
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sytest' ],
+                    [
+                        file("${projectDir}/tests/data/sylph/sylph_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/sylph/sylph_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def fields = path(process.out.report.get(0)).readLines()[1].split('\t')
+            def classified = fields[3] as double
+            assert classified > 0.60 && classified < 0.72
+            assert fields[4] == '1500'
+        }
+    }
+
+    test("counts uncompressed reads and handles a sample without hits") {
+        // --quality_control false passes plain .fastq through to sylph: the
+        // read-pair count must use zcat -f. These 10 non-host pairs hit
+        // neither fixture genome, so the profile is header-only
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'syplain' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.profile.get(0).get(1)).readLines().size() == 1
+            assert path(process.out.report.get(0)).readLines()[1] == "syplain\ttestdb\t1.000000\t0.000000\t10"
+        }
+    }
+
+    test("fails on an R1 that is not whole FASTQ records") {
+        // The read-pair count runs in the background while sylph profiles;
+        // its failure must still fail the task (sylph itself accepts this file)
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sybad' ],
+                    [
+                        file("${projectDir}/tests/data/sylph/malformed_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("not a multiple of 4 (truncated or malformed FASTQ)") }
+        }
+    }
+
+    test("stub emits a header-only profile and a zero report") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sytest' ],
+                    [
+                        file("${projectDir}/tests/data/sylph/sylph_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/sylph/sylph_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.profile.get(0).get(1)).readLines().size() == 1
+            assert path(process.out.report.get(0)).readLines()[1] == "sytest\ttestdb\t1.000000\t0.000000\t0"
+        }
+    }
+}

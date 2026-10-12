@@ -68,8 +68,8 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--taxonomic_profiler`
 - **Type**: String
 - **Default**: `sourmash`
-- **Options**: `kraken2`, `sourmash`, `none`
-- **Description**: Tool for taxonomic profiling at read level
+- **Options**: `kraken2`, `sourmash`, `sylph`, `none`
+- **Description**: Tool for taxonomic profiling at read level. `sylph` profiles the paired clean reads by containment ANI against a sylph genome database (`sylph profile -u`) and turns the genome hits into lineages with sylph-tax; like `kraken2`, it uses R1/R2 only (a singleton file would be a separate sylph sample)
 - **Example**: `--taxonomic_profiler kraken2`
 
 ### `--include_binning`
@@ -182,6 +182,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Sourmash database selection
 - **Size**: 17 GB
 - **Example**: `--sourmash_db gtdb_220_k31`
+
+### `--sylph_db`
+- **Type**: String
+- **Default**: `gtdb_r232`
+- **Options**: `gtdb_r232` (two-stage `.syl2db`, 19 GB), `gtdb_r226` (`.syldb`, 18 GB), `gtdb_r220` (`.syldb`, 13.1 GB)
+- **Description**: Sylph database selection: GTDB representative genomes (c200 builds), downloaded together with the sylph-tax taxonomy metadata of the same release (~5-13 MB) into `<databases_dir>/sylph/`
+- **Example**: `--sylph_db gtdb_r226`
 
 ### `--karga_db`
 - **Type**: String
@@ -338,6 +345,16 @@ Override automatic downloads by providing custom database paths:
 - **Type**: Array of strings
 - **Description**: Paths to custom Sourmash database files [kmer_file, lineages_file]
 - **Example**: `--custom_sourmash_db '["/path/to/kmers.zip", "/path/to/lineages.csv"]'`
+
+### `--custom_sylph_db`
+- **Type**: String (file path)
+- **Description**: Path to a local sylph genome database (`.syldb` or `.syl2db`, e.g. a [pre-built database](https://sylph-docs.github.io/pre%E2%80%90built-databases/) or one made with `sylph sketch`). Must be given together with `--custom_sylph_taxonomy` (checked at launch), so a custom database is never paired with the registry's taxonomy; the two skip both downloads. Outputs are then labelled with the database's file name without extension (e.g. `sylph_gtdb-r232-c200-dbv2_otu_table.tsv` and `gtdb-r232-c200-dbv2` in the `Sylph DB` column) instead of the `--sylph_db` key
+- **Example**: `--custom_sylph_db /path/to/gtdb-r232-c200-dbv2.syl2db`
+
+### `--custom_sylph_taxonomy`
+- **Type**: String (file path)
+- **Description**: Path to a local sylph-tax metadata file matching the sylph database: genome accession, a tab, and a `d__...;p__...;...;s__...` lineage per line (`.tsv` or `.tsv.gz`). Use the file `sylph-tax download` fetches for a pre-built database (e.g. `gtdb_r232_metadata.tsv.gz`), or write your own for custom genomes. Must be given together with `--custom_sylph_db`
+- **Example**: `--custom_sylph_taxonomy /path/to/gtdb_r232_metadata.tsv.gz`
 
 ### `--custom_checkm2_db`
 - **Type**: String (file path)
@@ -505,6 +522,28 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `genus`, `species`, `strain`
 - **Description**: Taxonomic rank for Sourmash classification
 - **Example**: `--sourmash_tax_rank genus`
+
+### `--sylph_read_seq_id`
+- **Type**: Number (percent, > 0 and <= 100)
+- **Default**: unset (sylph's automatic estimate)
+- **Description**: Read sequence identity passed to `sylph profile --read-seq-id`. It drives sylph's unknown-fraction estimate (`-u`), i.e. the `Classified` column of `Reads_report.csv` and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified (on simulated reads with 1/3 unknown: automatic 100%, `100` gave 66.1% against a true 66.7%), so set it when `Classified` looks too high
+- **Example**: `--sylph_read_seq_id 99.5` (typical Illumina)
+
+### Sylph outputs
+Sylph runs with sylph's defaults plus `-u` (estimate the unknown fraction) and
+`--read-seq-id` when `--sylph_read_seq_id` is set. Per sample it publishes the genome
+profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
+`02_taxonomy/tables/` set holds:
+
+- `sylph_<db>_otu_table.tsv`: sylph's **relative (taxonomic) abundance** of each
+  genome (`t__` accession), coverage-normalised, MetaPhlAn-like; this is the
+  table behind the plots and the phyloseq objects
+- `sylph_<db>_read_counts.tsv`: **estimated read pairs per genome**,
+  `sequence_abundance / 100 × the read pairs given to sylph`. With `-u`,
+  `sequence_abundance` is the genome's share of all input reads (unknown
+  included), so the column sums to the classified pairs
+- The `Classified` column of `Reads_report.csv` is the sum of `sequence_abundance / 100`
+  (capped at 1.0); see `--sylph_read_seq_id` when it looks too high
 
 ---
 

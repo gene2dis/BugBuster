@@ -1,0 +1,49 @@
+name: sylph_profile
+description: Read-level taxonomic profiling with sylph - profiles the paired host-removed reads against a sylph database (.syldb or two-stage .syl2db) with -u (unknown-fraction estimation), plus a per-sample classified/unclassified report carrying the read-pair count
+keywords:
+  - taxonomy
+  - taxonomic profiling
+  - ANI
+  - k-mer
+  - sylph
+  - metagenomics
+tools:
+  - sylph:
+      description: Ultrafast containment-ANI metagenomic profiler for short and long reads (1.0.0)
+      homepage: https://github.com/bluenote-1577/sylph
+      documentation: https://sylph-docs.github.io/
+      doi: "10.1038/s41587-024-02412-y"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads [R1, R2] (gzipped); a singleton file is not passed, sylph would profile it as a separate sample
+      pattern: "*.fastq.gz"
+  - db:
+      type: file
+      description: sylph genome database (the registry default is GTDB r232 c200, two-stage .syl2db); reads are sketched at sylph's default -c 200, which sylph reconciles with the database's c
+      pattern: "*.{syldb,syl2db}"
+  - db_name:
+      type: value
+      description: Database name, used in output file names and the report
+
+output:
+  - profile:
+      type: file
+      description: sylph profile TSV (one row per detected genome; Sequence_abundance is the share of all input reads, unknown included, because of -u; header-only when no genome passes the threshold)
+      pattern: "*_sylph_*.tsv"
+  - report:
+      type: file
+      description: Per-sample report (Id, Sylph DB, Unclassified, Classified, Read pairs); Classified is the sum of Sequence_abundance / 100, Read pairs the number of R1 records given to sylph
+      pattern: "*_sylph_*_report.tsv"
+  - versions:
+      type: file
+      description: Software versions (sylph, plus the database file name)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -8,6 +8,8 @@
 */
 
 include { FORMAT_KRAKEN_DB        } from '../../modules/local/format_db/main'
+include { FORMAT_SYLPH_DB         } from '../../modules/local/format_db/main'
+include { FORMAT_SYLPH_TAXONOMY   } from '../../modules/local/format_db/main'
 include { FORMAT_NT_BLAST_DB      } from '../../modules/local/format_db/main'
 include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
@@ -33,6 +35,8 @@ workflow PREPARE_DATABASES {
     // Initialize empty channels
     ch_kraken_db        = channel.empty()
     ch_sourmash_db      = channel.empty()
+    ch_sylph_db         = channel.empty()
+    ch_sylph_taxonomy   = channel.empty()
     ch_karga_db         = channel.empty()
     ch_kargva_db        = channel.empty()
     ch_deeparg_db       = channel.empty()
@@ -94,6 +98,23 @@ workflow PREPARE_DATABASES {
         ch_sourmash_db = ch_sourmash_kmer
             .combine(ch_sourmash_tax_db)
             .collect()
+    }
+
+    //
+    // Sylph database + the sylph-tax taxonomy metadata of the same release:
+    // both local (main.nf requires the two custom paths together) or both
+    // downloaded from the --sylph_db registry entry
+    //
+    if ( params.taxonomic_profiler == "sylph" ) {
+        if ( params.custom_sylph_db ) {
+            ch_sylph_db       = channel.fromPath(params.custom_sylph_db, checkIfExists: true)
+            ch_sylph_taxonomy = channel.fromPath(params.custom_sylph_taxonomy, checkIfExists: true)
+        } else {
+            FORMAT_SYLPH_DB(params.sylph_ref_db[params.sylph_db]["url"][0])
+            FORMAT_SYLPH_TAXONOMY(params.sylph_ref_db[params.sylph_db]["url"][1])
+            ch_sylph_db       = FORMAT_SYLPH_DB.out.db
+            ch_sylph_taxonomy = FORMAT_SYLPH_TAXONOMY.out.taxonomy
+        }
     }
 
     //
@@ -347,6 +368,8 @@ workflow PREPARE_DATABASES {
     emit:
     kraken_db              = ch_kraken_db
     sourmash_db            = ch_sourmash_db
+    sylph_db               = ch_sylph_db
+    sylph_taxonomy         = ch_sylph_taxonomy
     karga_db               = ch_karga_db
     kargva_db              = ch_kargva_db
     decontamination_index  = ch_decontamination_index  // Combined phiX + host index
