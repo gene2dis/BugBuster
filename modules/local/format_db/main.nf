@@ -378,6 +378,39 @@ process FORMAT_SUPERFOCUS_DB {
         """
 }
 
+process FORMAT_KMARVEL_DB {
+    tag "format_kmarvel_db"
+    // Runs in the pipeline-built K-MARVEL image the KMARVEL module uses: the
+    // CARD data is a .tar.bz2 and the shared wget image has no bzip2 (the
+    // K-MARVEL image carries GNU wget and bzip2 for this). ~4.6 MB download.
+    // 1.0.0-0fd49c9 (containers/kmarvel); re-pin after a rebuild
+    container 'ghcr.io/gene2dis/bugbuster-kmarvel@sha256:0fd49c9a1665d63541913f090ebc8cbaa75d4e60753addaf6ff34f5e2747b5a5'
+
+    label 'process_download'
+
+    input:
+        val(key)
+
+    output:
+        path("kmarvel_db")
+
+    script:
+        def entry = params.kmarvel_ref_db[key]
+        """
+        ${entry["fmtscript"]} \
+            '${entry["url"]}' \
+            '${entry["md5"]}' \
+            '${entry["dbversion"]}'
+        """
+
+    stub:
+        """
+        mkdir kmarvel_db
+        touch kmarvel_db/CARD_protein_all.fasta kmarvel_db/metadata.tsv kmarvel_db/snps.txt \
+            kmarvel_db/DB_VERSION
+        """
+}
+
 process SOURMASH_TAX_PREPARE {
 
     container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'

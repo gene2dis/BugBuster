@@ -1,0 +1,9 @@
+[2026-10-11 21:38:56 INFO] K-MARVEL starting up....
+[INFO] Processing reads from reads.fastq
+[2026-10-11 21:38:58 INFO] Finished Read processing....
+[2026-10-11 21:38:58 INFO] Finished Assembling Genes....
+[INFO] Found 0 Antimicrobial Resistance Genes (ARGs) for reads.fastq
+[INFO] Running Protein BLAST Now. 2026-10-11 21:38:58
+Warning: [blastp] Examining 5 or more matches is recommended
+Warning: [blastp] Query is Empty!
+[INFO] Processed reads.fastq in 0.18 seconds

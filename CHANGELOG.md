@@ -12,6 +12,40 @@ next release is tagged.
 
 ### Added
 
+- **Read-level ARG detection with K-MARVEL (`--kmarvel_prediction`)**
+  - New optional read-level step, independent of assembly and of
+    `--read_arg_prediction` / `--rgi_prediction`: `KMARVEL` runs
+    [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel) 1.0.0 (commit
+    7108d2d) on each sample's host-removed reads (R1, R2 and singletons
+    pooled, short-read mode) against the CARD protein models: assembled ARGs
+    are chimera-filtered, variant models need a CARD resistance SNP, and
+    every ARG is confirmed with blastp
+  - `KMARVEL_REPORT` (`bin/kmarvel_report.py`) merges the per-sample tables
+    into a long table, ARG (CARD ARO) x sample and AMR gene family x sample
+    matrices of supporting read pairs (both mates count once), and a drug
+    class x sample ARG-count matrix. The gene-family matrix is the one to
+    compare samples with: the allele K-MARVEL reports among close variants
+    of one gene is not stable (`05_arg_prediction/read_level/kmarvel/`
+    and `kmarvel_summary/`); samples without ARGs stay as zero columns
+  - `FORMAT_KMARVEL_DB` (`bin/kmarvel_db_reformat.sh`) builds the database
+    from the md5-verified CARD 4.0.1 data tarball (~4.6 MB, `--kmarvel_db
+    card_v4.0.1`); `--custom_kmarvel_db` takes an existing one
+  - New parameters `--kmarvel_min_coverage`, `--kmarvel_min_identity` (90 %
+    each) and `--kmarvel_min_read_length` (100 bp)
+  - K-MARVEL has no bioconda package: the pipeline builds its own image
+    (`containers/kmarvel/Dockerfile`: K-MARVEL built with cargo 1.93.1 against
+    a refreshed `Cargo.lock`, since upstream's is stale; BLAST+ 2.17.0),
+    published to `ghcr.io/gene2dis/bugbuster-kmarvel` by the manual
+    `.github/workflows/kmarvel-image.yml`
+  - Works around three K-MARVEL 1.0.0 behaviours: it reads only the first
+    member of a multi-member gzip (the reads, gzipped or plain, are
+    streamed through a named pipe in a local temp dir instead of
+    concatenating `.gz` files; no uncompressed copy on disk, and a task
+    whose reads K-MARVEL never consumed fails instead of hanging), it exits 0 when its blastp step
+    fails and writes a header-less table for zero ARGs
+    (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
+    and it cuts output names at the first `.` (it runs on fixed file names)
+
 - **Read-level functional profiling (`--read_level_functional woltka`)**
   - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
     with `--assembly_mode none`) and of the contig/MAG branches; one backend
