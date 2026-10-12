@@ -747,7 +747,7 @@ Override automatic downloads by providing custom database paths:
 - **Options**: `bowtie2`, `bwamem3`
 - **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0 and is being benchmarked against `bowtie2`. Woltka and HUMAnN always use bowtie2 with their own databases. Differences under `bwamem3`:
   - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
-  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes; it runs under the `process_high_memory` label). Mapping against it needs ~11 GB per task, against ~3.5 GB for bowtie2.
+  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes; it runs under the `process_high_memory` label). Mapping against it needs ~14 GB per task, against ~4 GB for bowtie2.
   - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. The co-assembly contig index is built once and shared by all alignments.
   - **Co-assembly bin depth.** Each sample is mapped once against all refined bins together instead of once per bin.
   - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+).
@@ -762,7 +762,7 @@ Override automatic downloads by providing custom database paths:
 ### `--decontam_min_score`
 - **Type**: Integer
 - **Default**: `30`
-- **Description**: bwa-mem3 minimum alignment score (`-T`) for a read to count as a contaminant hit. Only for `--read_aligner bwamem3`. With bwa's default scoring, 30 corresponds to ~30 matching bases.
+- **Description**: bwa-mem3 minimum alignment score (`-T`) for a read to count as a contaminant hit. Only for `--read_aligner bwamem3`. With bwa's default scoring, 30 corresponds to ~30 matching bases. The threshold applies to each mate on its own: decontamination runs bwa-mem3 with pairing off (`-P`), because in paired mode bwa mem skips `-T` for a chosen pair and random ~20 bp host hits on overlapping mates would remove microbial reads.
 - **Example**: `--decontam_min_score 40`
 
 Bowtie2 parameters for read alignment during host filtering (`--read_aligner bowtie2`):

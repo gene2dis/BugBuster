@@ -1,7 +1,8 @@
 name: bwamem3_decontaminate
 description: |
   Single-pass read decontamination against a combined bwa-mem3 index (--read_aligner bwamem3).
-  A pair is kept only when both mates are unmapped; singletons are kept when unmapped.
+  A pair is kept only when both mates are unmapped; singletons are kept when unmapped. Mates are aligned
+  without pairing (-P) so the -T score floor applies to each mate (paired mode skips it for a chosen pair).
 keywords:
   - alignment
   - decontamination

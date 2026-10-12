@@ -667,7 +667,7 @@
                     "type": "integer",
                     "default": 30,
                     "minimum": 1,
-                    "description": "bwa-mem3 minimum alignment score (-T) for a read to count as a contaminant hit (--read_aligner bwamem3).",
+                    "description": "bwa-mem3 minimum alignment score (-T) for a read to count as a contaminant hit (--read_aligner bwamem3), applied to each mate on its own (pairing is off, -P).",
                     "fa_icon": "fas fa-filter"
                 }
             }

@@ -13,6 +13,13 @@
     survived. -F 0x900 drops secondary/supplementary records, which would
     otherwise write the same read twice. -n keeps the input read names.
     -K fixes the batch size so the output does not depend on task.cpus.
+
+    -P (no pairing) is required: in paired mode bwa mem applies the -T score
+    floor only to single-end picks and emits a chosen pair without it. Random
+    19-22 bp seed hits in a 3 Gb host then pass as "proper pairs" whenever the
+    mates overlap (short inserts), which removed 17.5% of a bacterial mock
+    community in the benchmark (0.1% with -P; simulated human reads 100%
+    removed either way). Mate rescue stays on.
 ----------------------------------------------------------------------------------------
 */
 
@@ -57,9 +64,11 @@ process BWAMEM3_DECONTAMINATE {
     fi
     index=\${bwt%.bwt.2bit.64}
 
-    # Align paired-end reads; keep pairs with both mates unmapped (clean)
+    # Align paired-end reads; keep pairs with both mates unmapped (clean).
+    # -P: score each mate against -T on its own (see header)
     bwa-mem3 mem \\
         ${args} \\
+        -P \\
         -t ${task.cpus} \\
         -K 100000000 \\
         --bam \\
