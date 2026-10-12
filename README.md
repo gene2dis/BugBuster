@@ -29,6 +29,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
+   - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
 6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
 7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
@@ -144,6 +145,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
+| **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
@@ -167,6 +169,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
 - **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
+- **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 - **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
@@ -215,6 +218,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 |-----------|---------|-------------|
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
+| `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
 | `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
@@ -290,6 +294,9 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--rgi_aligner` | `kma` | RGI aligner: kma, bowtie2, bwa |
 | `--rgi_kmer_size` | `61` | K-mer size for pathogen prediction |
 | `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage |
+| `--kmarvel_min_coverage` | `90` | K-MARVEL minimum gene coverage (%) |
+| `--kmarvel_min_identity` | `90` | K-MARVEL minimum gene identity (%) |
+| `--kmarvel_min_read_length` | `100` | K-MARVEL minimum read length (bp, below 200) |
 
 ### Resource Limits
 
@@ -338,7 +345,9 @@ results/
 │   │   ├── summary/            # Normalized ARG report (if read_arg_prediction=true)
 │   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
-│   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
+│   │   ├── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
+│   │   ├── kmarvel/            # K-MARVEL per-sample ARG tables, JSON and logs (if kmarvel_prediction=true)
+│   │   └── kmarvel_summary/    # K-MARVEL ARG, gene-family and drug-class matrices (if kmarvel_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/; coassembly/ under co-assembly)
 │   │   ├── summary/            # Combined tax + ARG report

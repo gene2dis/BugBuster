@@ -380,6 +380,30 @@ for a worker that had died. It also stops a run that takes too long. Its message
   check whether the new version still needs the fixes, then update or remove
   `bin/rgi_kmer_kma_fix.py`.
 
+### KMARVEL fails: "protein BLAST step failed", "did not finish", or "has no CARD_protein_all.fasta"
+
+`KMARVEL` runs K-MARVEL and then `bin/kmarvel_check_output.sh` on its log,
+because K-MARVEL 1.0.0 exits 0 even when its blastp step fails.
+
+- **"K-MARVEL found N ARGs but its protein BLAST step failed":** blastp could
+  not run on the assembled ARGs, so the table would be unfiltered and lack the
+  `blast_*` columns. The task fails instead of publishing it. See
+  `{sample}_kmarvel.log` in the task work directory; out-of-memory or a broken
+  BLAST index of `CARD_protein_all.fasta` are the usual causes.
+- **"no 'Found N Antimicrobial Resistance Genes' line ... K-MARVEL did not
+  finish":** K-MARVEL stopped before reporting its ARG count (a Rust panic, for
+  example an unexpected character in the reads), or a different K-MARVEL
+  version changed its log. Check `.command.log` in the task work directory.
+- **"... has no CARD_protein_all.fasta (expected a FORMAT_KMARVEL_DB /
+  --custom_kmarvel_db layout)":** `--custom_kmarvel_db` must point at the
+  directory holding `CARD_protein_all.fasta`, `metadata.tsv` and `snps.txt`
+  (for example `databases/kmarvel/kmarvel_db` from an earlier run), not at its
+  parent.
+- **No ARGs for any sample:** K-MARVEL ignores reads shorter than
+  `--kmarvel_min_read_length` (100 bp), so heavily trimmed short reads can leave
+  little to assemble. Lowering `--kmarvel_min_coverage` / `--kmarvel_min_identity`
+  (90 % each) admits partial or more divergent genes.
+
 ### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
 
 **Error:**

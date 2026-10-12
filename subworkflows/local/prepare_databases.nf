@@ -23,6 +23,7 @@ include { FORMAT_HUMANN_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_COG_DB           } from '../../modules/local/format_db/main'
 include { DOWNLOAD_GTDBTK_DB      } from '../../modules/local/format_db/main'
 include { SOURMASH_TAX_PREPARE    } from '../../modules/local/format_db/main'
+include { FORMAT_KMARVEL_DB       } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
@@ -44,6 +45,7 @@ workflow PREPARE_DATABASES {
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
     ch_rgi_card_db      = channel.empty()
+    ch_kmarvel_db       = channel.empty()
     ch_eggnog_db        = channel.empty()
     ch_dbcan_db         = channel.empty()
     ch_bakta_db         = channel.empty()
@@ -350,6 +352,19 @@ workflow PREPARE_DATABASES {
         }
     }
 
+    //
+    // CARD protein models for K-MARVEL (~4.6 MB download): a directory with
+    // CARD_protein_all.fasta, metadata.tsv and snps.txt is passed with
+    // --custom_kmarvel_db
+    //
+    if ( flagOn(params.kmarvel_prediction) ) {
+        if ( params.custom_kmarvel_db ) {
+            ch_kmarvel_db = channel.fromPath(params.custom_kmarvel_db, checkIfExists: true)
+        } else {
+            ch_kmarvel_db = FORMAT_KMARVEL_DB(channel.of(params.kmarvel_db))
+        }
+    }
+
     emit:
     kraken_db              = ch_kraken_db
     sourmash_db            = ch_sourmash_db
@@ -364,6 +379,7 @@ workflow PREPARE_DATABASES {
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db
+    kmarvel_db             = ch_kmarvel_db
     eggnog_db              = ch_eggnog_db
     dbcan_db               = ch_dbcan_db
     bakta_db               = ch_bakta_db

@@ -34,8 +34,12 @@ REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'
 # FORMAT_SUPERFOCUS_DB runs in the pinned SUPER-FOCUS image (GNU wget + unzip)
 SF_IMG=$(grep -o "'community.wave.seqera.io/library/super-focus[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
     | tr -d "'" | head -1)
+# FORMAT_KMARVEL_DB runs in the pipeline-built K-MARVEL image (GNU wget +
+# bzip2 for the CARD .tar.bz2)
+KMARVEL_IMG=$(grep -o "'ghcr.io/gene2dis/bugbuster-kmarvel[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ] || [ -z "${SF_IMG}" ]; then
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ] || [ -z "${SF_IMG}" ] || [ -z "${KMARVEL_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
@@ -46,6 +50,7 @@ echo "Bakta image:    ${BAKTA_IMG}"
 echo "Woltka image:   ${WOLTKA_IMG}"
 echo "Report image:   ${REPORT_IMG}"
 echo "SUPER-FOCUS image: ${SF_IMG}"
+echo "K-MARVEL image: ${KMARVEL_IMG}"
 echo ""
 
 TMP_DIR=$(mktemp -d)
@@ -267,6 +272,22 @@ tar -cf "${HU}/bt2_incomplete.tar" -C "${HU}/bt2" bowtie2_indexes
 ( cd "${HU}" && md5sum "${IDX}.tar" > "${IDX}.md5" && md5sum "${IDX}_bt2.tar" > "${IDX}_bt2.md5" )
 printf '%s  %s\n' "$(md5sum "${HU}/bt2_incomplete.tar" | cut -d' ' -f1)" "${IDX}_bt2.tar" > "${HU}/bt2_incomplete.md5"
 printf '00000000000000000000000000000000  %s\n' "${IDX}_bt2.tar" > "${HU}/bad_bt2.md5"
+
+# Mock CARD data tarballs (.tar.bz2, files at the archive root with a
+# leading ./ as CARD ships them): complete, and one without the protein
+# variant model FASTA
+KM="${FIXTURES}/km"
+mkdir -p "${KM}/card" "${KM}/card_novar"
+printf '>gb|A|ARO:1|blaX\nMKLV\n' > "${KM}/card/protein_fasta_protein_homolog_model.fasta"
+printf '>gb|B|ARO:2|ompX\nMQQA\n' > "${KM}/card/protein_fasta_protein_overexpression_model.fasta"
+printf '>gb|C|ARO:3|gyrA\nMSDL\n' > "${KM}/card/protein_fasta_protein_variant_model.fasta"
+printf 'ARO Accession\tCVTERM ID\nARO:1\t1\n' > "${KM}/card/aro_index.tsv"
+printf 'Accession\tName\tModel Type\n3\tgyrA\tprotein variant model\n' > "${KM}/card/snps.txt"
+printf 'nucleotide\n' > "${KM}/card/nucleotide_fasta_protein_homolog_model.fasta"
+tar -cjf "${KM}/card.tar.bz2" -C "${KM}/card" .
+cp "${KM}"/card/* "${KM}/card_novar/"
+rm "${KM}/card_novar/protein_fasta_protein_variant_model.fasta"
+tar -cjf "${KM}/card_novar.tar.bz2" -C "${KM}/card_novar" .
 
 #
 # Local HTTP server for the fixtures
@@ -599,6 +620,40 @@ expect_fail "superfocus: unknown aligner fails" superfocus_db_reformat.sh rapsea
     "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
 expect_fail "superfocus: 404 archive URL fails" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/no_such.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
+RUN_IMG=""
+
+#
+# kmarvel_db_reformat.sh
+#
+echo "--- kmarvel_db_reformat.sh ---"
+RUN_IMG="${KMARVEL_IMG}"
+km_md5() { md5sum "${FIXTURES}/km/$1" | cut -d' ' -f1; }
+expect_pass "kmarvel: CARD data tarball" kmarvel_db_reformat.sh \
+    "${BASE_URL}/km/card.tar.bz2" "$(km_md5 card.tar.bz2)" "CARD test"
+check_file "kmarvel: metadata.tsv (aro_index.tsv) in kmarvel_db" "kmarvel_db/metadata.tsv"
+check_file "kmarvel: snps.txt in kmarvel_db" "kmarvel_db/snps.txt"
+if [ "$(grep -c '^>' "${LAST_WORKDIR}/kmarvel_db/CARD_protein_all.fasta" 2>/dev/null)" = "3" ] \
+        && [ "$(cat "${LAST_WORKDIR}/kmarvel_db/DB_VERSION" 2>/dev/null)" = "CARD test" ]; then
+    echo "✓ kmarvel: homolog + overexpression + variant FASTAs concatenated, DB_VERSION written"
+    PASS=$((PASS + 1))
+else
+    echo "✗ kmarvel: CARD_protein_all.fasta lacks the 3 model FASTAs, or DB_VERSION is wrong"
+    FAIL=$((FAIL + 1))
+fi
+if [ -z "$(ls "${LAST_WORKDIR}" | grep -v '^kmarvel_db$')" ] \
+        && [ "$(ls "${LAST_WORKDIR}/kmarvel_db" | tr '\n' ' ')" = "CARD_protein_all.fasta DB_VERSION metadata.tsv snps.txt " ]; then
+    echo "✓ kmarvel: only the four database files are left"
+    PASS=$((PASS + 1))
+else
+    echo "✗ kmarvel: leftover files next to or inside kmarvel_db/"
+    FAIL=$((FAIL + 1))
+fi
+expect_fail "kmarvel: tarball md5 mismatch fails" kmarvel_db_reformat.sh \
+    "${BASE_URL}/km/card.tar.bz2" 00000000000000000000000000000000 "CARD test"
+expect_fail "kmarvel: tarball without the variant model FASTA fails" kmarvel_db_reformat.sh \
+    "${BASE_URL}/km/card_novar.tar.bz2" "$(km_md5 card_novar.tar.bz2)" "CARD test"
+expect_fail "kmarvel: 404 tarball URL fails" kmarvel_db_reformat.sh \
+    "${BASE_URL}/km/no_such.tar.bz2" 00000000000000000000000000000000 "CARD test"
 RUN_IMG=""
 
 #

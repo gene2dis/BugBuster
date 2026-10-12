@@ -180,6 +180,7 @@ taxonomic_profiler: "sourmash"
 # Feature toggles
 read_arg_prediction: false
 rgi_prediction: false
+kmarvel_prediction: false
 contig_tax_and_arg: false
 contig_level_functional: false
 mag_level_functional: false

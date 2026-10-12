@@ -102,6 +102,13 @@ Complete reference for all BugBuster pipeline parameters.
 - **Example**: `--rgi_prediction true`
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for manual database preparation
 
+### `--kmarvel_prediction`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Enable read-level ARG detection with [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel): CARD protein ARGs are assembled from each sample's host-removed reads (R1, R2 and singletons pooled), chimeric assemblies are removed, variant models are kept only with a CARD resistance SNP, and every ARG is confirmed with blastp. Needs no assembly. Results in `05_arg_prediction/read_level/kmarvel/` and `kmarvel_summary/`
+- **Example**: `--kmarvel_prediction true`
+- **Note**: Runs from the pipeline-built image `ghcr.io/gene2dis/bugbuster-kmarvel` (no bioconda package). Independent of `--read_arg_prediction` and `--rgi_prediction`
+
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
@@ -196,6 +203,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: KARGVA reference database selection
 - **Size**: 1.5 MB
 - **Example**: `--kargva_db kargva`
+
+### `--kmarvel_db`
+- **Type**: String
+- **Default**: `card_v4.0.1`
+- **Options**: `card_v4.0.1`
+- **Description**: CARD release for K-MARVEL: the CARD 4.0.1 data tarball (md5-verified), from which the protein homolog, overexpression and variant model FASTAs are concatenated into `CARD_protein_all.fasta`, with `aro_index.tsv` (as `metadata.tsv`) and `snps.txt`. CARD is free for academic use; commercial use needs a CARD licence
+- **Size**: 4.6 MB download, 4.1 MB stored
+- **Example**: `--kmarvel_db card_v4.0.1`
 
 ### `--blast_db`
 - **Type**: String
@@ -388,6 +403,12 @@ Override automatic downloads by providing custom database paths:
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
 - **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
+
+### `--custom_kmarvel_db`
+- **Type**: String (directory path)
+- **Description**: Path to a K-MARVEL database directory; skips the download. A database published by an earlier run (`databases/kmarvel/kmarvel_db`) can be reused as is
+- **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/kmarvel_db`
+- **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). No BLAST index is needed: each task indexes its own copy of the FASTA. An optional `DB_VERSION` file is recorded in `software_versions.yml` (`custom` otherwise)
 
 ### `--custom_dbcan_db`
 - **Type**: String (directory path)
@@ -727,6 +748,27 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Default**: `10`
 - **Description**: Minimum k-mer coverage threshold for pathogen prediction
 - **Example**: `--rgi_min_kmer_coverage 10`
+
+### `--kmarvel_min_coverage`
+- **Type**: Integer
+- **Default**: `90`
+- **Range**: 1-100
+- **Description**: K-MARVEL minimum coverage (%) of the CARD reference protein by an assembled ARG (`--coverage`)
+- **Example**: `--kmarvel_min_coverage 80`
+
+### `--kmarvel_min_identity`
+- **Type**: Integer
+- **Default**: `90`
+- **Range**: 1-100
+- **Description**: K-MARVEL minimum identity (%) of an assembled ARG to its CARD reference protein (`--identity`)
+- **Example**: `--kmarvel_min_identity 95`
+
+### `--kmarvel_min_read_length`
+- **Type**: Integer
+- **Default**: `100`
+- **Range**: 1-199
+- **Description**: K-MARVEL minimum read length in bp (`--min-length`); reads shorter than this after fastp trimming are ignored. K-MARVEL runs in short-read mode, which rejects values of 200 or more; its k-mer (6) and extension (9) sizes are fixed by that mode and not exposed
+- **Example**: `--kmarvel_min_read_length 75`
 
 ---
 
