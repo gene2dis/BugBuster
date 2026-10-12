@@ -58,10 +58,13 @@ jobs:
               kmarvel_db_reformat.sh '${url}' '${md5}' 'CARD (image test)'
               cp kmarvel_db/CARD_protein_all.fasta .
               makeblastdb -in CARD_protein_all.fasta -dbtype prot -blastdb_version 5 -out CARD_protein_all.fasta > /dev/null
-              zcat test_sample1_R1.fastq.gz test_sample1_R2.fastq.gz > reads.fastq
+              mkfifo reads.fastq
+              zcat test_sample1_R1.fastq.gz test_sample1_R2.fastq.gz > reads.fastq &
+              zcat_pid=\$!
               kmarvel --filename reads.fastq --output kmarvel.json --data-type sr \
                 --reference CARD_protein_all.fasta --metadata kmarvel_db/metadata.tsv \
                 --snpdata kmarvel_db/snps.txt --threads 2 2>&1 | tee kmarvel.log
+              wait \$zcat_pid
               kmarvel_check_output.sh kmarvel.log kmarvel.tsv
               head -1 kmarvel.tsv | grep -q blast_e_value
             "

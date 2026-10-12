@@ -29,7 +29,8 @@ process KMARVEL_REPORT {
 
     stub:
     """
-    touch KMARVEL_summary_long.tsv KMARVEL_supporting_reads_matrix.tsv KMARVEL_drug_class_matrix.tsv
+    touch KMARVEL_summary_long.tsv KMARVEL_supporting_reads_matrix.tsv KMARVEL_gene_family_matrix.tsv \\
+        KMARVEL_drug_class_matrix.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

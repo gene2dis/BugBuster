@@ -698,8 +698,13 @@ extension (9) sizes are fixed by the tool and not exposed.
 - A sample with no ARG found still gets a (header-only) table and an all-zero
   column in the summary matrices. If blastp fails for a sample with ARGs, the
   task fails instead of publishing unfiltered results.
-- Counts are supporting reads, not normalised (K-MARVEL can run without
-  ARGs-OAP, which provides the cell counts used for KARGA/KARGVA).
+- Counts are K-MARVEL's supporting reads, which count read pairs (both mates
+  of a fragment count once). They are not normalised: K-MARVEL can run without
+  ARGs-OAP, which provides the cell counts used for KARGA/KARGVA.
+- The allele K-MARVEL reports among close variants of one gene is not stable
+  (simulated TEM-1 reads were called TEM-117, TEM-192 or TEM-246 depending on
+  the read subset). Compare samples with `KMARVEL_gene_family_matrix.tsv`;
+  treat the per-ARO matrix as allele-level detail.
 
 ### 6.12 Bowtie2 Alignment Options
 
@@ -939,12 +944,13 @@ results/
 │   │   │   └── RGI_sample_amr_counts.png
 │   │   ├── kmarvel/                            # K-MARVEL per-sample results (if kmarvel_prediction=true)
 │   │   │   └── {sample}/
-│   │   │       ├── {sample}_kmarvel.tsv        # One row per assembled ARG (CARD ARO, drug class, identity, coverage, supporting reads, blast_* columns); header-only when none
+│   │   │       ├── {sample}_kmarvel.tsv        # One row per assembled ARG (CARD ARO, drug class, identity, coverage, supporting read pairs, blast_* columns); header-only when none
 │   │   │       ├── {sample}_kmarvel.json       # K-MARVEL JSON result
 │   │   │       └── {sample}_kmarvel.log        # K-MARVEL stdout
 │   │   ├── kmarvel_summary/                    # K-MARVEL aggregated reports (if kmarvel_prediction=true)
 │   │   │   ├── KMARVEL_summary_long.tsv        # One row per sample and ARG
-│   │   │   ├── KMARVEL_supporting_reads_matrix.tsv  # ARG x sample supporting reads
+│   │   │   ├── KMARVEL_supporting_reads_matrix.tsv  # ARG (CARD ARO) x sample supporting read pairs
+│   │   │   ├── KMARVEL_gene_family_matrix.tsv  # AMR gene family x sample supporting read pairs (use this to compare samples)
 │   │   │   └── KMARVEL_drug_class_matrix.tsv   # Drug class x sample number of ARGs
 │   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
 │   │       └── *.csv

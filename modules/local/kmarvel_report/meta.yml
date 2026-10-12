@@ -1,5 +1,5 @@
 name: kmarvel_report
-description: Study-level K-MARVEL report that merges the per-sample ARG tables into a long table, an ARG x sample supporting-reads matrix and a drug class x sample ARG-count matrix (bin/kmarvel_report.py); samples without ARGs stay as all-zero columns
+description: Study-level K-MARVEL report that merges the per-sample ARG tables into a long table, ARG x sample and AMR gene family x sample matrices of supporting read pairs, and a drug class x sample ARG-count matrix (bin/kmarvel_report.py); samples without ARGs stay as all-zero columns
 keywords:
   - antimicrobial resistance
   - kmarvel
@@ -20,7 +20,7 @@ input:
 output:
   - reports:
       type: file
-      description: KMARVEL_summary_long.tsv, KMARVEL_supporting_reads_matrix.tsv and KMARVEL_drug_class_matrix.tsv (raw counts, not normalised)
+      description: KMARVEL_summary_long.tsv, KMARVEL_supporting_reads_matrix.tsv (per CARD ARO), KMARVEL_gene_family_matrix.tsv (per AMR gene family; compare samples here, as the reported allele among close variants is not stable) and KMARVEL_drug_class_matrix.tsv; supporting reads count read pairs (both mates once), raw counts, not normalised
       pattern: "KMARVEL_*.tsv"
   - versions:
       type: file

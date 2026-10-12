@@ -515,6 +515,7 @@ nextflow_pipeline {
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel/test_sample1/test_sample1_kmarvel.tsv").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel/test_sample1/test_sample1_kmarvel.json").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_supporting_reads_matrix.tsv").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_gene_family_matrix.tsv").exists()
             assert path("${outputDir}/../databases/kmarvel/kmarvel_db/DB_VERSION").exists()
         }
     }

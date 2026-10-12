@@ -35,6 +35,7 @@ nextflow_process {
             assert reports.keySet() == [
                 "KMARVEL_summary_long.tsv",
                 "KMARVEL_supporting_reads_matrix.tsv",
+                "KMARVEL_gene_family_matrix.tsv",
                 "KMARVEL_drug_class_matrix.tsv"
             ] as Set
 
@@ -42,6 +43,11 @@ nextflow_process {
             assert reads[0] == "aro_id\taro_full_name\tsampleA\tsampleB"
             assert reads.contains("ARO:3000980\tTEM-117\t60\t0")
             assert reads.contains("ARO:3001967\tCTX-M-107\t60\t0")
+
+            def family = reports["KMARVEL_gene_family_matrix.tsv"]
+            assert family[0] == "gene_family\tsampleA\tsampleB"
+            assert family.contains("TEM beta-lactamase\t60\t0")
+            assert family.contains("CTX-M beta-lactamase\t60\t0")
 
             def drug = reports["KMARVEL_drug_class_matrix.tsv"]
             assert drug[0] == "drug_class\tsampleA\tsampleB"

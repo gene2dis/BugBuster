@@ -322,6 +322,8 @@ check_grep "kmarvel_report: matrix keeps the zero-ARG sample column" \
     "KMARVEL_supporting_reads_matrix.tsv" "^aro_id	aro_full_name	sampleA	sampleB$"
 check_grep "kmarvel_report: supporting reads per ARG and sample" \
     "KMARVEL_supporting_reads_matrix.tsv" "^ARO:3000980	TEM-117	60	0$"
+check_grep "kmarvel_report: read pairs summed per AMR gene family" \
+    "KMARVEL_gene_family_matrix.tsv" "^TEM beta-lactamase	60	0$"
 check_grep "kmarvel_report: multi-class ARG counted once per drug class" \
     "KMARVEL_drug_class_matrix.tsv" "^cephalosporin	2	0$"
 check_file "kmarvel_report: long table created" "KMARVEL_summary_long.tsv"
@@ -329,6 +331,8 @@ NEXT_WORKDIR="${KM_WORK}"
 expect_pass "kmarvel_report: only zero-ARG samples still reports" kmarvel_report.py sampleB_kmarvel.tsv
 check_grep "kmarvel_report: empty matrix keeps the sample header" \
     "KMARVEL_supporting_reads_matrix.tsv" "^aro_id	aro_full_name	sampleB$"
+check_grep "kmarvel_report: empty gene-family matrix keeps the sample header" \
+    "KMARVEL_gene_family_matrix.tsv" "^gene_family	sampleB$"
 expect_fail "kmarvel_report: no input tables fails" kmarvel_report.py
 KM_BAD="${WORK}/kmarvel_report_bad"
 mkdir -p "${KM_BAD}"

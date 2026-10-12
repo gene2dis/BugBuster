@@ -7,10 +7,20 @@ Usage: kmarvel_report.py <sample>_kmarvel.tsv [...]
 Merges the per-sample K-MARVEL tables (one row per assembled ARG, written by
 the KMARVEL module) into:
   KMARVEL_summary_long.tsv             one row per sample and ARG, key columns
-  KMARVEL_supporting_reads_matrix.tsv  ARG x sample, supporting reads (0 = not found)
+  KMARVEL_supporting_reads_matrix.tsv  ARG (CARD ARO) x sample, supporting read
+                                       pairs (0 = not found)
+  KMARVEL_gene_family_matrix.tsv       AMR gene family x sample, supporting read
+                                       pairs summed over the family's ARGs
   KMARVEL_drug_class_matrix.tsv        drug class x sample, number of ARGs found
                                        (an ARG counts once for each ';'-separated
                                        class it confers resistance to)
+K-MARVEL's supporting_reads counts read pairs: both mates of a fragment count
+once (checked on simulated pairs with /1 /2, Illumina "1:N:0" and identical
+mate headers). The allele it reports among close variants of one gene (TEM-1
+reads called TEM-117, TEM-192 or TEM-246 depending on the read subset) is not
+stable, so compare samples at gene-family level. A gene family is kept exactly
+as CARD lists it: a combined family such as "AAC(6');AAC(6')-Ib-cr" is one row,
+so no read is counted twice.
 A sample with no ARGs (header-only table) is kept as an all-zero column.
 Counts are not normalised: K-MARVEL can run without ARGs-OAP, which provides
 the cell counts the KARGA/KARGVA report uses.
@@ -68,6 +78,14 @@ def main(paths):
     reads.columns.name = None
     reads.to_csv("KMARVEL_supporting_reads_matrix.tsv", sep="\t")
 
+    family = (
+        long.pivot_table(index="gene_family", columns="sample",
+                         values="supporting_reads", aggfunc="sum", fill_value=0)
+        .reindex(columns=samples, fill_value=0)
+    )
+    family.columns.name = None
+    family.to_csv("KMARVEL_gene_family_matrix.tsv", sep="\t")
+
     classes = long[["sample", "aro_id", "drug_class"]].copy()
     classes["drug_class"] = classes["drug_class"].str.split(";")
     classes = classes.explode("drug_class")
@@ -83,7 +101,8 @@ def main(paths):
     drug.to_csv("KMARVEL_drug_class_matrix.tsv", sep="\t")
 
     print(f"{len(samples)} samples, {len(long)} ARG calls, "
-          f"{len(reads)} distinct ARGs, {len(drug)} drug classes")
+          f"{len(reads)} distinct ARGs, {len(family)} gene families, "
+          f"{len(drug)} drug classes")
 
 
 if __name__ == "__main__":

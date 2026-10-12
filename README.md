@@ -343,7 +343,7 @@ results/
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   ├── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
 │   │   ├── kmarvel/            # K-MARVEL per-sample ARG tables, JSON and logs (if kmarvel_prediction=true)
-│   │   └── kmarvel_summary/    # K-MARVEL ARG and drug-class matrices (if kmarvel_prediction=true)
+│   │   └── kmarvel_summary/    # K-MARVEL ARG, gene-family and drug-class matrices (if kmarvel_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/; coassembly/ under co-assembly)
 │   │   ├── summary/            # Combined tax + ARG report

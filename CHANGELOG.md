@@ -21,8 +21,11 @@ next release is tagged.
     are chimera-filtered, variant models need a CARD resistance SNP, and
     every ARG is confirmed with blastp
   - `KMARVEL_REPORT` (`bin/kmarvel_report.py`) merges the per-sample tables
-    into a long table, an ARG x sample supporting-reads matrix and a drug
-    class x sample ARG-count matrix (`05_arg_prediction/read_level/kmarvel/`
+    into a long table, ARG (CARD ARO) x sample and AMR gene family x sample
+    matrices of supporting read pairs (both mates count once), and a drug
+    class x sample ARG-count matrix. The gene-family matrix is the one to
+    compare samples with: the allele K-MARVEL reports among close variants
+    of one gene is not stable (`05_arg_prediction/read_level/kmarvel/`
     and `kmarvel_summary/`); samples without ARGs stay as zero columns
   - `FORMAT_KMARVEL_DB` (`bin/kmarvel_db_reformat.sh`) builds the database
     from the md5-verified CARD 4.0.1 data tarball (~4.6 MB, `--kmarvel_db
@@ -35,8 +38,9 @@ next release is tagged.
     published to `ghcr.io/gene2dis/bugbuster-kmarvel` by the manual
     `.github/workflows/kmarvel-image.yml`
   - Works around three K-MARVEL 1.0.0 behaviours: it reads only the first
-    member of a multi-member gzip (the reads are decompressed into one FASTQ
-    instead of concatenating `.gz` files), it exits 0 when its blastp step
+    member of a multi-member gzip (the reads are streamed decompressed
+    through a named pipe instead of concatenating `.gz` files; no
+    uncompressed copy on disk), it exits 0 when its blastp step
     fails and writes a header-less table for zero ARGs
     (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
     and it cuts output names at the first `.` (it runs on fixed file names)

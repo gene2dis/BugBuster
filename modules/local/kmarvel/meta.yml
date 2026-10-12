@@ -20,7 +20,7 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - reads:
       type: file
-      description: Host-removed reads [R1, R2, optional singletons], decompressed into one plain FASTQ (K-MARVEL reads only the first member of a multi-member gzip) and run with --data-type sr; -k/-e are fixed by the data type and not exposed
+      description: Host-removed reads [R1, R2, optional singletons], decompressed together into a named pipe that K-MARVEL reads as one FASTQ (it reads only the first member of a multi-member gzip, so the .gz files are not concatenated; no uncompressed copy is written to disk) and run with --data-type sr; -k/-e are fixed by the data type and not exposed
       pattern: "*.fastq.gz"
   - kmarvel_db:
       type: directory
@@ -30,7 +30,7 @@ input:
 output:
   - tsv:
       type: file
-      description: Tuple of meta and the per-sample ARG table (one row per assembled ARG, K-MARVEL's flat columns incl. blast_*); header-only when no ARG was found
+      description: Tuple of meta and the per-sample ARG table (one row per assembled ARG, K-MARVEL's flat columns incl. blast_*; supporting_reads counts read pairs, both mates once); header-only when no ARG was found
       pattern: "*_kmarvel.tsv"
   - json:
       type: file

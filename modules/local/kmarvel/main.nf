@@ -15,8 +15,9 @@
     Upstream behaviours handled here (commit 7108d2d):
       - it reads gzip input with flate2's single-member GzDecoder, so a `cat`
         of several .gz files (and fastp's multi-member output) is silently
-        truncated after the first member: the reads are decompressed into
-        one plain FASTQ instead
+        truncated after the first member: the reads are decompressed into a
+        named pipe instead (kmarvel reads its input once, so nothing is
+        written to disk)
       - output and temporary file names are cut at the first '.', so it runs
         on fixed dot-free names and the results are renamed to the sample
       - a failed blastp exits 0, and zero ARGs give a header-less TSV:
@@ -79,7 +80,14 @@ process KMARVEL {
         ln -s ${kmarvel_db}/metadata.tsv metadata.tsv
         ln -s ${kmarvel_db}/snps.txt snps.txt
 
-        zcat ${reads} > reads.fastq
+        # Stream the decompressed reads through a named pipe: no uncompressed
+        # copy on disk. A failed zcat (corrupt .gz) fails the task at `wait`;
+        # the trap stops a zcat still blocked on the pipe if kmarvel exits
+        # before opening it
+        mkfifo reads.fastq
+        zcat ${reads} > reads.fastq &
+        zcat_pid=\$!
+        trap 'kill \$zcat_pid 2>/dev/null || true' EXIT
 
         kmarvel \\
             --filename reads.fastq \\
@@ -92,6 +100,7 @@ process KMARVEL {
             ${args} \\
             2>&1 | tee kmarvel.log
 
+        wait \$zcat_pid
         rm -f reads.fastq
 
         kmarvel_check_output.sh kmarvel.log kmarvel.tsv
