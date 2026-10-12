@@ -25,6 +25,22 @@ process SYLPH_PROFILE {
         // Paired reads only: sylph treats every -r file as a separate sample,
         // so a staged singleton cannot join the pair's profile (as for kraken2)
         """
+        # Count the read pairs given to sylph while it profiles (a second full
+        # read of R1, so it runs concurrently instead of after sylph).
+        # Uncompressed .fastq/.fq reach this step with --quality_control
+        # false; the image's busybox zcat has no -f passthrough, so the reader
+        # is picked from the gzip magic. A line count that is not a multiple
+        # of 4 is a truncated or malformed FASTQ, not a read count
+        if [ "\$(head -c 2 ${reads[0]} | od -An -tx1 | tr -d ' \\n')" = "1f8b" ]; then
+            reader=zcat
+        else
+            reader=cat
+        fi
+        \${reader} ${reads[0]} | awk '
+            END { if (NR % 4) { print "ERROR: " NR " lines in ${reads[0]}, not a multiple of 4 (truncated or malformed FASTQ)" > "/dev/stderr"; exit 1 }
+                  printf "%.0f", NR / 4 }' > read_pairs.txt &
+        count_pid=\$!
+
         # -u scales Sequence_abundance by the estimated unknown fraction, so it
         # becomes each genome's share of ALL input reads: its sum is the
         # classified fraction and, times the read pairs, the estimated pairs
@@ -39,18 +55,10 @@ process SYLPH_PROFILE {
             ${args} \\
             -o ${prefix}_sylph_${db_name}.tsv
 
-        # Uncompressed .fastq/.fq reach this step with --quality_control
-        # false; the image's busybox zcat has no -f passthrough, so pick the
-        # reader from the gzip magic. A line count that is not a multiple of 4
-        # is a truncated or malformed FASTQ, not a read count
-        if [ "\$(head -c 2 ${reads[0]} | od -An -tx1 | tr -d ' \\n')" = "1f8b" ]; then
-            reader=zcat
-        else
-            reader=cat
-        fi
-        read_pairs=\$(\${reader} ${reads[0]} | awk '
-            END { if (NR % 4) { print "ERROR: " NR " lines in ${reads[0]}, not a multiple of 4 (truncated or malformed FASTQ)" > "/dev/stderr"; exit 1 }
-                  printf "%.0f", NR / 4 }')
+        # wait returns the count's exit status, so a failed count fails the
+        # task (set -e)
+        wait \${count_pid}
+        read_pairs=\$(cat read_pairs.txt)
 
         classified=\$(awk -F'\\t' '
             NR == 1 { for (i = 1; i <= NF; i++) if (\$i == "Sequence_abundance") col = i

@@ -31,6 +31,10 @@ next release is tagged.
     the estimated read pairs), is skewed by reads from genomes absent from the
     database (simulated 1/3 unknown: 100% classified automatically, 66.1%
     with the identity set, truth 66.7%)
+  - `SYLPH_PROFILE` requests 12 GB with a two-stage `.syl2db` (GTDB r232:
+    ~4.3 GB peak measured, it loads only the sparse first-stage index) and
+    36 GB with a single-stage `.syldb`, doubling on an OOM retry; the read-pair
+    count runs concurrently with sylph
   - Outputs: per-sample profiles in `02_taxonomy/sylph/`; the phyloseq tables
     hold sylph's relative (taxonomic) abundance per genome, and a new
     `sylph_<db>_read_counts.tsv` holds the estimated read pairs per genome

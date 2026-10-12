@@ -125,6 +125,31 @@ nextflow_process {
         }
     }
 
+    test("fails on an R1 that is not whole FASTQ records") {
+        // The read-pair count runs in the background while sylph profiles;
+        // its failure must still fail the task (sylph itself accepts this file)
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sybad' ],
+                    [
+                        file("${projectDir}/tests/data/sylph/malformed_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/sylph/sylph_test_db.syldb", checkIfExists: true)
+                input[2] = 'testdb'
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("not a multiple of 4 (truncated or malformed FASTQ)") }
+        }
+    }
+
     test("stub emits a header-only profile and a zero report") {
         options "-stub"
 

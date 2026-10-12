@@ -11,6 +11,8 @@
 #   sylph_tax_fixture.tsv.gz  sylph-tax metadata for the two accessions
 #   sylph_profile_hit.tsv     real sylph profile -u of those reads (lambda)
 #   sylph_profile_empty.tsv   real header-only profile of the random pairs
+#   malformed_R1.fastq        tests/data/reads/singleton_test_R1.fastq plus one
+#                             stray empty line (41 lines: not whole records)
 #
 # tests/data/taxonomy/sampleA_sylph_gtdb.sylphmpa is NOT made here: it is a
 # verbatim sylph-tax 1.9.2 capture of a real sylph 1.0.0 profile against the
@@ -82,8 +84,11 @@ if [ "$(wc -l < "${WORK}/sylph_profile_empty.tsv")" -ne 1 ]; then
     exit 1
 fi
 
+{ cat "${REPO_DIR}/tests/data/reads/singleton_test_R1.fastq"; echo; } > "${WORK}/malformed_R1.fastq"
+
 for f in sylph_test_db.syldb sylph_test_R1.fastq.gz sylph_test_R2.fastq.gz \
-         sylph_tax_fixture.tsv.gz sylph_profile_hit.tsv sylph_profile_empty.tsv; do
+         sylph_tax_fixture.tsv.gz sylph_profile_hit.tsv sylph_profile_empty.tsv \
+         malformed_R1.fastq; do
     cp "${WORK}/${f}" "${OUT_DIR}/${f}"
     echo "wrote ${OUT_DIR}/${f}"
 done
