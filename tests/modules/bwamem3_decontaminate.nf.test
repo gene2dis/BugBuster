@@ -1,0 +1,141 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BWAMEM3_DECONTAMINATE Module Test
+
+    Single-pass decontamination for --read_aligner bwamem3 against the
+    combined phiX + host-mock index (built in setup). Fixtures come from
+    tests/bin/make_singleton_fixtures.py: 10 pairs (4 host-derived) + 10
+    singletons (6 host-derived). The strict pair policy keeps only pairs with
+    both mates unmapped, and samtools fastq must keep the input read names
+    and write each clean read once.
+
+    A Bowtie2 index directory must be rejected with a pointer to the fix
+    instead of failing inside bwa-mem3.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BWAMEM3_DECONTAMINATE Process"
+    script "../../modules/local/bwamem3_decontaminate/main.nf"
+    process "BWAMEM3_DECONTAMINATE"
+
+    setup {
+        run("BWAMEM3_BUILD_COMBINED") {
+            script "../../modules/local/bwamem3_build_combined/main.nf"
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/decontamination/phiX174.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+    }
+
+    test("removes host pairs and singletons (strict pair policy)") {
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'singleton_test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]).combine(BWAMEM3_BUILD_COMBINED.out.index)
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def clean = process.out.reads[0][1]
+            assert clean.collect { f -> file(f).name } == [
+                "singleton_test_R1_clean.fastq.gz",
+                "singleton_test_R2_clean.fastq.gz",
+                "singleton_test_Singleton_clean.fastq.gz"
+            ]
+
+            // 6 of 10 pairs and 4 of 10 singletons are non-host
+            def r1 = path(clean[0]).linesGzip
+            def r2 = path(clean[1]).linesGzip
+            def s  = path(clean[2]).linesGzip
+            assert r1.size() == 6 * 4
+            assert r2.size() == 6 * 4
+            assert s.size() == 4 * 4
+
+            // Input names kept (no /1 /2 appended), mates in step, no host read
+            def r1_names = r1.findAll { line -> line.startsWith('@nonhost') || line.startsWith('@host') }
+            def r2_names = r2.findAll { line -> line.startsWith('@nonhost') || line.startsWith('@host') }
+            assert r1_names == r2_names
+            assert r1_names.every { name -> name ==~ /@nonhost_pair_\d+/ }
+
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[0] == "Id\tClean reads (contaminants removed)\tClean singletons (contaminants removed)"
+            assert report[1] == "singleton_test\t12\t4"
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("bwamem3: 0.14.0")
+            assert versions.contains("samtools: 1.22.1")
+        }
+    }
+
+    test("paired reads without singletons, dotted sample id") {
+        // Clean read names are passed to samtools explicitly; bowtie2's
+        // --un-conc-gz inserted .1/.2 before the last dot of a dotted prefix
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'paired.only' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]).combine(BWAMEM3_BUILD_COMBINED.out.index)
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def clean = process.out.reads[0][1]
+            assert clean.size() == 2
+            assert clean.collect { f -> file(f).name } == ["paired.only_R1_clean.fastq.gz", "paired.only_R2_clean.fastq.gz"]
+            assert path(clean[0]).linesGzip.size() == 6 * 4
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[0] == "Id\tClean reads (contaminants removed)"
+            assert report[1] == "paired.only\t12"
+        }
+    }
+
+    test("rejects a Bowtie2 index directory") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'wrong_index' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/woltka/db/databases/bowtie2", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("holds a Bowtie2 index") }
+        }
+    }
+}

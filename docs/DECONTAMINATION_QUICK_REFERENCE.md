@@ -31,6 +31,16 @@ nextflow run main.nf \
   -profile docker
 ```
 
+### With bwa-mem3 (`--read_aligner bwamem3`)
+```bash
+nextflow run main.nf \
+  --input samples.csv \
+  --output results \
+  --read_aligner bwamem3 \
+  -profile docker
+```
+This builds a bwa-mem3 index from the same FASTAs. Building it for a human host needs ~75 GB RAM and takes a few minutes; mapping against it needs ~11 GB per task. A pair counts as clean only when **both** mates are unmapped. Under bwa-mem3, `--custom_decontamination_index` must point to a bwa-mem3 or bwa-mem2 index (`*.bwt.2bit.64`); a Bowtie2 index is rejected at launch. See [`--read_aligner`](parameters.md#--read_aligner).
+
 ---
 
 ## Key Parameters

@@ -6,8 +6,8 @@
     
     DESCRIPTION:
         This subworkflow handles metagenome assembly using MEGAHIT, followed by contig
-        filtering with BBMap, and optional read alignment with Bowtie2/SAMtools for
-        downstream binning and coverage analysis.
+        filtering with BBMap, and optional read alignment with Bowtie2 or bwa-mem3
+        (--read_aligner) plus SAMtools for downstream binning and coverage analysis.
     
     INPUTS:
         reads: Channel of [meta, reads] tuples for per-sample assembly
@@ -39,6 +39,11 @@ include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main
 // module's per-sample script branch; the coassembly index is rebuilt in each
 // task (accepted trade-off, revisit at T9 if it dominates runtime).
 include { BOWTIE2_SAMTOOLS as BOWTIE2_SAMTOOLS_PER_SAMPLE } from '../../modules/local/bowtie2_samtools/main'
+// --read_aligner bwamem3: the contig index is its own task, so the co-assembly
+// index is built once and shared by the pooled and per-sample alignments
+include { BWAMEM3_INDEX        } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_SAMTOOLS     } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_SAMTOOLS as BWAMEM3_SAMTOOLS_PER_SAMPLE } from '../../modules/local/bwamem3_samtools/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
 include { flagOn                } from './utils_params'
 
@@ -81,14 +86,29 @@ workflow ASSEMBLY {
 
         // Generate BAM files for binning/contig analysis/gene counting if needed
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
-            BOWTIE2_SAMTOOLS(BBMAP.out.contigs_with_reads)
+            if ( params.read_aligner == 'bwamem3' ) {
+                BWAMEM3_INDEX(BBMAP.out.contigs_only)
+                ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
 
-            ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
-            ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
-            // Per-sample BAM is directly suitable for gene counting (Q1)
-            ch_counting_bam = BOWTIE2_SAMTOOLS.out.bam_only
-            ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
-            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
+                // [meta, reads, contigs] + [meta, index] -> [meta, reads, contigs, index]
+                BWAMEM3_SAMTOOLS(BBMAP.out.contigs_with_reads.join(BWAMEM3_INDEX.out.index))
+
+                ch_bam_with_contigs = BWAMEM3_SAMTOOLS.out.contigs_and_bam
+                ch_bam_only = BWAMEM3_SAMTOOLS.out.bam_only
+                // Per-sample BAM is directly suitable for gene counting (Q1)
+                ch_counting_bam = BWAMEM3_SAMTOOLS.out.bam_only
+                ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
+                ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
+            } else {
+                BOWTIE2_SAMTOOLS(BBMAP.out.contigs_with_reads)
+
+                ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+                ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
+                // Per-sample BAM is directly suitable for gene counting (Q1)
+                ch_counting_bam = BOWTIE2_SAMTOOLS.out.bam_only
+                ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
+                ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
+            }
         }
     }
 
@@ -124,6 +144,15 @@ workflow ASSEMBLY {
         // Set output channels
         ch_contigs_only = BBMAP.out.contigs_only
 
+        // One bwa-mem3 index of the co-assembly, shared by the pooled and the
+        // per-sample alignments below (bowtie2 rebuilds it in each task)
+        ch_coassembly_index = channel.empty()
+        if ( params.read_aligner == 'bwamem3' && ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) ) {
+            BWAMEM3_INDEX(BBMAP.out.contigs_only)
+            ch_coassembly_index = BWAMEM3_INDEX.out.index.map { _meta, index -> index }
+            ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
+        }
+
         // Generate BAM files for binning/contig analysis if needed
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
             // Prepare input: combine all original reads with filtered contigs
@@ -132,13 +161,22 @@ workflow ASSEMBLY {
                 .map { all_reads -> [[id: "coassembly"], all_reads] }
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
                 .map { meta, reads_list, contigs -> [meta, reads_list, contigs] }
-            
-            BOWTIE2_SAMTOOLS(ch_alignment_input)
 
-            ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
-            ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
-            ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
-            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
+            if ( params.read_aligner == 'bwamem3' ) {
+                BWAMEM3_SAMTOOLS(ch_alignment_input.combine(ch_coassembly_index))
+
+                ch_bam_only = BWAMEM3_SAMTOOLS.out.bam_only
+                ch_bam_with_contigs = BWAMEM3_SAMTOOLS.out.contigs_and_bam
+                ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
+                ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
+            } else {
+                BOWTIE2_SAMTOOLS(ch_alignment_input)
+
+                ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
+                ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+                ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
+                ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
+            }
         }
 
         // Per-sample alignments against the co-assembly for gene counting
@@ -150,11 +188,19 @@ workflow ASSEMBLY {
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
                 .map { meta, reads_files, contigs -> [meta, reads_files, contigs] }
 
-            BOWTIE2_SAMTOOLS_PER_SAMPLE(ch_per_sample_input)
+            if ( params.read_aligner == 'bwamem3' ) {
+                BWAMEM3_SAMTOOLS_PER_SAMPLE(ch_per_sample_input.combine(ch_coassembly_index))
 
-            ch_counting_bam = BOWTIE2_SAMTOOLS_PER_SAMPLE.out.bam_only
-            ch_empty_reports = ch_empty_reports.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.empty_contig_report)
-            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.versions.first())
+                ch_counting_bam = BWAMEM3_SAMTOOLS_PER_SAMPLE.out.bam_only
+                ch_empty_reports = ch_empty_reports.mix(BWAMEM3_SAMTOOLS_PER_SAMPLE.out.empty_contig_report)
+                ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS_PER_SAMPLE.out.versions.first())
+            } else {
+                BOWTIE2_SAMTOOLS_PER_SAMPLE(ch_per_sample_input)
+
+                ch_counting_bam = BOWTIE2_SAMTOOLS_PER_SAMPLE.out.bam_only
+                ch_empty_reports = ch_empty_reports.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.empty_contig_report)
+                ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.versions.first())
+            }
         }
     }
 

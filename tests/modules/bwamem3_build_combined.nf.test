@@ -1,0 +1,46 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BWAMEM3_BUILD_COMBINED Module Test
+
+    The combined decontamination index for --read_aligner bwamem3 must build
+    from genome FASTA inputs, both plain and gzipped, and hold the four
+    bwa-mem3 index files (no .0123: mem never reads it).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BWAMEM3_BUILD_COMBINED Process"
+    script "../../modules/local/bwamem3_build_combined/main.nf"
+    process "BWAMEM3_BUILD_COMBINED"
+
+    test("builds combined index from plain and gzipped FASTA") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/decontamination/phiX174.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta.gz", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def index_dir = process.out.index.get(0)
+            ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext ->
+                assert path("${index_dir}/contaminants.${ext}").exists()
+            }
+            assert !path("${index_dir}/contaminants.0123").exists()
+            // Both references made it into the index
+            def ann = path("${index_dir}/contaminants.ann").text
+            assert ann.contains("NC_001422.1")
+            assert ann.contains("NC_001416.1")
+
+            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.14.0")
+        }
+    }
+}

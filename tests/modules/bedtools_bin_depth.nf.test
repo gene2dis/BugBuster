@@ -1,0 +1,45 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BEDTOOLS_BIN_DEPTH Module Test
+
+    Per-bin coverage for --read_aligner bwamem3 from one all-bins BAM plus the
+    contig -> bin table. tests/data/bam/test_bin.4_all_reads.bam holds
+    contig_a (1 kb, two 50 bp reads: mean depth 0.1) and contig_b (100 bp, no
+    reads); tests/data/bins/contig_to_bin.tsv puts them in bin.a and bin.b and
+    lists an empty bin.empty. The table must match BEDTOOLS' format exactly
+    (BIN_SUMMARY parses it), including the 0-contig row of an empty bin.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BEDTOOLS_BIN_DEPTH Process"
+    script "../../modules/local/bedtools/main.nf"
+    process "BEDTOOLS_BIN_DEPTH"
+
+    test("aggregates contig coverage per bin") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    file("${projectDir}/tests/data/bam/test_bin.4_all_reads.bam", checkIfExists: true),
+                    file("${projectDir}/tests/data/bins/contig_to_bin.tsv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.bin_depth.get(0)).readLines()
+            assert lines == [
+                "sample\tbin_id\tTotal_contigs\taverage_cov",
+                "test\tbin.a\t 1 \t 0.1",
+                "test\tbin.b\t 1 \t 0",
+                "test\tbin.empty\t 0 \t 0"
+            ]
+            assert path(process.out.versions.get(0)).text.contains("bedtools:")
+        }
+    }
+}

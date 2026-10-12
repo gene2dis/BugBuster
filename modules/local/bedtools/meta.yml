@@ -1,5 +1,5 @@
 name: bedtools
-description: Per-bin read coverage under co-assembly binning - runs bedtools genomecov on each per-bin BAM and reports the bin's contig count and the mean of its per-contig average depths
+description: Per-bin read coverage under co-assembly binning - runs bedtools genomecov and reports each bin's contig count and the mean of its per-contig average depths
 keywords:
   - coverage
   - depth
@@ -13,24 +13,53 @@ tools:
       doi: "10.1093/bioinformatics/btq033"
       licence: ["MIT"]
 
-input:
-  - meta:
-      type: map
-      description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
-  - bam_files:
-      type: file
-      description: Per-bin BAMs from BOWTIE2_SAMTOOLS_DEPTH, named <sample>_<bin>_all_reads.bam (the bin id is parsed from the file name)
-      pattern: "*_all_reads.bam"
+processes:
+  - name: BEDTOOLS
+    description: |
+      --read_aligner bowtie2: one BAM per bin (BOWTIE2_SAMTOOLS_DEPTH); the bin id is parsed from the file name.
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
+      - bam_files:
+          type: file
+          description: Per-bin BAMs from BOWTIE2_SAMTOOLS_DEPTH, named <sample>_<bin>_all_reads.bam (the bin id is parsed from the file name)
+          pattern: "*_all_reads.bam"
+    output:
+      - bin_depth:
+          type: file
+          description: TSV with columns sample, bin_id, Total_contigs and average_cov, one row per bin
+          pattern: "*_bin_depth.tsv"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
 
-output:
-  - bin_depth:
-      type: file
-      description: TSV with columns sample, bin_id, Total_contigs and average_cov, one row per bin
-      pattern: "*_bin_depth.tsv"
-  - versions:
-      type: file
-      description: Software versions
-      pattern: "versions.yml"
+  - name: BEDTOOLS_BIN_DEPTH
+    description: |
+      --read_aligner bwamem3: one BAM of the sample's reads mapped against all bins at once; contigs are
+      assigned to bins through contig_to_bin.tsv (BINS_REFERENCE). Same output table as BEDTOOLS.
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
+      - bam:
+          type: file
+          description: Sorted BAM of the sample's reads against all bins (BWAMEM3_BIN_DEPTH)
+          pattern: "*_all_reads.bam"
+      - contig_to_bin:
+          type: file
+          description: contig TAB bin table; a row with an empty contig field marks a bin without sequences
+          pattern: "contig_to_bin.tsv"
+    output:
+      - bin_depth:
+          type: file
+          description: TSV with columns sample, bin_id, Total_contigs and average_cov, one row per bin
+          pattern: "*_bin_depth.tsv"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
 
 authors:
   - "@juanu"

@@ -298,7 +298,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_decontamination_index`
 - **Type**: String (directory path)
-- **Description**: Path to a pre-built combined Bowtie2 decontamination index directory (host + phiX). Skips both the genome downloads and the index build.
+- **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a Bowtie2 index, or a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under `--read_aligner bwamem3` (a Bowtie2 index is then rejected at launch). Skips both the genome downloads and the index build. Pointing it at the index the pipeline published (`<databases_dir>/bowtie_index/contaminants_index` or `<databases_dir>/bwamem3_index/contaminants_index`) avoids rebuilding it in later runs.
 - **Example**: `--custom_decontamination_index /path/to/bowtie_index`
 - **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
@@ -741,7 +741,31 @@ Override automatic downloads by providing custom database paths:
 
 ## Alignment Parameters
 
-Bowtie2 parameters for read alignment during host filtering:
+### `--read_aligner`
+- **Type**: String
+- **Default**: `bowtie2`
+- **Options**: `bowtie2`, `bwamem3`
+- **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0 and is being benchmarked against `bowtie2`. Woltka and HUMAnN always use bowtie2 with their own databases. Differences under `bwamem3`:
+  - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
+  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes; it runs under the `process_high_memory` label). Mapping against it needs ~11 GB per task, against ~3.5 GB for bowtie2.
+  - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. The co-assembly contig index is built once and shared by all alignments.
+  - **Co-assembly bin depth.** Each sample is mapped once against all refined bins together instead of once per bin.
+  - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+).
+- **Example**: `--read_aligner bwamem3`
+
+### `--bwamem3_dense_sa`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Build the bwa-mem3 decontamination index with a denser suffix array (`-u 1`, one row in two instead of one in eight). Mapping is faster, at ~12 GB more RAM per decontamination task for a human host. Only for `--read_aligner bwamem3`.
+- **Example**: `--bwamem3_dense_sa true`
+
+### `--decontam_min_score`
+- **Type**: Integer
+- **Default**: `30`
+- **Description**: bwa-mem3 minimum alignment score (`-T`) for a read to count as a contaminant hit. Only for `--read_aligner bwamem3`. With bwa's default scoring, 30 corresponds to ~30 matching bases.
+- **Example**: `--decontam_min_score 40`
+
+Bowtie2 parameters for read alignment during host filtering (`--read_aligner bowtie2`):
 
 ### `--bowtie_ma`
 - **Type**: Integer

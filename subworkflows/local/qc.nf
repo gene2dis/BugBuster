@@ -11,6 +11,7 @@ include { FASTP as FASTP_SINGLETON   } from '../../modules/nf-core/fastp/main'
 include { QFILTER                    } from '../../modules/local/qfilter/main'
 include { COUNT_READS                } from '../../modules/local/count_reads/main'
 include { BOWTIE2_DECONTAMINATE      } from '../../modules/local/bowtie2_decontaminate/main'
+include { BWAMEM3_DECONTAMINATE      } from '../../modules/local/bwamem3_decontaminate/main'
 include { READS_REPORT               } from '../../modules/local/reads_report/main'
 include { flagOn                     } from './utils_params'
 
@@ -114,10 +115,13 @@ workflow QC {
         //
         // Single-pass decontamination (removes phiX + host in one step)
         //
-        ch_decontaminated = BOWTIE2_DECONTAMINATE(
-            ch_fastp_reads_filtered.combine(decontamination_index),
-            "contaminants"
-        )
+        // (bowtie2 or bwa-mem3 per --read_aligner; same outputs)
+        def ch_decontaminated
+        if ( params.read_aligner == 'bwamem3' ) {
+            ch_decontaminated = BWAMEM3_DECONTAMINATE(ch_fastp_reads_filtered.combine(decontamination_index), "contaminants")
+        } else {
+            ch_decontaminated = BOWTIE2_DECONTAMINATE(ch_fastp_reads_filtered.combine(decontamination_index), "contaminants")
+        }
         ch_versions = ch_versions.mix(ch_decontaminated.versions.first())
 
         //

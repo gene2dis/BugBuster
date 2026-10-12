@@ -1,0 +1,134 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BWAMEM3_SAMTOOLS Module Test
+
+    Reads -> contigs for --read_aligner bwamem3, against an index built in
+    setup (BWAMEM3_INDEX of tests/data/bins/real_bins/bin.1.fa, whose contig
+    is assembled from the non-host fixture reads):
+      - one sample, paired + singletons: per-library BAMs merged into one
+      - co-assembly: the pooled reads of two samples are classified by file
+        name and each library is mapped on its own (bwa mem takes no
+        bowtie2-style comma lists)
+      - empty contig set: header-only BAM plus the empty-contig report
+        consumed by CONTIG_FILTER_SUMMARY
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BWAMEM3_SAMTOOLS Process"
+    script "../../modules/local/bwamem3_samtools/main.nf"
+    process "BWAMEM3_SAMTOOLS"
+
+    setup {
+        run("BWAMEM3_INDEX") {
+            script "../../modules/local/bwamem3_samtools/main.nf"
+            process {
+                """
+                input[0] = [
+                    [ id: 'bin1' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+    }
+
+    test("maps one sample's paired reads plus singletons") {
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.bam_only[0][1]).name == "test_all_reads.bam"
+            assert file(process.out.bam_only[0][1]).size() > 0
+            assert file(process.out.contigs_and_bam[0][1]).name == "bin.1.fa"
+            assert process.out.empty_contig_report.size() == 0
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("bwamem3: 0.14.0")
+            assert versions.contains("samtools: 1.22.1")
+        }
+    }
+
+    test("maps the pooled co-assembly reads library by library") {
+        when {
+            process {
+                """
+                // Post-QC co-assembly names: <sample>_{R1,R2,Singleton}_clean.fastq.gz
+                def pooled = file("${outputDir}/pooled")
+                pooled.mkdirs()
+                def reads_dir = "${projectDir}/tests/data/reads"
+                def pooled_reads = [
+                    ['s1_R1_clean.fastq.gz',        'singleton_test_R1.fastq.gz'],
+                    ['s1_R2_clean.fastq.gz',        'singleton_test_R2.fastq.gz'],
+                    ['s1_Singleton_clean.fastq.gz', 'singleton_test_S.fastq.gz'],
+                    // A sample id containing "unpaired" must still pair its R1/R2
+                    ['unpaired_s2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
+                    ['unpaired_s2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz']
+                ].collect { names ->
+                    def target = pooled.resolve(names[0])
+                    file("\${reads_dir}/\${names[1]}").copyTo(target)
+                    target
+                }
+                input[0] = channel.of([
+                    [ id: 'coassembly' ],
+                    pooled_reads,
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.bam_only[0][1]).name == "coassembly_all_reads.bam"
+            assert file(process.out.bam_only[0][1]).size() > 0
+        }
+    }
+
+    test("writes a header-only BAM and a report for an empty contig set") {
+        when {
+            process {
+                """
+                def empty_fasta = file("${outputDir}/empty_contigs.fa")
+                empty_fasta.parent.mkdirs()
+                empty_fasta.text = ''
+                def empty_index = file("${outputDir}/empty_bwamem3_index")
+                empty_index.mkdirs()
+                input[0] = [
+                    [ id: 'empty' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    empty_fasta,
+                    empty_index
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.bam_only[0][1]).size() > 0
+            def report = path(process.out.empty_contig_report.get(0)).readLines()
+            assert report.contains("sample_id\tempty")
+            assert report.contains("stage\tBWAMEM3_SAMTOOLS")
+            assert report.contains("empty_contig_detected\tTRUE")
+        }
+    }
+}

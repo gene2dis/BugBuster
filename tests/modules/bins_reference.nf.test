@@ -1,0 +1,73 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BINS_REFERENCE Module Test
+
+    Co-assembly bin depth under --read_aligner bwamem3 maps each sample once
+    against all bins, so the bins are concatenated into one reference with a
+    contig -> bin table. tests/data/bins/overlap_bins:
+      - a.fa: c1 (header with a description), c2
+      - b.fa: c2 again (must be skipped, keeping the reference names unique)
+              and c3
+      - c.fa: empty bin (one table row with an empty contig field)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BINS_REFERENCE Process"
+    script "../../modules/local/bwamem3_samtools/main.nf"
+    process "BINS_REFERENCE"
+
+    test("concatenates bins, skips duplicate contigs, keeps empty bins") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/bins/overlap_bins", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def fasta = path(process.out.reference[0][0]).readLines()
+            assert fasta.findAll { line -> line.startsWith('>') } == ['>c1 len=8', '>c2', '>c3']
+            // c2's sequence is written once (two lines), from a.fa
+            assert fasta == ['>c1 len=8', 'ACGTACGT', '>c2', 'GGGGCCCC', 'AAAA', '>c3', 'TTTTAAAA']
+
+            def table = path(process.out.reference[0][1]).readLines()
+            assert table == ["c1\ta", "c2\ta", "c3\tb", "\tc"]
+        }
+    }
+
+    test("real bins") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.reference[0][1]).readLines() == ["bin1_contig_1\tbin.1"]
+        }
+    }
+
+    test("bins dir holding only a SKIPPED marker") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/bins/marker_only_bins", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.reference[0][0]).text == ''
+            assert path(process.out.reference[0][1]).text == ''
+        }
+    }
+}

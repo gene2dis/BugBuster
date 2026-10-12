@@ -336,7 +336,7 @@
                 },
                 "custom_decontamination_index": {
                     "type": "string",
-                    "description": "Path to a pre-built combined phiX + host Bowtie2 index (skips the local build).",
+                    "description": "Path to a pre-built combined phiX + host index directory matching --read_aligner: a Bowtie2 index, or a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64) under bwamem3 (skips the local build).",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },
@@ -640,6 +640,35 @@
                     ],
                     "description": "DeepARG model version.",
                     "fa_icon": "fas fa-code-branch"
+                }
+            }
+        },
+        "read_alignment_options": {
+            "title": "Read alignment options",
+            "type": "object",
+            "fa_icon": "fas fa-align-left",
+            "description": "Aligner for host/phiX removal, reads-to-contigs mapping and co-assembly bin depth. Woltka and HUMAnN always use bowtie2 with their own databases.",
+            "properties": {
+                "read_aligner": {
+                    "type": "string",
+                    "default": "bowtie2",
+                    "enum": ["bowtie2", "bwamem3"],
+                    "description": "Short-read aligner: 'bowtie2' or 'bwamem3' (bwa-mem3; strict decontamination: a pair is clean only when both mates are unmapped).",
+                    "help_text": "bwa-mem3 needs its own decontamination index (a bwa-mem2 index also works); building it for a human host needs ~75 GB RAM. A Bowtie2 --custom_decontamination_index is rejected under 'bwamem3'.",
+                    "fa_icon": "fas fa-random"
+                },
+                "bwamem3_dense_sa": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Build the bwa-mem3 decontamination index with a denser suffix array (-u 1): faster mapping, ~12 GB more RAM for a human host.",
+                    "fa_icon": "fas fa-tachometer-alt"
+                },
+                "decontam_min_score": {
+                    "type": "integer",
+                    "default": 30,
+                    "minimum": 1,
+                    "description": "bwa-mem3 minimum alignment score (-T) for a read to count as a contaminant hit (--read_aligner bwamem3).",
+                    "fa_icon": "fas fa-filter"
                 }
             }
         },
@@ -1175,6 +1204,9 @@
         },
         {
             "$ref": "#/$defs/functional_annotation_options"
+        },
+        {
+            "$ref": "#/$defs/read_alignment_options"
         },
         {
             "$ref": "#/$defs/bowtie2_options"

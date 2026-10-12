@@ -1,0 +1,70 @@
+name: bwamem3_decontaminate
+description: |
+  Single-pass read decontamination against a combined bwa-mem3 index (--read_aligner bwamem3).
+  A pair is kept only when both mates are unmapped; singletons are kept when unmapped.
+keywords:
+  - alignment
+  - decontamination
+  - bwa-mem3
+  - samtools
+  - quality control
+  - host removal
+  - phix removal
+tools:
+  - bwa-mem3:
+      description: |
+        Short-read aligner derived from bwa-mem2 (same algorithm and flags, faster).
+      homepage: https://github.com/fg-labs/bwa-mem3
+      documentation: https://bwa-mem3.readthedocs.io/
+      doi: 10.1109/IPDPS.2019.00041
+      licence: ["MIT"]
+  - samtools:
+      description: Tools for manipulating SAM/BAM alignments (fastq extraction of unmapped reads)
+      homepage: http://www.htslib.org/
+      documentation: http://www.htslib.org/doc/samtools.html
+      doi: "10.1093/bioinformatics/btp352"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'test', single_end:false ]
+  - reads:
+      type: file
+      description: |
+        List of input FastQ files of size 2 (paired-end) or 3 (paired-end with singletons)
+      pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
+  - index_db:
+      type: directory
+      description: bwa-mem3 (or bwa-mem2) index directory of the combined contaminant sequences (*.bwt.2bit.64)
+  - db_alias:
+      type: string
+      description: Alias for reporting purposes (e.g., "contaminants", "phiX_host")
+
+output:
+  - meta:
+      type: map
+      description: |
+        Groovy Map containing sample information
+        e.g. [ id:'test', single_end:false ]
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - reads:
+      type: file
+      description: Clean reads (pairs with both mates unmapped, unmapped singletons)
+      pattern: "*_R*_clean.fastq.gz"
+  - reads_coassembly:
+      type: file
+      description: Clean reads for coassembly (without meta)
+      pattern: "*_clean.fastq.gz"
+  - report:
+      type: file
+      description: TSV report with decontamination statistics
+      pattern: "*_decontamination_report.tsv"
+
+authors:
+  - "@gene2dis"

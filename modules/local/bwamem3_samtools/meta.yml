@@ -1,0 +1,111 @@
+name: bwamem3_samtools
+description: |
+  bwa-mem3 read mapping with samtools sorting (--read_aligner bwamem3) - reads against assembled contigs
+  (BWAMEM3_SAMTOOLS, aliased BWAMEM3_SAMTOOLS_PER_SAMPLE) and, under co-assembly binning, each sample's
+  reads against all refined bins at once (BINS_REFERENCE + BWAMEM3_INDEX + BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH)
+keywords:
+  - alignment
+  - bwa-mem3
+  - samtools
+  - bam
+  - metagenomics
+tools:
+  - bwa-mem3:
+      description: Short-read aligner derived from bwa-mem2 (same algorithm and flags, faster)
+      homepage: https://github.com/fg-labs/bwa-mem3
+      documentation: https://bwa-mem3.readthedocs.io/
+      doi: 10.1109/IPDPS.2019.00041
+      licence: ["MIT"]
+  - samtools:
+      description: Tools for manipulating SAM/BAM alignments (view, sort, merge)
+      homepage: http://www.htslib.org/
+      documentation: http://www.htslib.org/doc/samtools.html
+      doi: "10.1093/bioinformatics/btp352"
+      licence: ["MIT"]
+
+processes:
+  - name: BWAMEM3_INDEX
+    description: |
+      Builds a bwa-mem3 index of a FASTA (filtered contigs, or the concatenated bins). Memory scales with
+      the FASTA size. A FASTA without sequences yields an empty index directory; the mapping task then
+      writes a header-only BAM.
+    input:
+      - meta:
+          type: map
+          description: Metadata (meta.id names the index; 'coassembly' for the co-assembly)
+      - fasta:
+          type: file
+          description: Uncompressed FASTA to index
+          pattern: "*.{fa,fasta}"
+    output:
+      - index:
+          type: tuple
+          description: Tuple of meta and the index directory (<id>_bwamem3_index/<id>.{amb,ann,bwt.2bit.64,pac})
+          pattern: "*_bwamem3_index"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+  - name: BWAMEM3_SAMTOOLS
+    description: |
+      Maps each library's paired reads (and singletons when present) with bwa-mem3, drops secondary and
+      supplementary records, coordinate-sorts and merges into one BAM. When meta.id is 'coassembly' the
+      collected reads are split into R1/R2/singleton lists by file name. A contig file with no sequences
+      yields a header-only BAM plus an empty-contig report instead of failing.
+    input:
+      - meta:
+          type: map
+          description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+      - reads:
+          type: file
+          description: |
+            Host-removed reads - R1, R2 and optional singleton for one sample, or all samples' reads
+            under co-assembly (classified by _R1_/_1., _R2_/_2. and singleton/unpaired in the file name)
+          pattern: "*.fastq.gz"
+      - contigs:
+          type: file
+          description: The FASTA the index was built from (filtered contigs or all_bins.fa)
+          pattern: "*.fa"
+      - index:
+          type: directory
+          description: BWAMEM3_INDEX directory of the contigs
+    output:
+      - contigs_and_bam:
+          type: tuple
+          description: Tuple of meta, the input contigs and the sorted BAM
+          pattern: "*_all_reads.bam"
+      - bam_only:
+          type: tuple
+          description: Tuple of meta and the sorted BAM (header-only when the contig file was empty)
+          pattern: "*_all_reads.bam"
+      - empty_contig_report:
+          type: file
+          description: Optional; written only when the contig file had no sequences (sample_id, stage, timestamp, action_taken); aggregated by CONTIG_FILTER_SUMMARY
+          pattern: "*_empty_contig_report.txt"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+  - name: BINS_REFERENCE
+    description: |
+      Concatenates the refined bins into one reference and writes a contig -> bin table (bin id = FASTA
+      basename). Contigs already present in an earlier bin are skipped with a warning; a bin without
+      sequences gets a table row with an empty contig field.
+    input:
+      - bins:
+          type: directory
+          description: Refined bin directory (bins as *.fa)
+    output:
+      - reference:
+          type: tuple
+          description: Tuple of all_bins.fa and contig_to_bin.tsv (contig TAB bin)
+          pattern: "{all_bins.fa,contig_to_bin.tsv}"
+      - versions:
+          type: file
+          description: Software versions
+          pattern: "versions.yml"
+
+authors:
+  - "@gene2dis"

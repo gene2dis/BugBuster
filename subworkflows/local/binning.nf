@@ -40,6 +40,11 @@ include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/m
 include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
 include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
 include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
+// --read_aligner bwamem3: each sample is mapped once against all bins
+include { BINS_REFERENCE             } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_INDEX as BWAMEM3_BINS_INDEX } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH } from '../../modules/local/bwamem3_samtools/main'
+include { BEDTOOLS_BIN_DEPTH         } from '../../modules/local/bedtools/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
@@ -254,13 +259,39 @@ workflow BINNING {
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
-        BOWTIE2_SAMTOOLS_DEPTH(
-            reads.combine(ch_refined_bins.map { _meta, bins -> bins })
-        )
-        ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
-        BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
-        ch_bin_cov = BEDTOOLS.out.bin_depth
-        ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
+        def ch_bin_cov
+        if ( params.read_aligner == 'bwamem3' ) {
+            // One reference of all refined bins (+ contig -> bin table), one
+            // index, one alignment per sample: bwa mem aligns locally, so
+            // mapping against a single bin at a time would let reads from the
+            // other bins inflate its coverage with clipped partial hits
+            BINS_REFERENCE(ch_refined_bins.map { _meta, bins -> bins })
+            ch_versions = ch_versions.mix(BINS_REFERENCE.out.versions)
+            ch_bins_fasta = BINS_REFERENCE.out.reference.map { fasta, _table -> fasta }
+            ch_contig_to_bin = BINS_REFERENCE.out.reference.map { _fasta, table -> table }
+
+            BWAMEM3_BINS_INDEX(ch_bins_fasta.map { fasta -> [[id: "bins"], fasta] })
+            ch_versions = ch_versions.mix(BWAMEM3_BINS_INDEX.out.versions)
+
+            BWAMEM3_BIN_DEPTH(
+                reads
+                    .combine(ch_bins_fasta)
+                    .combine(BWAMEM3_BINS_INDEX.out.index.map { _meta, index -> index })
+            )
+            ch_versions = ch_versions.mix(BWAMEM3_BIN_DEPTH.out.versions.first())
+
+            BEDTOOLS_BIN_DEPTH(BWAMEM3_BIN_DEPTH.out.bam_only.combine(ch_contig_to_bin))
+            ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
+            ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
+        } else {
+            BOWTIE2_SAMTOOLS_DEPTH(
+                reads.combine(ch_refined_bins.map { _meta, bins -> bins })
+            )
+            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
+            BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
+            ch_bin_cov = BEDTOOLS.out.bin_depth
+            ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
+        }
 
         BIN_SUMMARY(
             ch_bin_cov.collect(sort: true)

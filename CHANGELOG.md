@@ -12,6 +12,15 @@ next release is tagged.
 
 ### Added
 
+- **bwa-mem3 as an alternative short-read aligner (`--read_aligner bwamem3`, default `bowtie2` while it is benchmarked)**
+  - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka, HUMAnN/MetaPhlAn and RGI keep bowtie2 with their own databases
+  - bwa-mem3 0.14.0 and samtools 1.22.1 run from one pinned Seqera Containers image. Output is independent of the thread count (`-K` fixed)
+  - Decontamination is strict: a pair is clean only when both mates are unmapped. bowtie2 `--un-conc` kept pairs with a single host mate. Clean-read counts are therefore not directly comparable with bowtie2 runs, and the FASTQ comment field is not carried over. Output file names are set explicitly, so sample ids containing dots no longer break decontamination. New `--decontam_min_score` (bwa `-T`, default 30) and `--bwamem3_dense_sa` (denser suffix array: faster mapping for ~12 GB more RAM)
+  - The decontamination index is published to `<databases_dir>/bwamem3_index/`. A human host needs ~75 GB RAM to build it (minutes rather than bowtie2-build's hours), and the build retries on bwa-mem3's out-of-budget exit status 3. `--custom_decontamination_index` accepts a bwa-mem3 or bwa-mem2 index under `bwamem3` and rejects a Bowtie2 one at launch
+  - Contig alignments drop secondary and supplementary records, keeping one record per read as with bowtie2. Each library of a pooled co-assembly is mapped separately and the results merged. The co-assembly index is built once instead of once per alignment task
+  - Co-assembly bin depth maps each sample once against all refined bins concatenated, instead of once per bin (bwa mem aligns locally, so per-bin mapping would let other bins' reads inflate coverage). It writes the same `*_bin_depth.tsv` table
+  - The bioconda bwa-mem3 build needs an AVX2-capable CPU (x86-64-v3)
+
 - **Read-level functional profiling (`--read_level_functional woltka`)**
   - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
     with `--assembly_mode none`) and of the contig/MAG branches; one backend
