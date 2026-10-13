@@ -19,3 +19,11 @@
 def flagOn(value) {
     return value.toString().toBoolean()
 }
+
+// Label of the sylph database in output file names, the Sylph DB column of
+// Reads_report.csv, plots and the run summary: the --sylph_db registry key,
+// or a custom database's file name without extension (gtdb-r232-c200-dbv2),
+// so a custom release is never shown as the registry default
+def sylphDbLabel() {
+    return params.custom_sylph_db ? file(params.custom_sylph_db).baseName : params.sylph_db
+}

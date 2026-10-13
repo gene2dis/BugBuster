@@ -1,0 +1,2 @@
+Sample_file	Genome_file	Taxonomic_abundance	Sequence_abundance	Adjusted_ANI	True_cov	ANI_5-95_percentile	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Naive_ANI	kmers_reassigned	Contig_name
+sylph_test_R1.fastq.gz	GCF_000840245.1_genomic.fna	100.0000	100.0000	99.97	9.287	NA-NA	HIGH	NA-NA	5	4.881	210/212	99.97	0	NC_001416.1 Enterobacteria phage lambda, complete genome

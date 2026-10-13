@@ -380,6 +380,30 @@ for a worker that had died. It also stops a run that takes too long. Its message
   check whether the new version still needs the fixes, then update or remove
   `bin/rgi_kmer_kma_fix.py`.
 
+### KMARVEL fails: "protein BLAST step failed", "did not finish", or "has no CARD_protein_all.fasta"
+
+`KMARVEL` runs K-MARVEL and then `bin/kmarvel_check_output.sh` on its log,
+because K-MARVEL 1.0.0 exits 0 even when its blastp step fails.
+
+- **"K-MARVEL found N ARGs but its protein BLAST step failed":** blastp could
+  not run on the assembled ARGs, so the table would be unfiltered and lack the
+  `blast_*` columns. The task fails instead of publishing it. See
+  `{sample}_kmarvel.log` in the task work directory; out-of-memory or a broken
+  BLAST index of `CARD_protein_all.fasta` are the usual causes.
+- **"no 'Found N Antimicrobial Resistance Genes' line ... K-MARVEL did not
+  finish":** K-MARVEL stopped before reporting its ARG count (a Rust panic, for
+  example an unexpected character in the reads), or a different K-MARVEL
+  version changed its log. Check `.command.log` in the task work directory.
+- **"... has no CARD_protein_all.fasta (expected a FORMAT_KMARVEL_DB /
+  --custom_kmarvel_db layout)":** `--custom_kmarvel_db` must point at the
+  directory holding `CARD_protein_all.fasta`, `metadata.tsv` and `snps.txt`
+  (for example `databases/kmarvel/kmarvel_db` from an earlier run), not at its
+  parent.
+- **No ARGs for any sample:** K-MARVEL ignores reads shorter than
+  `--kmarvel_min_read_length` (100 bp), so heavily trimmed short reads can leave
+  little to assemble. Lowering `--kmarvel_min_coverage` / `--kmarvel_min_identity`
+  (90 % each) admits partial or more divergent genes.
+
 ### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
 
 **Error:**
@@ -749,6 +773,34 @@ no longer work.
 pipeline download the R232 package (~61 GB), or pass an R232 directory you
 already have with `--custom_gtdbtk_db /path/to/release232` (the directory that
 directly contains `markers/`, `skani/`, `taxonomy/`, ...).
+
+---
+
+### Sylph: Classified is 1.0, or TAXONOMY_PHYLOSEQ fails with "No sylph genomes in any sample"
+
+**Symptom (a):** with `--taxonomic_profiler sylph`, the `Classified` column of
+`Reads_report.csv` is 1.0 (or close) for samples that surely hold organisms
+missing from the database, and the estimated read pairs in
+`sylph_<db>_read_counts.tsv` add up to every read pair.
+
+**Cause:** the classified fraction is the sum of sylph's `Sequence_abundance`
+under `-u`, which rests on sylph's estimate of the read accuracy. Reads from
+genomes absent from the database can lower that estimate, so sylph
+overestimates coverage and caps the explained fraction at 100% (seen on
+simulated data; sylph itself warns that `-u` has caveats for complex
+communities). The relative abundance table is not affected.
+
+**Solution:** set the read identity explicitly with `--sylph_read_seq_id`
+(Illumina: about 99.5) and rerun with `-resume`, which re-runs only the sylph
+profiling and the steps after it.
+
+**Symptom (b):** `TAXONOMY_PHYLOSEQ` fails with *No sylph genomes in any
+sample*. No genome passed sylph's detection threshold in any sample (each
+skipped sample is warned about first): very shallow samples, or a database that
+does not cover the community. Check the per-sample `.tsv` profiles in
+`02_taxonomy/sylph/` and the `Classified` column, and use a database that fits
+the samples (`--sylph_db`, or `--custom_sylph_db` together with its
+`--custom_sylph_taxonomy`), or rerun with `--taxonomic_profiler none`.
 
 ---
 

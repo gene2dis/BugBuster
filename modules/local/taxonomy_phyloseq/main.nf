@@ -19,6 +19,7 @@ process TAXONOMY_PHYLOSEQ {
     path("*_tax_table.tsv"), emit: tax_table
     path("*_sample_metadata.tsv"), emit: sample_metadata
     path("*_phyloseq_data.h5"), emit: phyloseq_h5, optional: true
+    path("*_read_counts.tsv"), emit: read_counts, optional: true  // sylph: estimated read pairs per genome
     path("*.png"), emit: plots, optional: true
     path("versions.yml"), emit: versions
     
@@ -57,6 +58,9 @@ process TAXONOMY_PHYLOSEQ {
     touch ${profiler}_${db_name}_tax_table.tsv
     touch ${profiler}_${db_name}_sample_metadata.tsv
     touch ${profiler}_${db_name}_phyloseq_data.h5
+    if [ "${profiler}" = "sylph" ]; then
+        touch ${profiler}_${db_name}_read_counts.tsv
+    fi
     touch versions.yml
     """
 }

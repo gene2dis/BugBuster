@@ -29,11 +29,12 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
+   - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
 6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
 7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
    - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
-8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/) or [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html)
+8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/), [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html) or [`Sylph`](https://github.com/bluenote-1577/sylph) (+ [`sylph-tax`](https://github.com/bluenote-1577/sylph-tax))
 9. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
 10. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
 11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
@@ -137,12 +138,14 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
+| **Sylph GTDB r232 (c200, two-stage .syl2db)** + sylph-tax metadata | 19 GB + 5.5 MB (`gtdb_r226` 18 GB, `gtdb_r220` 13.1 GB) | Taxonomic profiling | `taxonomic_profiler='sylph'` | `--custom_sylph_db`, `--custom_sylph_taxonomy` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
+| **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
@@ -159,12 +162,14 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **host_db**: [`T2T-CHM13v2.0 genome (chm13v2.0.fa.gz)`](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz)
 - **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
 - **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
+- **sylph_db**: [`sylph pre-built databases`](https://sylph-docs.github.io/pre%E2%80%90built-databases/) + [`sylph-tax metadata`](https://github.com/bluenote-1577/sylph-tax)
 - **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 - **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
 - **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
 - **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
 - **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
+- **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 - **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
@@ -202,7 +207,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--output` | *required* | Output directory |
 | `--quality_control` | `true` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, or `none` |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, or `none` |
 | `--include_binning` | `false` | Enable binning and refinement |
 | `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
 | `--min_read_sample` | `0` | Minimum reads required after QC |
@@ -213,6 +218,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 |-----------|---------|-------------|
 | `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
+| `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
 | `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
@@ -227,6 +233,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 |-----------|---------|---------|-------------|
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--databases_dir` | `<output>/../databases` | Path | Database storage location |
 
 ### Quality Control Options
@@ -244,6 +251,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--kraken_confidence` | `0.1` | Kraken2 confidence threshold (0-1) |
 | `--bracken_tax_level` | `S` | Bracken level: D, P, C, O, F, G, S |
 | `--sourmash_tax_rank` | `species` | Sourmash rank: genus, species, strain |
+| `--sylph_read_seq_id` | unset | Sylph read identity (%), e.g. 99.5; corrects the unknown fraction when Classified looks too high |
 | `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Taxonomic levels to plot |
 | `--taxonomy_top_n_taxa` | `10` | Number of top taxa in plots |
 | `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files |
@@ -286,6 +294,9 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--rgi_aligner` | `kma` | RGI aligner: kma, bowtie2, bwa |
 | `--rgi_kmer_size` | `61` | K-mer size for pathogen prediction |
 | `--rgi_min_kmer_coverage` | `10` | Minimum k-mer coverage |
+| `--kmarvel_min_coverage` | `90` | K-MARVEL minimum gene coverage (%) |
+| `--kmarvel_min_identity` | `90` | K-MARVEL minimum gene identity (%) |
+| `--kmarvel_min_read_length` | `100` | K-MARVEL minimum read length (bp, below 200) |
 
 ### Resource Limits
 
@@ -313,9 +324,9 @@ results/
 │   ├── fastp/                  # Per-sample FastP reports
 │   └── summary/                # Aggregated statistics
 ├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
-│   ├── kraken2/ or sourmash/   # Per-sample profiler results
+│   ├── kraken2/, sourmash/ or sylph/  # Per-sample profiler results (sylph: profile .tsv + sylph-tax .sylphmpa)
 │   ├── bracken/                # Bracken abundance estimates (kraken2 only)
-│   ├── tables/                 # Abundance tables
+│   ├── tables/                 # Abundance tables (sylph: relative-abundance OTU table + estimated read pairs per genome)
 │   ├── phyloseq/               # Phyloseq objects (*.h5, *.RDS)
 │   └── figures/                # Taxonomy plots
 ├── 03_assembly/                # Genome assembly (if assembly_mode != 'none')
@@ -334,7 +345,9 @@ results/
 │   │   ├── summary/            # Normalized ARG report (if read_arg_prediction=true)
 │   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
-│   │   └── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
+│   │   ├── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)
+│   │   ├── kmarvel/            # K-MARVEL per-sample ARG tables, JSON and logs (if kmarvel_prediction=true)
+│   │   └── kmarvel_summary/    # K-MARVEL ARG, gene-family and drug-class matrices (if kmarvel_prediction=true)
 │   ├── contig_level/           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── deeparg/            # Per-sample DeepARG predictions (proteins from 07_functional_annotation/gene_calling/; coassembly/ under co-assembly)
 │   │   ├── summary/            # Combined tax + ARG report

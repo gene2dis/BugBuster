@@ -12,6 +12,74 @@ next release is tagged.
 
 ### Added
 
+- **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
+  - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by
+    containment ANI against a sylph database with `-u` (unknown-fraction
+    estimation); `SYLPH_TAXPROF` (sylph-tax 1.9.2, `--no-config` with the
+    staged metadata file) turns each genome profile into a lineage profile
+    (`.sylphmpa`), writing a header-only profile for a sample without genomes
+  - New `--sylph_db` registry (`gtdb_r232` default: GTDB r232 c200 two-stage
+    `.syl2db`, 19 GB; `gtdb_r226`, `gtdb_r220`), each downloaded with its
+    sylph-tax metadata by `FORMAT_SYLPH_DB` / `FORMAT_SYLPH_TAXONOMY`
+    (`bin/sylph_db_reformat.sh`) into `<databases_dir>/sylph/`;
+    `--custom_sylph_db` and `--custom_sylph_taxonomy` (required together,
+    checked at launch, so a database is never paired with another release's
+    taxonomy) skip both downloads; outputs are then labelled with the custom
+    database's file name (e.g. `gtdb-r232-c200-dbv2`), not the `--sylph_db` key
+  - `--sylph_read_seq_id` passes `--read-seq-id` to sylph: its automatic
+    read-accuracy estimate, which drives the unknown fraction (Classified and
+    the estimated read pairs), is skewed by reads from genomes absent from the
+    database (simulated 1/3 unknown: 100% classified automatically, 66.1%
+    with the identity set, truth 66.7%)
+  - `SYLPH_PROFILE` requests 12 GB with a two-stage `.syl2db` (GTDB r232:
+    ~4.3 GB peak measured, it loads only the sparse first-stage index) and
+    36 GB with a single-stage `.syldb`, doubling on an OOM retry; the read-pair
+    count runs concurrently with sylph
+  - Outputs: per-sample profiles in `02_taxonomy/sylph/`; the phyloseq tables
+    hold sylph's relative (taxonomic) abundance per genome, and a new
+    `sylph_<db>_read_counts.tsv` holds the estimated read pairs per genome
+    (`sequence_abundance` × the read pairs given to sylph); `Reads_report.csv`
+    gains the `Sylph DB` / classified fraction columns. `TAXONOMY_PHYLOSEQ`
+    gains an optional `read_counts` output
+  - Tests: real-container nf-tests for both modules on a committed two-genome
+    database and simulated reads (`tests/bin/make_sylph_fixtures.sh`), sylph
+    cases in the report / phyloseq / DB reformat script harnesses and two
+    pipeline stub runs (registry and custom databases)
+
+- **Read-level ARG detection with K-MARVEL (`--kmarvel_prediction`)**
+  - New optional read-level step, independent of assembly and of
+    `--read_arg_prediction` / `--rgi_prediction`: `KMARVEL` runs
+    [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel) 1.0.0 (commit
+    7108d2d) on each sample's host-removed reads (R1, R2 and singletons
+    pooled, short-read mode) against the CARD protein models: assembled ARGs
+    are chimera-filtered, variant models need a CARD resistance SNP, and
+    every ARG is confirmed with blastp
+  - `KMARVEL_REPORT` (`bin/kmarvel_report.py`) merges the per-sample tables
+    into a long table, ARG (CARD ARO) x sample and AMR gene family x sample
+    matrices of supporting read pairs (both mates count once), and a drug
+    class x sample ARG-count matrix. The gene-family matrix is the one to
+    compare samples with: the allele K-MARVEL reports among close variants
+    of one gene is not stable (`05_arg_prediction/read_level/kmarvel/`
+    and `kmarvel_summary/`); samples without ARGs stay as zero columns
+  - `FORMAT_KMARVEL_DB` (`bin/kmarvel_db_reformat.sh`) builds the database
+    from the md5-verified CARD 4.0.1 data tarball (~4.6 MB, `--kmarvel_db
+    card_v4.0.1`); `--custom_kmarvel_db` takes an existing one
+  - New parameters `--kmarvel_min_coverage`, `--kmarvel_min_identity` (90 %
+    each) and `--kmarvel_min_read_length` (100 bp)
+  - K-MARVEL has no bioconda package: the pipeline builds its own image
+    (`containers/kmarvel/Dockerfile`: K-MARVEL built with cargo 1.93.1 against
+    a refreshed `Cargo.lock`, since upstream's is stale; BLAST+ 2.17.0),
+    published to `ghcr.io/gene2dis/bugbuster-kmarvel` by the manual
+    `.github/workflows/kmarvel-image.yml`
+  - Works around three K-MARVEL 1.0.0 behaviours: it reads only the first
+    member of a multi-member gzip (the reads, gzipped or plain, are
+    streamed through a named pipe in a local temp dir instead of
+    concatenating `.gz` files; no uncompressed copy on disk, and a task
+    whose reads K-MARVEL never consumed fails instead of hanging), it exits 0 when its blastp step
+    fails and writes a header-less table for zero ARGs
+    (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
+    and it cuts output names at the first `.` (it runs on fixed file names)
+
 - **bwa-mem3 as an alternative short-read aligner (`--read_aligner bwamem3`, default `bowtie2` while it is benchmarked)**
   - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka, HUMAnN/MetaPhlAn and RGI keep bowtie2 with their own databases
   - bwa-mem3 0.14.0 and samtools 1.22.1 run from one pinned Seqera Containers image. Output is independent of the thread count (`-K` fixed)

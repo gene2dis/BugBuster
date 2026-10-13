@@ -1,0 +1,20 @@
+#SampleID	/reads/mix_R1.fastq.gz	Taxonomies_used:['md.tsv.gz']
+clade_name	relative_abundance	sequence_abundance	ANI (if strain-level)	Coverage (if strain-level)
+d__Bacteria	99.99999999999999	100.0	NA	NA
+d__Bacteria|p__Pseudomonadota	77.66239999999999	79.1551	NA	NA
+d__Bacteria|p__Bacillota	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria	77.66239999999999	79.1551	NA	NA
+d__Bacteria|p__Bacillota|c__Bacilli	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales	77.66239999999999	79.1551	NA	NA
+d__Bacteria|p__Bacillota|c__Bacilli|o__Bacillales	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae	77.66239999999999	79.1551	NA	NA
+d__Bacteria|p__Bacillota|c__Bacilli|o__Bacillales|f__Bacillaceae	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199115	39.8005	40.7752	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199095	37.8619	38.3799	NA	NA
+d__Bacteria|p__Bacillota|c__Bacilli|o__Bacillales|f__Bacillaceae|g__Bacillus	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199115|s__G047199115 sp047199115	39.8005	40.7752	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199095|s__G047199095 sp047199095	37.8619	38.3799	NA	NA
+d__Bacteria|p__Bacillota|c__Bacilli|o__Bacillales|f__Bacillaceae|g__Bacillus|s__Bacillus subtilis	22.3376	20.8449	NA	NA
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199115|s__G047199115 sp047199115|t__GCA_047199115.1	39.8005	40.7752	98.31	2.234
+d__Bacteria|p__Pseudomonadota|c__Gammaproteobacteria|o__Enterobacterales|f__Enterobacteriaceae|g__G047199095|s__G047199095 sp047199095|t__GCA_047199095.1	37.8619	38.3799	95.13	2.125
+d__Bacteria|p__Bacillota|c__Bacilli|o__Bacillales|f__Bacillaceae|g__Bacillus|s__Bacillus subtilis|t__GCF_000009045.1	22.3376	20.8449	99.94	1.254

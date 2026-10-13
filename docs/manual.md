@@ -25,7 +25,7 @@
 BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysis and antimicrobial resistance gene (ARG) prediction. Built following bioinformatics best practices, it provides:
 
 - **Read Quality Control**: Filtering, trimming, and host decontamination
-- **Taxonomic Profiling**: Species identification using Kraken2 or Sourmash
+- **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
 - **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
 - **Metagenomic Binning**: MAG recovery with MetaBAT2, SemiBin, and COMEBin
 - **Bin Refinement**: Quality improvement with MetaWRAP
@@ -37,7 +37,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 ### Pipeline Workflow
 
 ```
-Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash)
+Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/Sylph)
                                             ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
@@ -177,12 +177,14 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` |
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
+| **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
 | **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
+| **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
@@ -211,6 +213,14 @@ wget -P /shared/databases/bugbuster/sourmash/ \
     https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/gtdb-reps-rs220-k31.zip
 wget -P /shared/databases/bugbuster/sourmash/ \
     https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/gtdb-rs220.lineages.reps.csv
+
+# Download Sylph GTDB r232 (19 GB) + its sylph-tax taxonomy metadata (5.5 MB)
+# -> --custom_sylph_db .../gtdb-r232-c200-dbv2.syl2db
+#    --custom_sylph_taxonomy .../gtdb_r232_metadata.tsv.gz
+wget -P /shared/databases/bugbuster/sylph/ \
+    https://faust.compbio.cs.cmu.edu/sylph-stuff/gtdb-r232-c200-dbv2.syl2db
+wget -P /shared/databases/bugbuster/sylph/ \
+    https://zenodo.org/records/19646381/files/gtdb_r232_metadata.tsv.gz
 
 # Download CheckM2
 wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
@@ -353,8 +363,11 @@ alongside the paired reads, and carried into downstream assembly/profiling
 steps that accept them. A few caveats: the `--min_read_sample` threshold counts
 paired reads only; Kraken2 profiles the paired reads only (it runs in
 `--paired` mode); and read-level RGI ARG prediction (`--rgi_prediction`) also
-uses the paired reads only (`rgi bwt` accepts a single read pair). Sourmash
-and assembly use singletons as well.
+uses the paired reads only (`rgi bwt` accepts a single read pair); Sylph
+profiles the paired reads only too (sylph would treat a singleton file as a
+separate sample). Sourmash, K-MARVEL (`--kmarvel_prediction`, which pools R1,
+R2 and singletons into one read set, as upstream asks for paired-end data) and
+assembly use singletons as well.
 
 ### Input Requirements
 
@@ -394,11 +407,12 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|---------|-------------|
 | `--quality_control` | `true` | `true`, `false` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `none` | Taxonomic profiling tool |
+| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables MetaWRAP |
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
+| `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
 | `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
 | `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (with the contig or read functional branch; failure is non-fatal — affected samples get no CPGE: TPM-only in the contig tables, native read counts only in the read tables) |
@@ -539,6 +553,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--host_db` | `human` | `human` | Host genome for read removal |
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
+| `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
 | `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
@@ -548,6 +563,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
 | `--humann_db` | `v4_alpha-full` | `v4_alpha-full`, `v4_alpha-ec_filtered` | HUMAnN 4 database set: full (44.8 GB) or EC-filtered (6.9 GB) ChocoPhlAn, plus UniRef90 EC-filtered, utility mapping and MetaPhlAn vOct22 (recorded in provenance) |
 | `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
+| `--kmarvel_db` | `card_v4.0.1` | `card_v4.0.1` | CARD release for K-MARVEL (CARD 4.0.1 data tarball, the release upstream's `get_ref_db.sh` fetches) |
 
 ### 6.4 Custom Database Paths
 
@@ -558,6 +574,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
 | `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
+| `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
+| `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
 | `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
@@ -567,6 +585,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--custom_kargva_db` | Path to KARGVA database FASTA file |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
+| `--custom_kmarvel_db` | Path to a K-MARVEL database directory: `CARD_protein_all.fasta`, `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`); no BLAST index needed |
 | `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
 | `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
 | `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
@@ -595,6 +614,10 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--bracken_read_len` | `150` | Read length for Bracken estimation |
 | `--bracken_tax_level` | `S` | Taxonomic level: D, P, C, O, F, G, S |
 | `--sourmash_tax_rank` | `species` | Rank: `genus`, `species`, `strain` |
+| `--sylph_read_seq_id` | unset (automatic) | Sylph read identity (%), e.g. `99.5`; corrects the unknown fraction (Classified, estimated read pairs) |
+
+Sylph runs with its defaults plus `-u`; its abundance tables are described in
+`docs/parameters.md` (*Sylph outputs*).
 
 ### 6.7 Assembly Options
 
@@ -666,7 +689,41 @@ Parameters for RGI AMR gene prediction with pathogen-of-origin analysis:
 
 **Note**: For detailed manual CARD database preparation instructions, see [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) ("Manual CARD Database Preparation").
 
-### 6.11 Bowtie2 Alignment Options
+### 6.11 K-MARVEL Options
+
+Parameters for K-MARVEL read-level ARG detection (`--kmarvel_prediction`).
+[K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel) assembles CARD protein
+ARGs straight from the reads (translated k-mer search, gene-centric protein
+assembly), removes chimeric assemblies, keeps housekeeping-gene variant models
+only when they carry a resistance SNP from CARD's `snps.txt`, and confirms
+every assembled ARG with blastp. It runs per sample on the host-removed reads
+(R1, R2 and singletons pooled) in short-read mode, whose k-mer (6) and
+extension (9) sizes are fixed by the tool and not exposed.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--kmarvel_min_coverage` | `90` | Minimum coverage (%) of the CARD reference protein by an assembled ARG |
+| `--kmarvel_min_identity` | `90` | Minimum identity (%) of an assembled ARG to its CARD reference protein |
+| `--kmarvel_min_read_length` | `100` | Minimum read length (bp); must be below 200 in short-read mode. Reads shorter than this after fastp trimming are ignored |
+
+**Notes**:
+- K-MARVEL has no bioconda package; the pipeline runs it from its own image
+  (`ghcr.io/gene2dis/bugbuster-kmarvel`, built from `containers/kmarvel/`),
+  which also carries BLAST+ 2.17.0.
+- The default database is the CARD 4.0.1 data release (~4.6 MB). CARD is free
+  for academic use; commercial use needs a licence from CARD.
+- A sample with no ARG found still gets a (header-only) table and an all-zero
+  column in the summary matrices. If blastp fails for a sample with ARGs, the
+  task fails instead of publishing unfiltered results.
+- Counts are K-MARVEL's supporting reads, which count read pairs (both mates
+  of a fragment count once). They are not normalised: K-MARVEL can run without
+  ARGs-OAP, which provides the cell counts used for KARGA/KARGVA.
+- The allele K-MARVEL reports among close variants of one gene is not stable
+  (simulated TEM-1 reads were called TEM-117, TEM-192 or TEM-246 depending on
+  the read subset). Compare samples with `KMARVEL_gene_family_matrix.tsv`;
+  treat the per-ARO matrix as allele-level detail.
+
+### 6.12 Bowtie2 Alignment Options
 
 Advanced parameters for Bowtie2 read alignment during host filtering:
 
@@ -681,7 +738,7 @@ Advanced parameters for Bowtie2 read alignment during host filtering:
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.12 Taxonomy Visualization Options
+### 6.13 Taxonomy Visualization Options
 
 Control taxonomic output visualization and formatting:
 
@@ -693,7 +750,7 @@ Control taxonomic output visualization and formatting:
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
 
-### 6.13 Database Storage Options
+### 6.14 Database Storage Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -701,7 +758,7 @@ Control taxonomic output visualization and formatting:
 
 By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
 
-### 6.14 Resource Limit Options
+### 6.15 Resource Limit Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -832,8 +889,12 @@ results/
 │   │   └── {sample}_*.bracken                  # Per-sample Bracken results
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
+│   ├── sylph/                                  # Sylph results (if taxonomic_profiler='sylph')
+│   │   ├── {sample}_sylph_{db}.tsv             # Per-sample sylph genome profile (sylph profile -u)
+│   │   └── {sample}_sylph_{db}.sylphmpa        # Per-sample lineage profile (sylph-tax, every rank down to t__ genome)
 │   ├── tables/                                 # Taxonomy tables
-│   │   └── *.tsv                               # Abundance tables
+│   │   ├── *.tsv                               # Abundance tables (OTU = relative abundance for sylph)
+│   │   └── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
 │   ├── phyloseq/                               # Phyloseq objects
 │   │   ├── *.h5                                # HDF5 format
 │   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
@@ -902,6 +963,16 @@ results/
 │   │   │   ├── RGI_drug_class_profile.png
 │   │   │   ├── RGI_resistance_mechanisms.png
 │   │   │   └── RGI_sample_amr_counts.png
+│   │   ├── kmarvel/                            # K-MARVEL per-sample results (if kmarvel_prediction=true)
+│   │   │   └── {sample}/
+│   │   │       ├── {sample}_kmarvel.tsv        # One row per assembled ARG (CARD ARO, drug class, identity, coverage, supporting read pairs, blast_* columns); header-only when none
+│   │   │       ├── {sample}_kmarvel.json       # K-MARVEL JSON result
+│   │   │       └── {sample}_kmarvel.log        # K-MARVEL stdout
+│   │   ├── kmarvel_summary/                    # K-MARVEL aggregated reports (if kmarvel_prediction=true)
+│   │   │   ├── KMARVEL_summary_long.tsv        # One row per sample and ARG
+│   │   │   ├── KMARVEL_supporting_reads_matrix.tsv  # ARG (CARD ARO) x sample supporting read pairs
+│   │   │   ├── KMARVEL_gene_family_matrix.tsv  # AMR gene family x sample supporting read pairs (use this to compare samples)
+│   │   │   └── KMARVEL_drug_class_matrix.tsv   # Drug class x sample number of ARGs
 │   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
 │   │       └── *.csv
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
@@ -1140,10 +1211,12 @@ databases/                            # Database storage (configurable via --dat
 ├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
 ├── kraken/                           # Kraken2 database (selected via --kraken2_db)
 ├── sourmash/                         # Sourmash database
+├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
 ├── taxdump/                          # NCBI taxonomy dump
 ├── blast/                            # NCBI NT BLAST database
 ├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
+├── kmarvel/                          # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
 ├── checkm2/                          # CheckM2 database
 ├── gtdbtk/                           # GTDB-TK database
 ├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
@@ -1174,6 +1247,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
 | `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA/KARGVA ARG predictions |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
+| `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |

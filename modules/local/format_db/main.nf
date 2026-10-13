@@ -27,6 +27,54 @@ process FORMAT_KRAKEN_DB {
         """
 }
 
+process FORMAT_SYLPH_DB {
+    tag "format_sylph_db"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download_extensive'
+
+    input:
+        val(db)
+
+    output:
+        path("sylph_db/*.syl*db"), emit: db
+
+    script:
+        """
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db
+        """
+
+    stub:
+        """
+        mkdir sylph_db
+        touch sylph_db/${db.tokenize('/')[-1]}
+        """
+}
+
+process FORMAT_SYLPH_TAXONOMY {
+    tag "format_sylph_taxonomy"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download'
+
+    input:
+        val(taxonomy)
+
+    output:
+        path("sylph_db/*.tsv.gz"), emit: taxonomy
+
+    script:
+        """
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} taxonomy $taxonomy
+        """
+
+    stub:
+        """
+        mkdir sylph_db
+        printf 'GCF_000000001.1\\td__Bacteria;p__P;c__C;o__O;f__F;g__G;s__G species\\n' | gzip > sylph_db/${taxonomy.tokenize('/')[-1]}
+        """
+}
+
 process FORMAT_NT_BLAST_DB {
     tag "format_blast_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
@@ -375,6 +423,39 @@ process FORMAT_SUPERFOCUS_DB {
         mkdir -p superfocus_db/db/static/${aligner}
         touch superfocus_db/db/database_PKs.txt superfocus_db/db/static/${static_file} \
             superfocus_db/DB_VERSION
+        """
+}
+
+process FORMAT_KMARVEL_DB {
+    tag "format_kmarvel_db"
+    // Runs in the pipeline-built K-MARVEL image the KMARVEL module uses: the
+    // CARD data is a .tar.bz2 and the shared wget image has no bzip2 (the
+    // K-MARVEL image carries GNU wget and bzip2 for this). ~4.6 MB download.
+    // 1.0.0-0fd49c9 (containers/kmarvel); re-pin after a rebuild
+    container 'ghcr.io/gene2dis/bugbuster-kmarvel@sha256:0fd49c9a1665d63541913f090ebc8cbaa75d4e60753addaf6ff34f5e2747b5a5'
+
+    label 'process_download'
+
+    input:
+        val(key)
+
+    output:
+        path("kmarvel_db")
+
+    script:
+        def entry = params.kmarvel_ref_db[key]
+        """
+        ${entry["fmtscript"]} \
+            '${entry["url"]}' \
+            '${entry["md5"]}' \
+            '${entry["dbversion"]}'
+        """
+
+    stub:
+        """
+        mkdir kmarvel_db
+        touch kmarvel_db/CARD_protein_all.fasta kmarvel_db/metadata.tsv kmarvel_db/snps.txt \
+            kmarvel_db/DB_VERSION
         """
 }
 

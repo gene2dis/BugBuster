@@ -23,6 +23,12 @@ tools:
       documentation: https://github.com/ncbi/amr/wiki
       doi: "10.1038/s41598-021-91456-0"
       licence: ["Public Domain"]
+  - kmarvel:
+      description: K-MARVEL image (containers/kmarvel), whose GNU wget and bzip2 FORMAT_KMARVEL_DB uses to fetch and unpack the CARD data
+      homepage: https://bitbucket.org/amr-avengers/k-marvel
+      documentation: https://bitbucket.org/amr-avengers/k-marvel/src/main/README.md
+      doi: "10.1101/2025.10.08.681127"
+      licence: ["GPL-3.0"]
   - sourmash:
       description: FracMinHash sketching and comparison toolkit; sourmash tax prepare converts the lineage CSV into a SQLite taxonomy database (4.8.11)
       homepage: https://sourmash.readthedocs.io/
@@ -38,6 +44,30 @@ processes:
           type: value
           description: Kraken2 database tarball URL (params.kraken_ref_db[params.kraken2_db].url)
     output: []
+
+  - name: FORMAT_SYLPH_DB
+    description: Runs bin/sylph_db_reformat.sh db - downloads the sylph genome database (.syldb or two-stage .syl2db) into sylph_db/ under its URL name, which carries the release, and checks it is non-empty
+    input:
+      - db:
+          type: value
+          description: sylph database URL (first entry of params.sylph_ref_db[params.sylph_db].url)
+    output:
+      - db:
+          type: file
+          description: sylph genome database
+          pattern: "sylph_db/*.syl*db"
+
+  - name: FORMAT_SYLPH_TAXONOMY
+    description: Runs bin/sylph_db_reformat.sh taxonomy - downloads the sylph-tax metadata file matching the database into sylph_db/, checks the gzip stream and the accession <TAB> lineage layout
+    input:
+      - taxonomy:
+          type: value
+          description: sylph-tax metadata URL (second entry of params.sylph_ref_db[params.sylph_db].url)
+    output:
+      - taxonomy:
+          type: file
+          description: sylph-tax metadata file (e.g. gtdb_r232_metadata.tsv.gz)
+          pattern: "sylph_db/*.tsv.gz"
 
   - name: FORMAT_NT_BLAST_DB
     description: Runs bin/blast_nt_reformat.sh - reads the nt volume list from nt-nucl-metadata.json, downloads every volume with its .md5, verifies (md5sum -c) and extracts them, checks the taxdb files and one .nin index per volume, and moves everything into blast_nt_db/
@@ -138,6 +168,14 @@ processes:
       - aligner:
           type: value
           description: SUPER-FOCUS aligner (diamond or mmseqs2; params.superfocus_aligner); only that aligner's archive is downloaded
+    output: []
+
+  - name: FORMAT_KMARVEL_DB
+    description: Runs bin/kmarvel_db_reformat.sh in the K-MARVEL image - downloads and md5-verifies the CARD data tarball, concatenates the protein homolog, overexpression and variant model FASTAs into kmarvel_db/CARD_protein_all.fasta, keeps aro_index.tsv as metadata.tsv and snps.txt, and writes DB_VERSION (no BLAST index; KMARVEL indexes per task)
+    input:
+      - key:
+          type: value
+          description: K-MARVEL database registry key (params.kmarvel_db)
     output: []
 
   - name: SOURMASH_TAX_PREPARE

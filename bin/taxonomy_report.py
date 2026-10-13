@@ -2,7 +2,7 @@
 """
 Unified Taxonomy Report Generator for BugBuster Pipeline
 
-Generates classification reports and plots for both Kraken2 and Sourmash taxonomic profilers.
+Generates classification reports and plots for the Kraken2, Sourmash and Sylph taxonomic profilers.
 Replaces Tax_unify_report.R and SM_unify_report.R with improved performance and maintainability.
 
 Author: BugBuster Development Team
@@ -25,6 +25,13 @@ rcParams['axes.linewidth'] = 1.5
 rcParams['xtick.major.width'] = 1.5
 rcParams['ytick.major.width'] = 1.5
 
+# Per profiler: plot title label, database column in Reads_report.csv, plot file
+PROFILERS = {
+    'kraken2': ('Kraken2', 'Kraken DB', 'Kraken_plot.png'),
+    'sourmash': ('Sourmash', 'Sourmash DB', 'sourmash_tax_classified_reads.png'),
+    'sylph': ('Sylph', 'Sylph DB', 'sylph_tax_classified_reads.png'),
+}
+
 
 class TaxonomyReportGenerator:
     """Generate unified taxonomy classification reports and visualizations."""
@@ -34,7 +41,7 @@ class TaxonomyReportGenerator:
         Initialize the report generator.
         
         Args:
-            profiler: Taxonomic profiler used ('kraken2' or 'sourmash')
+            profiler: Taxonomic profiler used ('kraken2', 'sourmash' or 'sylph')
             db_name: Database name for labeling
             output_dir: Output directory for reports and plots
         """
@@ -43,8 +50,8 @@ class TaxonomyReportGenerator:
         self.output_dir = Path(output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
         
-        if self.profiler not in ['kraken2', 'sourmash']:
-            raise ValueError(f"Profiler must be 'kraken2' or 'sourmash', got '{profiler}'")
+        if self.profiler not in PROFILERS:
+            raise ValueError(f"Profiler must be one of {', '.join(PROFILERS)}, got '{profiler}'")
     
     def parse_kraken2_reports(self, report_files: List[Path]) -> pd.DataFrame:
         """
@@ -102,18 +109,25 @@ class TaxonomyReportGenerator:
 
         return pd.DataFrame(rows, columns=['Id', 'Kraken DB', 'Unclassified', 'Classified'])
     
-    def parse_sourmash_reports(self, report_files: List[Path]) -> pd.DataFrame:
+    def parse_per_sample_reports(self, report_files: List[Path]) -> pd.DataFrame:
         """
-        Parse Sourmash report TSV files.
+        Parse the per-sample report TSV files written by the SOURMASH and
+        SYLPH_PROFILE modules.
         
-        Expected format: Id, Sourmash DB, Unclassified, Classified
+        Expected format: Id, <Tool> DB, Unclassified, Classified (fractions);
+        any further column (SYLPH_PROFILE's 'Read pairs', used by
+        taxonomy_phyloseq.py) is dropped so it does not reach Reads_report.csv.
+        A report missing one of the four columns raises: skipping it would
+        leave that sample's classification blank in Reads_report.csv
         
         Args:
-            report_files: List of Sourmash report TSV files
+            report_files: List of per-sample report TSV files
             
         Returns:
-            DataFrame with combined Sourmash reports
+            DataFrame with combined reports
         """
+        label, db_col, _plot_name = PROFILERS[self.profiler]
+        columns = ['Id', db_col, 'Unclassified', 'Classified']
         all_reports = []
         
         for report_file in report_files:
@@ -123,18 +137,21 @@ class TaxonomyReportGenerator:
                     sep='\t',
                     dtype={
                         'Id': str,
-                        'Sourmash DB': str,
+                        db_col: str,
                         'Unclassified': float,
                         'Classified': float
                     }
                 )
-                all_reports.append(df)
             except Exception as e:
                 print(f"Warning: Failed to parse {report_file}: {e}", file=sys.stderr)
                 continue
+            missing = [c for c in columns if c not in df.columns]
+            if missing:
+                raise ValueError(f"{report_file} is missing report columns {missing} (expected {columns})")
+            all_reports.append(df[columns])
         
         if not all_reports:
-            raise ValueError("No valid Sourmash reports found")
+            raise ValueError(f"No valid {label} reports found")
         
         combined = pd.concat(all_reports, ignore_index=True)
         return combined
@@ -192,12 +209,7 @@ class TaxonomyReportGenerator:
             output_path: Path for output PNG file
         """
         # Prepare data for plotting
-        if self.profiler == 'kraken2':
-            db_col = 'Kraken DB'
-            plot_title_prefix = 'Kraken2'
-        else:
-            db_col = 'Sourmash DB'
-            plot_title_prefix = 'Sourmash'
+        plot_title_prefix, db_col, _plot_name = PROFILERS[self.profiler]
         
         # Convert to long format for plotting
         plot_data = taxonomy_data.copy()
@@ -291,7 +303,7 @@ class TaxonomyReportGenerator:
         if self.profiler == 'kraken2':
             taxonomy_data = self.parse_kraken2_reports(report_files)
         else:
-            taxonomy_data = self.parse_sourmash_reports(report_files)
+            taxonomy_data = self.parse_per_sample_reports(report_files)
         
         print(f"Parsed {len(taxonomy_data)} records from {len(report_files)} report files")
         
@@ -304,10 +316,7 @@ class TaxonomyReportGenerator:
         print(f"Saved merged report: {output_csv}")
         
         # Create classification plot
-        if self.profiler == 'kraken2':
-            plot_name = 'Kraken_plot.png'
-        else:
-            plot_name = 'sourmash_tax_classified_reads.png'
+        plot_name = PROFILERS[self.profiler][2]
         
         plot_path = self.output_dir / plot_name
         
@@ -334,13 +343,17 @@ Examples:
   # Sourmash reports
   taxonomy_report.py --profiler sourmash --reports *.report.tsv \\
       --reads-report Reads_report.csv --db-name gtdb --output-dir .
+
+  # Sylph reports (SYLPH_PROFILE *_report.tsv)
+  taxonomy_report.py --profiler sylph --reports *_report.tsv \\
+      --reads-report Reads_report.csv --db-name gtdb_r232 --output-dir .
         """
     )
     
     parser.add_argument(
         '--profiler',
         required=True,
-        choices=['kraken2', 'sourmash'],
+        choices=list(PROFILERS),
         help='Taxonomic profiler used'
     )
     

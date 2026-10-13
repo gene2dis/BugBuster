@@ -1,0 +1,2 @@
+#SampleID	sampleB	Taxonomies_used:['gtdb_r232_metadata.tsv.gz']
+clade_name	relative_abundance	sequence_abundance	ANI (if strain-level)	Coverage (if strain-level)

@@ -1,0 +1,44 @@
+name: sylph_taxprof
+description: Converts a per-sample sylph profile into a MetaPhlAn-style taxonomic profile (.sylphmpa) with sylph-tax taxprof, using a staged sylph-tax metadata file and no sylph-tax config; writes a header-only profile when sylph found no genome
+keywords:
+  - taxonomy
+  - taxonomic profiling
+  - lineage
+  - sylph
+  - metagenomics
+tools:
+  - sylph-tax:
+      description: Turns sylph's genome-level output into taxonomic profiles with pre-built (GTDB, ...) or custom taxonomy metadata (1.9.2)
+      homepage: https://github.com/bluenote-1577/sylph-tax
+      documentation: https://sylph-docs.github.io/sylph-tax/
+      doi: "10.1038/s41587-024-02412-y"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - profile:
+      type: file
+      description: sylph profile TSV from SYLPH_PROFILE (one sample)
+      pattern: "*_sylph_*.tsv"
+  - taxonomy:
+      type: file
+      description: sylph-tax metadata file matching the database (genome accession <TAB> d__...;s__... lineage), e.g. gtdb_r232_metadata.tsv.gz
+      pattern: "*.{tsv,tsv.gz}"
+  - db_name:
+      type: value
+      description: Database name, used in the output file name
+
+output:
+  - sylphmpa:
+      type: file
+      description: Taxonomic profile (#SampleID line, header line, then one row per clade at every rank; lineages joined with | down to t__<genome accession>; columns relative_abundance, sequence_abundance, ANI and Coverage, the last two at strain level only)
+      pattern: "*_sylph_*.sylphmpa"
+  - versions:
+      type: file
+      description: Software versions (sylph-tax, plus the metadata file name)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

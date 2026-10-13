@@ -1,10 +1,11 @@
 name: taxonomy_report
-description: Generate unified taxonomy classification reports and plots for Kraken2 or Sourmash
+description: Generate unified taxonomy classification reports and plots for Kraken2, Sourmash or Sylph
 keywords:
   - taxonomy
   - classification
   - kraken2
   - sourmash
+  - sylph
   - report
   - visualization
 tools:
@@ -18,7 +19,7 @@ tools:
 input:
   - reports:
       type: file
-      description: Taxonomy report TSV files from Kraken2 or Sourmash
+      description: Taxonomy report files - raw Kraken2 reports, or the per-sample report TSVs of the SOURMASH / SYLPH_PROFILE modules (Id, <Tool> DB, Unclassified, Classified; extra columns are dropped)
       pattern: "*.{tsv,txt}"
   - reads_report:
       type: file
@@ -26,7 +27,7 @@ input:
       pattern: "*.csv"
   - profiler:
       type: value
-      description: Taxonomic profiler used ('kraken2' or 'sourmash')
+      description: Taxonomic profiler used ('kraken2', 'sourmash' or 'sylph')
   - db_name:
       type: value
       description: Database name for labeling outputs

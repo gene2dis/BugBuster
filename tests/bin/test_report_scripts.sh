@@ -319,6 +319,40 @@ for f in KARGA_norm.csv KARGVA_norm.csv; do
 done
 
 #
+# kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
+# two ARGs, sampleB header-only); the zero-ARG sample must stay as an
+# all-zero column. Runs in the mulled image KMARVEL_REPORT pins (MULLED_IMG).
+#
+echo "--- kmarvel_report.py ---"
+KM_WORK="${WORK}/kmarvel_report"
+mkdir -p "${KM_WORK}"
+cp "${REPO_DIR}"/tests/data/kmarvel/sample{A,B}_kmarvel.tsv "${KM_WORK}/"
+NEXT_WORKDIR="${KM_WORK}"
+expect_pass "kmarvel_report: ARG and zero-ARG samples merged" kmarvel_report.py \
+    sampleA_kmarvel.tsv sampleB_kmarvel.tsv
+check_grep "kmarvel_report: matrix keeps the zero-ARG sample column" \
+    "KMARVEL_supporting_reads_matrix.tsv" "^aro_id	aro_full_name	sampleA	sampleB$"
+check_grep "kmarvel_report: supporting reads per ARG and sample" \
+    "KMARVEL_supporting_reads_matrix.tsv" "^ARO:3000980	TEM-117	60	0$"
+check_grep "kmarvel_report: read pairs summed per AMR gene family" \
+    "KMARVEL_gene_family_matrix.tsv" "^TEM beta-lactamase	60	0$"
+check_grep "kmarvel_report: multi-class ARG counted once per drug class" \
+    "KMARVEL_drug_class_matrix.tsv" "^cephalosporin	2	0$"
+check_file "kmarvel_report: long table created" "KMARVEL_summary_long.tsv"
+NEXT_WORKDIR="${KM_WORK}"
+expect_pass "kmarvel_report: only zero-ARG samples still reports" kmarvel_report.py sampleB_kmarvel.tsv
+check_grep "kmarvel_report: empty matrix keeps the sample header" \
+    "KMARVEL_supporting_reads_matrix.tsv" "^aro_id	aro_full_name	sampleB$"
+check_grep "kmarvel_report: empty gene-family matrix keeps the sample header" \
+    "KMARVEL_gene_family_matrix.tsv" "^gene_family	sampleB$"
+expect_fail "kmarvel_report: no input tables fails" kmarvel_report.py
+KM_BAD="${WORK}/kmarvel_report_bad"
+mkdir -p "${KM_BAD}"
+cut -f1-5 "${REPO_DIR}/tests/data/kmarvel/sampleA_kmarvel.tsv" > "${KM_BAD}/s1_kmarvel.tsv"
+NEXT_WORKDIR="${KM_BAD}"
+expect_fail "kmarvel_report: table without the K-MARVEL columns fails" kmarvel_report.py s1_kmarvel.tsv
+
+#
 # blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the
 # figure is also pickled, and lambda tick formatters made pickle.dump fail
 # after the PNG was written. Fixtures are cut from a real T9 run (BlobTools
