@@ -52,7 +52,7 @@ process CALCULATE_DEPTH {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: \$(jgi_summarize_bam_contig_depths --version 2>&1 | sed 's/.*version //')
+        metabat2: \$(jgi_summarize_bam_contig_depths 2>&1 | grep -o 'jgi_summarize_bam_contig_depths [0-9][0-9.]*' | head -n 1 | sed 's/.* //')
     END_VERSIONS
     """
     

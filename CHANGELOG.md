@@ -259,7 +259,8 @@ next release is tagged.
   (BOWTIE2_SAMTOOLS*) and a three-tab python heredoc (GTDB_TK_BATCH) left `END_VERSIONS`
   indented. `<<-` strips only tabs, so the terminator was written into `versions.yml`
   and the aggregate failed to parse. Heredoc bodies now sit at the script's base
-  indentation. BBMAP's version was also empty: `bbversion.sh` prints the bare number.
+  indentation. BBMAP's and METAWRAP's versions were also empty, and CALCULATE_DEPTH wrote the
+  usage text of `jgi_summarize_bam_contig_depths` (it has no `--version`).
   The stub pipeline tests now parse `software_versions.yml`
 - **bowtie2 decontamination failed for sample ids containing a dot** (#21): without a
   `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
