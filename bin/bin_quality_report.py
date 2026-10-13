@@ -14,6 +14,11 @@ import sys
 import numpy as np
 
 
+# Columns of Mag_quality_summary.csv and of the two per-MAG tables
+SUMMARY_COLUMNS = ['Binner', 'Quality classify', 'Total MAGs']
+TABLE_COLUMNS = ['Sample', 'Binner', 'Bin name', 'Quality classify', 'Completeness', 'Contamination']
+
+
 def classify_quality(row):
     """Classify bin quality based on completeness and contamination."""
     if row['Completeness'] >= 90 and row['Contamination'] <= 5:
@@ -57,16 +62,28 @@ def main():
         df['Sample'] = sample
         all_reports.append(df)
     
+    # No sample has a bin: binning found nothing on this data (SemiBin and
+    # MetaWRAP finish with empty bin sets). Warn and write header-only tables
+    # and a placeholder plot so the run can finish; a missing CheckM2 file
+    # above still fails
     if not all_reports:
-        # Fail loudly instead of publishing "successful" empty QC tables.
         print(
-            "ERROR: all CheckM2 quality reports are empty (header-only) - no "
-            "bins were assessed. This means upstream binning produced no bins "
-            "for any sample (e.g. every binner was skipped or found nothing "
-            "on this data). Failing instead of writing empty quality tables.",
+            "WARNING: all CheckM2 quality reports are empty (header-only) - no "
+            "bins were assessed. Upstream binning produced no bins for any "
+            "sample; writing empty quality tables.",
             file=sys.stderr
         )
-        sys.exit(1)
+        pd.DataFrame(columns=SUMMARY_COLUMNS).to_csv('Mag_quality_summary.csv', index=False)
+        pd.DataFrame(columns=TABLE_COLUMNS).to_csv('All_Mag_quality_table.csv', index=False)
+        pd.DataFrame(columns=TABLE_COLUMNS).to_csv('Refined_Mag_quality_table.csv', index=False)
+        fig, ax = plt.subplots(figsize=(16, 8))
+        ax.text(0.5, 0.5, 'No bins were assessed', ha='center', va='center', fontsize=25)
+        ax.axis('off')
+        fig.patch.set_facecolor('white')
+        plt.savefig('Total_bins_quality_plot.png', dpi=100, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print("Generated empty quality tables and a placeholder Total_bins_quality_plot.png")
+        return
     
     # Combine all reports
     all_quality_reports = pd.concat(all_reports, ignore_index=True)
@@ -97,7 +114,8 @@ def main():
     
     # Prepare data tables for export
     all_data = quality_data[['Sample', 'Binner', 'Name', 'Quality classify', 'Completeness', 'Contamination']].copy()
-    all_data.columns = ['Sample', 'Binner', 'Bin name', 'Quality classify', 'Completeness', 'Contamination']
+    all_data.columns = TABLE_COLUMNS
+    assert list(mag_summary.columns) == SUMMARY_COLUMNS
     
     refined_data = all_data[all_data['Binner'] == 'Metawrap'].copy()
     

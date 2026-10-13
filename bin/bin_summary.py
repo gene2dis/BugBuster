@@ -11,6 +11,15 @@ import sys
 from pathlib import Path
 
 
+RANKS = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
+QUALITY_COLUMNS = [
+    'Name', 'Completeness', 'Contamination',
+    'Contig_N50', 'Genome_Size', 'Total_Coding_Sequences'
+]
+# Columns of Bin_summary.csv before the per-sample <sample>_avgcov columns
+SUMMARY_COLUMNS = QUALITY_COLUMNS + ['Total_contigs'] + RANKS
+
+
 def parse_gtdb_taxonomy(classification):
     """Parse GTDB taxonomy string into individual ranks."""
     if pd.isna(classification):
@@ -37,31 +46,6 @@ def parse_gtdb_taxonomy(classification):
 def main():
     """Main function to generate bin summary report."""
     
-    # Read bin depth files
-    depth_files = glob.glob('*bin_depth.tsv')
-    if not depth_files:
-        print("ERROR: No bin depth files found (*bin_depth.tsv)", file=sys.stderr)
-        sys.exit(1)
-    
-    depth_dfs = []
-    for file in depth_files:
-        df = pd.read_csv(file, sep='\t')
-        depth_dfs.append(df)
-    
-    bin_depth = pd.concat(depth_dfs, ignore_index=True)
-    
-    # Add suffix to sample names and pivot
-    bin_depth['sample'] = bin_depth['sample'] + '_avgcov'
-    bin_depth_wide = bin_depth.pivot_table(
-        index=['bin_id', 'Total_contigs'],
-        columns='sample',
-        values='average_cov',
-        aggfunc='first'
-    ).reset_index()
-    
-    # Separate Total_contigs for later join
-    bin_tmp = bin_depth_wide[['bin_id', 'Total_contigs']].copy()
-    
     # Read ALL bin quality reports (per-binner, per-sample); previously only the
     # first glob hit was read, dropping every other staged report (audit #11)
     quality_files = glob.glob('*quality_report.tsv')
@@ -77,14 +61,6 @@ def main():
             print(f"WARNING: skipping empty quality report {file}", file=sys.stderr)
 
     bin_quality = pd.concat(quality_dfs, ignore_index=True) if quality_dfs else pd.DataFrame()
-    if bin_quality.empty:
-        print("ERROR: all quality reports are empty - no bins were assessed", file=sys.stderr)
-        sys.exit(1)
-
-    bin_quality = bin_quality[[
-        'Name', 'Completeness', 'Contamination',
-        'Contig_N50', 'Genome_Size', 'Total_Coding_Sequences'
-    ]]
 
     # Read ALL bin taxonomy summaries (bac120 + ar53); GTDB-Tk writes a zero-byte
     # or header-only ar53 file when no archaea are found
@@ -101,10 +77,54 @@ def main():
             print(f"WARNING: skipping empty taxonomy file {file}", file=sys.stderr)
 
     bin_tax = pd.concat(tax_dfs, ignore_index=True) if tax_dfs else pd.DataFrame()
+
+    # No refined bin at all: MetaWRAP finished with an empty bin set, so the
+    # bin depth step was skipped (no depth files). Warn and write a
+    # header-only summary so the run can finish. Bins without a quality or
+    # taxonomy row are still an error below
+    if bin_quality.empty and bin_tax.empty:
+        print(
+            "WARNING: all quality reports and GTDB-Tk summaries are empty - "
+            "binning produced no refined bins; writing an empty Bin_summary.csv",
+            file=sys.stderr
+        )
+        pd.DataFrame(columns=SUMMARY_COLUMNS).to_csv('Bin_summary.csv', index=False)
+        print("Generated an empty Bin_summary.csv")
+        return
+    if bin_quality.empty:
+        print("ERROR: all quality reports are empty - no bins were assessed", file=sys.stderr)
+        sys.exit(1)
     if bin_tax.empty:
         print("ERROR: all GTDB-Tk summaries are empty - no bins were classified", file=sys.stderr)
         sys.exit(1)
-    
+
+    bin_quality = bin_quality[QUALITY_COLUMNS]
+
+    # Read bin depth files
+    depth_files = glob.glob('*bin_depth.tsv')
+    if not depth_files:
+        print("ERROR: No bin depth files found (*bin_depth.tsv)", file=sys.stderr)
+        sys.exit(1)
+
+    depth_dfs = []
+    for file in depth_files:
+        df = pd.read_csv(file, sep='\t')
+        depth_dfs.append(df)
+
+    bin_depth = pd.concat(depth_dfs, ignore_index=True)
+
+    # Add suffix to sample names and pivot
+    bin_depth['sample'] = bin_depth['sample'] + '_avgcov'
+    bin_depth_wide = bin_depth.pivot_table(
+        index=['bin_id', 'Total_contigs'],
+        columns='sample',
+        values='average_cov',
+        aggfunc='first'
+    ).reset_index()
+
+    # Separate Total_contigs for later join
+    bin_tmp = bin_depth_wide[['bin_id', 'Total_contigs']].copy()
+
     # Parse taxonomy classification
     taxonomy_parsed = bin_tax['classification'].apply(parse_gtdb_taxonomy)
     taxonomy_df = pd.DataFrame(taxonomy_parsed.tolist())
@@ -143,6 +163,8 @@ def main():
         how='left'
     ).drop(columns=['bin_id'])
     
+    assert list(bin_reports.columns[:len(SUMMARY_COLUMNS)]) == SUMMARY_COLUMNS
+
     # Write output
     bin_reports.to_csv('Bin_summary.csv', index=False)
     print(f"Successfully generated Bin_summary.csv with {len(bin_reports)} bins")

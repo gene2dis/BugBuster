@@ -3,10 +3,10 @@
 # Regression tests for audit item #13 (report steps must not mask failures):
 #   - bin/report_unify.py exits non-zero when no fastp reports are present
 #     (previously exit 0 with no output, hidden by the module's path("*")),
-#   - bin/bin_quality_report.py exits non-zero when every input is
-#     header-only (previously a "successful" empty report); bin/bin_tax_report.py
-#     warns and writes empty outputs instead (a run without bins finishes),
-#     but still fails when no GTDB-Tk file is staged,
+#   - bin/bin_quality_report.py, bin/bin_tax_report.py and bin/bin_summary.py
+#     warn and write empty outputs when every input is header-only (SemiBin
+#     and MetaWRAP finish with empty bin sets, so a run without bins
+#     finishes), but still fail when no input file is staged,
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
 #   - and the happy paths still produce their real outputs,
@@ -190,8 +190,20 @@ BQ_EMPTY="${WORK}/bin_quality_empty"
 mkdir -p "${BQ_EMPTY}"
 printf 'Name\tCompleteness\tContamination\n' > "${BQ_EMPTY}/sampleA_semibin_quality_report.tsv"
 NEXT_WORKDIR="${BQ_EMPTY}"
-expect_fail "bin_quality: all-header-only input fails" bin_quality_report.py
-check_grep "bin_quality: failure message names the empty input" "../bin_quality_empty.log" "no bins were assessed"
+# No sample with a bin: warn and write empty outputs
+expect_pass "bin_quality: all-header-only input warns and succeeds" bin_quality_report.py
+check_grep "bin_quality: warning names the empty input" "../bin_quality_empty.log" "WARNING: all CheckM2 quality reports are empty"
+check_grep "bin_quality: header-only summary written" "Mag_quality_summary.csv" "^Binner,Quality classify,Total MAGs$"
+check_grep "bin_quality: header-only all-MAGs table written" "All_Mag_quality_table.csv" \
+    "^Sample,Binner,Bin name,Quality classify,Completeness,Contamination$"
+check_grep "bin_quality: header-only refined table written" "Refined_Mag_quality_table.csv" \
+    "^Sample,Binner,Bin name,Quality classify,Completeness,Contamination$"
+check_file "bin_quality: placeholder plot written" "Total_bins_quality_plot.png"
+
+BQ_NONE="${WORK}/bin_quality_none"
+mkdir -p "${BQ_NONE}"
+NEXT_WORKDIR="${BQ_NONE}"
+expect_fail "bin_quality: no CheckM2 file still fails" bin_quality_report.py
 
 #
 # bin_tax_report.py (GTDB-Tk batch summary format)
@@ -275,14 +287,35 @@ else
     FAIL=$((FAIL + 1))
 fi
 
-# All quality reports header-only: must exit non-zero, not write an empty summary
+# Quality reports header-only but classified bins present: CheckM2 lost
+# bins, so it must exit non-zero, not write an empty summary
 BS_EMPTY="${WORK}/bin_summary_empty"
 mkdir -p "${BS_EMPTY}"
 cp "${BS_WORK}/s1_bin_depth.tsv" "${BS_WORK}/coassembly_gtdbtk_bac120.tsv" "${BS_EMPTY}/"
 printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\n' \
     > "${BS_EMPTY}/coassembly_semibin_quality_report.tsv"
 NEXT_WORKDIR="${BS_EMPTY}"
-expect_fail "bin_summary: all-header-only quality input fails" bin_summary.py
+expect_fail "bin_summary: header-only quality with classified bins fails" bin_summary.py
+
+# No refined bin at all: header-only quality and taxonomy, no depth files
+# (the bin depth step is skipped). Warn and write a header-only summary
+BS_NOBINS="${WORK}/bin_summary_nobins"
+mkdir -p "${BS_NOBINS}"
+printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\n' \
+    > "${BS_NOBINS}/coassembly_metawrap_quality_report.tsv"
+printf 'user_genome\tclassification\n' > "${BS_NOBINS}/coassembly_gtdbtk_bac120.tsv"
+: > "${BS_NOBINS}/coassembly_gtdbtk_ar53.tsv"
+NEXT_WORKDIR="${BS_NOBINS}"
+expect_pass "bin_summary: no refined bins warns and succeeds" bin_summary.py
+check_grep "bin_summary: warning names the empty input" "../bin_summary_nobins.log" "WARNING: all quality reports and GTDB-Tk summaries are empty"
+check_grep "bin_summary: header-only summary written" "Bin_summary.csv" \
+    "^Name,Completeness,Contamination,Contig_N50,Genome_Size,Total_Coding_Sequences,Total_contigs,Domain,Phylum,Class,Order,Family,Genus,Species$"
+
+BS_NONE="${WORK}/bin_summary_none"
+mkdir -p "${BS_NONE}"
+printf 'user_genome\tclassification\n' > "${BS_NONE}/coassembly_gtdbtk_bac120.tsv"
+NEXT_WORKDIR="${BS_NONE}"
+expect_fail "bin_summary: no quality file still fails" bin_summary.py
 
 #
 # arg_norm_report.py — audit item #22: a sample where ARGs-OAP finds nothing

@@ -315,11 +315,13 @@ next release is tagged.
 
 ### Fixed
 
-- **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT warns when
-  every GTDB-Tk summary is empty and writes a header-only `MAGs_tax_summary.csv` and a
-  placeholder plot, instead of failing (audit #13 made it fail; with SemiBin and MetaWRAP
-  now finishing on binless samples, that case is a valid outcome). A missing GTDB-Tk file
-  still fails
+- **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
+  and BIN_SUMMARY warn when every input report is empty and write header-only tables (and
+  placeholder plots), instead of failing (audit #13 made them fail; with SemiBin and MetaWRAP
+  now finishing on binless samples, that case is a valid outcome). A missing input file
+  still fails, and so does BIN_SUMMARY when CheckM2 or GTDB-Tk reports bins the other does
+  not. In co-assembly mode the bin depth step is skipped for an empty refined bin set (both
+  aligners failed on an empty reference)
 - **SemiBin and MetaWRAP stopped the run for a sample without usable bins**:
   - SemiBin2 fails when it finds no bins (its reclustering gets an empty ORF file). SEMIBIN now writes an empty bin directory with a note; any other failure still fails.
   - MetaWRAP stopped on any empty bin set: a binner with no bins, a hybrid set when two binners' bins share too little sequence, or a final set when no bin passes the thresholds. It also counted notes such as `SKIPPED.txt` as bins.

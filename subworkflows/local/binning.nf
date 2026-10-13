@@ -259,13 +259,25 @@ workflow BINNING {
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
+        // Bin depth needs at least one refined bin: a bin set can be empty
+        // (MetaWRAP or SemiBin write only SKIPPED.txt when nothing passes),
+        // and both depth paths fail on an empty reference. BIN_SUMMARY then
+        // writes a header-only table from the empty quality/taxonomy reports
+        def ch_bins_for_depth = ch_refined_bins
+            .filter { meta, bins ->
+                def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
+                if ( !has_bins ) {
+                    log.warn "No refined bins for ${meta.id}: skipping bin depth"
+                }
+                has_bins
+            }
         def ch_bin_cov
         if ( params.read_aligner == 'bwamem3' ) {
             // One reference of all refined bins (+ contig -> bin table), one
             // index, one alignment per sample: bwa mem aligns locally, so
             // mapping against a single bin at a time would let reads from the
             // other bins inflate its coverage with clipped partial hits
-            BINS_REFERENCE(ch_refined_bins.map { _meta, bins -> bins })
+            BINS_REFERENCE(ch_bins_for_depth.map { _meta, bins -> bins })
             ch_versions = ch_versions.mix(BINS_REFERENCE.out.versions)
             ch_bins_fasta = BINS_REFERENCE.out.reference.map { fasta, _table -> fasta }
             ch_contig_to_bin = BINS_REFERENCE.out.reference.map { _fasta, table -> table }
@@ -285,7 +297,7 @@ workflow BINNING {
             ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
         } else {
             BOWTIE2_SAMTOOLS_DEPTH(
-                reads.combine(ch_refined_bins.map { _meta, bins -> bins })
+                reads.combine(ch_bins_for_depth.map { _meta, bins -> bins })
             )
             ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
             BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
@@ -294,7 +306,7 @@ workflow BINNING {
         }
 
         BIN_SUMMARY(
-            ch_bin_cov.collect(sort: true)
+            ch_bin_cov.collect(sort: true).ifEmpty([])
                 .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
                 .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect(sort: true))
         )
