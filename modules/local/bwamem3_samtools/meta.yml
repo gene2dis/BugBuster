@@ -50,7 +50,9 @@ processes:
   - name: BWAMEM3_SAMTOOLS
     description: |
       Maps each library's paired reads (and singletons when present) with bwa-mem3, drops secondary and
-      supplementary records, coordinate-sorts and merges into one BAM. When meta.id is 'coassembly' the
+      supplementary records, turns alignments below ext.min_identity / ext.min_aligned_length into
+      unmapped reads (bin/filter_alignments.sh, then samtools fixmate), coordinate-sorts and merges into
+      one BAM. When meta.id is 'coassembly' the
       collected reads are split into R1/R2/singleton lists by file name. A contig file with no sequences
       yields a header-only BAM plus an empty-contig report instead of failing.
     input:

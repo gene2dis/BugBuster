@@ -12,6 +12,13 @@
     each sample once: bwa mem aligns locally, and mapping against one bin at
     a time would let reads from other bins pile up as clipped partial hits.
 
+    Alignments pass bin/filter_alignments.sh before sorting: a primary
+    alignment needs >= ext.min_aligned_length aligned bases and an identity
+    >= ext.min_identity, otherwise the read is kept as unmapped (samtools
+    fixmate then updates its mate). bwa mem's local hits from genomes the
+    reference does not contain otherwise inflate gene counts and bin depth
+    in poorly covered samples (docs/benchmarks/bwamem3_vs_bowtie2.md).
+
     Input:
         BWAMEM3_INDEX:    tuple val(meta), path(fasta)
         BWAMEM3_SAMTOOLS: tuple val(meta), path(reads), path(contigs), path(index)
@@ -110,6 +117,9 @@ process BWAMEM3_SAMTOOLS {
     script:
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
+    // != null, not ?:, so that 0 (filter off) is honoured
+    def min_identity = task.ext.min_identity != null ? task.ext.min_identity : 0.95
+    def min_aligned_length = task.ext.min_aligned_length != null ? task.ext.min_aligned_length : 50
     def prefix = meta.id
 
     if (!reads || reads.size() < 2) {
@@ -184,16 +194,19 @@ process BWAMEM3_SAMTOOLS {
         fi
         idx=\${bwt%.bwt.2bit.64}
 
-        # One coordinate-sorted BAM per library. Secondary and supplementary
-        # records are dropped (-F 0x900): downstream depth, binning and
+        # One coordinate-sorted BAM per library. filter_alignments.sh drops
+        # secondary and supplementary records (downstream depth, binning and
         # featureCounts expect one record per read, as bowtie2 end-to-end
-        # produced. Unmapped records stay. -K fixes the batch size so the
-        # output does not depend on task.cpus.
+        # produced) and turns short or divergent hits into unmapped records;
+        # fixmate updates their mates (bwa mem keeps a read's records
+        # together, as fixmate needs). Unmapped records stay. -K fixes the
+        # batch size so the output does not depend on task.cpus.
         map_reads() {
             local out=\$1
             shift
-            bwa-mem3 mem ${args} -t ${task.cpus} -K 100000000 --bam \${idx} "\$@" \\
-                | samtools view -u -F 0x900 - \\
+            bwa-mem3 mem ${args} -t ${task.cpus} -K 100000000 \${idx} "\$@" \\
+                | filter_alignments.sh ${min_identity} ${min_aligned_length} \\
+                | samtools fixmate -u - - \\
                 | samtools sort ${args2} -@ ${task.cpus} -o "\${out}" -
         }
 

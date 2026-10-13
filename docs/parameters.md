@@ -748,7 +748,7 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0 and is being benchmarked against `bowtie2`. Woltka and HUMAnN always use bowtie2 with their own databases. Differences under `bwamem3`:
   - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
   - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes; it runs under the `process_high_memory` label). Mapping against it needs ~14 GB per task, against ~4 GB for bowtie2.
-  - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. The co-assembly contig index is built once and shared by all alignments.
+  - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. Short or divergent local hits are turned into unmapped reads (`--bwamem3_min_identity`, `--bwamem3_min_aligned_length`). The co-assembly contig index is built once and shared by all alignments.
   - **Co-assembly bin depth.** Each sample is mapped once against all refined bins together instead of once per bin.
   - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+).
 - **Example**: `--read_aligner bwamem3`
@@ -764,6 +764,18 @@ Override automatic downloads by providing custom database paths:
 - **Default**: `30`
 - **Description**: bwa-mem3 minimum alignment score (`-T`) for a read to count as a contaminant hit. Only for `--read_aligner bwamem3`. With bwa's default scoring, 30 corresponds to ~30 matching bases. The threshold applies to each mate on its own: decontamination runs bwa-mem3 with pairing off (`-P`), because in paired mode bwa mem skips `-T` for a chosen pair and random ~20 bp host hits on overlapping mates would remove microbial reads.
 - **Example**: `--decontam_min_score 40`
+
+### `--bwamem3_min_identity`
+- **Type**: Number (0–1)
+- **Default**: `0.95`
+- **Description**: Minimum identity, `1 - NM / (M + I + D)`, for a bwa-mem3 read-to-contig or read-to-bin alignment to count. A failing read is kept as an unmapped read. Only for `--read_aligner bwamem3`. It applies to contig depth, binning, featureCounts and co-assembly bin depth, not to decontamination. bwa mem aligns locally, so reads from genomes the assembly lacks still place short or divergent partial hits. A MAPQ cut does not remove them, because such a hit is often the read's only placement. In the bowtie2 vs bwa-mem3 benchmark ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)), these hits inflated gene counts and bin depth in poorly covered samples. `0` turns the identity check off.
+- **Example**: `--bwamem3_min_identity 0.97`
+
+### `--bwamem3_min_aligned_length`
+- **Type**: Integer
+- **Default**: `50`
+- **Description**: Minimum number of aligned bases (CIGAR `M`) for a bwa-mem3 read-to-contig or read-to-bin alignment to count; a failing read is kept as an unmapped read. Only for `--read_aligner bwamem3`; see `--bwamem3_min_identity`. Reads clipped at a contig end still count when 50 bases align. `0` turns the length check off.
+- **Example**: `--bwamem3_min_aligned_length 40`
 
 Bowtie2 parameters for read alignment during host filtering (`--read_aligner bowtie2`):
 

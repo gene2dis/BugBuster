@@ -669,6 +669,22 @@
                     "minimum": 1,
                     "description": "bwa-mem3 minimum alignment score (-T) for a read to count as a contaminant hit (--read_aligner bwamem3), applied to each mate on its own (pairing is off, -P).",
                     "fa_icon": "fas fa-filter"
+                },
+                "bwamem3_min_identity": {
+                    "type": "number",
+                    "default": 0.95,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum identity (1 - NM / aligned columns) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); failing reads are kept as unmapped. 0 turns the identity check off.",
+                    "help_text": "bwa mem aligns locally, so reads from genomes missing from the assembly still place short or divergent partial hits, which inflate gene counts and bin depth in poorly covered samples. Applies to contig depth, binning, featureCounts and co-assembly bin depth; not to decontamination.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "bwamem3_min_aligned_length": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "description": "Minimum aligned bases (CIGAR M) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); failing reads are kept as unmapped. 0 turns the length check off.",
+                    "fa_icon": "fas fa-ruler-horizontal"
                 }
             }
         },

@@ -129,6 +129,10 @@ jobs:
         run: |
           tests/bin/test_gff2saf.sh
 
+      - name: Run bwa-mem3 alignment filter tests
+        run: |
+          tests/bin/test_filter_alignments.sh
+
       - name: Run functional aggregation script tests (design doc T4)
         run: |
           tests/bin/test_aggregate_functions.sh
