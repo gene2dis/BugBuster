@@ -247,6 +247,12 @@ next release is tagged.
 
 ### Fixed
 
+- **SemiBin and MetaWRAP stopped the run for a sample without usable bins**:
+  - SemiBin2 fails when it finds no bins (its reclustering gets an empty ORF file). SEMIBIN now writes an empty bin directory with a note; any other failure still fails.
+  - MetaWRAP stopped on any empty bin set: a binner with no bins, a hybrid set when two binners' bins share too little sequence, or a final set when no bin passes the thresholds. It also counted notes such as `SKIPPED.txt` as bins.
+  - METAWRAP now passes only binners with FASTA bins. When an empty hybrid set stops refinement, it refines the binners' own sets (`--skip-refinement`). When no bin reaches `--metawrap_completeness` / `--metawrap_contamination`, it writes an empty refined set with a note.
+  - MetaWRAP 1.2 cannot refine a single bin set. When only one binner found bins, METAWRAP keeps the ones that pass MetaWRAP's own CheckM thresholds.
+  - MetaWRAP exits 0 when it stops on an error, so the outcome is now read from its output directories.
 - **eggNOG-mapper search failed on real-size samples instead of retrying with more
   memory**: diamond peaks at ~80 GB against the eggNOG 7 database, above `process_high`'s
   72 GB, and emapper reports the out-of-memory kill as exit 1, which the memory retry
