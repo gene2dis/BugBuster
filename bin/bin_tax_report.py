@@ -14,6 +14,13 @@ import sys
 import numpy as np
 
 
+# Columns of MAGs_tax_summary.csv
+SUMMARY_COLUMNS = [
+    'sample', 'bin_name', 'closest_genome_reference',
+    'Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species'
+]
+
+
 def parse_gtdb_taxonomy(classification):
     """Parse GTDB taxonomy string into individual ranks."""
     if pd.isna(classification):
@@ -93,19 +100,27 @@ def main():
         
         all_tax_reports.append(result)
     
-    # Check if we have any data
+    # No sample has a classified bin: binning found nothing usable on this
+    # data (SemiBin and MetaWRAP now finish with empty bin sets). Warn and
+    # write a header-only summary and a placeholder plot so the run can
+    # finish; a missing GTDB-Tk file above still fails
     if not all_tax_reports:
-        # Fail loudly instead of publishing a "successful" empty taxonomy report.
         print(
-            "ERROR: all GTDB-Tk summaries are empty (header-only) - no bins "
-            "were classified. This means upstream binning produced no bins "
-            "for any sample (e.g. every binner was skipped or found nothing "
-            "on this data). Failing instead of writing an empty taxonomy "
-            "summary.",
+            "WARNING: all GTDB-Tk summaries are empty (header-only) - no bins "
+            "were classified. Upstream binning produced no refined bins for "
+            "any sample; writing an empty taxonomy summary.",
             file=sys.stderr
         )
-        sys.exit(1)
-    
+        pd.DataFrame(columns=SUMMARY_COLUMNS).to_csv('MAGs_tax_summary.csv', index=False)
+        fig, ax = plt.subplots(figsize=(16, 8))
+        ax.text(0.5, 0.5, 'No MAGs were classified', ha='center', va='center', fontsize=25)
+        ax.axis('off')
+        fig.patch.set_facecolor('white')
+        plt.savefig('MAGs_tax_plot.png', dpi=100, bbox_inches='tight', facecolor='white')
+        plt.close()
+        print("Generated an empty MAGs_tax_summary.csv and a placeholder MAGs_tax_plot.png")
+        return
+
     # Combine all reports
     all_tax_bin_reports_full = pd.concat(all_tax_reports, ignore_index=True)
     
@@ -114,6 +129,7 @@ def main():
         'sample', 'user_genome', 'closest_genome_reference',
         'Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species'
     ]].rename(columns={'user_genome': 'bin_name'})
+    assert list(all_tax_bin_reports_csv.columns) == SUMMARY_COLUMNS
     
     # Count bins by phylum
     phylum_counts = all_tax_bin_reports_csv.groupby('Phylum').size().reset_index(name='Bin count')

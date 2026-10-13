@@ -3,8 +3,10 @@
 # Regression tests for audit item #13 (report steps must not mask failures):
 #   - bin/report_unify.py exits non-zero when no fastp reports are present
 #     (previously exit 0 with no output, hidden by the module's path("*")),
-#   - bin/bin_quality_report.py and bin/bin_tax_report.py exit non-zero when
-#     every input is header-only (previously a "successful" empty report),
+#   - bin/bin_quality_report.py exits non-zero when every input is
+#     header-only (previously a "successful" empty report); bin/bin_tax_report.py
+#     warns and writes empty outputs instead (a run without bins finishes),
+#     but still fails when no GTDB-Tk file is staged,
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
 #   - and the happy paths still produce their real outputs,
@@ -221,8 +223,18 @@ BT_EMPTY="${WORK}/bin_tax_empty"
 mkdir -p "${BT_EMPTY}"
 printf 'user_genome\tclassification\tclosest_genome_reference\n' > "${BT_EMPTY}/sampleA_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BT_EMPTY}"
-expect_fail "bin_tax: all-header-only input fails" bin_tax_report.py
-check_grep "bin_tax: failure message names the empty input" "../bin_tax_empty.log" "no bins were classified"
+# No sample with a classified bin: warn and write empty outputs (SemiBin and
+# MetaWRAP finish with empty bin sets, so a binless run must finish too)
+expect_pass "bin_tax: all-header-only input warns and succeeds" bin_tax_report.py
+check_grep "bin_tax: warning names the empty input" "../bin_tax_empty.log" "WARNING: all GTDB-Tk summaries are empty"
+check_grep "bin_tax: header-only summary written" "MAGs_tax_summary.csv" \
+    "^sample,bin_name,closest_genome_reference,Domain,Phylum,Class,Order,Family,Genus,Species$"
+check_file "bin_tax: placeholder plot written" "MAGs_tax_plot.png"
+
+BT_NONE="${WORK}/bin_tax_none"
+mkdir -p "${BT_NONE}"
+NEXT_WORKDIR="${BT_NONE}"
+expect_fail "bin_tax: no GTDB-Tk file still fails" bin_tax_report.py
 
 #
 # bin_summary.py — audit item #11: ALL staged quality and taxonomy files must be
