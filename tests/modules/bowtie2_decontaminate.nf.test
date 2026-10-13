@@ -1,0 +1,76 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BOWTIE2_DECONTAMINATE Module Test
+
+    Decontamination for --read_aligner bowtie2 against the combined phiX +
+    host-mock index (built in setup). Fixtures come from
+    tests/bin/make_singleton_fixtures.py: 10 pairs (4 host-derived) + 10
+    singletons (6 host-derived).
+
+    Regression test for issue #21: without a '%' in the --un-conc-gz path,
+    bowtie2 inserts the mate number before the last extension, which for a
+    dotted sample id lands inside the id and the clean reads were not found.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BOWTIE2_DECONTAMINATE Process"
+    script "../../modules/local/bowtie2_decontaminate/main.nf"
+    process "BOWTIE2_DECONTAMINATE"
+
+    setup {
+        run("BOWTIE2_BUILD_COMBINED") {
+            script "../../modules/local/bowtie2_build_combined/main.nf"
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/decontamination/phiX174.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+    }
+
+    test("dotted sample id with singletons (issue #21)") {
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'sim.ARG' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]).combine(BOWTIE2_BUILD_COMBINED.out.index)
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def clean = process.out.reads[0][1]
+            assert clean.collect { f -> file(f).name } == [
+                "sim.ARG_R1_clean.fastq.gz",
+                "sim.ARG_R2_clean.fastq.gz",
+                "sim.ARG_Singleton_clean.fastq.gz"
+            ]
+
+            // Host-derived pairs and singletons are removed
+            def r1 = path(clean[0]).linesGzip
+            def s  = path(clean[2]).linesGzip
+            assert r1.size() == 6 * 4
+            assert s.size() == 4 * 4
+            assert r1.findAll { line -> line.startsWith('@') && line.contains('host') }
+                     .every { name -> name.startsWith('@nonhost') }
+
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[1] == "sim.ARG\t12\t4"
+        }
+    }
+}

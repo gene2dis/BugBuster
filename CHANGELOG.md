@@ -247,6 +247,10 @@ next release is tagged.
 
 ### Fixed
 
+- **bowtie2 decontamination failed for sample ids containing a dot** (#21): without a
+  `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
+  extension, which for `S1.2` lands inside the id, so the clean reads were not found
+  (exit 1). The path now carries `%`. New nf-test `tests/modules/bowtie2_decontaminate.nf.test`
 - **`low_disk` was described as freeing disk during the run**: the `--help` text, the
   profile description, the launch warning, the README, the manual and
   `docs/DISK_OPTIMIZATION.md` called its work-dir cleanup "progressive" and promised a

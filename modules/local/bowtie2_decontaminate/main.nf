@@ -45,11 +45,13 @@ process BOWTIE2_DECONTAMINATE {
         -p ${task.cpus} \\
         -1 ${r1} \\
         -2 ${r2} \\
-        --un-conc-gz ${prefix}_clean_tmp > ${prefix}_bowtie_mapped_${db_alias}
+        --un-conc-gz ${prefix}_clean_tmp.%.fastq.gz > ${prefix}_bowtie_mapped_${db_alias}
 
-    # Rename output files
-    mv ${prefix}_clean_tmp.1 ${prefix}_R1_clean.fastq.gz
-    mv ${prefix}_clean_tmp.2 ${prefix}_R2_clean.fastq.gz
+    # Rename output files. bowtie2 puts the mate number at the '%'; without
+    # one it inserts it before the last extension, which for a dotted sample
+    # id (S1.2) lands inside the id (S1.1.2_clean_tmp)
+    mv ${prefix}_clean_tmp.1.fastq.gz ${prefix}_R1_clean.fastq.gz
+    mv ${prefix}_clean_tmp.2.fastq.gz ${prefix}_R2_clean.fastq.gz
 
     # Count clean reads
     R1_lines=\$(zcat ${prefix}_R1_clean.fastq.gz | wc -l)
