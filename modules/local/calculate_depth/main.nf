@@ -61,10 +61,10 @@ process CALCULATE_DEPTH {
     """
     # Create stub depth file
     cat > ${prefix}_depth.txt << 'EOF'
-contigName	contigLen	totalAvgDepth	sample1.bam	sample1.bam-var
-contig_1	5000	25.5	25.5	10.2
-contig_2	3000	18.3	18.3	8.1
-EOF
+    contigName	contigLen	totalAvgDepth	sample1.bam	sample1.bam-var
+    contig_1	5000	25.5	25.5	10.2
+    contig_2	3000	18.3	18.3	8.1
+    EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

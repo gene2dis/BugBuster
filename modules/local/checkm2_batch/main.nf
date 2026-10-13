@@ -177,10 +177,10 @@ process CHECKM2_BATCH {
     for meta_id in ${meta_ids}; do
         for binner in metabat semibin comebin metawrap; do
             cat > \${meta_id}_\${binner}_quality_report.tsv << 'EOF'
-Name	Completeness	Contamination
-bin.1	95.5	2.1
-bin.2	87.3	1.5
-EOF
+    Name	Completeness	Contamination
+    bin.1	95.5	2.1
+    bin.2	87.3	1.5
+    EOF
         done
     done
     

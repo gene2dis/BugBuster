@@ -309,6 +309,12 @@ nextflow_pipeline {
             assert vtext.contains("metabat2:")
             // Pins the GTDB-Tk container/stub version bump in lockstep
             assert vtext.contains("gtdbtk: 2.7.2")
+            // Every versions.yml heredoc must close: a script line below the
+            // block's base indentation left END_VERSIONS indented, so the
+            // terminator was written into versions.yml and the aggregate was
+            // invalid YAML
+            assert !vtext.contains("END_VERSIONS")
+            assert new org.yaml.snakeyaml.Yaml().load(vtext) instanceof Map
 
             // T7 off-path: binning with 2 binners but WITHOUT
             // --mag_level_functional must run no Bakta and publish no mags/
@@ -351,6 +357,10 @@ nextflow_pipeline {
             assert path("${outputDir}/04_binning/coassembly/quality/checkm2/coassembly_semibin_quality_report.tsv").exists()
             assert path("${outputDir}/04_binning/coassembly/taxonomy/gtdbtk/coassembly_gtdbtk_bac120.tsv").exists()
             assert !path("${outputDir}/04_binning/per_sample").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert !vtext.contains("END_VERSIONS")
+            assert new org.yaml.snakeyaml.Yaml().load(vtext) instanceof Map
         }
     }
 

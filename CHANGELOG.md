@@ -247,6 +247,14 @@ next release is tagged.
 
 ### Fixed
 
+- **`software_versions.yml` was invalid YAML for every assembly run**: Nextflow strips a
+  script's common indentation, and heredoc bodies at column 0 (BBMAP, CONTIG_FILTER_SUMMARY
+  and ten module stubs), `\n` in `printf` strings that Groovy turned into real newlines
+  (BOWTIE2_SAMTOOLS*) and a three-tab python heredoc (GTDB_TK_BATCH) left `END_VERSIONS`
+  indented. `<<-` strips only tabs, so the terminator was written into `versions.yml`
+  and the aggregate failed to parse. Heredoc bodies now sit at the script's base
+  indentation. BBMAP's version was also empty: `bbversion.sh` prints the bare number.
+  The stub pipeline tests now parse `software_versions.yml`
 - **bowtie2 decontamination failed for sample ids containing a dot** (#21): without a
   `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
   extension, which for `S1.2` lands inside the id, so the clean reads were not found

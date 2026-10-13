@@ -174,11 +174,11 @@ process MEGAHIT {
     """
     # Create a minimal test contig file
     cat > ${prefix}_contigs.fa << 'EOF'
->contig_1 length=1234
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->contig_2 length=5678
-TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
-EOF
+    >contig_1 length=1234
+    ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+    >contig_2 length=5678
+    TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
+    EOF
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

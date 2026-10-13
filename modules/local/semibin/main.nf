@@ -139,16 +139,16 @@ process SEMIBIN {
     
     # Create stub bin files
     cat > ${prefix}_semibin_output_bins/bin.1.fa << 'EOF'
->contig_1
-ACGTACGTACGTACGTACGTACGTACGTACGT
->contig_2
-TGCATGCATGCATGCATGCATGCATGCATGCA
-EOF
+    >contig_1
+    ACGTACGTACGTACGTACGTACGTACGTACGT
+    >contig_2
+    TGCATGCATGCATGCATGCATGCATGCATGCA
+    EOF
     
     cat > ${prefix}_semibin_output_bins/bin.2.fa << 'EOF'
->contig_3
-GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
-EOF
+    >contig_3
+    GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
+    EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -93,20 +93,20 @@ process BOWTIE2_SAMTOOLS {
             echo "WARNING: Contig file is empty for ${prefix} - creating empty BAM" >&2
             
             # Create minimal empty BAM with header only
-            printf '@HD\tVN:1.6\tSO:coordinate\n' > empty.sam
+            printf '@HD\\tVN:1.6\\tSO:coordinate\\n' > empty.sam
             samtools view -bS empty.sam > ${prefix}_all_reads.bam
             
             # Generate empty contig tracking report
-            printf 'sample_id\t${prefix}\n' > ${prefix}_empty_contig_report.txt
-            printf 'stage\tBOWTIE2_SAMTOOLS\n' >> ${prefix}_empty_contig_report.txt
-            printf 'empty_contig_detected\tTRUE\n' >> ${prefix}_empty_contig_report.txt
-            printf 'timestamp\t%s\n' "\$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> ${prefix}_empty_contig_report.txt
-            printf 'action_taken\tCreated empty BAM file\n' >> ${prefix}_empty_contig_report.txt
+            printf 'sample_id\\t${prefix}\\n' > ${prefix}_empty_contig_report.txt
+            printf 'stage\\tBOWTIE2_SAMTOOLS\\n' >> ${prefix}_empty_contig_report.txt
+            printf 'empty_contig_detected\\tTRUE\\n' >> ${prefix}_empty_contig_report.txt
+            printf 'timestamp\\t%s\\n' "\$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> ${prefix}_empty_contig_report.txt
+            printf 'action_taken\\tCreated empty BAM file\\n' >> ${prefix}_empty_contig_report.txt
             
             # Generate versions file
-            printf '"${task.process}":\n' > versions.yml
-            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
-            printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
+            printf '"${task.process}":\\n' > versions.yml
+            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+            printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
         fi
@@ -194,20 +194,20 @@ process BOWTIE2_SAMTOOLS {
             echo "WARNING: Contig file is empty for sample ${prefix} - creating empty BAM" >&2
             
             # Create minimal empty BAM with header only
-            printf '@HD\tVN:1.6\tSO:coordinate\n' > empty.sam
+            printf '@HD\\tVN:1.6\\tSO:coordinate\\n' > empty.sam
             samtools view -bS empty.sam > ${prefix}_all_reads.bam
             
             # Generate empty contig tracking report
-            printf 'sample_id\t${prefix}\n' > ${prefix}_empty_contig_report.txt
-            printf 'stage\tBOWTIE2_SAMTOOLS\n' >> ${prefix}_empty_contig_report.txt
-            printf 'empty_contig_detected\tTRUE\n' >> ${prefix}_empty_contig_report.txt
-            printf 'timestamp\t%s\n' "\$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> ${prefix}_empty_contig_report.txt
-            printf 'action_taken\tCreated empty BAM file\n' >> ${prefix}_empty_contig_report.txt
+            printf 'sample_id\\t${prefix}\\n' > ${prefix}_empty_contig_report.txt
+            printf 'stage\\tBOWTIE2_SAMTOOLS\\n' >> ${prefix}_empty_contig_report.txt
+            printf 'empty_contig_detected\\tTRUE\\n' >> ${prefix}_empty_contig_report.txt
+            printf 'timestamp\\t%s\\n' "\$(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> ${prefix}_empty_contig_report.txt
+            printf 'action_taken\\tCreated empty BAM file\\n' >> ${prefix}_empty_contig_report.txt
             
             # Generate versions file
-            printf '"%s":\n' "${task.process}" > versions.yml
-            printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
-            printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
+            printf '"%s":\\n' "${task.process}" > versions.yml
+            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+            printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
         fi
@@ -356,9 +356,9 @@ process BOWTIE2_SAMTOOLS_DEPTH {
             rm -f ${prefix}_bowtie_map.log
         done
 
-        printf '"%s":\n' "${task.process}" > versions.yml
-        printf '    bowtie2: %s\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
-        printf '    samtools: %s\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
+        printf '"%s":\\n' "${task.process}" > versions.yml
+        printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+        printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
 	"""
 
     stub:
