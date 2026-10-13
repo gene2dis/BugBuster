@@ -54,6 +54,11 @@ process EGGNOG_MAPPER_SEARCH {
     # through unchanged
     gzip -cdf ${proteins} > ${prefix}_proteins_input.faa
 
+    # emapper exits 1 when the kernel kills diamond for running out of
+    # memory, which the memory retry (exit 130-145) does not catch: report
+    # such a failure as 137 instead. diamond peaks at ~80 GB against the
+    # eggNOG 7 database for a real metagenome (block size 8, one index chunk)
+    status=0
     emapper.py \\
         -m diamond \\
         --no_annot \\
@@ -62,9 +67,20 @@ process EGGNOG_MAPPER_SEARCH {
         --cpu ${task.cpus} \\
         -i ${prefix}_proteins_input.faa \\
         --data_dir ${eggnog_db} \\
-        --output ${prefix}
+        --output ${prefix} \\
+        > emapper.stdout 2> emapper.stderr || status=\$?
+    cat emapper.stdout
+    cat emapper.stderr >&2
+    if [ "\$status" -ne 0 ]; then
+        # emapper prints diamond's failure ("Error running diamond: ... Killed") on stdout
+        if grep -qE 'Killed|std::bad_alloc|Cannot allocate memory|[Oo]ut of memory|MemoryError' emapper.stdout emapper.stderr; then
+            echo "EGGNOG_MAPPER_SEARCH: diamond ran out of memory with ${task.memory}; exiting 137 so the task is retried with more" >&2
+            exit 137
+        fi
+        exit "\$status"
+    fi
 
-    rm -f ${prefix}_proteins_input.faa
+    rm -f ${prefix}_proteins_input.faa emapper.stdout emapper.stderr
 
     # Keep the full version string — beta suffixes like 3.0.0-beta6 matter for
     # the version-aware parsing downstream (design doc Section 4.2)

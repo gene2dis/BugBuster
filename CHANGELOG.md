@@ -247,6 +247,12 @@ next release is tagged.
 
 ### Fixed
 
+- **eggNOG-mapper search failed on real-size samples instead of retrying with more
+  memory**: diamond peaks at ~80 GB against the eggNOG 7 database, above `process_high`'s
+  72 GB, and emapper reports the out-of-memory kill as exit 1, which the memory retry
+  (exit 130-145) skips. EGGNOG_MAPPER_SEARCH now exits 137 when diamond was killed or ran
+  out of memory, and asks for 96 GB on the first attempt (192 GB on the retry, clamped by
+  `--max_memory`)
 - **`software_versions.yml` was invalid YAML for every assembly run**: Nextflow strips a
   script's common indentation, and heredoc bodies at column 0 (BBMAP, CONTIG_FILTER_SUMMARY
   and ten module stubs), `\n` in `printf` strings that Groovy turned into real newlines
