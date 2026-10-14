@@ -2,7 +2,7 @@
 
 ## TL;DR
 
-BugBuster removes phiX and host contamination in a **single pass** against one combined Bowtie2 index, built automatically from the phiX and host genome FASTAs.
+BugBuster removes phiX and host contamination in a **single pass** against one combined bwa-mem3 index, built automatically from the phiX and host genome FASTAs. Building it for a human host needs ~75 GB RAM; `--read_aligner bowtie2` is the fallback for smaller nodes and for CPUs without AVX2.
 
 ---
 
@@ -31,15 +31,18 @@ nextflow run main.nf \
   -profile docker
 ```
 
-### With bwa-mem3 (`--read_aligner bwamem3`)
+### Aligners
+The default, bwa-mem3, builds its index for a human host in a few minutes with ~75 GB RAM; mapping against it needs ~14 GB per task. A pair counts as clean only when **both** mates are unmapped; each mate must reach `--decontam_min_score` on its own (bwa-mem3 runs with pairing off, `-P`). `--custom_decontamination_index` must then point to a bwa-mem3 or bwa-mem2 index (`*.bwt.2bit.64`); a Bowtie2 index is rejected at launch.
+
+### With bowtie2 (fallback: `--read_aligner bowtie2`)
 ```bash
 nextflow run main.nf \
   --input samples.csv \
   --output results \
-  --read_aligner bwamem3 \
+  --read_aligner bowtie2 \
   -profile docker
 ```
-This builds a bwa-mem3 index from the same FASTAs. Building it for a human host needs ~75 GB RAM and takes a few minutes; mapping against it needs ~14 GB per task. A pair counts as clean only when **both** mates are unmapped; each mate must reach `--decontam_min_score` on its own (bwa-mem3 runs with pairing off, `-P`). Under bwa-mem3, `--custom_decontamination_index` must point to a bwa-mem3 or bwa-mem2 index (`*.bwt.2bit.64`); a Bowtie2 index is rejected at launch. See [`--read_aligner`](parameters.md#--read_aligner).
+Use it on CPUs without AVX2, on nodes with less than ~75 GB RAM, or to keep using a Bowtie2 index from an earlier release (`--custom_decontamination_index`). Building the human Bowtie2 index takes about an hour with ~6 GB RAM. bowtie2 keeps a pair when it has no concordant alignment (`--un-conc`), so a pair with only one host mate survives, as do host pairs aligned with an insert above 500 bp. See [`--read_aligner`](parameters.md#--read_aligner).
 
 ---
 
@@ -101,12 +104,14 @@ nextflow run main.nf \
 # Concatenate FASTA files
 cat phix.fasta host.fasta > contaminants.fasta
 
-# Build index
+# Build the bwa-mem3 index (default aligner; ~75 GB RAM for a human host)
 mkdir contaminants_index
-bowtie2-build contaminants.fasta contaminants_index/contaminants
-
-# Use in pipeline
+bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 nextflow run main.nf --custom_decontamination_index contaminants_index
+
+# Or a Bowtie2 index for the fallback
+bowtie2-build contaminants.fasta bowtie2_index/contaminants
+nextflow run main.nf --read_aligner bowtie2 --custom_decontamination_index bowtie2_index
 ```
 
 ---
@@ -128,7 +133,8 @@ results/01_quality_control/summary/Reads_report.csv
 
 ### Combined Index (Cached)
 ```
-<databases_dir>/bowtie_index/contaminants_index/   # default: <output>/../databases
+<databases_dir>/bwamem3_index/contaminants_index/  # default: <output>/../databases
+<databases_dir>/bowtie_index/contaminants_index/   # under --read_aligner bowtie2
 ```
 
 ---
@@ -145,9 +151,15 @@ results/01_quality_control/summary/Reads_report.csv
 ## Troubleshooting
 
 ### High Memory Usage
+The bwa-mem3 index build for a human host needs ~75 GB RAM. With a lower
+`--max_memory` the pipeline warns at launch and the build stops with exit status 3.
+Pass a pre-built index, or use the bowtie2 fallback:
 ```bash
-nextflow run main.nf --max_memory 64.GB
+nextflow run main.nf --max_memory 64.GB --read_aligner bowtie2
 ```
+
+### "Illegal instruction" in a BWAMEM3_* task
+The bioconda bwa-mem3 build needs a CPU with AVX2 (x86-64-v3). Use `--read_aligner bowtie2`.
 
 ### Resume Failed Run
 ```bash
@@ -164,7 +176,7 @@ cat results/01_quality_control/summary/Reads_report.csv
 ## How It Works
 
 ```
-Reads → Combined phiX + Host Decontamination (one Bowtie2 pass) → Clean Reads
+Reads → Combined phiX + Host Decontamination (one bwa-mem3 or Bowtie2 pass) → Clean Reads
 ```
 
 A single alignment against the combined index replaces separate host and phiX

@@ -49,12 +49,19 @@ process BWAMEM3_BUILD_COMBINED {
         fi
     done
 
+    # Exit 3: the reference does not fit in the memory budget (checked before
+    # building). The retry raises it until --max_memory caps it
+    status=0
     bwa-mem3 index \\
         ${args} \\
         -t ${task.cpus} \\
         ${max_memory} \\
         -p ${index_name}_index/${index_name} \\
-        combined_contaminants.fasta
+        combined_contaminants.fasta || status=\$?
+    if [ \$status -eq 3 ]; then
+        echo "ERROR: building the bwa-mem3 index needs more memory than ${task.memory} (a human host needs ~75 GB). Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2." >&2
+    fi
+    [ \$status -eq 0 ] || exit \$status
 
     rm combined_contaminants.fasta
 

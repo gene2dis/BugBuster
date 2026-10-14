@@ -58,7 +58,7 @@ process BWAMEM3_DECONTAMINATE {
     if [ -z "\${bwt}" ]; then
         echo "ERROR: no bwa-mem3/bwa-mem2 index (*.bwt.2bit.64) in ${index_db}." >&2
         if find -L ${index_db} -maxdepth 1 -name '*.bt2*' | grep -q .; then
-            echo "It holds a Bowtie2 index: rebuild it with bwa-mem3, or pass the genome FASTA via --custom_host_fasta." >&2
+            echo "It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3, or pass the genome FASTA via --custom_host_fasta." >&2
         fi
         exit 1
     fi

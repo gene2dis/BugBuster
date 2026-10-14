@@ -706,10 +706,10 @@
             "properties": {
                 "read_aligner": {
                     "type": "string",
-                    "default": "bowtie2",
-                    "enum": ["bowtie2", "bwamem3"],
-                    "description": "Short-read aligner: 'bowtie2' or 'bwamem3' (bwa-mem3; strict decontamination: a pair is clean only when both mates are unmapped).",
-                    "help_text": "bwa-mem3 needs its own decontamination index (a bwa-mem2 index also works); building it for a human host needs ~75 GB RAM. A Bowtie2 --custom_decontamination_index is rejected under 'bwamem3'.",
+                    "default": "bwamem3",
+                    "enum": ["bwamem3", "bowtie2"],
+                    "description": "Short-read aligner: 'bwamem3' (bwa-mem3; strict decontamination: a pair is clean only when both mates are unmapped) or 'bowtie2' (fallback).",
+                    "help_text": "bwa-mem3 needs a CPU with AVX2 and its own decontamination index (a bwa-mem2 index also works); building it for a human host needs ~75 GB RAM. A Bowtie2 --custom_decontamination_index is rejected under 'bwamem3': pass --read_aligner bowtie2 to keep using it. 'bowtie2' is the fallback for CPUs without AVX2 or nodes with less memory.",
                     "fa_icon": "fas fa-random"
                 },
                 "bwamem3_dense_sa": {

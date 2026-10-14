@@ -80,7 +80,7 @@ next release is tagged.
     (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
     and it cuts output names at the first `.` (it runs on fixed file names)
 
-- **bwa-mem3 as an alternative short-read aligner (`--read_aligner bwamem3`, default `bowtie2` while it is benchmarked)**
+- **bwa-mem3 short-read aligner (`--read_aligner`, now the default; see Changed)**
   - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka, HUMAnN/MetaPhlAn and RGI keep bowtie2 with their own databases
   - bwa-mem3 0.14.0 and samtools 1.22.1 run from one pinned Seqera Containers image. Output is independent of the thread count (`-K` fixed)
   - Decontamination is strict: a pair is clean only when both mates are unmapped. bowtie2 `--un-conc` kept pairs with a single host mate. Clean-read counts are therefore not directly comparable with bowtie2 runs, and the FASTQ comment field is not carried over. Output file names are set explicitly, so sample ids containing dots no longer break decontamination. Mates are aligned without pairing (`-P`) so that `-T` holds for each mate: in paired mode bwa mem skips it for a chosen pair, and random ~20 bp host hits on overlapping mates removed 17.5% of a bacterial mock community (0.1% with `-P`). New `--decontam_min_score` (bwa `-T`, default 30) and `--bwamem3_dense_sa` (denser suffix array: faster mapping for ~12 GB more RAM)
@@ -272,6 +272,26 @@ next release is tagged.
     subworkflow and its parameters)
 
 ### Changed
+
+- **Breaking (default aligner)**: `--read_aligner` defaults to `bwamem3` instead of
+  `bowtie2`, after a benchmark on five real metagenomes and a spiked mock community
+  (`docs/benchmarks/bwamem3_vs_bowtie2.md`): host removal 4.1x faster, reads-to-contigs
+  mapping 3.9-6.2x faster with the alignment filter, co-assembly bin depth ~34x faster,
+  no human pairs leaked from the spike-in (bowtie2 0.157%) and 0.11% of the mock
+  removed (bowtie2 3.0%), the same bins and GTDB species. `--read_aligner bowtie2`
+  stays as the fallback, unchanged. What changes for an existing setup:
+  - building the human decontamination index needs ~75 GB RAM (bowtie2: ~6 GB) and
+    mapping ~14 GB per task (~4 GB). The pipeline warns at launch when `--max_memory`
+    is lower, and the build no longer repeats an exit-3 retry that `--max_memory`
+    caps at the same memory
+  - the index is published to `<databases_dir>/bwamem3_index/`; a Bowtie2
+    `--custom_decontamination_index` is rejected at launch, with a message naming
+    `--read_aligner bowtie2`
+  - clean-read counts are lower than in bowtie2 runs (a pair with one host mate is
+    removed), and `-resume` of an earlier project re-runs from decontamination
+  - the CPU needs AVX2 (x86-64-v3); without it the `BWAMEM3_*` tasks stop with
+    "Illegal instruction" (exit 132)
+  - the `--bowtie_*` options apply only under `--read_aligner bowtie2`
 
 - **Breaking (Nextflow version)**: minimum Nextflow raised again, from
   24.04.0 (v1.1) to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now

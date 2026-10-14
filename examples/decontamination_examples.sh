@@ -65,14 +65,17 @@ nextflow run main.nf \
   -profile docker,low_disk
 
 # ==============================================================================
-# Example 6: Custom Bowtie2 Parameters
+# Example 6: Bowtie2 Fallback with Custom Parameters
 # ==============================================================================
-# Adjust alignment sensitivity for decontamination
+# The --bowtie_* options apply only under --read_aligner bowtie2 (the fallback
+# for CPUs without AVX2 or nodes with < ~75 GB RAM); the default bwa-mem3 uses
+# --decontam_min_score
 
 nextflow run main.nf \
   --input samplesheet.csv \
   --output results \
   --quality_control true \
+  --read_aligner bowtie2 \
   --bowtie_k 5 \
   --bowtie_score_min 'L,-0.6,-0.6' \
   -profile docker
@@ -96,9 +99,11 @@ nextflow run main.nf \
 # Step 1: Concatenate FASTA files
 cat phix.fasta human.fasta > contaminants.fasta
 
-# Step 2: Build Bowtie2 index
+# Step 2: Build the bwa-mem3 index (default aligner; ~75 GB RAM for a human host).
+# For --read_aligner bowtie2, build a Bowtie2 index instead:
+#   bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
 mkdir -p contaminants_index
-bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
+bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 
 # Step 3: Use in pipeline
 nextflow run main.nf \

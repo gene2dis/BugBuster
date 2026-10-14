@@ -269,12 +269,20 @@ workflow {
         log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
+    // bwa-mem3 (the default aligner) builds the human decontamination index
+    // with ~57-75 GB RAM, bowtie2 with ~6 GB. Under a lower --max_memory the
+    // build stops with exit 3: say so before the downloads start
+    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta && (params.max_memory as MemoryUnit) < 75.GB) {
+        log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+    }
+
     // Print run configuration
     log.info "  Run configuration:"
     log.info "  -------------------"
     log.info "  Input samplesheet    : ${params.input}"
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
+    log.info "  Read aligner         : ${params.read_aligner}"
     log.info "  Assembly mode        : ${params.assembly_mode}"
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"

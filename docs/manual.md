@@ -73,7 +73,7 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/S
 
 | Analysis Type | Memory | CPUs | Storage |
 |---------------|--------|------|---------|
-| QC + Taxonomy only | 16 GB | 4 | 50 GB |
+| QC + Taxonomy only | 16 GB (75 GB once, to build the human bwa-mem3 index) | 4 | 50 GB |
 | QC + Taxonomy + Assembly | 64 GB | 16 | 100 GB |
 | Full pipeline with binning | 128 GB | 16 | 200 GB |
 | Large datasets / co-assembly | 256 GB | 32 | 500 GB |
@@ -95,13 +95,11 @@ time observed on the pipeline's own validation runs:
 | `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
 
 These are observations, not limits: needs grow with input size and community
-complexity. The eggNOG search requests `process_high` resources (16 CPUs,
-72 GB on the first attempt; an out-of-memory failure is retried with
-2 × 72 GB, capped at `--max_memory`, default 128 GB). The 79.9 GB peak above
-was measured under apptainer, which does not enforce task memory on a local
-machine. Where memory is enforced (docker, SLURM, cloud batch), a real
-co-assembly can exceed the first attempt and only finish on the retry, so make
-at least ~96 GB available to it. The annotate step (`process_medium`, 36 GB on
+complexity. The eggNOG search requests 16 CPUs and 96 GB on the first attempt;
+an out-of-memory failure is retried with 2 × 96 GB, capped at `--max_memory`
+(default 128 GB). The 79.9 GB peak above was measured under apptainer, which
+does not enforce task memory on a local machine, so make at least ~96 GB
+available to it where memory is enforced (docker, SLURM, cloud batch). The annotate step (`process_medium`, 36 GB on
 the first attempt) peaked at 35.1 GB, close to that request, so on larger
 co-assemblies it may also need its retry.
 
@@ -723,9 +721,42 @@ extension (9) sizes are fixed by the tool and not exposed.
   the read subset). Compare samples with `KMARVEL_gene_family_matrix.tsv`;
   treat the per-ARO matrix as allele-level detail.
 
-### 6.12 Bowtie2 Alignment Options
+### 6.12 Read Aligner Options
 
-Advanced parameters for Bowtie2 read alignment during host filtering:
+`--read_aligner` picks the aligner for host/phiX removal, reads-to-contigs
+mapping (contig depth, binning, gene counting) and co-assembly bin depth.
+Woltka and HUMAnN always use bowtie2 with their own databases.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--read_aligner` | `bwamem3` | `bwamem3` (bwa-mem3 0.14.0) or `bowtie2` (fallback) |
+| `--decontam_min_score` | `30` | bwa-mem3 minimum alignment score (`-T`) for a contaminant hit, per mate |
+| `--bwamem3_min_identity` | `0.95` | Minimum identity of a read-to-contig/bin alignment (`0` = off) |
+| `--bwamem3_min_aligned_length` | `50` | Minimum aligned bases of a read-to-contig/bin alignment (`0` = off) |
+| `--bwamem3_dense_sa` | `false` | Denser suffix array for the decontamination index (faster, ~12 GB more RAM) |
+
+bwa-mem3 replaced bowtie2 as the default after a benchmark on five real
+metagenomes ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)): host removal
+4.1× faster, reads-to-contigs mapping 3.9–6.2× faster, the same bins and GTDB
+species, and a stricter host removal (a pair is clean only when both mates are
+unmapped). Use `--read_aligner bowtie2`:
+
+- on a CPU without AVX2 (x86-64-v3, Haswell 2013+): the `BWAMEM3_*` tasks
+  stop with "Illegal instruction" (exit status 132);
+- on nodes with less than ~75 GB RAM, which the human bwa-mem3 index build
+  needs (bowtie2: ~6 GB, but about an hour). The build runs once; pass the
+  published index with `--custom_decontamination_index` in later runs;
+- to keep using a Bowtie2 `--custom_decontamination_index` from an earlier
+  release. A Bowtie2 index is rejected at launch under `bwamem3`.
+
+Clean-read counts from the two aligners are not directly comparable: bowtie2
+keeps a pair without a concordant alignment, so a pair with a single host mate
+survives.
+
+#### Bowtie2 options
+
+Advanced parameters for Bowtie2 read alignment during host filtering
+(`--read_aligner bowtie2` only):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1208,7 +1239,8 @@ By default, databases are stored separately from results at `<output_dir>/../dat
 
 ```
 databases/                            # Database storage (configurable via --databases_dir)
-├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
+├── bwamem3_index/                    # Combined bwa-mem3 decontamination index (host + phiX)
+├── bowtie_index/                     # Combined Bowtie2 index instead, under --read_aligner bowtie2
 ├── kraken/                           # Kraken2 database (selected via --kraken2_db)
 ├── sourmash/                         # Sourmash database
 ├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
@@ -1422,7 +1454,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
-    --custom_decontamination_index /shared/db/bowtie_index \
+    --custom_decontamination_index /shared/db/bwamem3_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/release232 \
@@ -1509,7 +1541,7 @@ params {
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
     custom_gtdbtk_db              = '/shared/db/release232'
-    custom_decontamination_index  = '/shared/db/bowtie_index'
+    custom_decontamination_index  = '/shared/db/bwamem3_index'
 }
 
 // The local executor's machine-wide pool is copied from max_cpus/max_memory

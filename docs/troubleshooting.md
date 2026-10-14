@@ -806,6 +806,35 @@ the samples (`--sylph_db`, or `--custom_sylph_db` together with its
 
 ## Decontamination Issues
 
+The default aligner is bwa-mem3 (`BWAMEM3_*` tasks); `--read_aligner bowtie2`
+runs the `BOWTIE2_*` tasks instead.
+
+### A BWAMEM3_* task fails with "Illegal instruction" (exit status 132)
+
+The bioconda bwa-mem3 build needs an x86-64 CPU with AVX2 (Haswell 2013 or
+newer). Check a compute node with `grep -c avx2 /proc/cpuinfo` (0 = no AVX2)
+and run with `--read_aligner bowtie2` on nodes without it.
+
+### Process BWAMEM3_BUILD_COMBINED failed
+
+**Exit status 3 / "needs more memory":** the human index build needs ~75 GB
+RAM; the pipeline warns at launch when `--max_memory` is lower. Either:
+
+- raise `--max_memory` (the build runs once; later runs reuse the index with
+  `--custom_decontamination_index <databases_dir>/bwamem3_index/contaminants_index`),
+- pass an index built elsewhere (`bwa-mem3 index -p contaminants_index/contaminants contaminants.fasta`,
+  or a bwa-mem2 index), or
+- use `--read_aligner bowtie2` (~6 GB to build, about an hour).
+
+For other failures, check the FASTA files as for BOWTIE2_BUILD_COMBINED below.
+
+### BWAMEM3_DECONTAMINATE fails with "no bwa-mem3/bwa-mem2 index", or a Bowtie2 index is rejected at launch
+
+`--custom_decontamination_index` points to a Bowtie2 index (`*.bt2`), for
+example one built by an earlier release, where bowtie2 was the default. Add
+`--read_aligner bowtie2` to keep using it, or point the option at a bwa-mem3
+index (`*.bwt.2bit.64`).
+
 ### Process BOWTIE2_BUILD_COMBINED failed
 
 **Possible causes:** FASTA files not found, insufficient memory, or corrupted FASTA files.
@@ -833,6 +862,8 @@ the samples (`--sylph_db`, or `--custom_sylph_db` together with its
    ```bash
    ls -lh <databases_dir>/bowtie_index/contaminants_index/
    # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2
+   # (the default bwa-mem3 index is in bwamem3_index/contaminants_index/:
+   #  contaminants.amb .ann .bwt.2bit.64 .pac)
    ```
 2. Verify read files decompress cleanly: `zcat sample_R1.fastq.gz | head -n 4`
 3. Check disk space: `df -h .`
@@ -862,11 +893,13 @@ custom_host_fasta:
 - Pre-build the index once and reuse it:
   ```bash
   cat phix.fasta host.fasta > contaminants.fasta
-  bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
+  bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 
   nextflow run main.nf ... --custom_decontamination_index contaminants_index
   ```
-- Faster (less sensitive) alignment settings: `--bowtie_k 1 --bowtie_score_min "L,-0.6,-0.6"`
+- Under `--read_aligner bowtie2`, the human index build takes about an hour
+  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`),
+  and faster, less sensitive settings are available: `--bowtie_k 1 --bowtie_score_min "L,-0.6,-0.6"`
 
 ---
 

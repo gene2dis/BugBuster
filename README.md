@@ -26,7 +26,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Optionally remove samples that fall below a minimum read count after quality filtering (`--min_read_sample`, default `0` = filter disabled).
-3. Remove host contamintant reads. [`Bowtie2`](https://github.com/BenLangmead/bowtie2)
+3. Remove host contaminant reads. [`bwa-mem3`](https://github.com/fg-labs/bwa-mem3) (default) or [`Bowtie2`](https://github.com/BenLangmead/bowtie2) (`--read_aligner bowtie2`)
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
    - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
@@ -59,6 +59,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 
 - [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=25.10.0`)
 - Container runtime: [Docker](https://docs.docker.com/engine/installation/), [Singularity](https://sylabs.io/guides/), or [Podman](https://podman.io/)
+- An x86-64 CPU with AVX2 (Haswell 2013 or newer) for the default aligner, bwa-mem3, and ~75 GB RAM once to build its human decontamination index. On older CPUs or smaller nodes, use `--read_aligner bowtie2`
 
 ### Basic Usage
 
@@ -243,6 +244,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--fastp_qualified_quality_phred` | `20` | Phred quality threshold |
 | `--fastp_unqualified_percent_limit` | `10` | Max % unqualified bases |
 | `--fastp_n_base_limit` | `5` | Max N bases per read |
+| `--read_aligner` | `bwamem3` | Aligner for host removal, reads→contigs mapping and bin depth: `bwamem3`, or `bowtie2` as a fallback for CPUs without AVX2 or nodes with less than ~75 GB RAM ([benchmark](docs/benchmarks/bwamem3_vs_bowtie2.md)) |
 
 ### Taxonomy Options
 

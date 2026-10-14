@@ -1,12 +1,14 @@
 # bowtie2 vs bwa-mem3 in BugBuster
 
-Benchmark of `--read_aligner bwamem3` (bwa-mem3 0.14.0) against the default `bowtie2`, run 2026-10-11 to 2026-10-13. The goal was to decide whether bwa-mem3 should replace bowtie2 in the pipeline's own alignment steps:
+Benchmark of `--read_aligner bwamem3` (bwa-mem3 0.14.0) against `bowtie2`, then the default, run 2026-10-11 to 2026-10-13. The goal was to decide whether bwa-mem3 should replace bowtie2 in the pipeline's own alignment steps:
 
 - host/phiX decontamination,
 - reads→contigs mapping (contig depth, binning, featureCounts),
 - co-assembly bin depth.
 
 Woltka, HUMAnN and RGI keep bowtie2 with their own databases.
+
+**Outcome:** bwa-mem3 is now the default. `--read_aligner bowtie2` remains as a fallback for CPUs without AVX2 and for nodes without ~75 GB RAM for the human index build.
 
 ## Summary
 

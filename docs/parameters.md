@@ -157,14 +157,14 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--phiX_index`
 - **Type**: String
 - **Default**: `phiX174`
-- **Description**: PhiX genome selection for automatic download (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Description**: PhiX genome selection for automatic download (genome FASTA; the pipeline builds the decontamination index for `--read_aligner`)
 - **Size**: 5.4 kB
 - **Example**: `--phiX_index phiX174`
 
 ### `--host_db`
 - **Type**: String
 - **Default**: `human`
-- **Description**: Host genome for read filtering (genome FASTA; the Bowtie2 index is built by the pipeline)
+- **Description**: Host genome for read filtering (genome FASTA; the pipeline builds the decontamination index for `--read_aligner`)
 - **Size**: 940 MB (T2T-CHM13v2.0)
 - **Example**: `--host_db human`
 
@@ -320,18 +320,18 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_decontamination_index`
 - **Type**: String (directory path)
-- **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a Bowtie2 index, or a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under `--read_aligner bwamem3` (a Bowtie2 index is then rejected at launch). Skips both the genome downloads and the index build. Pointing it at the index the pipeline published (`<databases_dir>/bowtie_index/contaminants_index` or `<databases_dir>/bwamem3_index/contaminants_index`) avoids rebuilding it in later runs.
-- **Example**: `--custom_decontamination_index /path/to/bowtie_index`
+- **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under the default `bwamem3`, or a Bowtie2 index under `--read_aligner bowtie2`. A Bowtie2 index under `bwamem3` is rejected at launch: add `--read_aligner bowtie2` to keep using an index built by an earlier release. Skips both the genome downloads and the index build. Pointing it at the index the pipeline published (`<databases_dir>/bwamem3_index/contaminants_index`, or `<databases_dir>/bowtie_index/contaminants_index` under `bowtie2`) avoids rebuilding it in later runs.
+- **Example**: `--custom_decontamination_index /path/to/bwamem3_index/contaminants_index`
 - **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
 ### `--custom_phiX_fasta`
 - **Type**: String (file path)
-- **Description**: Path to a custom phiX genome FASTA; the pipeline builds the Bowtie2 index from it
+- **Description**: Path to a custom phiX genome FASTA; the pipeline builds the decontamination index (`--read_aligner`) from it
 - **Example**: `--custom_phiX_fasta /path/to/phiX174.fasta`
 
 ### `--custom_host_fasta`
 - **Type**: String (file path)
-- **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the Bowtie2 index from it
+- **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the decontamination index (`--read_aligner`) from it
 - **Example**: `--custom_host_fasta /path/to/mouse_genome.fa`
 
 > **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
@@ -780,7 +780,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Options**: `primary`, `all`, `none`
 - **Description**: Multi-mapping policy for featureCounts gene quantification (`--contig_level_functional` branch, published to `07_functional_annotation/gene_abundance/`): `primary` counts primary alignments only, `all` counts every reported alignment (featureCounts `-M`), `none` excludes multi-mapping reads entirely. Counting is read-level (each mate counted separately), not fragment-level
 - **Example**: `--featurecounts_multimap all`
-- **Note**: With the pipeline's Bowtie2 defaults (one reported alignment per read) the three settings coincide in practice; the parameter makes the counting policy explicit
+- **Note**: Both aligners keep one record per read (bwa-mem3: secondary and supplementary records are dropped; bowtie2 reports one alignment per read by default), so the three settings coincide in practice; the parameter makes the counting policy explicit
 
 ### `--microbecensus`
 - **Type**: Boolean
@@ -824,15 +824,15 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 
 ### `--read_aligner`
 - **Type**: String
-- **Default**: `bowtie2`
-- **Options**: `bowtie2`, `bwamem3`
-- **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0 and is being benchmarked against `bowtie2`. Woltka and HUMAnN always use bowtie2 with their own databases. Differences under `bwamem3`:
+- **Default**: `bwamem3`
+- **Options**: `bwamem3`, `bowtie2`
+- **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0. It replaced `bowtie2` as the default after a benchmark on five real metagenomes ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)): host removal 4.1× faster, reads→contigs mapping 3.9–6.2× faster with the alignment filter, and the same bins and GTDB species. `bowtie2` stays available as a fallback for CPUs without AVX2 and for nodes without ~75 GB RAM for the human index build. Woltka and HUMAnN always use bowtie2 with their own databases. Differences from `bowtie2`:
   - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
   - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes; it runs under the `process_high_memory` label). Mapping against it needs ~14 GB per task, against ~4 GB for bowtie2.
   - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. Short or divergent local hits are turned into unmapped reads (`--bwamem3_min_identity`, `--bwamem3_min_aligned_length`). The co-assembly contig index is built once and shared by all alignments.
   - **Co-assembly bin depth.** Each sample is mapped once against all refined bins together instead of once per bin.
-  - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+).
-- **Example**: `--read_aligner bwamem3`
+  - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+). On an older CPU the `BWAMEM3_*` tasks stop with "Illegal instruction" (exit status 132): use `--read_aligner bowtie2`.
+- **Example**: `--read_aligner bowtie2`
 
 ### `--bwamem3_dense_sa`
 - **Type**: Boolean
