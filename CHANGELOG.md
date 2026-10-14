@@ -88,6 +88,7 @@ next release is tagged.
   - Contig alignments drop secondary and supplementary records, keeping one record per read as with bowtie2. Short or divergent local hits become unmapped reads: an alignment needs >= 95% identity (`--bwamem3_min_identity`) and >= 50 aligned bases (`--bwamem3_min_aligned_length`), or 80% of a read shorter than that (2x50 libraries, reads trimmed below 50 bp). Without the filter, reads from genomes missing from the assembly inflated gene counts (Spearman vs bowtie2 0.74 in a poorly covered sample) and the depth of near-absent bins (~1.9x). Each library of a pooled co-assembly is mapped separately and the results merged. The co-assembly index is built once instead of once per alignment task
   - Co-assembly bin depth maps each sample once against all refined bins concatenated, instead of once per bin (bwa mem aligns locally, so per-bin mapping would let other bins' reads inflate coverage). It writes the same `*_bin_depth.tsv` table; a refined bin that adds no contig to the reference (no sequences, or only contigs of an earlier bin) still gets a 0-coverage row
   - The bioconda bwa-mem3 build needs an AVX2-capable CPU (x86-64-v3)
+  - `--read_aligner` is listed in `--help`
 
 - **Read-level functional profiling (`--read_level_functional woltka`)**
   - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
@@ -391,6 +392,11 @@ next release is tagged.
   `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
   extension, which for `S1.2` lands inside the id, so the clean reads were not found
   (exit 1). The path now carries `%`. New nf-test `tests/modules/bowtie2_decontaminate.nf.test`
+- **`--custom_host_fasta` lists**: the docs and examples (including
+  `examples/params_multiple_genomes.yaml`) give several host genomes as a
+  comma-separated list, but the pipeline read the whole string as one path, which did
+  not exist. The list is now split on commas (spaces around them are ignored) and all
+  the FASTAs go into the one combined index. New pipeline nf-test with a two-file list
 - **bowtie2 decontamination failed with a large (`.bt2l`) index**: BOWTIE2_DECONTAMINATE
   read the basename of `contaminants.1.bt2l` as `contaminantsl`, although the launch check
   accepts `.bt2l`. bowtie2-build writes a large index on its own for references over

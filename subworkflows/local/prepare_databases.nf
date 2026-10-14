@@ -151,8 +151,10 @@ workflow PREPARE_DATABASES {
                 [params.custom_phiX_fasta] : 
                 params.bowtie_ref_genomes_for_build[params.phiX_index]["url"]
             
-            def host_files = params.custom_host_fasta ? 
-                [params.custom_host_fasta] : 
+            // --custom_host_fasta takes one FASTA or a comma-separated list
+            // (several host genomes go into the one combined index)
+            def host_files = params.custom_host_fasta ?
+                params.custom_host_fasta.toString().tokenize(',')*.trim().findAll { f -> f } :
                 params.bowtie_ref_host_index[params.host_db]["url"]
             
             // Combine lists and create single channel

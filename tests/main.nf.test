@@ -160,6 +160,54 @@ nextflow_pipeline {
         }
     }
 
+    test("QC builds the decontamination index from a comma-separated custom_host_fasta list") {
+        // The host mock (phage lambda) split into two FASTAs, one gzipped, passed
+        // as "a.fasta, b.fasta.gz": the counts above hold only if both halves
+        // reach the index
+        when {
+            params {
+                input = {
+                    def sheet = new File("${outputDir}", "singleton_samplesheet.csv")
+                    sheet.parentFile.mkdirs()
+                    def reads_dir = "${projectDir}/tests/data/reads"
+                    sheet.text = "sample,r1,r2,s\n" +
+                        "singleton_test,${reads_dir}/singleton_test_R1.fastq.gz," +
+                        "${reads_dir}/singleton_test_R2.fastq.gz," +
+                        "${reads_dir}/singleton_test_S.fastq.gz\n"
+                    sheet.absolutePath
+                }()
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = {
+                    def lines = new File("${projectDir}/tests/data/decontamination/host_mock.fasta").readLines()
+                    def seq = lines.drop(1).join('')
+                    def half = (int) (seq.length() / 2)
+                    def a = new File("${outputDir}", "host_part_a.fasta")
+                    a.parentFile.mkdirs()
+                    a.text = ">host_part_a\n" + seq.substring(0, half) + "\n"
+                    def b = new File("${outputDir}", "host_part_b.fasta.gz")
+                    new java.util.zip.GZIPOutputStream(new FileOutputStream(b)).withWriter { w ->
+                        w << ">host_part_b\n" << seq.substring(half) << "\n"
+                    }
+                    "${a.absolutePath}, ${b.absolutePath}"
+                }()
+                store_clean_reads = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def clean_dir = "${outputDir}/clean_reads/singleton_test"
+            assert path("${clean_dir}/singleton_test_R1_clean.fastq.gz").linesGzip.size() == 6 * 4
+            assert path("${clean_dir}/singleton_test_Singleton_clean.fastq.gz").linesGzip.size() == 4 * 4
+        }
+    }
+
     test("Rejects a Bowtie2 custom_decontamination_index under the default aligner (bwa-mem3)") {
         when {
             params {

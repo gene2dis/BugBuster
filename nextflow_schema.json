@@ -380,7 +380,7 @@
                 },
                 "custom_host_fasta": {
                     "type": "string",
-                    "description": "Custom host genome FASTA (plain or gzipped) used to build the combined decontamination index.",
+                    "description": "Custom host genome FASTA (plain or gzipped) used to build the combined decontamination index; several host genomes as a comma-separated list.",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },
