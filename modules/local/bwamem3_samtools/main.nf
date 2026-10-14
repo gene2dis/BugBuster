@@ -249,45 +249,50 @@ process BINS_REFERENCE {
     """
     set -euo pipefail
 
-    # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order. A bin with no
-    # sequences gets one row with an empty contig field, so it still reports
-    # a 0-coverage row downstream. Bin ids are the FASTA basenames. A contig
-    # already placed in an earlier bin is skipped with a warning, so the
-    # reference has unique names (MetaWRAP-refined bins should never share
-    # contigs; the old per-bin mapping tolerated it silently).
+    # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order. Bin ids are
+    # the FASTA basenames. A contig already placed in an earlier bin is
+    # skipped with a warning, so the reference has unique names
+    # (MetaWRAP-refined bins should never share contigs; the old per-bin
+    # mapping tolerated it silently). A bin that adds no contig (no
+    # sequences, or only contigs of earlier bins) gets one row with an empty
+    # contig field, so it still reports a 0-coverage row downstream. One awk
+    # reads every bin in order, keeping the placed contigs in memory.
     : > all_bins.fa
     : > contig_to_bin.tsv
+    bin_files=()
     for bin in ${bins}/*.fa; do
-        [ -e "\${bin}" ] || continue
-        bin_name=\$(basename "\${bin}" .fa)
-        if ! grep -q '^>' "\${bin}"; then
-            printf '\\t%s\\n' "\${bin_name}" >> contig_to_bin.tsv
-            continue
-        fi
-        awk -v bin="\${bin_name}" '
-            BEGIN {
-                while ((getline line < "contig_to_bin.tsv") > 0) {
-                    split(line, f, "\\t")
-                    if (f[1] != "") seen[f[1]] = 1
-                }
-            }
-            /^>/ {
-                name = substr(\$1, 2)
-                keep = !(name in seen)
-                if (keep) {
-                    seen[name] = 1
-                    print name "\\t" bin > "contig_to_bin.part"
-                } else {
-                    print "WARNING: contig " name " of bin " bin " is already in another bin - skipped" > "/dev/stderr"
-                }
-            }
-            keep { print }
-        ' "\${bin}" >> all_bins.fa
-        if [ -f contig_to_bin.part ]; then
-            cat contig_to_bin.part >> contig_to_bin.tsv
-            rm contig_to_bin.part
-        fi
+        [ -e "\${bin}" ] && bin_files+=("\${bin}")
     done
+    awk '
+        BEGIN {
+            for (i = 1; i < ARGC; i++) {
+                file = ARGV[i]
+                bin = file
+                sub(/.*\\//, "", bin)
+                sub(/\\.fa\$/, "", bin)
+                kept = 0
+                keep = 0
+                while ((getline line < file) > 0) {
+                    if (substr(line, 1, 1) == ">") {
+                        split(substr(line, 2), words, /[ \\t]/)
+                        name = words[1]
+                        keep = !(name in seen)
+                        if (keep) {
+                            seen[name] = 1
+                            kept++
+                            print name "\\t" bin > "contig_to_bin.tsv"
+                        } else {
+                            print "WARNING: contig " name " of bin " bin " is already in another bin - skipped" > "/dev/stderr"
+                        }
+                    }
+                    if (keep) print line > "all_bins.fa"
+                }
+                close(file)
+                if (!kept) print "\\t" bin > "contig_to_bin.tsv"
+            }
+            exit
+        }
+    ' "\${bin_files[@]}"
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

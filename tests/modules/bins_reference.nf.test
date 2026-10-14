@@ -9,6 +9,8 @@
       - b.fa: c2 again (must be skipped, keeping the reference names unique)
               and c3
       - c.fa: empty bin (one table row with an empty contig field)
+      - d.fa: only c1 again, so it adds no contig and gets the same
+              empty-contig row (it had no row, and no depth row, before)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -18,7 +20,7 @@ nextflow_process {
     script "../../modules/local/bwamem3_samtools/main.nf"
     process "BINS_REFERENCE"
 
-    test("concatenates bins, skips duplicate contigs, keeps empty bins") {
+    test("concatenates bins, skips duplicate contigs, keeps empty and fully duplicated bins") {
         when {
             process {
                 """
@@ -36,7 +38,7 @@ nextflow_process {
             assert fasta == ['>c1 len=8', 'ACGTACGT', '>c2', 'GGGGCCCC', 'AAAA', '>c3', 'TTTTAAAA']
 
             def table = path(process.out.reference[0][1]).readLines()
-            assert table == ["c1\ta", "c2\ta", "c3\tb", "\tc"]
+            assert table == ["c1\ta", "c2\ta", "c3\tb", "\tc", "\td"]
         }
     }
 
