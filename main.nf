@@ -276,6 +276,33 @@ workflow {
         log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
     }
 
+    // A pre-built --custom_decontamination_index must match --read_aligner: a
+    // Bowtie2 index cannot serve bwa-mem3 (a bwa-mem2 index can), nor the
+    // reverse. Checked here, before any channel exists: raised later, while
+    // INPUT_CHECK's samplesheet channel was starting, the error could be
+    // reported as "Cannot find samplesheet file" instead
+    if (flagOn(params.quality_control) && params.custom_decontamination_index) {
+        if ( params.read_aligner == 'bwamem3' ) {
+            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
+            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
+            if ( !index_files.any { name -> name.endsWith('.bwt.2bit.64') } ) {
+                def bowtie2_hint = index_files.any { name -> name ==~ /.*\.bt2l?$/ } ?
+                    " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta." : ""
+                error "--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64): ${params.custom_decontamination_index}.${bowtie2_hint}"
+            }
+        } else {
+            // The reverse mix-up: the index the pipeline publishes by
+            // default (bwamem3_index/) passed under the bowtie2 fallback
+            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
+            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
+            if ( !index_files.any { name -> name ==~ /.*\.[0-9]\.bt2l?$/ } ) {
+                def bwamem3_hint = index_files.any { name -> name.endsWith('.bwt.2bit.64') } ?
+                    " It holds a bwa-mem3/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index." : ""
+                error "--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index (*.bt2): ${params.custom_decontamination_index}.${bwamem3_hint}"
+            }
+        }
+    }
+
     // Print run configuration
     log.info "  Run configuration:"
     log.info "  -------------------"

@@ -182,6 +182,35 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects a bwa-mem3 custom_decontamination_index under --read_aligner bowtie2") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                read_aligner       = "bowtie2"
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                // The layout the pipeline publishes under the default aligner
+                custom_decontamination_index = {
+                    def dir = new File("${outputDir}", "bwamem3_index/contaminants_index")
+                    dir.mkdirs()
+                    ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext -> new File(dir, "contaminants.${ext}").text = '' }
+                    dir.absolutePath
+                }()
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("needs --custom_decontamination_index to be a directory with a Bowtie2 index")
+            assert console_out.contains("It holds a bwa-mem3/bwa-mem2 index")
+        }
+    }
+
     test("Stub run wires --read_aligner bwamem3 under per-sample assembly") {
         // One contig index and one alignment per sample feed binning and
         // gene counting; no bowtie2 task may run

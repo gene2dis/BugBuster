@@ -341,6 +341,12 @@ next release is tagged.
   matched. The role now comes from the last R1/R2/singleton token of
   the file name (`bin/read_role.sh`, and the same rule in Groovy), tested by
   `tests/bin/test_read_role.sh`
+- **Index / aligner mismatch under `--read_aligner bowtie2`** is caught at launch (a
+  bwa-mem3 index, e.g. the one the pipeline publishes by default, was failing inside
+  BOWTIE2_DECONTAMINATE with an unclear bowtie2 error), and BOWTIE2_DECONTAMINATE itself
+  stops with a clear message when its index has no `*.bt2` files. Both index checks now run
+  with the other launch checks, before any channel starts: raised later, the error could
+  be reported as "Cannot find samplesheet file" instead
 - **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
   and BIN_SUMMARY warn when every input report is empty and write header-only tables (and
   placeholder plots), instead of failing (audit #13 made them fail; with SemiBin and MetaWRAP

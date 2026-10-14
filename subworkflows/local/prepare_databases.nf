@@ -142,17 +142,8 @@ workflow PREPARE_DATABASES {
     //
     if ( flagOn(params.quality_control) ) {
         if ( params.custom_decontamination_index ) {
-            // Use pre-built combined index. It must match --read_aligner: a
-            // Bowtie2 index cannot serve bwa-mem3 (a bwa-mem2 index can)
-            if ( params.read_aligner == 'bwamem3' ) {
-                def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
-                def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
-                if ( !index_files.any { name -> name.endsWith('.bwt.2bit.64') } ) {
-                    def bowtie2_hint = index_files.any { name -> name ==~ /.*\.bt2l?$/ } ?
-                        " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta." : ""
-                    error "--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64): ${params.custom_decontamination_index}.${bowtie2_hint}"
-                }
-            }
+            // Pre-built combined index; main.nf checked at launch that it
+            // matches --read_aligner
             ch_decontamination_index = channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
         } else {
             // Collect FASTA file paths into lists

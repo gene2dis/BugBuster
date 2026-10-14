@@ -36,7 +36,14 @@ process BOWTIE2_DECONTAMINATE {
 
     """
     # Get bowtie2 index basename
-    basename=\$(ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | sort -u | head -1)
+    basename=\$(ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | sort -u | head -1 || true)
+    if [ -z "\${basename}" ]; then
+        echo "ERROR: no Bowtie2 index (*.bt2) in ${index_db}." >&2
+        if find -L ${index_db} -maxdepth 1 -name '*.bwt.2bit.64' | grep -q .; then
+            echo "It holds a bwa-mem3/bwa-mem2 index: run with the default --read_aligner bwamem3 to use it." >&2
+        fi
+        exit 1
+    fi
 
     # Align paired-end reads and extract unmapped (clean) reads
     bowtie2 \\
