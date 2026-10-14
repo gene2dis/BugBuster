@@ -14,9 +14,12 @@
 #   - header lines pass through;
 #   - secondary and supplementary records are dropped (one record per read);
 #   - unmapped records pass through;
-#   - a mapped record is kept when it has >= <min_aligned_length> aligned
-#     bases (CIGAR M/=/X) and an identity >= <min_identity>, with
-#     identity = 1 - NM / (M + I + D);
+#   - a mapped record is kept when it has enough aligned bases (CIGAR M/=/X)
+#     and an identity >= <min_identity>, with identity = 1 - NM / (M + I + D).
+#     Enough means <min_aligned_length>, or 80% of the read (CIGAR M/I/S/=/X)
+#     when that is fewer: a read shorter than the threshold (2x50 libraries,
+#     reads fastp trimmed below it) still counts when it aligns over most of
+#     its length, and a short local hit on a long read still does not;
 #   - a failing record is turned into an unmapped one (flag 0x4 set, proper
 #     pair 0x2 cleared, MAPQ 0, CIGAR *, TLEN 0, optional fields dropped), so
 #     read totals and mapping rates still add up. RNAME/POS are kept; pipe the
@@ -50,7 +53,7 @@ awk -F'\t' -v min_id="${min_identity}" -v min_len="${min_aligned_length}" '
         if (has(flag, 256) || has(flag, 2048)) next   # secondary, supplementary
         if (has(flag, 4)) { print; next }             # unmapped
 
-        m = 0; ins = 0; del = 0
+        m = 0; ins = 0; del = 0; clip = 0
         cigar = $6
         while (match(cigar, /^[0-9]+[MIDNSHP=X]/)) {
             n = substr(cigar, 1, RLENGTH - 1) + 0
@@ -58,15 +61,21 @@ awk -F'\t' -v min_id="${min_identity}" -v min_len="${min_aligned_length}" '
             if (op == "M" || op == "=" || op == "X") m += n
             else if (op == "I") ins += n
             else if (op == "D") del += n
+            else if (op == "S") clip += n
             cigar = substr(cigar, RLENGTH + 1)
         }
+        # Required aligned bases: min_len, or ceil(80% of the read) if fewer
+        read_len = m + ins + clip
+        need = min_len
+        short_need = int((4 * read_len + 4) / 5)
+        if (short_need < need) need = short_need
         nm = 0
         for (i = 12; i <= NF; i++) {
             if (substr($i, 1, 5) == "NM:i:") { nm = substr($i, 6) + 0; break }
         }
         span = m + ins + del
         identity = span > 0 ? 1 - nm / span : 0
-        if (m >= min_len && identity >= min_id) { print; next }
+        if (m >= need && identity >= min_id) { print; next }
 
         flag += 4
         if (has(flag, 2)) flag -= 2

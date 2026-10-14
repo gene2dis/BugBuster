@@ -6,6 +6,8 @@
 #   - secondary and supplementary records are dropped,
 #   - unmapped records pass through unchanged,
 #   - a long, near-identical alignment is kept unchanged,
+#   - a read shorter than 50 bp counts when >= 80% of it aligns (a 40 bp
+#     read with 40M or 32M8S is kept, 31M9S is not),
 #   - a short (< 50 M bases) or divergent (< 95% identity) alignment becomes
 #     an unmapped record: flag 0x4 set, 0x2 cleared, MAPQ 0, CIGAR *, TLEN 0,
 #     optional fields dropped, RNAME/POS/mate fields/SEQ/QUAL kept,
@@ -40,12 +42,13 @@ check() {
 }
 
 # Record <name> <flag> <mapq> <cigar> <tlen> [tags...]: a 100 bp read on c1
+# (READ_LEN overrides the length)
 rec() {
     local name=$1 flag=$2 mapq=$3 cigar=$4 tlen=$5
     shift 5
-    local seq qual
-    seq=$(printf 'A%.0s' $(seq 1 100))
-    qual=$(printf 'I%.0s' $(seq 1 100))
+    local seq qual len=${READ_LEN:-100}
+    seq=$(printf 'A%.0s' $(seq 1 "${len}"))
+    qual=$(printf 'I%.0s' $(seq 1 "${len}"))
     local line="${name}\t${flag}\tc1\t101\t${mapq}\t${cigar}\t=\t301\t${tlen}\t${seq}\t${qual}"
     for t in "$@"; do line="${line}\t${t}"; done
     printf '%b\n' "${line}"
@@ -65,6 +68,15 @@ rec() {
     rec unmapped  69  0  '*'         0
     rec no_nm     99  60 100M        300 AS:i:100
 } > "${TMP_DIR}/in.sam"
+
+# 40 bp reads (2x50 library, or fastp-trimmed): 80% of 40 = 32 aligned bases
+{
+    printf '@SQ\tSN:c1\tLN:1000\n'
+    READ_LEN=40 rec short_full  99 60 40M    100 NM:i:0 AS:i:40
+    READ_LEN=40 rec short_80    99 60 32M8S  100 NM:i:1 AS:i:30
+    READ_LEN=40 rec short_local 99 60 31M9S  100 NM:i:0 AS:i:31
+    READ_LEN=40 rec short_div   99 60 40M    100 NM:i:3 AS:i:25
+} > "${TMP_DIR}/short.sam"
 
 echo "=== filter_alignments.sh test suite ==="
 
@@ -102,6 +114,17 @@ check "unmapped conversion keeps SEQ and QUAL, drops optional fields" \
     "[[ \$(field short 10 | wc -c) -eq 101 && \$(awk -F'\t' '\$1 == \"short\" { print NF }' '${out}') -eq 11 ]]"
 check "missing NM tag treated as identity 1" \
     "[[ \$(field no_nm 2) == 99 ]]"
+
+"${FILTER}" 0.95 50 < "${TMP_DIR}/short.sam" > "${TMP_DIR}/short_out.sam"
+sfield() { awk -F'\t' -v n="$1" -v f="$2" '$1 == n { print $f }' "${TMP_DIR}/short_out.sam"; }
+check "40 bp read aligned end to end kept (80% rule, not 50 bases)" \
+    "[[ \$(sfield short_full 2) == 99 ]]"
+check "40 bp read with 32 of 40 bases aligned kept" \
+    "[[ \$(sfield short_80 2) == 99 ]]"
+check "40 bp read with 31 of 40 bases aligned -> unmapped" \
+    "[[ \$(sfield short_local 2) == 101 ]]"
+check "40 bp read at 92.5% identity -> unmapped" \
+    "[[ \$(sfield short_div 2) == 101 ]]"
 
 "${FILTER}" 0 0 < "${TMP_DIR}/in.sam" > "${TMP_DIR}/off.sam"
 check "thresholds 0 0 keep every primary alignment unchanged" \

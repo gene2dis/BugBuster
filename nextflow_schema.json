@@ -738,7 +738,7 @@
                     "type": "integer",
                     "default": 50,
                     "minimum": 0,
-                    "description": "Minimum aligned bases (CIGAR M) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); failing reads are kept as unmapped. 0 turns the length check off.",
+                    "description": "Minimum aligned bases (CIGAR M) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); a read shorter than this needs 80% of its length aligned instead. Failing reads are kept as unmapped. 0 turns the length check off.",
                     "fa_icon": "fas fa-ruler-horizontal"
                 }
             }

@@ -735,7 +735,7 @@ Woltka and HUMAnN always use bowtie2 with their own databases.
 | `--read_aligner` | `bwamem3` | `bwamem3` (bwa-mem3 0.14.0) or `bowtie2` (fallback) |
 | `--decontam_min_score` | `30` | bwa-mem3 minimum alignment score (`-T`) for a contaminant hit, per mate |
 | `--bwamem3_min_identity` | `0.95` | Minimum identity of a read-to-contig/bin alignment (`0` = off) |
-| `--bwamem3_min_aligned_length` | `50` | Minimum aligned bases of a read-to-contig/bin alignment (`0` = off) |
+| `--bwamem3_min_aligned_length` | `50` | Minimum aligned bases of a read-to-contig/bin alignment, or 80% of a shorter read (`0` = off) |
 | `--bwamem3_dense_sa` | `false` | Denser suffix array for the decontamination index (faster, ~12 GB more RAM) |
 
 bwa-mem3 replaced bowtie2 as the default after a benchmark on five real

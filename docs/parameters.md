@@ -855,7 +855,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 ### `--bwamem3_min_aligned_length`
 - **Type**: Integer
 - **Default**: `50`
-- **Description**: Minimum number of aligned bases (CIGAR `M`) for a bwa-mem3 read-to-contig or read-to-bin alignment to count; a failing read is kept as an unmapped read. Only for `--read_aligner bwamem3`; see `--bwamem3_min_identity`. Reads clipped at a contig end still count when 50 bases align. `0` turns the length check off.
+- **Description**: Minimum number of aligned bases (CIGAR `M`) for a bwa-mem3 read-to-contig or read-to-bin alignment to count; a failing read is kept as an unmapped read. Only for `--read_aligner bwamem3`; see `--bwamem3_min_identity`. Reads clipped at a contig end still count when 50 bases align. A read shorter than the threshold (a 2×50 library, or reads fastp trimmed below it) needs 80% of its length aligned instead, so short reads that align well still count while a short local hit on a long read does not. `0` turns the length check off.
 - **Example**: `--bwamem3_min_aligned_length 40`
 
 Bowtie2 parameters for read alignment during host filtering (`--read_aligner bowtie2`):
