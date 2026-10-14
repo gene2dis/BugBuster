@@ -320,6 +320,13 @@ next release is tagged.
   `04_binning/coassembly/taxonomy/gtdbtk/`, next to the co-assembly bins; a
   co-assembly run no longer creates `04_binning/per_sample/`. Per-sample mode
   is unchanged
+- **K-MARVEL database provenance**: a `--custom_kmarvel_db` without a
+  `DB_VERSION` file was recorded as `card: "custom"` in
+  `software_versions.yml`; it is now recorded as
+  `custom (CARD_protein_all.fasta md5 <md5>)`, so the CARD reference used can be
+  traced (`bin/kmarvel_db_version.sh`, tested by
+  `tests/bin/test_kmarvel_db_version.sh`). A `DB_VERSION` file, as written by
+  `FORMAT_KMARVEL_DB`, is still recorded as is (first line)
 
 ### Removed
 

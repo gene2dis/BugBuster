@@ -178,6 +178,10 @@ jobs:
         run: |
           tests/bin/test_kmarvel_check_output.sh
 
+      - name: Run K-MARVEL database version tests (DB_VERSION, md5 fallback)
+        run: |
+          tests/bin/test_kmarvel_db_version.sh
+
       - name: Run BLOBTOOLS read-only image regression test (design doc Q21)
         run: |
           tests/bin/test_blobtools_readonly.sh
