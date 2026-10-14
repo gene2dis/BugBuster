@@ -159,12 +159,14 @@ workflow BINNING {
                     def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
                     mid == sample_id
                 }
+                // Every report is named <sample>_<binner>_...: an unmatched
+                // one is a naming bug, and dropping it would silently skip
+                // the bin reports
                 if (meta == null) {
-                    log.warn "CheckM2: Could not find meta for sample_id: ${sample_id}"
-                    return null
+                    error "CheckM2: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                 }
                 [meta, report_list]
-            }.findAll { it -> it != null }
+            }
         }
     
     // CheckM2 reports for refined bins (metawrap when available, all reports otherwise)
@@ -192,11 +194,10 @@ workflow BINNING {
                         mid == sample_id
                     }
                     if (meta == null) {
-                        log.warn "CheckM2 metawrap: Could not find meta for sample_id: ${sample_id}"
-                        return null
+                        error "CheckM2 metawrap: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                     }
                     [meta, report_list]
-                }.findAll { it -> it != null }
+                }
             }
     } else {
         ch_checkm_refined = ch_checkm_all_reports
@@ -242,11 +243,10 @@ workflow BINNING {
                     mid == sample_id
                 }
                 if (meta == null) {
-                    log.warn "GTDB-Tk: Could not find meta for sample_id: ${sample_id}"
-                    return null
+                    error "GTDB-Tk: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                 }
                 [meta, report_list]
-            }.findAll { it -> it != null }
+            }
         }
 
     //

@@ -341,6 +341,9 @@ next release is tagged.
   matched. The role now comes from the last R1/R2/singleton token of
   the file name (`bin/read_role.sh`, and the same rule in Groovy), tested by
   `tests/bin/test_read_role.sh`
+- **Bin reports can no longer be skipped silently**: a CheckM2 or GTDB-Tk report whose
+  file name matched no sample was dropped with a warning; if that happened for every
+  sample, BIN_QUALITY_REPORT, BIN_TAX_REPORT and BIN_SUMMARY never ran. It is now an error
 - **Index / aligner mismatch under `--read_aligner bowtie2`** is caught at launch (a
   bwa-mem3 index, e.g. the one the pipeline publishes by default, was failing inside
   BOWTIE2_DECONTAMINATE with an unclear bowtie2 error), and BOWTIE2_DECONTAMINATE itself
