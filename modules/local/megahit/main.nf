@@ -62,14 +62,14 @@ process MEGAHIT {
         R2_files=()
         Singleton_files=()
         
+        # Role from the file name's last R1/R2/singleton token (bin/read_role.sh),
+        # so a sample id such as S_1.2 cannot pull its R2 file into R1
         for read_file in ${reads}; do
-            if [[ \$read_file =~ _R1_|_1\\. ]]; then
-                R1_files+=("\$read_file")
-            elif [[ \$read_file =~ _R2_|_2\\. ]]; then
-                R2_files+=("\$read_file")
-            elif [[ \$read_file =~ [Ss]ingleton|[Uu]npaired ]]; then
-                Singleton_files+=("\$read_file")
-            fi
+            case "\$(read_role.sh "\$read_file")" in
+                R1) R1_files+=("\$read_file") ;;
+                R2) R2_files+=("\$read_file") ;;
+                S)  Singleton_files+=("\$read_file") ;;
+            esac
         done
         
         # Build comma-separated lists

@@ -133,6 +133,10 @@ jobs:
         run: |
           tests/bin/test_filter_alignments.sh
 
+      - name: Run co-assembly read-role tests
+        run: |
+          tests/bin/test_read_role.sh
+
       - name: Run functional aggregation script tests (design doc T4)
         run: |
           tests/bin/test_aggregate_functions.sh

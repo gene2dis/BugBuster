@@ -78,7 +78,11 @@ nextflow_process {
                     ['s1_Singleton_clean.fastq.gz', 'singleton_test_S.fastq.gz'],
                     // A sample id containing "unpaired" must still pair its R1/R2
                     ['unpaired_s2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
-                    ['unpaired_s2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz']
+                    ['unpaired_s2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz'],
+                    // ... and so must one containing "_1.": a substring match
+                    // put S_1.2's R2 file into R1 and the pairing failed
+                    ['S_1.2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
+                    ['S_1.2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz']
                 ].collect { names ->
                     def target = pooled.resolve(names[0])
                     file("\${reads_dir}/\${names[1]}").copyTo(target)

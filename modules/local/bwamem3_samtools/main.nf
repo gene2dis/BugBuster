@@ -136,15 +136,18 @@ process BWAMEM3_SAMTOOLS {
     def r2_files = []
     def singleton_files = []
     if (meta.id == 'coassembly') {
-        // One list per file, R1 before R2 before singleton (the bowtie2
-        // module's if/elif order): a sample id containing "unpaired" must
-        // not put its R1/R2 files in the singleton list too
+        // The same rule as bin/read_role.sh (MEGAHIT, BOWTIE2_SAMTOOLS): strip
+        // the extension, split the name on '_' and '.', and take the LAST
+        // token naming a role, so a sample id such as S_1.2 or unpaired_s2
+        // cannot move its files into another list
         reads.each { f ->
-            if (f.name ==~ /.*(_R1_|_1\.).*/) {
+            def tokens = f.name.replaceFirst(/(\.fastq|\.fq)?(\.gz|\.bz2)?$/, '').tokenize('_.')
+            def role = tokens.reverse().collect { tok -> tok.toLowerCase() }.find { tok -> tok in ['r1', '1', 'r2', '2', 'singleton', 'unpaired'] }
+            if (role in ['r1', '1']) {
                 r1_files << f
-            } else if (f.name ==~ /.*(_R2_|_2\.).*/) {
+            } else if (role in ['r2', '2']) {
                 r2_files << f
-            } else if (f.name ==~ /.*([Ss]ingleton|[Uu]npaired).*/) {
+            } else if (role) {
                 singleton_files << f
             }
         }

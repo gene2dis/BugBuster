@@ -335,6 +335,12 @@ next release is tagged.
 
 ### Fixed
 
+- **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
+  and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
+  `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer
+  matched. The role now comes from the last R1/R2/singleton token of
+  the file name (`bin/read_role.sh`, and the same rule in Groovy), tested by
+  `tests/bin/test_read_role.sh`
 - **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
   and BIN_SUMMARY warn when every input report is empty and write header-only tables (and
   placeholder plots), instead of failing (audit #13 made them fail; with SemiBin and MetaWRAP
