@@ -263,6 +263,11 @@ nextflow run main.nf \
 | Binning | 128 GB | 16 | 200 GB |
 | Full Pipeline | 256 GB | 32 | 500 GB |
 
+The first run also builds the human decontamination index: ~75 GB RAM with the
+default aligner (bwa-mem3), once. Reuse it with `--custom_decontamination_index`,
+or use `--read_aligner bowtie2` (~6 GB, about an hour) on smaller nodes and on
+CPUs without AVX2.
+
 ### Pre-downloaded Databases
 
 For better performance, pre-download databases to shared storage:

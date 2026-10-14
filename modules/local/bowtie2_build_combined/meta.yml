@@ -1,5 +1,5 @@
 name: bowtie2_build_combined
-description: Build a single Bowtie2 index from multiple FASTA files for efficient decontamination
+description: Build a single Bowtie2 index from multiple FASTA files for efficient decontamination (--read_aligner bowtie2)
 keywords:
   - alignment
   - index

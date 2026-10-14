@@ -52,8 +52,10 @@ quality_control: true
 custom_host_fasta: "/data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/rat.fasta"
 custom_phiX_fasta: "/data/genomes/phix.fasta"
 
-# Optional: adjust resources for larger index
-max_memory: "64.GB"
+# Larger index: the default aligner (bwa-mem3) needs ~20-25 GB RAM per Gbp
+# of combined genome to build it (human + mouse + rat ~8.4 Gbp); see
+# "Memory Considerations" below
+max_memory: "200.GB"
 max_cpus: 16
 ```
 
@@ -132,9 +134,12 @@ custom_decontamination_index: "/data/databases/contaminants_index"
 # Concatenate all genomes
 cat human.fasta mouse.fasta ecoli.fasta phix.fasta > contaminants.fasta
 
-# Build index
+# Build the bwa-mem3 index (default aligner)
 mkdir contaminants_index
-bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
+bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
+
+# Or a Bowtie2 index, used with read_aligner: "bowtie2"
+bowtie2-build --threads 16 contaminants.fasta bowtie2_index/contaminants
 ```
 
 ### Complete Production Configuration
@@ -155,7 +160,12 @@ store_clean_reads: true
 custom_host_fasta: "/data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/rat.fasta"
 custom_phiX_fasta: "/data/genomes/phix.fasta"
 
-# Bowtie2 alignment parameters
+# Aligner: bwa-mem3 (default) or bowtie2 (fallback for CPUs without AVX2
+# or nodes with too little RAM for the bwa-mem3 index build)
+read_aligner: "bwamem3"
+decontam_min_score: 30        # bwa-mem3 only
+
+# Bowtie2 alignment parameters (read_aligner: "bowtie2" only)
 bowtie_ma: 2
 bowtie_mp: "6,2"
 bowtie_score_min: "G,15,6"
@@ -225,7 +235,23 @@ custom_host_fasta:
 
 ### 4. Memory Considerations
 
-More genomes = larger combined index = more memory needed:
+More genomes = larger combined index = more memory needed. The index is built
+once and can be reused with `custom_decontamination_index`.
+
+With the default aligner (bwa-mem3), the build needs about 20-25 GB RAM per Gbp
+of combined genome (measured: 57 GB peak for GRCh38 + phiX, 3.1 Gbp); the
+pipeline warns at launch when `max_memory` is below 75 GB for the human host:
+
+```yaml
+# Human only
+max_memory: "80.GB"
+
+# Human + mouse (~5.8 Gbp)
+max_memory: "150.GB"
+```
+
+With `read_aligner: "bowtie2"` the build needs far less memory (~6 GB for a
+human host) but takes about an hour:
 
 ```yaml
 # For 2-3 genomes
@@ -233,9 +259,6 @@ max_memory: "32.GB"
 
 # For 4-6 genomes
 max_memory: "64.GB"
-
-# For 7+ genomes
-max_memory: "128.GB"
 ```
 
 ## Usage Examples

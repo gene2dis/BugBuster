@@ -84,11 +84,15 @@ custom_phiX_fasta: "/data/genomes/phix174.fasta"
 # min_read_sample: 10000
 # store_clean_reads: true
 # 
-# # Bowtie2 parameters
+# # Aligner: bwa-mem3 (default) needs ~20-25 GB RAM per Gbp of combined
+# # genome to build the index; bowtie2 is the low-memory fallback
+# read_aligner: "bowtie2"
+# 
+# # Bowtie2 parameters (read_aligner: "bowtie2" only)
 # bowtie_k: 1
 # bowtie_score_min: "G,15,6"
 # 
-# # Resource limits
+# # Resource limits (bwa-mem3 with human + mouse + rat needs ~200 GB)
 # max_memory: "128.GB"
 # max_cpus: 32
 # 

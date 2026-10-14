@@ -1,5 +1,5 @@
 name: bowtie2_decontaminate
-description: Single-pass read decontamination using combined Bowtie2 index to remove contaminants (phiX, host, etc.)
+description: Single-pass read decontamination using combined Bowtie2 index to remove contaminants (phiX, host, etc.) (--read_aligner bowtie2)
 keywords:
   - alignment
   - decontamination

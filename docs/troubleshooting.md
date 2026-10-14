@@ -159,7 +159,7 @@ exitCode: 137
 3. Use a larger instance type (cloud) or node (HPC)
 
 The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
-on a real co-assembly, above its 72 GB first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
+on a real co-assembly; it requests 96 GB on the first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
 see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step are
 listed under [Functional annotation branches](manual.md#functional-annotation-branches)
 in the manual.
@@ -977,6 +977,35 @@ Azure Batch authentication failed
    ```
 
 2. Check work directory for intermediate files
+
+### No bins: empty bin tables, `SKIPPED.txt` instead of bins
+
+**Symptom:** the run succeeds, but `04_binning/` has no bins. A bin folder holds
+only `SKIPPED.txt`. The bin tables (`Mag_quality_summary.csv`,
+`MAGs_tax_summary.csv`, `Bin_summary.csv`) have a header and no rows, the plots
+say "No bins were assessed" / "No MAGs were classified", and the log shows
+warnings such as `all CheckM2 quality reports are empty` or
+`No refined bins for coassembly: skipping bin depth`.
+
+**Cause:** binning found nothing usable on this data. This is common for
+host-dominated or shallow samples, where little microbial DNA is left after
+host removal:
+
+- `SemiBin found no bins`: SemiBin2 had no bin before reclustering.
+- `All contigs < <N>bp - SemiBin skipped`: no contig is long enough for SemiBin2.
+- `No bin reached <completeness>% completeness and <contamination>% contamination`:
+  MetaWRAP ran, but no refined bin passed `--metawrap_completeness` /
+  `--metawrap_contamination` (default 50 / 10).
+- `No bins available for refinement`: no binner produced a bin for MetaWRAP.
+
+The run finishes on purpose instead of failing. A report step still fails when
+an input file is missing, which points to a real pipeline problem.
+
+**What to try:** check the clean-read counts in `Reads_report.csv` and the
+assembly size first. Co-assembling samples (`--assembly_mode coassembly`) or
+sequencing deeper gives the binners more coverage. Lowering the MetaWRAP
+thresholds keeps lower-quality bins, at the cost of more incomplete or
+contaminated MAGs.
 
 ### Corrupted output files
 

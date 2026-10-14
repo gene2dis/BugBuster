@@ -1,5 +1,5 @@
 name: bin_tax_report
-description: Per-sample assembly mode MAG taxonomy report (bin/bin_tax_report.py) - parses GTDB-Tk classifications into ranks, writes a per-bin taxonomy table and plots bin counts by phylum; fails if every summary is empty
+description: Per-sample assembly mode MAG taxonomy report (bin/bin_tax_report.py) - parses GTDB-Tk classifications into ranks, writes a per-bin taxonomy table and plots bin counts by phylum; warns and writes a header-only table and a placeholder plot if every summary is empty, fails if no GTDB-Tk file is staged
 keywords:
   - binning
   - taxonomy

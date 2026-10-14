@@ -37,7 +37,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 ### Pipeline Workflow
 
 ```
-Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/Sylph)
+Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/Sylph)
                                             ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
@@ -287,7 +287,8 @@ wget -P /shared/databases/bugbuster/cog/ \
     https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab
 
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
-# combined phiX + host Bowtie2 index from FASTA on first use
+# combined phiX + host index (bwa-mem3, or Bowtie2 under --read_aligner bowtie2)
+# from FASTA on first use
 wget -P /shared/databases/bugbuster/ \
     https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
 ```
@@ -315,8 +316,8 @@ nextflow run main.nf \
 ### Using Custom Host Genomes
 
 To filter reads from non-human hosts, point the pipeline at the host genome
-FASTA (plain or gzipped) — it builds the combined phiX + host Bowtie2 index
-automatically:
+FASTA (plain or gzipped) — it builds the combined phiX + host index for
+`--read_aligner` automatically:
 
 ```bash
 # Download your host genome
@@ -330,8 +331,10 @@ nextflow run main.nf \
     -profile docker
 ```
 
-If you already have a pre-built combined (phiX + host) Bowtie2 index, pass its
-directory with `--custom_decontamination_index` instead.
+If you already have a pre-built combined (phiX + host) index, pass its
+directory with `--custom_decontamination_index` instead: a bwa-mem3 or bwa-mem2
+index (`*.bwt.2bit.64`) under the default aligner, or a Bowtie2 index (`*.bt2`)
+under `--read_aligner bowtie2`.
 
 ---
 
@@ -567,7 +570,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 
 | Parameter | Description |
 |-----------|-------------|
-| `--custom_decontamination_index` | Path to a pre-built combined Bowtie2 index directory (host + phiX) |
+| `--custom_decontamination_index` | Path to a pre-built combined index directory (host + phiX) matching `--read_aligner`: bwa-mem3/bwa-mem2 (`*.bwt.2bit.64`, default) or Bowtie2 (`*.bt2`) |
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
@@ -1454,7 +1457,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
-    --custom_decontamination_index /shared/db/bwamem3_index \
+    --custom_decontamination_index /shared/db/bwamem3_index/contaminants_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/release232 \
@@ -1541,7 +1544,7 @@ params {
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
     custom_gtdbtk_db              = '/shared/db/release232'
-    custom_decontamination_index  = '/shared/db/bwamem3_index'
+    custom_decontamination_index  = '/shared/db/bwamem3_index/contaminants_index'
 }
 
 // The local executor's machine-wide pool is copied from max_cpus/max_memory
