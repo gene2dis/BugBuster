@@ -35,10 +35,11 @@ process BOWTIE2_DECONTAMINATE {
     def singleton = reads.size() > 2 ? reads[2] : null
 
     """
-    # Get bowtie2 index basename
-    basename=\$(ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | sort -u | head -1 || true)
+    # Get bowtie2 index basename (.bt2, or .bt2l for a large index: bowtie2-build
+    # writes one for references over ~4 Gbp, e.g. several host genomes)
+    basename=\$(ls ${index_db} | grep -E '\\.[0-9]\\.bt2l?\$' | sed -E 's/(\\.rev)?\\.[0-9]\\.bt2l?\$//' | sort -u | head -1 || true)
     if [ -z "\${basename}" ]; then
-        echo "ERROR: no Bowtie2 index (*.bt2) in ${index_db}." >&2
+        echo "ERROR: no Bowtie2 index (*.bt2 / *.bt2l) in ${index_db}." >&2
         if find -L ${index_db} -maxdepth 1 -name '*.bwt.2bit.64' | grep -q .; then
             echo "It holds a bwa-mem3/bwa-mem2 index: run with the default --read_aligner bwamem3 to use it." >&2
         fi

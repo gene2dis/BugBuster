@@ -10,6 +10,8 @@
     Regression test for issue #21: without a '%' in the --un-conc-gz path,
     bowtie2 inserts the mate number before the last extension, which for a
     dotted sample id lands inside the id and the clean reads were not found.
+    A second test builds a large (.bt2l) index, whose basename the module
+    used to read as "<name>l".
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -71,6 +73,30 @@ nextflow_process {
 
             def report = path(process.out.report.get(0)).readLines()
             assert report[1] == "sim.ARG\t12\t4"
+        }
+    }
+
+    test("large (.bt2l) index") {
+        config "./bowtie2_large_index.config"
+
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'large' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]).combine(BOWTIE2_BUILD_COMBINED.out.index)
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.reads[0][1][0]).linesGzip.size() == 6 * 4
         }
     }
 }

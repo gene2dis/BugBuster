@@ -391,6 +391,11 @@ next release is tagged.
   `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
   extension, which for `S1.2` lands inside the id, so the clean reads were not found
   (exit 1). The path now carries `%`. New nf-test `tests/modules/bowtie2_decontaminate.nf.test`
+- **bowtie2 decontamination failed with a large (`.bt2l`) index**: BOWTIE2_DECONTAMINATE
+  read the basename of `contaminants.1.bt2l` as `contaminantsl`, although the launch check
+  accepts `.bt2l`. bowtie2-build writes a large index on its own for references over
+  ~4 Gbp, such as several host genomes. BOWTIE2_BUILD_COMBINED now also passes `ext.args`
+  (the new test builds with `--large-index`)
 - **`low_disk` was described as freeing disk during the run**: the `--help` text, the
   profile description, the launch warning, the README, the manual and
   `docs/DISK_OPTIMIZATION.md` called its work-dir cleanup "progressive" and promised a
