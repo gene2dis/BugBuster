@@ -373,7 +373,8 @@ next release is tagged.
   72 GB, and emapper reports the out-of-memory kill as exit 1, which the memory retry
   (exit 130-145) skips. EGGNOG_MAPPER_SEARCH now exits 137 when diamond was killed or ran
   out of memory, and asks for 96 GB on the first attempt (192 GB on the retry, clamped by
-  `--max_memory`)
+  `--max_memory`). Once `--max_memory` caps the request, an out-of-memory failure is not
+  retried: the retry would repeat a multi-hour search with the same memory
 - **`software_versions.yml` was invalid YAML for every assembly run**: Nextflow strips a
   script's common indentation, and heredoc bodies at column 0 (BBMAP, CONTIG_FILTER_SUMMARY
   and ten module stubs), `\n` in `printf` strings that Groovy turned into real newlines

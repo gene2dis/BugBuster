@@ -74,7 +74,7 @@ process EGGNOG_MAPPER_SEARCH {
     if [ "\$status" -ne 0 ]; then
         # emapper prints diamond's failure ("Error running diamond: ... Killed") on stdout
         if grep -qE 'Killed|std::bad_alloc|Cannot allocate memory|[Oo]ut of memory|MemoryError' emapper.stdout emapper.stderr; then
-            echo "EGGNOG_MAPPER_SEARCH: diamond ran out of memory with ${task.memory}; exiting 137 so the task is retried with more" >&2
+            echo "EGGNOG_MAPPER_SEARCH: diamond ran out of memory with ${task.memory}; exiting 137 (retried with more memory unless --max_memory ${params.max_memory} already caps it: then raise --max_memory)" >&2
             exit 137
         fi
         exit "\$status"
