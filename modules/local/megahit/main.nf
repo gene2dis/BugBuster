@@ -62,14 +62,16 @@ process MEGAHIT {
         R2_files=()
         Singleton_files=()
         
+        # Role from the file name's last R1/R2/singleton token (bin/read_role.sh),
+        # so a sample id such as S_1.2 cannot pull its R2 file into R1
+        # (it fails on a name without a role, so no file drops out unnoticed)
         for read_file in ${reads}; do
-            if [[ \$read_file =~ _R1_|_1\\. ]]; then
-                R1_files+=("\$read_file")
-            elif [[ \$read_file =~ _R2_|_2\\. ]]; then
-                R2_files+=("\$read_file")
-            elif [[ \$read_file =~ [Ss]ingleton|[Uu]npaired ]]; then
-                Singleton_files+=("\$read_file")
-            fi
+            role=\$(read_role.sh "\$read_file") || exit 1
+            case "\$role" in
+                R1) R1_files+=("\$read_file") ;;
+                R2) R2_files+=("\$read_file") ;;
+                S)  Singleton_files+=("\$read_file") ;;
+            esac
         done
         
         # Build comma-separated lists
@@ -174,11 +176,11 @@ process MEGAHIT {
     """
     # Create a minimal test contig file
     cat > ${prefix}_contigs.fa << 'EOF'
->contig_1 length=1234
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->contig_2 length=5678
-TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
-EOF
+    >contig_1 length=1234
+    ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+    >contig_2 length=5678
+    TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
+    EOF
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

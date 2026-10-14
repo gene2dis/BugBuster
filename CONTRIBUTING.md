@@ -125,7 +125,8 @@ feat(modules): add DIAMOND module for protein alignment
 ### Nextflow/Groovy
 
 - Use DSL2 syntax
-- One process per module file
+- One process per module file, except for closely related processes that share code
+  (`format_db`, `deeparg`, `bowtie2_samtools`, `bwamem3_samtools`, `bedtools`)
 - Include `meta.yml` for new modules
 - Add `versions.yml` output for software tracking
 - Add `stub` blocks for dry-run testing
@@ -258,7 +259,7 @@ authors:
 `input:` lists the process inputs in order (a `meta` map plus one entry per `val`/`path`
 variable, using its name) and `output:` lists every `emit:` name (a `meta` entry for tuple
 outputs is optional). When one `main.nf` defines several processes (`format_db`,
-`deeparg`, `bowtie2_samtools`), keep a single `meta.yml` with `tools` once at the top and a
+`deeparg`, `bowtie2_samtools`, `bwamem3_samtools`, `bedtools`), keep a single `meta.yml` with `tools` once at the top and a
 `processes:` list instead of top-level `input`/`output`, each item with `name` (the process
 name), `description`, `input` and `output`. `tests/bin/test_module_meta.sh` (run in CI)
 checks every local module against these rules and that every process has a `tag` and a
@@ -306,7 +307,13 @@ nextflow plugin install nf-schema@2.7.3
 ### Linting
 
 ```bash
-# Check Nextflow syntax
+# Strict-syntax check of the scripts and config (fix any errors it reports)
+nextflow lint .
+
+# Config check, as CI runs it (plus a JSON parse of nextflow_schema.json)
+nextflow config -flat . > /dev/null
+
+# Optional: resolve the workflow without running any task
 nextflow run main.nf -profile test,docker -preview
 ```
 

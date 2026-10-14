@@ -56,6 +56,7 @@ def printHelp() {
 
     \u001B[1;33mPipeline options:\u001B[0m
       --quality_control             Enable QC and host filtering (default: ${params.quality_control})
+      --read_aligner                Aligner for host removal, reads->contigs and bin depth: 'bwamem3' (needs AVX2), 'bowtie2' (default: ${params.read_aligner})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
@@ -269,12 +270,47 @@ workflow {
         log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
+    // bwa-mem3 (the default aligner) builds the human decontamination index
+    // with ~57-75 GB RAM, bowtie2 with ~6 GB. Under a lower --max_memory the
+    // build stops with exit 3: say so before the downloads start
+    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta && (params.max_memory as MemoryUnit) < 75.GB) {
+        log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+    }
+
+    // A pre-built --custom_decontamination_index must match --read_aligner: a
+    // Bowtie2 index cannot serve bwa-mem3 (a bwa-mem2 index can), nor the
+    // reverse. Checked here, before any channel exists: raised later, while
+    // INPUT_CHECK's samplesheet channel was starting, the error could be
+    // reported as "Cannot find samplesheet file" instead
+    if (flagOn(params.quality_control) && params.custom_decontamination_index) {
+        if ( params.read_aligner == 'bwamem3' ) {
+            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
+            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
+            if ( !index_files.any { name -> name.endsWith('.bwt.2bit.64') } ) {
+                def bowtie2_hint = index_files.any { name -> name ==~ /.*\.bt2l?$/ } ?
+                    " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta." : ""
+                error "--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64): ${params.custom_decontamination_index}.${bowtie2_hint}"
+            }
+        } else {
+            // The reverse mix-up: the index the pipeline publishes by
+            // default (bwamem3_index/) passed under the bowtie2 fallback
+            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
+            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
+            if ( !index_files.any { name -> name ==~ /.*\.[0-9]\.bt2l?$/ } ) {
+                def bwamem3_hint = index_files.any { name -> name.endsWith('.bwt.2bit.64') } ?
+                    " It holds a bwa-mem3/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index." : ""
+                error "--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index (*.bt2): ${params.custom_decontamination_index}.${bwamem3_hint}"
+            }
+        }
+    }
+
     // Print run configuration
     log.info "  Run configuration:"
     log.info "  -------------------"
     log.info "  Input samplesheet    : ${params.input}"
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
+    log.info "  Read aligner         : ${params.read_aligner}"
     log.info "  Assembly mode        : ${params.assembly_mode}"
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"

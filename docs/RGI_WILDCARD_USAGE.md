@@ -27,8 +27,9 @@ nextflow run main.nf \
 - Downloads CARD JSON database
 - Downloads WildCARD variants
 - Processes WildCARD annotations (30-60 minutes)
-- Combines both into a single database
-- Builds KMA indices
+- Combines both into a single database (`rgi load --local`)
+- RGI builds the aligner (KMA) indices it is missing at run time, inside each
+  RGI_BWT task (the shared database is only read, through symlinks)
 
 ## Scenario 2: Pre-Prepared Complete Database
 
@@ -44,13 +45,15 @@ nextflow run main.nf \
 ```
 
 **Requirements:**
-- Database must be RGI-loaded (created with `rgi load`)
-- Must contain KMA indices
+- Database must be RGI-loaded (created with `rgi load --local`): the pipeline
+  checks only for its `localDB/` directory
+- KMA indices are optional: RGI builds missing ones in each task
 - WildCARD must already be integrated
 
 **Database structure:**
 ```
 complete_card_database/
+├── localDB/            (required: the rgi load --local database)
 ├── card.json
 ├── card_database_v*.fasta
 ├── card_database_v*.fasta.comp.b
@@ -80,8 +83,7 @@ nextflow run main.nf \
 **What happens:**
 - Uses your existing CARD database
 - Processes WildCARD annotations from your directory
-- Combines them into a new database
-- Builds necessary KMA indices
+- Combines them into a new database, published to `<databases_dir>/rgi/card_db_with_wildcard`
 
 ### CARD Database Requirements
 
@@ -106,7 +108,7 @@ wildcard_directory/
 └── ... (other variant files)
 ```
 
-**Note:** Files can be gzipped (.gz) - the pipeline will decompress them.
+**Note:** The files must be decompressed (`gunzip *.gz` first): this path passes the directory to `rgi wildcard_annotation` as is. Only the automatic download decompresses WildCARD.
 
 ## How to Download WildCARD Separately
 
@@ -189,7 +191,7 @@ nextflow run main.nf \
     -profile docker
 ```
 
-This creates a new combined database in the work directory and uses it for analysis.
+This creates a new combined database, uses it for the analysis, and publishes it to `<databases_dir>/rgi/card_db_with_wildcard`; pass that path with `--custom_rgi_card_db` in later runs to skip the 30-60 minute preparation.
 
 ### Example 4: CARD Only (No WildCARD)
 
@@ -211,8 +213,12 @@ nextflow run main.nf \
     --output ./results \
     --rgi_prediction true \
     --custom_rgi_card_db /data/card_only \
+    --rgi_include_wildcard false \
     -profile docker
 ```
+
+`--rgi_include_wildcard` (default `true`) also adds `--include_wildcard` to
+`rgi bwt`, so set it to `false` for a CARD-only database.
 
 ## Troubleshooting
 
@@ -348,8 +354,9 @@ nextflow run main.nf \
     -profile docker
 ```
 
-Aligner indices (KMA by default) are built by RGI on first use; verify with
-`ls localDB/` after a first run if in doubt.
+Aligner indices (KMA by default) are built by RGI when missing, inside each
+RGI_BWT task's own `localDB/`; they are not written back to the prepared
+database.
 
 ### Sizing
 
@@ -377,7 +384,7 @@ tar -xvf data ./card.json
 | Parameter | Purpose | When to Use |
 |-----------|---------|-------------|
 | `--rgi_prediction` | Enable RGI | Always required for RGI analysis |
-| `--rgi_include_wildcard` | Download WildCARD | Automatic download mode only |
+| `--rgi_include_wildcard` | Download WildCARD (automatic mode) and pass `--include_wildcard` to `rgi bwt` | Default `true`; set `false` for a CARD-only database |
 | `--custom_rgi_card_db` | Use existing CARD database | When you have pre-prepared CARD |
 | `--custom_rgi_wildcard` | Add separate WildCARD | When CARD and WildCARD are separate |
 

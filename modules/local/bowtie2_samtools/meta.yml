@@ -1,5 +1,5 @@
 name: bowtie2_samtools
-description: Bowtie2 read mapping with samtools sorting - reads against assembled contigs (BOWTIE2_SAMTOOLS) and, under co-assembly binning, reads against each refined bin (BOWTIE2_SAMTOOLS_DEPTH)
+description: Bowtie2 read mapping with samtools sorting (--read_aligner bowtie2) - reads against assembled contigs (BOWTIE2_SAMTOOLS) and, under co-assembly binning, reads against each refined bin (BOWTIE2_SAMTOOLS_DEPTH)
 keywords:
   - alignment
   - bowtie2

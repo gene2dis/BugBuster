@@ -35,8 +35,16 @@ process BOWTIE2_DECONTAMINATE {
     def singleton = reads.size() > 2 ? reads[2] : null
 
     """
-    # Get bowtie2 index basename
-    basename=\$(ls ${index_db} | grep '\\.bt2' | sed -E 's/\\.rev\\.[0-9]\\.bt2//g' | sed -E 's/\\.[0-9]\\.bt2//g' | sort -u | head -1)
+    # Get bowtie2 index basename (.bt2, or .bt2l for a large index: bowtie2-build
+    # writes one for references over ~4 Gbp, e.g. several host genomes)
+    basename=\$(ls ${index_db} | grep -E '\\.[0-9]\\.bt2l?\$' | sed -E 's/(\\.rev)?\\.[0-9]\\.bt2l?\$//' | sort -u | head -1 || true)
+    if [ -z "\${basename}" ]; then
+        echo "ERROR: no Bowtie2 index (*.bt2 / *.bt2l) in ${index_db}." >&2
+        if find -L ${index_db} -maxdepth 1 -name '*.bwt.2bit.64' | grep -q .; then
+            echo "It holds a bwa-mem3/bwa-mem2 index: run with the default --read_aligner bwamem3 to use it." >&2
+        fi
+        exit 1
+    fi
 
     # Align paired-end reads and extract unmapped (clean) reads
     bowtie2 \\
@@ -45,11 +53,13 @@ process BOWTIE2_DECONTAMINATE {
         -p ${task.cpus} \\
         -1 ${r1} \\
         -2 ${r2} \\
-        --un-conc-gz ${prefix}_clean_tmp > ${prefix}_bowtie_mapped_${db_alias}
+        --un-conc-gz ${prefix}_clean_tmp.%.fastq.gz > ${prefix}_bowtie_mapped_${db_alias}
 
-    # Rename output files
-    mv ${prefix}_clean_tmp.1 ${prefix}_R1_clean.fastq.gz
-    mv ${prefix}_clean_tmp.2 ${prefix}_R2_clean.fastq.gz
+    # Rename output files. bowtie2 puts the mate number at the '%'; without
+    # one it inserts it before the last extension, which for a dotted sample
+    # id (S1.2) lands inside the id (S1.1.2_clean_tmp)
+    mv ${prefix}_clean_tmp.1.fastq.gz ${prefix}_R1_clean.fastq.gz
+    mv ${prefix}_clean_tmp.2.fastq.gz ${prefix}_R2_clean.fastq.gz
 
     # Count clean reads
     R1_lines=\$(zcat ${prefix}_R1_clean.fastq.gz | wc -l)

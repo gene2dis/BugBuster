@@ -1,0 +1,59 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BWAMEM3_INDEX Module Test
+
+    Contig index for --read_aligner bwamem3. A FASTA without sequences (empty
+    contig set after length filtering, no bins) must not fail the task: the
+    index directory stays empty and BWAMEM3_SAMTOOLS writes a header-only BAM.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BWAMEM3_INDEX Process"
+    script "../../modules/local/bwamem3_samtools/main.nf"
+    process "BWAMEM3_INDEX"
+
+    test("indexes a contig FASTA") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sample1' ],
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def index_dir = process.out.index[0][1]
+            assert file(index_dir).name == "sample1_bwamem3_index"
+            ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext ->
+                assert path("${index_dir}/sample1.${ext}").exists()
+            }
+            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.14.0")
+        }
+    }
+
+    test("leaves the index empty for a FASTA without sequences") {
+        when {
+            process {
+                """
+                def empty_fasta = file("${outputDir}/empty_contigs.fa")
+                empty_fasta.parent.mkdirs()
+                empty_fasta.text = ''
+                input[0] = [ [ id: 'empty' ], empty_fasta ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def index_dir = file(process.out.index[0][1])
+            assert index_dir.isDirectory()
+            assert index_dir.listFiles().size() == 0
+        }
+    }
+}

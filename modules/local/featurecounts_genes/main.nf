@@ -22,10 +22,11 @@
     summary so counting never crashes (Q1 note in the design doc).
 
     Multi-mapping policy comes from params.featurecounts_multimap
-    (primary | all | none, schema-validated). With the pipeline's Bowtie2
-    defaults (one reported alignment per read, no secondary records) the
+    (primary | all | none, schema-validated). The pipeline's BAMs carry one
+    record per read (bowtie2 defaults report one alignment per read;
+    BWAMEM3_SAMTOOLS drops bwa's secondary and supplementary records), so the
     settings coincide today; the param keeps the policy explicit as the spec
-    requires, and matters if BOWTIE2_SAMTOOLS ext.args ever changes.
+    requires, and matters if the aligner ext.args ever change.
 
     Input:
         tuple val(meta), path(bam), path(gff)

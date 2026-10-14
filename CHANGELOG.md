@@ -80,6 +80,16 @@ next release is tagged.
     (`bin/kmarvel_check_output.sh` fails the task, resp. writes the header),
     and it cuts output names at the first `.` (it runs on fixed file names)
 
+- **bwa-mem3 short-read aligner (`--read_aligner`, now the default; see Changed)**
+  - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka and HUMAnN/MetaPhlAn keep bowtie2 with their own databases; RGI keeps its own aligner (KMA by default, `--rgi_aligner`)
+  - bwa-mem3 0.14.0 and samtools 1.22.1 run from one pinned Seqera Containers image. Output is independent of the thread count (`-K` fixed)
+  - Decontamination is strict: a pair is clean only when both mates are unmapped. bowtie2 `--un-conc` kept pairs with a single host mate. Clean-read counts are therefore not directly comparable with bowtie2 runs, and the FASTQ comment field is not carried over. Output file names are set explicitly, so sample ids containing dots no longer break decontamination. Mates are aligned without pairing (`-P`) so that `-T` holds for each mate: in paired mode bwa mem skips it for a chosen pair, and random ~20 bp host hits on overlapping mates removed 17.5% of a bacterial mock community (0.1% with `-P`). New `--decontam_min_score` (bwa `-T`, default 30) and `--bwamem3_dense_sa` (denser suffix array: faster mapping for ~12 GB more RAM)
+  - The decontamination index is published to `<databases_dir>/bwamem3_index/`. A human host needs ~75 GB RAM to build it (minutes rather than bowtie2-build's hours). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4x its size; ~90 GB for the default human genome, 8 GB minimum), capped by `--max_memory`. On bwa-mem3's out-of-budget exit status 3 this build and the contig and bin index builds retry with more memory only while the request is below `--max_memory`; at the cap the task fails (the decontamination build with a message naming the three ways out). `--custom_decontamination_index` accepts a bwa-mem3 or bwa-mem2 index under `bwamem3` and rejects a Bowtie2 one at launch
+  - Contig alignments drop secondary and supplementary records, keeping one record per read as with bowtie2. Short or divergent local hits become unmapped reads: an alignment needs >= 95% identity (`--bwamem3_min_identity`) and >= 50 aligned bases (`--bwamem3_min_aligned_length`), or 80% of a read shorter than that (2x50 libraries, reads trimmed below 50 bp). Without the filter, reads from genomes missing from the assembly inflated gene counts (Spearman vs bowtie2 0.74 in a poorly covered sample) and the depth of near-absent bins (~1.9x). Each library of a pooled co-assembly is mapped separately and the results merged. The co-assembly index is built once instead of once per alignment task
+  - Co-assembly bin depth maps each sample once against all refined bins concatenated, instead of once per bin (bwa mem aligns locally, so per-bin mapping would let other bins' reads inflate coverage). It writes the same `*_bin_depth.tsv` table; a refined bin that adds no contig to the reference (no sequences, or only contigs of an earlier bin) still gets a 0-coverage row
+  - The bioconda bwa-mem3 build needs an AVX2-capable CPU (x86-64-v3)
+  - `--read_aligner` is listed in `--help`
+
 - **Read-level functional profiling (`--read_level_functional woltka`)**
   - New optional `READ_FUNCTIONAL` subworkflow, independent of assembly (runs
     with `--assembly_mode none`) and of the contig/MAG branches; one backend
@@ -264,6 +274,25 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (default aligner)**: `--read_aligner` defaults to `bwamem3` instead of
+  `bowtie2`, after a benchmark on five real metagenomes and a spiked mock community
+  (`docs/benchmarks/bwamem3_vs_bowtie2.md`): host removal 4.1x faster, reads-to-contigs
+  mapping 3.9-6.2x faster with the alignment filter, co-assembly bin depth ~34x faster,
+  no human pairs leaked from the spike-in (bowtie2 0.157%) and 0.11% of the mock
+  removed (bowtie2 3.0%), the same bins and GTDB species. `--read_aligner bowtie2`
+  stays as the fallback, unchanged. What changes for an existing setup:
+  - building the human decontamination index needs ~75 GB RAM (bowtie2: ~6 GB) and
+    mapping peaked at ~16 GB per task (~4 GB). The pipeline warns at launch when
+    `--max_memory` is lower (for the built-in `--host_db`; not for `--custom_host_fasta`)
+  - the index is published to `<databases_dir>/bwamem3_index/`; a Bowtie2
+    `--custom_decontamination_index` is rejected at launch, with a message naming
+    `--read_aligner bowtie2`
+  - clean-read counts are lower than in bowtie2 runs (a pair with one host mate is
+    removed), and `-resume` of an earlier project re-runs from decontamination
+  - the CPU needs AVX2 (x86-64-v3); without it the `BWAMEM3_*` tasks stop with
+    "Illegal instruction" (exit 132)
+  - the `--bowtie_*` options apply only under `--read_aligner bowtie2`
+
 - **Breaking (Nextflow version)**: minimum Nextflow raised again, from
   24.04.0 (v1.1) to **25.10.0**, and nf-schema from 2.4.2 to 2.7.3. The code now
   follows Nextflow's strict syntax, whose parser needs nf-schema >= 2.7.2,
@@ -306,6 +335,82 @@ next release is tagged.
 
 ### Fixed
 
+- **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
+  and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
+  `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer
+  matched. The role now comes from the last explicit R1/R2/singleton token of the file
+  name, falling back to a bare 1/2 only when there is none, so a chunk number
+  (`S1_R1_2.fastq.gz`) does not override it. A file whose name has no role (with
+  `--quality_control false`, e.g. `sample.fastq.gz`) was silently left out of the
+  co-assembly; it is now an error, and `singletons` counts as a singleton token. All
+  three modules use `bin/read_role.sh`, tested by `tests/bin/test_read_role.sh`
+- **Bin reports can no longer be skipped silently**: a CheckM2 or GTDB-Tk report whose
+  file name matched no sample was dropped with a warning; if that happened for every
+  sample, BIN_QUALITY_REPORT, BIN_TAX_REPORT and BIN_SUMMARY never ran. It is now an error
+- **Index / aligner mismatch under `--read_aligner bowtie2`** is caught at launch (a
+  bwa-mem3 index, e.g. the one the pipeline publishes by default, was failing inside
+  BOWTIE2_DECONTAMINATE with an unclear bowtie2 error), and BOWTIE2_DECONTAMINATE itself
+  stops with a clear message when its index has no `*.bt2` files. Both index checks now run
+  with the other launch checks, before any channel starts: raised later, the error could
+  be reported as "Cannot find samplesheet file" instead
+- `nextflow_schema.json`: the `deeparg_arg_alignment_evalue` default is the string
+  `"1e-10"`, matching its type and `nextflow.config`
+- **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
+  and BIN_SUMMARY warn when every input report is empty and write header-only tables (and
+  placeholder plots), instead of failing (audit #13 made them fail; with SemiBin and MetaWRAP
+  now finishing on binless samples, that case is a valid outcome). A missing input file
+  still fails, and so does BIN_SUMMARY when CheckM2 or GTDB-Tk reports bins the other does
+  not. In co-assembly mode the bin depth step is skipped for an empty refined bin set (both
+  aligners failed on an empty reference)
+- **SemiBin and MetaWRAP stopped the run for a sample without usable bins**:
+  - SemiBin2 fails when it finds no bins (its reclustering gets an empty ORF file). SEMIBIN now writes an empty bin directory with a note; any other failure still fails.
+  - MetaWRAP stopped on any empty bin set: a binner with no bins, a hybrid set when two binners' bins share too little sequence, or a final set when no bin passes the thresholds. It also counted notes such as `SKIPPED.txt` as bins.
+  - METAWRAP now passes only binners with FASTA bins. When an empty hybrid set stops refinement, it refines the binners' own sets (`--skip-refinement`). When no bin reaches `--metawrap_completeness` / `--metawrap_contamination`, it writes an empty refined set with a note.
+  - MetaWRAP 1.2 cannot refine a single bin set. When only one binner found bins, METAWRAP keeps the ones that pass MetaWRAP's own CheckM thresholds.
+  - MetaWRAP exits 0 when it stops on an error, so the outcome is now read from its output directories.
+- **eggNOG-mapper search failed on real-size samples instead of retrying with more
+  memory**: diamond peaks at ~80 GB against the eggNOG 7 database, above `process_high`'s
+  72 GB, and emapper reports the out-of-memory kill as exit 1, which the memory retry
+  (exit 130-145) skips. EGGNOG_MAPPER_SEARCH now exits 137 when diamond was killed or ran
+  out of memory, and asks for 96 GB on the first attempt (192 GB on the retry, clamped by
+  `--max_memory`). Once `--max_memory` caps the request, an out-of-memory failure is not
+  retried: the retry would repeat a multi-hour search with the same memory
+- **`software_versions.yml` was invalid YAML for every assembly run**: Nextflow strips a
+  script's common indentation, and heredoc bodies at column 0 (BBMAP, CONTIG_FILTER_SUMMARY
+  and ten module stubs), `\n` in `printf` strings that Groovy turned into real newlines
+  (BOWTIE2_SAMTOOLS*) and a three-tab python heredoc (GTDB_TK_BATCH) left `END_VERSIONS`
+  indented. `<<-` strips only tabs, so the terminator was written into `versions.yml`
+  and the aggregate failed to parse. Heredoc bodies now sit at the script's base
+  indentation. BBMAP's and METAWRAP's versions were also empty, and CALCULATE_DEPTH wrote the
+  usage text of `jgi_summarize_bam_contig_depths` (it has no `--version`).
+  The stub pipeline tests now parse `software_versions.yml`
+- **bowtie2 decontamination failed for sample ids containing a dot** (#21): without a
+  `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
+  extension, which for `S1.2` lands inside the id, so the clean reads were not found
+  (exit 1). The path now carries `%`. New nf-test `tests/modules/bowtie2_decontaminate.nf.test`
+- **Documentation checked against the code**:
+  - databases published to `--databases_dir` are not read back by later runs (only through
+    the `--custom_*` options or `-resume`), so the index is rebuilt on a fresh run;
+  - the launch memory warning covers only the built-in `--host_db`;
+  - Bracken and RGI output names, the `kargva/` output, the DeepARG download trigger
+    (`arg_bin_clustering` too), the Kraken2/CheckM2 manual-download commands;
+  - examples that failed or did nothing: a Bowtie2 index under the default aligner, a
+    128 GB limit for a three-genome bwa-mem3 index, an end-to-end `--bowtie_score_min`
+    under `--local`, MetaWRAP thresholds with a single binner;
+  - the WildCARD files given with `--custom_rgi_wildcard` must be decompressed, and
+    `--rgi_include_wildcard` also applies to `rgi bwt`;
+  - the workflow diagram's default mode and edges, the cloud retry note, and
+    CONTRIBUTING's module and lint rules
+- **`--custom_host_fasta` lists**: the docs and examples (including
+  `examples/params_multiple_genomes.yaml`) give several host genomes as a
+  comma-separated list, but the pipeline read the whole string as one path, which did
+  not exist. The list is now split on commas (spaces around them are ignored) and all
+  the FASTAs go into the one combined index. New pipeline nf-test with a two-file list
+- **bowtie2 decontamination failed with a large (`.bt2l`) index**: BOWTIE2_DECONTAMINATE
+  read the basename of `contaminants.1.bt2l` as `contaminantsl`, although the launch check
+  accepts `.bt2l`. bowtie2-build writes a large index on its own for references over
+  ~4 Gbp, such as several host genomes. BOWTIE2_BUILD_COMBINED now also passes `ext.args`
+  (the new test builds with `--large-index`)
 - **`low_disk` was described as freeing disk during the run**: the `--help` text, the
   profile description, the launch warning, the README, the manual and
   `docs/DISK_OPTIMIZATION.md` called its work-dir cleanup "progressive" and promised a

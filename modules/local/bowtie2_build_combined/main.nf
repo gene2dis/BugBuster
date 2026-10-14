@@ -24,6 +24,7 @@ process BOWTIE2_BUILD_COMBINED {
     task.ext.when == null || task.ext.when
 
     script:
+    def args = task.ext.args ?: ''
     """
     # Create output directory
     mkdir ${index_name}_index
@@ -41,6 +42,7 @@ process BOWTIE2_BUILD_COMBINED {
     # Build Bowtie2 index from combined FASTA
     bowtie2-build \\
         --threads ${task.cpus} \\
+        ${args} \\
         combined_contaminants.fasta \\
         ${index_name}_index/${index_name}
 

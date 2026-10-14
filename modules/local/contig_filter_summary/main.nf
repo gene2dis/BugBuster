@@ -44,15 +44,15 @@ process CONTIG_FILTER_SUMMARY {
     
     # Create summary report header
     cat > contig_filtering_summary.txt <<-HEADER
-# Contig Filtering Summary Report
-# Generated: \$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-# Pipeline: BugBuster
-#
-# This report tracks samples where contig filtering resulted in empty outputs
-#
-================================================================================
+    # Contig Filtering Summary Report
+    # Generated: \$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+    # Pipeline: BugBuster
+    #
+    # This report tracks samples where contig filtering resulted in empty outputs
+    #
+    ================================================================================
 
-HEADER
+    HEADER
     
     # Section 1: BBMAP Filtering Statistics
     echo "## BBMAP Contig Filtering Statistics" >> contig_filtering_summary.txt
@@ -145,33 +145,33 @@ HEADER
     stub:
     """
     cat > contig_filtering_summary.txt << 'EOF'
-# Contig Filtering Summary Report
-# Generated: 2026-01-22 21:20:00 UTC
-# Pipeline: BugBuster
+    # Contig Filtering Summary Report
+    # Generated: 2026-01-22 21:20:00 UTC
+    # Pipeline: BugBuster
 
-================================================================================
+    ================================================================================
 
-## BBMAP Contig Filtering Statistics
+    ## BBMAP Contig Filtering Statistics
 
-Sample_ID	Contigs_Before	Contigs_After	Min_Length	All_Filtered
-------------------------------------------------------------------------
-sample1	100	50	1000	FALSE
-sample2	25	0	1000	TRUE
+    Sample_ID	Contigs_Before	Contigs_After	Min_Length	All_Filtered
+    ------------------------------------------------------------------------
+    sample1	100	50	1000	FALSE
+    sample2	25	0	1000	TRUE
 
-## Samples with Empty Contigs Detected at Alignment Stage
+    ## Samples with Empty Contigs Detected at Alignment Stage
 
-Sample_ID	Stage	Timestamp	Action_Taken
-------------------------------------------------------------------------
-sample2	BOWTIE2_SAMTOOLS	2026-01-22 21:15:00 UTC	Created empty BAM file
+    Sample_ID	Stage	Timestamp	Action_Taken
+    ------------------------------------------------------------------------
+    sample2	BOWTIE2_SAMTOOLS	2026-01-22 21:15:00 UTC	Created empty BAM file
 
-## Summary Statistics
+    ## Summary Statistics
 
-Total samples processed: 2
-Samples with all contigs filtered: 1
-Percentage of samples with empty contigs: 50.00%
+    Total samples processed: 2
+    Samples with all contigs filtered: 1
+    Percentage of samples with empty contigs: 50.00%
 
-================================================================================
-EOF
+    ================================================================================
+    EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -81,12 +81,12 @@ process BBMAP {
     
     # Generate filter report
     cat > ${prefix}_filter_report.txt <<-REPORT
-sample_id\t${prefix}
-contigs_before_filter\t\${contigs_before}
-contigs_after_filter\t\${contigs_after}
-min_length_threshold\t${min_length}
-all_contigs_filtered\t\$([ \${contigs_after} -eq 0 ] && echo "TRUE" || echo "FALSE")
-REPORT
+    sample_id\t${prefix}
+    contigs_before_filter\t\${contigs_before}
+    contigs_after_filter\t\${contigs_after}
+    min_length_threshold\t${min_length}
+    all_contigs_filtered\t\$([ \${contigs_after} -eq 0 ] && echo "TRUE" || echo "FALSE")
+    REPORT
     
     # Log warning if all contigs were filtered
     if [ \${contigs_after} -eq 0 ]; then
@@ -99,7 +99,7 @@ REPORT
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bbmap: \$(bbversion.sh 2>&1 | grep -o 'BBMap version.*' | sed 's/BBMap version //')
+        bbmap: \$(bbversion.sh 2>&1 | head -n 1)
     END_VERSIONS
     """
 
@@ -108,27 +108,27 @@ REPORT
     """
     # Create a minimal filtered contig file
     cat > ${prefix}_filtered_contigs.fa << 'EOF'
->filtered_contig_1 length=2000
-ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
->filtered_contig_2 length=3500
-TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
-EOF
+    >filtered_contig_1 length=2000
+    ACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGT
+    >filtered_contig_2 length=3500
+    TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
+    EOF
     
     # Create a minimal stats file
     cat > ${prefix}_contig.stats << 'EOF'
-#name	length	gc
- filtered_contig_1	2000	0.50
-filtered_contig_2	3500	0.48
-EOF
+    #name	length	gc
+    filtered_contig_1	2000	0.50
+    filtered_contig_2	3500	0.48
+    EOF
     
     # Create filter report
     cat > ${prefix}_filter_report.txt << 'EOF'
-sample_id	${prefix}
-contigs_before_filter	10
-contigs_after_filter	2
-min_length_threshold	1000
-all_contigs_filtered	FALSE
-EOF
+    sample_id	${prefix}
+    contigs_before_filter	10
+    contigs_after_filter	2
+    min_length_threshold	1000
+    all_contigs_filtered	FALSE
+    EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

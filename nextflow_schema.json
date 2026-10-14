@@ -368,7 +368,7 @@
                 },
                 "custom_decontamination_index": {
                     "type": "string",
-                    "description": "Path to a pre-built combined phiX + host Bowtie2 index (skips the local build).",
+                    "description": "Path to a pre-built combined phiX + host index directory matching --read_aligner: a Bowtie2 index, or a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64) under bwamem3 (skips the local build).",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },
@@ -380,7 +380,7 @@
                 },
                 "custom_host_fasta": {
                     "type": "string",
-                    "description": "Custom host genome FASTA (plain or gzipped) used to build the combined decontamination index.",
+                    "description": "Custom host genome FASTA (plain or gzipped) used to build the combined decontamination index; several host genomes as a comma-separated list.",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },
@@ -667,7 +667,7 @@
                 },
                 "deeparg_arg_alignment_evalue": {
                     "type": "string",
-                    "default": 1e-10,
+                    "default": "1e-10",
                     "description": "Maximum E-value for DeepARG alignments.",
                     "fa_icon": "fas fa-calculator"
                 },
@@ -698,11 +698,56 @@
                 }
             }
         },
+        "read_alignment_options": {
+            "title": "Read alignment options",
+            "type": "object",
+            "fa_icon": "fas fa-align-left",
+            "description": "Aligner for host/phiX removal, reads-to-contigs mapping and co-assembly bin depth. Woltka and HUMAnN always use bowtie2 with their own databases.",
+            "properties": {
+                "read_aligner": {
+                    "type": "string",
+                    "default": "bwamem3",
+                    "enum": ["bwamem3", "bowtie2"],
+                    "description": "Short-read aligner: 'bwamem3' (bwa-mem3; strict decontamination: a pair is clean only when both mates are unmapped) or 'bowtie2' (fallback).",
+                    "help_text": "bwa-mem3 needs a CPU with AVX2 and its own decontamination index (a bwa-mem2 index also works); building it for a human host needs ~75 GB RAM. A Bowtie2 --custom_decontamination_index is rejected under 'bwamem3': pass --read_aligner bowtie2 to keep using it. 'bowtie2' is the fallback for CPUs without AVX2 or nodes with less memory.",
+                    "fa_icon": "fas fa-random"
+                },
+                "bwamem3_dense_sa": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Build the bwa-mem3 decontamination index with a denser suffix array (-u 1): faster mapping, ~12 GB more RAM for a human host.",
+                    "fa_icon": "fas fa-tachometer-alt"
+                },
+                "decontam_min_score": {
+                    "type": "integer",
+                    "default": 30,
+                    "minimum": 1,
+                    "description": "bwa-mem3 minimum alignment score (-T) for a read to count as a contaminant hit (--read_aligner bwamem3), applied to each mate on its own (pairing is off, -P).",
+                    "fa_icon": "fas fa-filter"
+                },
+                "bwamem3_min_identity": {
+                    "type": "number",
+                    "default": 0.95,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Minimum identity (1 - NM / aligned columns) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); failing reads are kept as unmapped. 0 turns the identity check off.",
+                    "help_text": "bwa mem aligns locally, so reads from genomes missing from the assembly still place short or divergent partial hits, which inflate gene counts and bin depth in poorly covered samples. Applies to contig depth, binning, featureCounts and co-assembly bin depth; not to decontamination.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "bwamem3_min_aligned_length": {
+                    "type": "integer",
+                    "default": 50,
+                    "minimum": 0,
+                    "description": "Minimum aligned bases (CIGAR M) for a bwa-mem3 read-to-contig or read-to-bin alignment to count (--read_aligner bwamem3); a read shorter than this needs 80% of its length aligned instead. Failing reads are kept as unmapped. 0 turns the length check off.",
+                    "fa_icon": "fas fa-ruler-horizontal"
+                }
+            }
+        },
         "bowtie2_options": {
             "title": "Bowtie2 alignment options",
             "type": "object",
             "fa_icon": "fas fa-align-center",
-            "description": "Parameters for Bowtie2 read alignment and filtering.",
+            "description": "Parameters for Bowtie2 read alignment during host filtering; they apply only under --read_aligner bowtie2.",
             "hidden": true,
             "properties": {
                 "bowtie_ma": {
@@ -1265,6 +1310,9 @@
         },
         {
             "$ref": "#/$defs/functional_annotation_options"
+        },
+        {
+            "$ref": "#/$defs/read_alignment_options"
         },
         {
             "$ref": "#/$defs/bowtie2_options"

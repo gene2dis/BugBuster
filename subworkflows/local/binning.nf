@@ -40,6 +40,11 @@ include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/m
 include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
 include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
 include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
+// --read_aligner bwamem3: each sample is mapped once against all bins
+include { BINS_REFERENCE             } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_INDEX as BWAMEM3_BINS_INDEX } from '../../modules/local/bwamem3_samtools/main'
+include { BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH } from '../../modules/local/bwamem3_samtools/main'
+include { BEDTOOLS_BIN_DEPTH         } from '../../modules/local/bedtools/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
@@ -154,12 +159,14 @@ workflow BINNING {
                     def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
                     mid == sample_id
                 }
+                // Every report is named <sample>_<binner>_...: an unmatched
+                // one is a naming bug, and dropping it would silently skip
+                // the bin reports
                 if (meta == null) {
-                    log.warn "CheckM2: Could not find meta for sample_id: ${sample_id}"
-                    return null
+                    error "CheckM2: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                 }
                 [meta, report_list]
-            }.findAll { it -> it != null }
+            }
         }
     
     // CheckM2 reports for refined bins (metawrap when available, all reports otherwise)
@@ -187,11 +194,10 @@ workflow BINNING {
                         mid == sample_id
                     }
                     if (meta == null) {
-                        log.warn "CheckM2 metawrap: Could not find meta for sample_id: ${sample_id}"
-                        return null
+                        error "CheckM2 metawrap: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                     }
                     [meta, report_list]
-                }.findAll { it -> it != null }
+                }
             }
     } else {
         ch_checkm_refined = ch_checkm_all_reports
@@ -237,11 +243,10 @@ workflow BINNING {
                     mid == sample_id
                 }
                 if (meta == null) {
-                    log.warn "GTDB-Tk: Could not find meta for sample_id: ${sample_id}"
-                    return null
+                    error "GTDB-Tk: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                 }
                 [meta, report_list]
-            }.findAll { it -> it != null }
+            }
         }
 
     //
@@ -254,16 +259,54 @@ workflow BINNING {
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
-        BOWTIE2_SAMTOOLS_DEPTH(
-            reads.combine(ch_refined_bins.map { _meta, bins -> bins })
-        )
-        ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
-        BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
-        ch_bin_cov = BEDTOOLS.out.bin_depth
-        ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
+        // Bin depth needs at least one refined bin: a bin set can be empty
+        // (MetaWRAP or SemiBin write only SKIPPED.txt when nothing passes),
+        // and both depth paths fail on an empty reference. BIN_SUMMARY then
+        // writes a header-only table from the empty quality/taxonomy reports
+        def ch_bins_for_depth = ch_refined_bins
+            .filter { meta, bins ->
+                def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
+                if ( !has_bins ) {
+                    log.warn "No refined bins for ${meta.id}: skipping bin depth"
+                }
+                has_bins
+            }
+        def ch_bin_cov
+        if ( params.read_aligner == 'bwamem3' ) {
+            // One reference of all refined bins (+ contig -> bin table), one
+            // index, one alignment per sample: bwa mem aligns locally, so
+            // mapping against a single bin at a time would let reads from the
+            // other bins inflate its coverage with clipped partial hits
+            BINS_REFERENCE(ch_bins_for_depth.map { _meta, bins -> bins })
+            ch_versions = ch_versions.mix(BINS_REFERENCE.out.versions)
+            ch_bins_fasta = BINS_REFERENCE.out.reference.map { fasta, _table -> fasta }
+            ch_contig_to_bin = BINS_REFERENCE.out.reference.map { _fasta, table -> table }
+
+            BWAMEM3_BINS_INDEX(ch_bins_fasta.map { fasta -> [[id: "bins"], fasta] })
+            ch_versions = ch_versions.mix(BWAMEM3_BINS_INDEX.out.versions)
+
+            BWAMEM3_BIN_DEPTH(
+                reads
+                    .combine(ch_bins_fasta)
+                    .combine(BWAMEM3_BINS_INDEX.out.index.map { _meta, index -> index })
+            )
+            ch_versions = ch_versions.mix(BWAMEM3_BIN_DEPTH.out.versions.first())
+
+            BEDTOOLS_BIN_DEPTH(BWAMEM3_BIN_DEPTH.out.bam_only.combine(ch_contig_to_bin))
+            ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
+            ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
+        } else {
+            BOWTIE2_SAMTOOLS_DEPTH(
+                reads.combine(ch_bins_for_depth.map { _meta, bins -> bins })
+            )
+            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
+            BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
+            ch_bin_cov = BEDTOOLS.out.bin_depth
+            ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
+        }
 
         BIN_SUMMARY(
-            ch_bin_cov.collect(sort: true)
+            ch_bin_cov.collect(sort: true).ifEmpty([])
                 .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
                 .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect(sort: true))
         )

@@ -27,6 +27,7 @@ include { FORMAT_KMARVEL_DB       } from '../../modules/local/format_db/main'
 include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
+include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
 include { flagOn                  } from './utils_params'
 
 workflow PREPARE_DATABASES {
@@ -141,7 +142,8 @@ workflow PREPARE_DATABASES {
     //
     if ( flagOn(params.quality_control) ) {
         if ( params.custom_decontamination_index ) {
-            // Use pre-built combined index
+            // Pre-built combined index; main.nf checked at launch that it
+            // matches --read_aligner
             ch_decontamination_index = channel.fromPath(params.custom_decontamination_index, checkIfExists: true)
         } else {
             // Collect FASTA file paths into lists
@@ -149,8 +151,10 @@ workflow PREPARE_DATABASES {
                 [params.custom_phiX_fasta] : 
                 params.bowtie_ref_genomes_for_build[params.phiX_index]["url"]
             
-            def host_files = params.custom_host_fasta ? 
-                [params.custom_host_fasta] : 
+            // --custom_host_fasta takes one FASTA or a comma-separated list
+            // (several host genomes go into the one combined index)
+            def host_files = params.custom_host_fasta ?
+                params.custom_host_fasta.toString().tokenize(',')*.trim().findAll { f -> f } :
                 params.bowtie_ref_host_index[params.host_db]["url"]
             
             // Combine lists and create single channel
@@ -163,18 +167,20 @@ workflow PREPARE_DATABASES {
             }
             if ( non_fasta ) {
                 error "Decontamination references must be genome FASTA files, but got: ${non_fasta.join(', ')}. " +
-                      "To use a pre-built Bowtie2 index, pass it via --custom_decontamination_index instead."
+                      "To use a pre-built index (Bowtie2, or bwa-mem3/bwa-mem2 under --read_aligner bwamem3), pass it via --custom_decontamination_index instead."
             }
 
             // Build combined index from all FASTA files
-            BOWTIE2_BUILD_COMBINED(
-                channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect(),
-                "contaminants"
-            )
-            
-            // Extract only the index output (not versions)
-            ch_decontamination_index = BOWTIE2_BUILD_COMBINED.out.index
-            ch_versions = ch_versions.mix(BOWTIE2_BUILD_COMBINED.out.versions)
+            def ch_contaminant_fasta = channel.fromList(all_fasta_files).map { filepath -> file(filepath) }.collect()
+            if ( params.read_aligner == 'bwamem3' ) {
+                BWAMEM3_BUILD_COMBINED(ch_contaminant_fasta, "contaminants")
+                ch_decontamination_index = BWAMEM3_BUILD_COMBINED.out.index
+                ch_versions = ch_versions.mix(BWAMEM3_BUILD_COMBINED.out.versions)
+            } else {
+                BOWTIE2_BUILD_COMBINED(ch_contaminant_fasta, "contaminants")
+                ch_decontamination_index = BOWTIE2_BUILD_COMBINED.out.index
+                ch_versions = ch_versions.mix(BOWTIE2_BUILD_COMBINED.out.versions)
+            }
         }
     } else {
         ch_decontamination_index = channel.empty()

@@ -46,7 +46,9 @@ nextflow_pipeline {
         }
     }
 
-    test("QC processes singleton reads end-to-end") {
+    test("QC processes singleton reads end-to-end (--read_aligner bowtie2)") {
+        // Runs the bowtie2 fallback; the default aligner (bwa-mem3) runs the
+        // same fixtures in the next test.
         // Regression test for audit items #2, #9, #16:
         // - #9: the singleton (s) column must survive QC (single-end fastp ->
         //   decontamination -> emitted clean reads), not be silently dropped
@@ -69,6 +71,7 @@ nextflow_pipeline {
                 }()
                 output = "${outputDir}"
                 quality_control    = true
+                read_aligner       = "bowtie2"
                 assembly_mode      = "none"
                 taxonomic_profiler = "none"
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
@@ -105,6 +108,303 @@ nextflow_pipeline {
             def singleton_json = path("${outputDir}/01_quality_control/fastp/singleton_test/singleton_test_Singleton.fastp.json")
             assert singleton_json.exists()
             assert singleton_json.text.contains("--qualified_quality_phred 20")
+        }
+    }
+
+    test("QC with the default aligner (bwa-mem3) removes host reads end-to-end") {
+        // No read_aligner: tests the default. Same fixtures and counts as the
+        // bowtie2 singleton test above
+        // (10 pairs, 4 host-derived; 10 singletons, 6 host-derived): the host
+        // pairs have both mates on the host, so the strict bwa-mem3 policy
+        // (pair clean only when both mates are unmapped) keeps the same 6.
+        when {
+            params {
+                input = {
+                    def sheet = new File("${outputDir}", "singleton_samplesheet.csv")
+                    sheet.parentFile.mkdirs()
+                    def reads_dir = "${projectDir}/tests/data/reads"
+                    sheet.text = "sample,r1,r2,s\n" +
+                        "singleton_test,${reads_dir}/singleton_test_R1.fastq.gz," +
+                        "${reads_dir}/singleton_test_R2.fastq.gz," +
+                        "${reads_dir}/singleton_test_S.fastq.gz\n"
+                    sheet.absolutePath
+                }()
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                store_clean_reads = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BUILD_COMBINED") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_DECONTAMINATE") } == 1
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2") }
+
+            def clean_dir = "${outputDir}/clean_reads/singleton_test"
+            assert path("${clean_dir}/singleton_test_R1_clean.fastq.gz").linesGzip.size() == 6 * 4
+            assert path("${clean_dir}/singleton_test_R2_clean.fastq.gz").linesGzip.size() == 6 * 4
+            assert path("${clean_dir}/singleton_test_Singleton_clean.fastq.gz").linesGzip.size() == 4 * 4
+
+            // The combined index is published to the database storage
+            assert path("${outputDir}/../databases/bwamem3_index/contaminants_index/contaminants.bwt.2bit.64").exists()
+
+            def report_text = path("${outputDir}/01_quality_control/summary/Reads_report.csv").text
+            assert report_text.contains("singleton_test")
+        }
+    }
+
+    test("QC builds the decontamination index from a comma-separated custom_host_fasta list") {
+        // The host mock (phage lambda) split into two FASTAs, one gzipped, passed
+        // as "a.fasta, b.fasta.gz": the counts above hold only if both halves
+        // reach the index
+        when {
+            params {
+                input = {
+                    def sheet = new File("${outputDir}", "singleton_samplesheet.csv")
+                    sheet.parentFile.mkdirs()
+                    def reads_dir = "${projectDir}/tests/data/reads"
+                    sheet.text = "sample,r1,r2,s\n" +
+                        "singleton_test,${reads_dir}/singleton_test_R1.fastq.gz," +
+                        "${reads_dir}/singleton_test_R2.fastq.gz," +
+                        "${reads_dir}/singleton_test_S.fastq.gz\n"
+                    sheet.absolutePath
+                }()
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = {
+                    def lines = new File("${projectDir}/tests/data/decontamination/host_mock.fasta").readLines()
+                    def seq = lines.drop(1).join('')
+                    def half = (int) (seq.length() / 2)
+                    def a = new File("${outputDir}", "host_part_a.fasta")
+                    a.parentFile.mkdirs()
+                    a.text = ">host_part_a\n" + seq.substring(0, half) + "\n"
+                    def b = new File("${outputDir}", "host_part_b.fasta.gz")
+                    new java.util.zip.GZIPOutputStream(new FileOutputStream(b)).withWriter { w ->
+                        w << ">host_part_b\n" << seq.substring(half) << "\n"
+                    }
+                    "${a.absolutePath}, ${b.absolutePath}"
+                }()
+                store_clean_reads = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def clean_dir = "${outputDir}/clean_reads/singleton_test"
+            assert path("${clean_dir}/singleton_test_R1_clean.fastq.gz").linesGzip.size() == 6 * 4
+            assert path("${clean_dir}/singleton_test_Singleton_clean.fastq.gz").linesGzip.size() == 4 * 4
+        }
+    }
+
+    test("Rejects a Bowtie2 custom_decontamination_index under the default aligner (bwa-mem3)") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_decontamination_index = "${projectDir}/tests/data/woltka/db/databases/bowtie2"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("It holds a Bowtie2 index")
+            assert console_out.contains("--read_aligner bowtie2")
+        }
+    }
+
+    test("Rejects a bwa-mem3 custom_decontamination_index under --read_aligner bowtie2") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                read_aligner       = "bowtie2"
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                // The layout the pipeline publishes under the default aligner
+                custom_decontamination_index = {
+                    def dir = new File("${outputDir}", "bwamem3_index/contaminants_index")
+                    dir.mkdirs()
+                    ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext -> new File(dir, "contaminants.${ext}").text = '' }
+                    dir.absolutePath
+                }()
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("needs --custom_decontamination_index to be a directory with a Bowtie2 index")
+            assert console_out.contains("It holds a bwa-mem3/bwa-mem2 index")
+        }
+    }
+
+    test("Stub run wires --read_aligner bwamem3 under per-sample assembly") {
+        // One contig index and one alignment per sample feed binning and
+        // gene counting; no bowtie2 task may run
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                read_aligner            = "bwamem3"
+                assembly_mode           = "assembly"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_level_functional = true
+                microbecensus           = false
+                functional_cazy         = false
+                taxonomic_profiler      = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2") }
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_DECONTAMINATE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_INDEX (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+        }
+    }
+
+    test("Stub run wires --read_aligner bwamem3 under co-assembly") {
+        // The co-assembly index is built ONCE and shared by the pooled
+        // alignment and the per-sample counting alignments; bin depth maps
+        // each sample once against all bins (BINS_REFERENCE + one index)
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                read_aligner            = "bwamem3"
+                assembly_mode           = "coassembly"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_level_functional = true
+                microbecensus           = false
+                functional_cazy         = false
+                taxonomic_profiler      = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2") }
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_INDEX (") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BINS_REFERENCE") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BINS_INDEX") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BIN_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BEDTOOLS_BIN_DEPTH") } == 2
+            assert path("${outputDir}/04_binning/coassembly/summary").exists()
+        }
+    }
+
+    test("Stub run wires the bowtie2 fallback under per-sample assembly") {
+        // --read_aligner bowtie2: one bowtie2 index + alignment task per
+        // sample feeds binning and gene counting; no bwa-mem3 task may run
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                read_aligner            = "bowtie2"
+                assembly_mode           = "assembly"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_level_functional = true
+                microbecensus           = false
+                functional_cazy         = false
+                taxonomic_profiler      = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3") }
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_BUILD_COMBINED") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_DECONTAMINATE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+        }
+    }
+
+    test("Stub run wires the bowtie2 fallback under co-assembly") {
+        // --read_aligner bowtie2: pooled and per-sample alignments, and bin
+        // depth mapped per sample against each refined bin
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                read_aligner            = "bowtie2"
+                assembly_mode           = "coassembly"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_level_functional = true
+                microbecensus           = false
+                functional_cazy         = false
+                taxonomic_profiler      = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3") || task.name.contains("BINS_REFERENCE") }
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_DEPTH") } == 2
+            assert path("${outputDir}/04_binning/coassembly/summary").exists()
         }
     }
 
@@ -161,6 +461,12 @@ nextflow_pipeline {
             assert vtext.contains("metabat2:")
             // Pins the GTDB-Tk container/stub version bump in lockstep
             assert vtext.contains("gtdbtk: 2.7.2")
+            // Every versions.yml heredoc must close: a script line below the
+            // block's base indentation left END_VERSIONS indented, so the
+            // terminator was written into versions.yml and the aggregate was
+            // invalid YAML
+            assert !vtext.contains("END_VERSIONS")
+            assert new org.yaml.snakeyaml.Yaml().load(vtext) instanceof Map
 
             // T7 off-path: binning with 2 binners but WITHOUT
             // --mag_level_functional must run no Bakta and publish no mags/
@@ -203,6 +509,10 @@ nextflow_pipeline {
             assert path("${outputDir}/04_binning/coassembly/quality/checkm2/coassembly_semibin_quality_report.tsv").exists()
             assert path("${outputDir}/04_binning/coassembly/taxonomy/gtdbtk/coassembly_gtdbtk_bac120.tsv").exists()
             assert !path("${outputDir}/04_binning/per_sample").exists()
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert !vtext.contains("END_VERSIONS")
+            assert new org.yaml.snakeyaml.Yaml().load(vtext) instanceof Map
         }
     }
 
@@ -258,7 +568,7 @@ nextflow_pipeline {
         // featureCounts gene quantification compose end-to-end under
         // per-sample assembly, under the docker CI profile (the docker path
         // uses the pipeline-built eggNOG-mapper image). The counting BAM
-        // comes from BOWTIE2_SAMTOOLS via the gate extended with
+        // comes from BWAMEM3_SAMTOOLS (default aligner) via the gate extended with
         // contig_level_functional (Q1) - binning and contig_tax_and_arg are
         // both off here to prove the branch produces its own BAM.
         options "-stub"
@@ -285,7 +595,7 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2_SAMTOOLS") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3_SAMTOOLS") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_SEARCH") }
             assert workflow.trace.tasks().any { task -> task.name.contains("EGGNOG_MAPPER_ANNOTATE") }
             // One counting task per sample, one study-level aggregation (T4),
@@ -322,7 +632,7 @@ nextflow_pipeline {
     test("Stub run wires the contig functional annotation branch (coassembly mode)") {
         // Wiring test for design doc T3/Q1 coassembly handling: the pooled
         // binning BAM has no read groups, so the branch adds per-sample
-        // alignments against the co-assembly (BOWTIE2_SAMTOOLS_PER_SAMPLE)
+        // alignments against the co-assembly (BWAMEM3_SAMTOOLS_PER_SAMPLE)
         // and counts each sample against the single shared co-assembly GFF.
         options "-stub"
 
@@ -354,7 +664,7 @@ nextflow_pipeline {
             assert workflow.success
             // One per-sample alignment and one counting task per sample,
             // against the single co-assembly gene set
-            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS_PER_SAMPLE") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1

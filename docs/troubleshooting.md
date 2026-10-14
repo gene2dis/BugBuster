@@ -147,10 +147,11 @@ exitCode: 137
    nextflow run main.nf --max_memory '256.GB' ...
    ```
 
-2. For specific processes, edit `conf/base.config`:
+2. For specific processes, put the setting in a config file and pass it with
+   `-c custom.config` (requests above `--max_memory` are still capped by it):
    ```groovy
    process {
-       withName: 'MEGAHIT.*' {
+       withName: 'MEGAHIT' {
            memory = '128.GB'
        }
    }
@@ -159,7 +160,7 @@ exitCode: 137
 3. Use a larger instance type (cloud) or node (HPC)
 
 The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
-on a real co-assembly, above its 72 GB first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
+on a real co-assembly; it requests 96 GB on the first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
 see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step are
 listed under [Functional annotation branches](manual.md#functional-annotation-branches)
 in the manual.
@@ -806,6 +807,35 @@ the samples (`--sylph_db`, or `--custom_sylph_db` together with its
 
 ## Decontamination Issues
 
+The default aligner is bwa-mem3 (`BWAMEM3_*` tasks); `--read_aligner bowtie2`
+runs the `BOWTIE2_*` tasks instead.
+
+### A BWAMEM3_* task fails with "Illegal instruction" (exit status 132)
+
+The bioconda bwa-mem3 build needs an x86-64 CPU with AVX2 (Haswell 2013 or
+newer). Check a compute node with `grep -c avx2 /proc/cpuinfo` (0 = no AVX2)
+and run with `--read_aligner bowtie2` on nodes without it.
+
+### Process BWAMEM3_BUILD_COMBINED failed
+
+**Exit status 3 / "needs more memory":** the human index build needs ~75 GB
+RAM; the pipeline warns at launch when `--max_memory` is lower. Either:
+
+- raise `--max_memory` (the build runs once; later runs reuse the index with
+  `--custom_decontamination_index <databases_dir>/bwamem3_index/contaminants_index`),
+- pass an index built elsewhere (`bwa-mem3 index -p contaminants_index/contaminants contaminants.fasta`,
+  or a bwa-mem2 index), or
+- use `--read_aligner bowtie2` (~6 GB to build, about an hour).
+
+For other failures, check the FASTA files as for BOWTIE2_BUILD_COMBINED below.
+
+### BWAMEM3_DECONTAMINATE fails with "no bwa-mem3/bwa-mem2 index", or a Bowtie2 index is rejected at launch
+
+`--custom_decontamination_index` points to a Bowtie2 index (`*.bt2`), for
+example one built by an earlier release, where bowtie2 was the default. Add
+`--read_aligner bowtie2` to keep using it, or point the option at a bwa-mem3
+index (`*.bwt.2bit.64`).
+
 ### Process BOWTIE2_BUILD_COMBINED failed
 
 **Possible causes:** FASTA files not found, insufficient memory, or corrupted FASTA files.
@@ -832,23 +862,23 @@ the samples (`--sylph_db`, or `--custom_sylph_db` together with its
 1. Check the index files (under your databases directory, `<output>/../databases` by default):
    ```bash
    ls -lh <databases_dir>/bowtie_index/contaminants_index/
-   # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2
+   # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2 (.bt2l for a large index)
+   # (the default bwa-mem3 index is in bwamem3_index/contaminants_index/:
+   #  contaminants.amb .ann .bwt.2bit.64 .pac)
    ```
 2. Verify read files decompress cleanly: `zcat sample_R1.fastq.gz | head -n 4`
 3. Check disk space: `df -h .`
 
-### Multiple host genomes not being used
+### Multiple host genomes
 
-**Symptom:** only one genome is used for decontamination.
-
-`custom_host_fasta` takes a **comma-separated string** — not a YAML list, and
-with no spaces after the commas:
+`custom_host_fasta` takes a **comma-separated string**, not a YAML list; spaces
+around the commas are ignored, and the paths themselves may not contain commas
+or spaces. Earlier versions read the whole string as one path, so a list failed
+with a missing-file error.
 
 ```yaml
 # Correct - comma-separated string
 custom_host_fasta: "/path/file1.fasta,/path/file2.fasta,/path/file3.fasta"
-
-# Incorrect - spaces after commas
 custom_host_fasta: "/path/file1.fasta, /path/file2.fasta"
 
 # Incorrect - YAML list (not supported)
@@ -857,16 +887,23 @@ custom_host_fasta:
   - "/path/file2.fasta"
 ```
 
+All the genomes go into one index; the bwa-mem3 build requests ~24 GB RAM per
+Gbp of combined genome, so raise `--max_memory` accordingly.
+
 ### Slow index building or decontamination
 
 - Pre-build the index once and reuse it:
   ```bash
   cat phix.fasta host.fasta > contaminants.fasta
-  bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
+  mkdir -p contaminants_index
+  bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 
   nextflow run main.nf ... --custom_decontamination_index contaminants_index
   ```
-- Faster (less sensitive) alignment settings: `--bowtie_k 1 --bowtie_score_min "L,-0.6,-0.6"`
+- Under `--read_aligner bowtie2`, the human index build takes about an hour
+  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`;
+  pass the index with `--read_aligner bowtie2`). bowtie2 runs with `--local`, so
+  `--bowtie_score_min` takes the local form `G,<a>,<b>` (default `G,15,6`)
 
 ---
 
@@ -945,6 +982,35 @@ Azure Batch authentication failed
 
 2. Check work directory for intermediate files
 
+### No bins: empty bin tables, `SKIPPED.txt` instead of bins
+
+**Symptom:** the run succeeds, but `04_binning/` has no bins. A bin folder holds
+only `SKIPPED.txt`. The bin tables (`Mag_quality_summary.csv`,
+`MAGs_tax_summary.csv`, `Bin_summary.csv`) have a header and no rows, the plots
+say "No bins were assessed" / "No MAGs were classified", and the log shows
+warnings such as `all CheckM2 quality reports are empty` or
+`No refined bins for coassembly: skipping bin depth`.
+
+**Cause:** binning found nothing usable on this data. This is common for
+host-dominated or shallow samples, where little microbial DNA is left after
+host removal:
+
+- `SemiBin found no bins`: SemiBin2 had no bin before reclustering.
+- `All contigs < <N>bp - SemiBin skipped`: no contig is long enough for SemiBin2.
+- `No bin reached <completeness>% completeness and <contamination>% contamination`:
+  MetaWRAP ran, but no refined bin passed `--metawrap_completeness` /
+  `--metawrap_contamination` (default 50 / 10).
+- `No bins available for refinement`: no binner produced a bin for MetaWRAP.
+
+The run finishes on purpose instead of failing. A report step still fails when
+an input file is missing, which points to a real pipeline problem.
+
+**What to try:** check the clean-read counts in `Reads_report.csv` and the
+assembly size first. Co-assembling samples (`--assembly_mode coassembly`) or
+sequencing deeper gives the binners more coverage. Lowering the MetaWRAP
+thresholds keeps lower-quality bins, at the cost of more incomplete or
+contaminated MAGs.
+
 ### Corrupted output files
 
 **Symptom:** Output files have zero size or are truncated
@@ -1022,7 +1088,7 @@ nextflow run main.nf -profile docker --input samplesheet.csv --output ./results 
 - [ ] Samplesheet exists and is formatted correctly (`sample,r1,r2,s` header)
 - [ ] FASTA/FASTQ files exist and paths are absolute
 - [ ] Sufficient disk space and memory allocated
-- [ ] YAML syntax is correct (comma-separated strings, no spaces after commas)
+- [ ] YAML syntax is correct (lists such as `custom_host_fasta` and `binners` are comma-separated strings)
 - [ ] Work directory exists (for `-resume`)
 - [ ] Container runtime works (Docker/Singularity)
 

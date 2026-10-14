@@ -1,5 +1,5 @@
 name: bin_summary
-description: Co-assembly bin summary table (bin/bin_summary.py) joining CheckM2 quality, GTDB-Tk taxonomy and per-sample bin coverage for each refined bin
+description: Co-assembly bin summary table (bin/bin_summary.py) joining CheckM2 quality, GTDB-Tk taxonomy and per-sample bin coverage for each refined bin; warns and writes a header-only table when there is no refined bin (no quality, taxonomy or depth rows)
 keywords:
   - binning
   - summary

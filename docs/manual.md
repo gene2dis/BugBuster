@@ -27,8 +27,8 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Read Quality Control**: Filtering, trimming, and host decontamination
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
 - **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
-- **Metagenomic Binning**: MAG recovery with MetaBAT2, SemiBin, and COMEBin
-- **Bin Refinement**: Quality improvement with MetaWRAP
+- **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
+- **Bin Refinement**: Quality improvement with MetaWRAP (when two or more binners run)
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
@@ -37,7 +37,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 ### Pipeline Workflow
 
 ```
-Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/Sylph)
+Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/Sylph)
                                             ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
                                             ↓
                                       Assembly (MEGAHIT)
@@ -46,9 +46,10 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/S
                                             ↓
                               ┌─────────────┴─────────────┐
                               ↓                           ↓
-                      Binning (3 tools)           Contig Analysis
-                              ↓                    (BlobTools, DeepARG)
-                      Refinement (MetaWRAP)
+                      Binning (SemiBin;           Contig Analysis
+                       + MetaBAT2/COMEBin)         (BlobTools, DeepARG)
+                              ↓
+                      Refinement (MetaWRAP, ≥2 binners)
                               ↓
                       Quality (CheckM2)
                               ↓
@@ -73,10 +74,24 @@ Reads → QC (FastP) → Host Removal (Bowtie2) → Taxonomy (Kraken2/Sourmash/S
 
 | Analysis Type | Memory | CPUs | Storage |
 |---------------|--------|------|---------|
-| QC + Taxonomy only | 16 GB | 4 | 50 GB |
+| QC + Taxonomy only | 16 GB (75 GB to build the human bwa-mem3 index, see below) | 4 | 50 GB |
 | QC + Taxonomy + Assembly | 64 GB | 16 | 100 GB |
 | Full pipeline with binning | 128 GB | 16 | 200 GB |
 | Large datasets / co-assembly | 256 GB | 32 | 500 GB |
+
+- **CPU:** the default aligner, bwa-mem3, needs an x86-64 CPU with AVX2
+  (x86-64-v3, Haswell 2013 or newer). On older CPUs use `--read_aligner bowtie2`.
+- **Set `--max_memory` to the node's RAM** (default 128 GB). Task requests are
+  capped by it, and on a local machine it is also the memory pool Nextflow
+  schedules from, so it decides what runs, not the table above. Decontamination
+  and MEGAHIT request 72 GB each on the first attempt (`process_high`), although
+  decontamination peaked at ~16 GB.
+- **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
+  ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
+  every fresh run unless you pass the published index
+  (`<databases_dir>/bwamem3_index/contaminants_index`) with
+  `--custom_decontamination_index`. Below ~75 GB, pass a pre-built index or use
+  `--read_aligner bowtie2` (~6 GB to build).
 
 #### Functional annotation branches
 
@@ -95,13 +110,11 @@ time observed on the pipeline's own validation runs:
 | `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
 
 These are observations, not limits: needs grow with input size and community
-complexity. The eggNOG search requests `process_high` resources (16 CPUs,
-72 GB on the first attempt; an out-of-memory failure is retried with
-2 × 72 GB, capped at `--max_memory`, default 128 GB). The 79.9 GB peak above
-was measured under apptainer, which does not enforce task memory on a local
-machine. Where memory is enforced (docker, SLURM, cloud batch), a real
-co-assembly can exceed the first attempt and only finish on the retry, so make
-at least ~96 GB available to it. The annotate step (`process_medium`, 36 GB on
+complexity. The eggNOG search requests 16 CPUs and 96 GB on the first attempt;
+an out-of-memory failure is retried with 2 × 96 GB, capped at `--max_memory`
+(default 128 GB). The 79.9 GB peak above was measured under apptainer, which
+does not enforce task memory on a local machine, so make at least ~96 GB
+available to it where memory is enforced (docker, SLURM, cloud batch). The annotate step (`process_medium`, 36 GB on
 the first attempt) peaked at 35.1 GB, close to that request, so on larger
 co-assemblies it may also need its retry.
 
@@ -166,7 +179,7 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, so they can be reused across pipeline runs.
+BugBuster automatically downloads required databases on first use. Databases are published to `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. The pipeline does not read that directory back: a fresh run downloads (and builds) them again, while `-resume` reuses them from the work directory's task cache. To reuse them across runs, pass the published paths with the `--custom_*` options.
 
 ### Automatic Download Databases
 
@@ -180,7 +193,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
-| **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` |
+| **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
@@ -202,7 +215,7 @@ For shared HPC systems or repeated runs, pre-download databases to shared storag
 
 ```bash
 # Create database directory
-mkdir -p /shared/databases/bugbuster
+mkdir -p /shared/databases/bugbuster/kraken2_standard8
 
 # Download Kraken2 Standard-8
 wget -O - https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08gb_20250402.tar.gz | \
@@ -225,7 +238,11 @@ wget -P /shared/databases/bugbuster/sylph/ \
 # Download CheckM2
 wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
     "https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1"
-tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/
+# The tarball holds CheckM2_database/uniref100.KO.1.dmnd; move the .dmnd up so
+# it is .../checkm2/uniref100.KO.1.dmnd (--custom_checkm2_db)
+mkdir -p /shared/databases/bugbuster/checkm2
+tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/checkm2
+find /shared/databases/bugbuster/checkm2 -mindepth 2 -name '*.dmnd' -exec mv {} /shared/databases/bugbuster/checkm2/ \;
 
 # Download GTDB-TK (large download)
 wget -O /shared/databases/bugbuster/gtdbtk_r232.tar.gz \
@@ -289,7 +306,8 @@ wget -P /shared/databases/bugbuster/cog/ \
     https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab
 
 # Download human host genome (T2T-CHM13v2.0); the pipeline builds the
-# combined phiX + host Bowtie2 index from FASTA on first use
+# combined phiX + host index (bwa-mem3, or Bowtie2 under --read_aligner bowtie2)
+# from FASTA on first use
 wget -P /shared/databases/bugbuster/ \
     https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
 ```
@@ -317,8 +335,8 @@ nextflow run main.nf \
 ### Using Custom Host Genomes
 
 To filter reads from non-human hosts, point the pipeline at the host genome
-FASTA (plain or gzipped) — it builds the combined phiX + host Bowtie2 index
-automatically:
+FASTA (plain or gzipped) — it builds the combined phiX + host index for
+`--read_aligner` automatically:
 
 ```bash
 # Download your host genome
@@ -332,8 +350,10 @@ nextflow run main.nf \
     -profile docker
 ```
 
-If you already have a pre-built combined (phiX + host) Bowtie2 index, pass its
-directory with `--custom_decontamination_index` instead.
+If you already have a pre-built combined (phiX + host) index, pass its
+directory with `--custom_decontamination_index` instead: a bwa-mem3 or bwa-mem2
+index (`*.bwt.2bit.64`) under the default aligner, or a Bowtie2 index (`*.bt2`)
+under `--read_aligner bowtie2`.
 
 ---
 
@@ -375,6 +395,16 @@ assembly use singletons as well.
 - **Paired-end**: Required (R1 and R2)
 - **Naming**: Sample names must be unique
 - **Paths**: Use absolute paths for cloud/HPC execution
+- **Read file names in co-assembly without QC** (`--assembly_mode coassembly
+  --quality_control false`): the pooled reads are sorted into R1, R2 and
+  singleton lists by file name (`bin/read_role.sh`), so each name needs a role.
+  The name minus its extension is split on `_` and `.`; the last `R1`, `R2`,
+  `singleton`, `singletons` or `unpaired` token wins (any case), otherwise the
+  last bare `1` or `2` (`sample_1.fastq.gz`). A trailing chunk number does not
+  override an explicit token (`S1_R1_2.fastq.gz` is R1). A file whose name has
+  no role (`sample.fastq.gz`) stops the run with an error. With QC on the clean
+  reads are renamed `<sample>_{R1,R2,Singleton}_clean.fastq.gz`, so any input
+  names work
 
 ### Cloud Storage Paths
 
@@ -424,6 +454,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
+| `--store_clean_reads` | `false` | `true`, `false` | Publish the decontaminated reads to `<output>/clean_reads/` (publishing only; `-resume` is the task cache) |
+| `--featurecounts_multimap` | `primary` | `primary`, `all`, `none` | featureCounts multi-mapping policy for gene counts: primary alignments only, every reported alignment (`-M`), or no multi-mapping reads |
 
 > **Container note for `--contig_level_functional`:** the branch uses eggNOG-mapper
 > 3.0.0-beta6, whose authors publish only an Apptainer image. Under
@@ -569,7 +601,7 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 
 | Parameter | Description |
 |-----------|-------------|
-| `--custom_decontamination_index` | Path to a pre-built combined Bowtie2 index directory (host + phiX) |
+| `--custom_decontamination_index` | Path to a pre-built combined index directory (host + phiX) matching `--read_aligner`: bwa-mem3/bwa-mem2 (`*.bwt.2bit.64`, default) or Bowtie2 (`*.bt2`) |
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory |
@@ -723,9 +755,42 @@ extension (9) sizes are fixed by the tool and not exposed.
   the read subset). Compare samples with `KMARVEL_gene_family_matrix.tsv`;
   treat the per-ARO matrix as allele-level detail.
 
-### 6.12 Bowtie2 Alignment Options
+### 6.12 Read Aligner Options
 
-Advanced parameters for Bowtie2 read alignment during host filtering:
+`--read_aligner` picks the aligner for host/phiX removal, reads-to-contigs
+mapping (contig depth, binning, gene counting) and co-assembly bin depth.
+Woltka and HUMAnN always use bowtie2 with their own databases.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--read_aligner` | `bwamem3` | `bwamem3` (bwa-mem3 0.14.0) or `bowtie2` (fallback) |
+| `--decontam_min_score` | `30` | bwa-mem3 minimum alignment score (`-T`) for a contaminant hit, per mate |
+| `--bwamem3_min_identity` | `0.95` | Minimum identity of a read-to-contig/bin alignment (`0` = off) |
+| `--bwamem3_min_aligned_length` | `50` | Minimum aligned bases of a read-to-contig/bin alignment, or 80% of a shorter read (`0` = off) |
+| `--bwamem3_dense_sa` | `false` | Denser suffix array for the decontamination index (faster, ~12 GB more RAM) |
+
+bwa-mem3 replaced bowtie2 as the default after a benchmark on five real
+metagenomes ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)): host removal
+4.1× faster, reads-to-contigs mapping 3.9–6.2× faster, the same bins and GTDB
+species, and a stricter host removal (a pair is clean only when both mates are
+unmapped). Use `--read_aligner bowtie2`:
+
+- on a CPU without AVX2 (x86-64-v3, Haswell 2013+): the `BWAMEM3_*` tasks
+  stop with "Illegal instruction" (exit status 132);
+- on nodes with less than ~75 GB RAM, which the human bwa-mem3 index build
+  needs (bowtie2: ~6 GB, but about an hour). The build runs once; pass the
+  published index with `--custom_decontamination_index` in later runs;
+- to keep using a Bowtie2 `--custom_decontamination_index` from an earlier
+  release. A Bowtie2 index is rejected at launch under `bwamem3`.
+
+Clean-read counts from the two aligners are not directly comparable: bowtie2
+keeps a pair without a concordant alignment, so a pair with a single host mate
+survives.
+
+#### Bowtie2 options
+
+Advanced parameters for Bowtie2 read alignment during host filtering
+(`--read_aligner bowtie2` only):
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -756,7 +821,7 @@ Control taxonomic output visualization and formatting:
 |-----------|---------|-------------|
 | `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
 
-By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
+By default, databases are published to a `databases/` directory at the same level as your output directory. Later runs reuse them only through the `--custom_*` options (or `-resume` on the same work directory); see [Database Management](#4-database-management).
 
 ### 6.15 Resource Limit Options
 
@@ -886,7 +951,8 @@ results/
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
 │   ├── bracken/                                # Bracken abundance estimates (kraken2 only)
-│   │   └── {sample}_*.bracken                  # Per-sample Bracken results
+│   │   ├── {sample}_{sample}.tsv               # Per-sample Bracken abundances
+│   │   └── {sample}_{sample}.kraken2.report_bracken.txt  # Kraken-style report
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
 │   ├── sylph/                                  # Sylph results (if taxonomic_profiler='sylph')
@@ -949,9 +1015,12 @@ results/
 │   │   │   └── {sample}_args_oap_s1_out/
 │   │   ├── rgi/                                # RGI per-sample results (if rgi_prediction=true)
 │   │   │   └── {sample}/
-│   │   │       ├── *_allele_mapping_data.txt
-│   │   │       ├── *_gene_mapping_data.txt
-│   │   │       └── *_sorted.length_100.bam
+│   │   │       ├── {sample}_rgi_bwt.allele_mapping_data.txt
+│   │   │       ├── {sample}_rgi_bwt.gene_mapping_data.txt
+│   │   │       ├── {sample}_rgi_bwt.overall_mapping_stats.txt
+│   │   │       ├── {sample}_rgi_bwt.reference_mapping_stats.txt
+│   │   │       ├── {sample}_rgi_bwt.artifacts_mapping_stats.txt  # when RGI writes it
+│   │   │       └── {sample}_rgi_bwt.sorted.length_100.bam        # absent for a sample without hits
 │   │   ├── rgi_kmer/                           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   │   └── {sample}/
 │   │   │       ├── *_61mer_analysis.json
@@ -1208,7 +1277,8 @@ By default, databases are stored separately from results at `<output_dir>/../dat
 
 ```
 databases/                            # Database storage (configurable via --databases_dir)
-├── bowtie_index/                     # Combined Bowtie2 decontamination index (host + phiX)
+├── bwamem3_index/                    # Combined bwa-mem3 decontamination index (host + phiX)
+├── bowtie_index/                     # Combined Bowtie2 index instead, under --read_aligner bowtie2
 ├── kraken/                           # Kraken2 database (selected via --kraken2_db)
 ├── sourmash/                         # Sourmash database
 ├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
@@ -1245,7 +1315,8 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
-| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA/KARGVA ARG predictions |
+| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA ARG predictions |
+| `05_arg_prediction/read_level/kargva/` | `read_arg_prediction=true` | KARGVA ARG variant predictions |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
@@ -1422,7 +1493,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
-    --custom_decontamination_index /shared/db/bowtie_index \
+    --custom_decontamination_index /shared/db/bwamem3_index/contaminants_index \
     --custom_kraken_db /shared/db/kraken2_standard8 \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/release232 \
@@ -1509,7 +1580,7 @@ params {
     custom_kraken_db         = '/shared/db/kraken2_standard8'
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
     custom_gtdbtk_db              = '/shared/db/release232'
-    custom_decontamination_index  = '/shared/db/bowtie_index'
+    custom_decontamination_index  = '/shared/db/bwamem3_index/contaminants_index'
 }
 
 // The local executor's machine-wide pool is copied from max_cpus/max_memory

@@ -52,7 +52,7 @@ process CALCULATE_DEPTH {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: \$(jgi_summarize_bam_contig_depths --version 2>&1 | sed 's/.*version //')
+        metabat2: \$(jgi_summarize_bam_contig_depths 2>&1 | grep -o 'jgi_summarize_bam_contig_depths [0-9][0-9.]*' | head -n 1 | sed 's/.* //')
     END_VERSIONS
     """
     
@@ -61,10 +61,10 @@ process CALCULATE_DEPTH {
     """
     # Create stub depth file
     cat > ${prefix}_depth.txt << 'EOF'
-contigName	contigLen	totalAvgDepth	sample1.bam	sample1.bam-var
-contig_1	5000	25.5	25.5	10.2
-contig_2	3000	18.3	18.3	8.1
-EOF
+    contigName	contigLen	totalAvgDepth	sample1.bam	sample1.bam-var
+    contig_1	5000	25.5	25.5	10.2
+    contig_2	3000	18.3	18.3	8.1
+    EOF
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

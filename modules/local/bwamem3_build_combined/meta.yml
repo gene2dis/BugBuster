@@ -1,0 +1,39 @@
+name: bwamem3_build_combined
+description: Build a single bwa-mem3 index from multiple FASTA files for single-pass decontamination (--read_aligner bwamem3)
+keywords:
+  - alignment
+  - index
+  - bwa-mem3
+  - decontamination
+  - reference genome
+tools:
+  - bwa-mem3:
+      description: |
+        Short-read aligner derived from bwa-mem2 (same algorithm and flags, faster). Its index
+        (.amb, .ann, .bwt.2bit.64, .pac) is interchangeable with a bwa-mem2 index.
+      homepage: https://github.com/fg-labs/bwa-mem3
+      documentation: https://bwa-mem3.readthedocs.io/
+      doi: 10.1109/IPDPS.2019.00041
+      licence: ["MIT"]
+
+input:
+  - fasta_files:
+      type: file
+      description: List of FASTA files to combine into a single index (e.g., phiX, host genomes)
+      pattern: "*.{fasta,fa,fna,fasta.gz,fa.gz,fna.gz}"
+  - index_name:
+      type: string
+      description: Name for the combined index (e.g., "contaminants")
+
+output:
+  - versions:
+      type: file
+      description: File containing software versions
+      pattern: "versions.yml"
+  - index:
+      type: directory
+      description: Directory containing the bwa-mem3 index files (<index_name>.{amb,ann,bwt.2bit.64,pac})
+      pattern: "*_index"
+
+authors:
+  - "@gene2dis"

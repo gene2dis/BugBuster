@@ -11,7 +11,7 @@ BugBuster is a comprehensive metagenomic analysis pipeline for bacterial genome 
 flowchart TD
     Start([Input Samplesheet CSV]) --> InputCheck[INPUT_CHECK<br/>Validate & Parse Samplesheet]
     
-    InputCheck --> PrepDB[PREPARE_DATABASES<br/>Download/Format Databases]
+    PrepDB[PREPARE_DATABASES<br/>Download/Format Databases] -->|decontamination index| QC
     InputCheck --> QC
     
     %% Quality Control Branch
@@ -21,7 +21,7 @@ flowchart TD
     CleanReads -->|if taxonomic_profiler != none| Taxonomy[TAXONOMY SUBWORKFLOW<br/>Kraken2, Sourmash or Sylph]
     
     %% Read-level ARG Branch
-    CleanReads -->|if read_arg_prediction| ReadARG[Read-level ARG Prediction<br/>KARGVA → KARGA → ARGS_OAP]
+    CleanReads -->|if read_arg_prediction| ReadARG[Read-level ARG Prediction<br/>KARGVA → KARGA; ARGS_OAP in parallel]
     ReadARG --> ARGNorm[ARG_NORM_REPORT]
 
     %% RGI Branch
@@ -113,6 +113,7 @@ flowchart TD
     Start --> QCdb{QC<br/>Enabled?}
     Start --> Bindb{Binning<br/>Enabled?}
     Start --> Contigdb{Contig Analysis<br/>Enabled?}
+    Start --> Argbindb{arg_bin_clustering?}
     Start --> Funcdb{Functional<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
@@ -126,10 +127,11 @@ flowchart TD
     Sourmash -->|Yes| SourmashDB[SOURMASH_TAX_PREPARE]
     Sylphdb -->|Yes, no custom_sylph_db| SylphDB[FORMAT_SYLPH_DB]
     Sylphdb -->|Yes, no custom_sylph_taxonomy| SylphTax[FORMAT_SYLPH_TAXONOMY]
-    QCdb -->|Yes| Decontam[BOWTIE2_BUILD_COMBINED]
+    QCdb -->|Yes| Decontam["BWAMEM3_BUILD_COMBINED<br/>(BOWTIE2_BUILD_COMBINED<br/>with read_aligner = bowtie2)"]
     Bindb -->|Yes| CheckM2[FORMAT_CHECKM2_DB]
     Bindb -->|Yes| GTDBTK[DOWNLOAD_GTDBTK_DB]
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
+    Argbindb -->|Yes| DeepARG
     Contigdb -->|Yes| BLAST[FORMAT_NT_BLAST_DB]
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
@@ -159,7 +161,7 @@ flowchart TD
     QCCheck -->|Yes| FASTP["FASTP (+ FASTP_SINGLETON)<br/>Quality Filtering"]
     FASTP --> QFILTER[QFILTER<br/>Extract QC Reports]
     QFILTER --> MinReads{Reads >=<br/>min_read_sample?}
-    MinReads -->|Yes| Decontaminate[BOWTIE2_DECONTAMINATE<br/>Single pass vs combined<br/>phiX + host index]
+    MinReads -->|Yes| Decontaminate["BWAMEM3_DECONTAMINATE<br/>(or BOWTIE2_DECONTAMINATE)<br/>Single pass vs combined<br/>phiX + host index"]
     MinReads -->|No| Skip1[Skip Sample]
     Decontaminate --> ReadsReport[READS_REPORT]
     
@@ -182,7 +184,7 @@ flowchart TD
     
     Profiler -->|kraken2| Kraken2[KRAKEN2<br/>Taxonomic Classification]
     Kraken2 --> Bracken[BRACKEN<br/>Abundance Estimation]
-    Bracken --> TaxReport1[TAXONOMY_REPORT]
+    Kraken2 --> TaxReport1[TAXONOMY_REPORT]
     Bracken --> TaxPhylo1[TAXONOMY_PHYLOSEQ<br/>Generate Tables & Plots]
     TaxPhylo1 --> PhyloOpt1{create_phyloseq_rds?}
     PhyloOpt1 -->|Yes| PhyloConv1[PHYLOSEQ_CONVERTER<br/>Create R Object]
@@ -216,17 +218,19 @@ flowchart TD
     PerSample --> MEGAHIT1[MEGAHIT<br/>Assemble Each Sample]
     MEGAHIT1 --> BBMAP1[BBMAP<br/>Filter Contigs ≥1000bp]
     BBMAP1 --> Align1{Binning, contig analysis<br/>or functional?}
-    Align1 -->|Yes| Bowtie1[BOWTIE2_SAMTOOLS<br/>Align Reads to Contigs]
-    Bowtie1 --> Summary1[CONTIG_FILTER_SUMMARY]
+    Align1 -->|Yes| Bowtie1["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Align Reads to Contigs"]
+    BBMAP1 -->|filter reports| Summary1[CONTIG_FILTER_SUMMARY]
+    Bowtie1 -->|empty-contig reports| Summary1
     
     Mode -->|coassembly| CoAssembly[Co-Assembly Mode]
     CoAssembly --> MEGAHIT2[MEGAHIT<br/>Assemble All Reads Together]
     MEGAHIT2 --> BBMAP2[BBMAP<br/>Filter Contigs ≥1000bp]
     BBMAP2 --> Align2{Binning or<br/>Contig Analysis?}
-    Align2 -->|Yes| Bowtie2[BOWTIE2_SAMTOOLS<br/>Align All Reads to Contigs<br/>one pooled BAM]
+    Align2 -->|Yes| Bowtie2["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Align All Reads to Contigs<br/>one pooled BAM"]
     BBMAP2 --> AlignFunc{Functional<br/>enabled?}
-    AlignFunc -->|Yes| BowtiePS[BOWTIE2_SAMTOOLS_PER_SAMPLE<br/>Per-sample alignments vs co-assembly<br/>for gene counting]
-    Bowtie2 --> Summary2[CONTIG_FILTER_SUMMARY]
+    AlignFunc -->|Yes| BowtiePS["BWAMEM3_SAMTOOLS_PER_SAMPLE<br/>(or BOWTIE2_SAMTOOLS_PER_SAMPLE)<br/>Per-sample alignments vs co-assembly<br/>for gene counting"]
+    BBMAP2 -->|filter reports| Summary2[CONTIG_FILTER_SUMMARY]
+    Bowtie2 -->|empty-contig reports| Summary2
 ```
 
 **Outputs:**
@@ -275,8 +279,8 @@ flowchart TD
     AssemblyReports --> TaxReport[BIN_TAX_REPORT]
 
     ModeCheck -->|coassembly| CoassemblyReports[Co-assembly Reports]
-    CoassemblyReports --> BinCov[BOWTIE2_SAMTOOLS_DEPTH<br/>Calculate Bin Coverage]
-    BinCov --> Bedtools[BEDTOOLS<br/>Coverage Statistics]
+    CoassemblyReports --> BinCov["BINS_REFERENCE + BWAMEM3_BINS_INDEX<br/>+ BWAMEM3_BIN_DEPTH: each sample vs all bins<br/>(or BOWTIE2_SAMTOOLS_DEPTH per bin)<br/>skipped when no refined bins"]
+    BinCov --> Bedtools["BEDTOOLS_BIN_DEPTH (or BEDTOOLS)<br/>Coverage Statistics"]
     Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
     CheckM --> Summary
     GTDBTK --> Summary
@@ -314,6 +318,7 @@ flowchart TD
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `quality_control` | `true` | Enable QC and host filtering |
+| `read_aligner` | `'bwamem3'` | Aligner for host removal, reads→contigs and bin depth: 'bwamem3', or 'bowtie2' (fallback for CPUs without AVX2 or < ~75 GB RAM) |
 | `assembly_mode` | `'assembly'` | Assembly mode: 'assembly', 'coassembly', 'none' |
 | `taxonomic_profiler` | `'sourmash'` | Profiler: 'kraken2', 'sourmash', 'sylph', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
@@ -362,7 +367,7 @@ flowchart LR
 ## Module Categories
 
 ### Core Analysis Modules
-- **Quality Control**: FASTP, FASTP_SINGLETON, QFILTER, BOWTIE2_DECONTAMINATE (combined phiX + host removal), COUNT_READS
+- **Quality Control**: FASTP, FASTP_SINGLETON, QFILTER, BWAMEM3_DECONTAMINATE or BOWTIE2_DECONTAMINATE (combined phiX + host removal, per `--read_aligner`), COUNT_READS
 - **Taxonomy**: KRAKEN2, BRACKEN, SOURMASH, SYLPH_PROFILE, SYLPH_TAXPROF
 - **Assembly**: MEGAHIT, BBMAP
 - **Binning**: METABAT2, SEMIBIN, COMEBIN, METAWRAP
@@ -399,7 +404,7 @@ flowchart LR
 |--------|-------------|
 | `FASTP` / `FASTP_SINGLETON` | Read quality filtering and adapter trimming (paired + singleton reads) |
 | `QFILTER` | Extract QC reports and filter by read count |
-| `BOWTIE2_DECONTAMINATE` | Single-pass removal of phiX and host reads against the combined index |
+| `BWAMEM3_DECONTAMINATE` / `BOWTIE2_DECONTAMINATE` | Single-pass removal of phiX and host reads against the combined index (bwa-mem3 by default; bowtie2 with `--read_aligner bowtie2`) |
 | `COUNT_READS` | Read counting when `--quality_control false` |
 | `READS_REPORT` | Generate read count summary report |
 
@@ -418,7 +423,7 @@ flowchart LR
 |--------|-------------|
 | `MEGAHIT` | De novo metagenome assembly |
 | `BBMAP` | Contig length filtering |
-| `BOWTIE2_SAMTOOLS` | Align reads back to contigs |
+| `BWAMEM3_INDEX` + `BWAMEM3_SAMTOOLS` / `BOWTIE2_SAMTOOLS` | Align reads back to contigs (per `--read_aligner`) |
 | `CONTIG_FILTER_SUMMARY` | Track samples whose contigs were fully filtered |
 
 ### Binning (BINNING Subworkflow - Mode-Agnostic)
@@ -432,7 +437,7 @@ flowchart LR
 | `CHECKM2_BATCH` | always | Bin completeness and contamination |
 | `GTDB_TK_BATCH` | always | Bin taxonomic classification |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | assembly mode | Per-sample quality/taxonomy reports |
-| `BOWTIE2_SAMTOOLS_DEPTH` / `BEDTOOLS` / `BIN_SUMMARY` | co-assembly mode | Bin coverage and comprehensive summary |
+| `BINS_REFERENCE` + `BWAMEM3_BINS_INDEX` + `BWAMEM3_BIN_DEPTH` + `BEDTOOLS_BIN_DEPTH` (or `BOWTIE2_SAMTOOLS_DEPTH` + `BEDTOOLS`) / `BIN_SUMMARY` | co-assembly mode | Bin coverage (skipped when no refined bins) and comprehensive summary |
 
 ### ARG / AMR Prediction
 | Module | Description |
@@ -499,17 +504,20 @@ results/
 
 ## Execution Modes
 
-### Mode 1: Full Pipeline (Default)
-- QC → Taxonomy → Assembly → Binning → ARG Prediction → Annotation
+### Mode 1: Default Run
+- QC → Taxonomy (Sourmash) → per-sample Assembly (MEGAHIT + BBMap contig filter)
+- Binning, ARG prediction and functional annotation are off by default; the
+  full pipeline needs their flags, e.g.
+  `--include_binning true --binners semibin,metabat2 --read_arg_prediction true --contig_tax_and_arg true --contig_level_functional true`
 
 ### Mode 2: QC + Taxonomy Only
 ```bash
---assembly_mode none --read_arg_prediction false
+--assembly_mode none
 ```
 
 ### Mode 3: Assembly + Binning Only
 ```bash
---taxonomic_profiler none --read_arg_prediction false
+--taxonomic_profiler none --include_binning true
 ```
 
 ### Mode 4: Co-assembly Mode

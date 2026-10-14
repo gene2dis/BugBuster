@@ -24,7 +24,7 @@ tools:
 input:
   - reports:
       type: file
-      description: Per-sample read tables (collected) - QFILTER *_fastp_report.tsv plus BOWTIE2_DECONTAMINATE *_decontamination_report.tsv, or COUNT_READS *_fastp_report.tsv when QC is skipped
+      description: Per-sample read tables (collected) - QFILTER *_fastp_report.tsv plus BWAMEM3_DECONTAMINATE / BOWTIE2_DECONTAMINATE *_decontamination_report.tsv, or COUNT_READS *_fastp_report.tsv when QC is skipped
       pattern: "*.tsv"
   - args:
       type: value

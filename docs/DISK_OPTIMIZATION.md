@@ -34,7 +34,13 @@ These processes delete temporary files inside their own task directory before fi
 - **Removes**: `intermediate_contigs/`, `kmer_k*/`, `*.tmp`, `checkpoints.txt`
 - **Keeps**: final contigs and log files
 
-#### BOWTIE2_SAMTOOLS (Alignment)
+#### BWAMEM3_SAMTOOLS (Alignment, default aligner)
+- **Location**: `modules/local/bwamem3_samtools/main.nf`
+- **Removes**: the per-library `*_lib*_paired.bam` / `*_lib*_singleton.bam` after
+  merging them into one BAM (the contig index is its own task, `BWAMEM3_INDEX`)
+- **Keeps**: the final merged BAM
+
+#### BOWTIE2_SAMTOOLS (Alignment, `--read_aligner bowtie2`)
 - **Location**: `modules/local/bowtie2_samtools/main.nf`
 - **Removes**: the per-task Bowtie2 index (`*_index*.bt2`) after alignment, the
   intermediate `*_paired.bam` / `*_singleton.bam` after merging, and their logs
@@ -261,7 +267,7 @@ before an interruption may not be recorded in any run.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `store_clean_reads` | `false` | Publish clean reads to the output dir (BOWTIE2_DECONTAMINATE, publishDir) |
+| `store_clean_reads` | `false` | Publish clean reads to the output dir (BWAMEM3_DECONTAMINATE or BOWTIE2_DECONTAMINATE, publishDir) |
 
 ### Process Settings
 
