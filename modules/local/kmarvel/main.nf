@@ -31,7 +31,8 @@
         reads: host-removed reads [R1, R2, optional singletons]; all are
                concatenated, as upstream asks for paired-end data
         kmarvel_db: CARD_protein_all.fasta, metadata.tsv, snps.txt
-                    (+ DB_VERSION when built by FORMAT_KMARVEL_DB)
+                    (+ DB_VERSION when built by FORMAT_KMARVEL_DB; without
+                    it, versions.yml records the FASTA's md5)
 
     Output:
         tsv: tuple val(meta), path("*_kmarvel.tsv")
@@ -71,6 +72,10 @@ process KMARVEL {
                 exit 1
             fi
         done
+
+        # CARD version for versions.yml: DB_VERSION, or the md5 of the FASTA
+        # for a --custom_kmarvel_db without one
+        card_version=\$(kmarvel_db_version.sh ${kmarvel_db})
 
         # Own copy of the reference with its BLAST index; the small metadata
         # files are only read
@@ -140,7 +145,7 @@ process KMARVEL {
         "${task.process}":
             kmarvel: \$(kmarvel --version 2>&1 | sed 's/^kmarvel //')
             blast: \$(blastp -version 2>&1 | head -n 1 | sed 's/^blastp: //; s/+\$//')
-            card: "\$(cat ${kmarvel_db}/DB_VERSION 2>/dev/null || echo custom)"
+            card: "\${card_version}"
         END_VERSIONS
         """
 

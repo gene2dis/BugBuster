@@ -42,7 +42,7 @@ output:
       pattern: "*_kmarvel.log"
   - versions:
       type: file
-      description: Software versions (kmarvel, blast, card from the database DB_VERSION or 'custom')
+      description: Software versions (kmarvel, blast, card from the database DB_VERSION, or 'custom (CARD_protein_all.fasta md5 <md5>)' without one)
       pattern: "versions.yml"
 
 authors:

@@ -408,7 +408,7 @@
                 "custom_kmarvel_db": {
                     "type": "string",
                     "format": "directory-path",
-                    "description": "Path to a local K-MARVEL database directory with CARD_protein_all.fasta, metadata.tsv (CARD aro_index.tsv) and snps.txt (CARD snps.txt); skips the download. A BLAST index is not needed (built per task).",
+                    "description": "Path to a local K-MARVEL database directory with CARD_protein_all.fasta, metadata.tsv (CARD aro_index.tsv) and snps.txt (CARD snps.txt); skips the download. A BLAST index is not needed (built per task). An optional DB_VERSION file is recorded in software_versions.yml; without it, the md5 of CARD_protein_all.fasta.",
                     "fa_icon": "fas fa-folder"
                 }
             }

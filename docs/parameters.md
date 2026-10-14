@@ -411,7 +411,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to a K-MARVEL database directory; skips the download. A database published by an earlier run (`databases/kmarvel/kmarvel_db`) can be reused as is
 - **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/kmarvel_db`
-- **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). No BLAST index is needed: each task indexes its own copy of the FASTA. An optional `DB_VERSION` file is recorded in `software_versions.yml` (`custom` otherwise)
+- **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). No BLAST index is needed: each task indexes its own copy of the FASTA. An optional `DB_VERSION` file (its first line) is recorded as `card:` under `KMARVEL` in `pipeline_info/software_versions.yml`; without it the entry is `custom (CARD_protein_all.fasta md5 <md5>)`, so the reference can still be traced
 
 ### `--custom_dbcan_db`
 - **Type**: String (directory path)
