@@ -30,6 +30,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Required**: Yes
 - **Description**: Path to CSV samplesheet containing sample information
 - **Format**: CSV file with columns: `sample`, `r1`, `r2`, `s` (optional)
+- **Rules** (checked at launch): `sample` starts with a letter or digit and holds only letters, digits, `_`, `.` or `-` (it becomes file and directory names); sample ids are unique; read files end in `.fastq`, `.fq`, `.fastq.gz` or `.fq.gz`; `r1` and `r2` are different files, and `s` differs from both. Under `--read_level_functional humann` a sample id may not contain `s__` or `t__`. In co-assembly with `--quality_control false` the read file names must carry their role (see the [manual](manual.md#input-requirements))
 - **Example**: `--input samplesheet.csv`
 
 ### `--output`
@@ -157,6 +158,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--phiX_index`
 - **Type**: String
 - **Default**: `phiX174`
+- **Options**: `phiX174` (the only built-in entry; use `--custom_phiX_fasta` for another genome)
 - **Description**: PhiX genome selection for automatic download (genome FASTA; the pipeline builds the decontamination index for `--read_aligner`)
 - **Size**: 5.4 kB
 - **Example**: `--phiX_index phiX174`
@@ -164,6 +166,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--host_db`
 - **Type**: String
 - **Default**: `human`
+- **Options**: `human` (T2T-CHM13v2.0, the only built-in entry; other hosts are passed with `--custom_host_fasta`)
 - **Description**: Host genome for read filtering (genome FASTA; the pipeline builds the decontamination index for `--read_aligner`)
 - **Size**: 940 MB (T2T-CHM13v2.0)
 - **Example**: `--host_db human`
@@ -331,8 +334,8 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_host_fasta`
 - **Type**: String (file path)
-- **Description**: Path to a custom host genome FASTA (e.g. a non-human host); the pipeline builds the decontamination index (`--read_aligner`) from it
-- **Example**: `--custom_host_fasta /path/to/mouse_genome.fa`
+- **Description**: Path to a custom host genome FASTA, plain or gzipped (e.g. a non-human host), or a comma-separated list of them (spaces around the commas are ignored; paths may not contain commas or spaces). The pipeline builds one decontamination index (`--read_aligner`) from them and the phiX genome. The bwa-mem3 build requests ~24 GB RAM per Gbp of genome, capped by `--max_memory`, and the launch memory warning covers only the built-in `--host_db`, so size `--max_memory` yourself for large or several genomes. See [`YAML_PARAMETERS_GUIDE.md`](YAML_PARAMETERS_GUIDE.md)
+- **Example**: `--custom_host_fasta /path/to/mouse_genome.fa` or `--custom_host_fasta /path/to/human.fa.gz,/path/to/mouse.fa.gz`
 
 > **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
 
@@ -828,7 +831,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Options**: `bwamem3`, `bowtie2`
 - **Description**: Short-read aligner for host/phiX removal, reads-to-contigs mapping (binning depth, contig coverage, gene counting) and co-assembly bin depth. `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.14.0. It replaced `bowtie2` as the default after a benchmark on five real metagenomes ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)): host removal 4.1× faster, reads→contigs mapping 3.9–6.2× faster with the alignment filter, and the same bins and GTDB species. `bowtie2` stays available as a fallback for CPUs without AVX2 and for nodes without ~75 GB RAM for the human index build. Woltka and HUMAnN always use bowtie2 with their own databases. Differences from `bowtie2`:
   - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
-  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4× its size; ~90 GB for the default gzipped human genome), doubles on retry and is capped by `--max_memory`. Mapping against it needs ~14 GB per task, against ~4 GB for bowtie2.
+  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4× its size; ~90 GB for the default gzipped human genome), doubles on retry and is capped by `--max_memory`. Mapping against it peaked at ~16 GB per task in the benchmark, against ~4 GB for bowtie2 (the task requests 72 GB, `process_high`, capped by `--max_memory`).
   - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. Short or divergent local hits are turned into unmapped reads (`--bwamem3_min_identity`, `--bwamem3_min_aligned_length`). The co-assembly contig index is built once and shared by all alignments.
   - **Co-assembly bin depth.** Each sample is mapped once against all refined bins together instead of once per bin.
   - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+). On an older CPU the `BWAMEM3_*` tasks stop with "Illegal instruction" (exit status 132): use `--read_aligner bowtie2`.
@@ -1033,6 +1036,7 @@ nextflow run main.nf \
     --assembly_mode assembly \
     --taxonomic_profiler kraken2 \
     --include_binning true \
+    --binners semibin,metabat2 \
     --read_arg_prediction true \
     --contig_tax_and_arg true \
     --metawrap_completeness 70 \

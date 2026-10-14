@@ -81,10 +81,10 @@ next release is tagged.
     and it cuts output names at the first `.` (it runs on fixed file names)
 
 - **bwa-mem3 short-read aligner (`--read_aligner`, now the default; see Changed)**
-  - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka, HUMAnN/MetaPhlAn and RGI keep bowtie2 with their own databases
+  - Covers the pipeline's own alignment steps: host/phiX decontamination (`BWAMEM3_BUILD_COMBINED`, `BWAMEM3_DECONTAMINATE`), reads-to-contigs mapping for binning, contig coverage and gene counting (`BWAMEM3_INDEX`, `BWAMEM3_SAMTOOLS`, `BWAMEM3_SAMTOOLS_PER_SAMPLE`), and co-assembly bin depth (`BINS_REFERENCE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`, `BEDTOOLS_BIN_DEPTH`). Woltka and HUMAnN/MetaPhlAn keep bowtie2 with their own databases; RGI keeps its own aligner (KMA by default, `--rgi_aligner`)
   - bwa-mem3 0.14.0 and samtools 1.22.1 run from one pinned Seqera Containers image. Output is independent of the thread count (`-K` fixed)
   - Decontamination is strict: a pair is clean only when both mates are unmapped. bowtie2 `--un-conc` kept pairs with a single host mate. Clean-read counts are therefore not directly comparable with bowtie2 runs, and the FASTQ comment field is not carried over. Output file names are set explicitly, so sample ids containing dots no longer break decontamination. Mates are aligned without pairing (`-P`) so that `-T` holds for each mate: in paired mode bwa mem skips it for a chosen pair, and random ~20 bp host hits on overlapping mates removed 17.5% of a bacterial mock community (0.1% with `-P`). New `--decontam_min_score` (bwa `-T`, default 30) and `--bwamem3_dense_sa` (denser suffix array: faster mapping for ~12 GB more RAM)
-  - The decontamination index is published to `<databases_dir>/bwamem3_index/`. A human host needs ~75 GB RAM to build it (minutes rather than bowtie2-build's hours), and the build retries on bwa-mem3's out-of-budget exit status 3. `--custom_decontamination_index` accepts a bwa-mem3 or bwa-mem2 index under `bwamem3` and rejects a Bowtie2 one at launch
+  - The decontamination index is published to `<databases_dir>/bwamem3_index/`. A human host needs ~75 GB RAM to build it (minutes rather than bowtie2-build's hours). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4x its size; ~90 GB for the default human genome, 8 GB minimum), capped by `--max_memory`. On bwa-mem3's out-of-budget exit status 3 this build and the contig and bin index builds retry with more memory only while the request is below `--max_memory`; at the cap the task fails (the decontamination build with a message naming the three ways out). `--custom_decontamination_index` accepts a bwa-mem3 or bwa-mem2 index under `bwamem3` and rejects a Bowtie2 one at launch
   - Contig alignments drop secondary and supplementary records, keeping one record per read as with bowtie2. Short or divergent local hits become unmapped reads: an alignment needs >= 95% identity (`--bwamem3_min_identity`) and >= 50 aligned bases (`--bwamem3_min_aligned_length`), or 80% of a read shorter than that (2x50 libraries, reads trimmed below 50 bp). Without the filter, reads from genomes missing from the assembly inflated gene counts (Spearman vs bowtie2 0.74 in a poorly covered sample) and the depth of near-absent bins (~1.9x). Each library of a pooled co-assembly is mapped separately and the results merged. The co-assembly index is built once instead of once per alignment task
   - Co-assembly bin depth maps each sample once against all refined bins concatenated, instead of once per bin (bwa mem aligns locally, so per-bin mapping would let other bins' reads inflate coverage). It writes the same `*_bin_depth.tsv` table; a refined bin that adds no contig to the reference (no sequences, or only contigs of an earlier bin) still gets a 0-coverage row
   - The bioconda bwa-mem3 build needs an AVX2-capable CPU (x86-64-v3)
@@ -282,10 +282,8 @@ next release is tagged.
   removed (bowtie2 3.0%), the same bins and GTDB species. `--read_aligner bowtie2`
   stays as the fallback, unchanged. What changes for an existing setup:
   - building the human decontamination index needs ~75 GB RAM (bowtie2: ~6 GB) and
-    mapping ~14 GB per task (~4 GB). The pipeline warns at launch when `--max_memory`
-    is lower. The build's request is sized from the genome FASTA (~90 GB for the
-    default gzipped human genome, 8 GB minimum) instead of a fixed 256 GB, and it no
-    longer repeats an exit-3 retry that `--max_memory` caps at the same memory
+    mapping peaked at ~16 GB per task (~4 GB). The pipeline warns at launch when
+    `--max_memory` is lower (for the built-in `--host_db`; not for `--custom_host_fasta`)
   - the index is published to `<databases_dir>/bwamem3_index/`; a Bowtie2
     `--custom_decontamination_index` is rejected at launch, with a message naming
     `--read_aligner bowtie2`
@@ -355,8 +353,6 @@ next release is tagged.
   stops with a clear message when its index has no `*.bt2` files. Both index checks now run
   with the other launch checks, before any channel starts: raised later, the error could
   be reported as "Cannot find samplesheet file" instead
-- **bwa-mem3 contig and bin index builds** no longer repeat an exit-3 (memory budget)
-  retry that `--max_memory` caps at the same memory
 - `nextflow_schema.json`: the `deeparg_arg_alignment_evalue` default is the string
   `"1e-10"`, matching its type and `nextflow.config`
 - **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
@@ -392,6 +388,19 @@ next release is tagged.
   `%` in the `--un-conc-gz` path, bowtie2 inserts the mate number before the last
   extension, which for `S1.2` lands inside the id, so the clean reads were not found
   (exit 1). The path now carries `%`. New nf-test `tests/modules/bowtie2_decontaminate.nf.test`
+- **Documentation checked against the code**:
+  - databases published to `--databases_dir` are not read back by later runs (only through
+    the `--custom_*` options or `-resume`), so the index is rebuilt on a fresh run;
+  - the launch memory warning covers only the built-in `--host_db`;
+  - Bracken and RGI output names, the `kargva/` output, the DeepARG download trigger
+    (`arg_bin_clustering` too), the Kraken2/CheckM2 manual-download commands;
+  - examples that failed or did nothing: a Bowtie2 index under the default aligner, a
+    128 GB limit for a three-genome bwa-mem3 index, an end-to-end `--bowtie_score_min`
+    under `--local`, MetaWRAP thresholds with a single binner;
+  - the WildCARD files given with `--custom_rgi_wildcard` must be decompressed, and
+    `--rgi_include_wildcard` also applies to `rgi bwt`;
+  - the workflow diagram's default mode and edges, the cloud retry note, and
+    CONTRIBUTING's module and lint rules
 - **`--custom_host_fasta` lists**: the docs and examples (including
   `examples/params_multiple_genomes.yaml`) give several host genomes as a
   comma-separated list, but the pipeline read the whole string as one path, which did

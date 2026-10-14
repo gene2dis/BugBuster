@@ -120,7 +120,7 @@ nextflow run main.nf \
 
 ### With Spot Instances
 
-AWS Batch automatically handles spot instance interruptions with the retry strategy configured in `conf/aws.config`.
+A task killed by a spot reclaim is retried under the pipeline-wide rule in `nextflow.config` (exit statuses 130–145 and 104, up to 2 retries). The `errorStrategy` and `maxRetries = 3` in `conf/aws.config` are currently overridden by that rule ([#31](https://github.com/gene2dis/BugBuster/issues/31)). Nextflow's own spot handling is set with `aws.batch.maxSpotAttempts` in a `-c` config.
 
 ### Fusion Filesystem (Recommended for Performance)
 
@@ -263,10 +263,13 @@ nextflow run main.nf \
 | Binning | 128 GB | 16 | 200 GB |
 | Full Pipeline | 256 GB | 32 | 500 GB |
 
-The first run also builds the human decontamination index: ~75 GB RAM with the
-default aligner (bwa-mem3), once. Reuse it with `--custom_decontamination_index`,
-or use `--read_aligner bowtie2` (~6 GB, about an hour) on smaller nodes and on
-CPUs without AVX2.
+A run also builds the human decontamination index: ~75 GB RAM with the default
+aligner (bwa-mem3). It is rebuilt on every fresh run unless you pass the
+published one (`<databases_dir>/bwamem3_index/contaminants_index`) with
+`--custom_decontamination_index`; or use `--read_aligner bowtie2` (~6 GB, about
+an hour) on smaller nodes and on CPUs without AVX2. Set `--max_memory` to what a
+node offers: decontamination and MEGAHIT request 72 GB each on the first attempt
+(`process_high`), capped by it.
 
 ### Pre-downloaded Databases
 
@@ -325,7 +328,7 @@ nextflow run main.nf \
 ### Common Issues
 
 1. **Out of memory**: Increase `--max_memory` or use larger instance types
-2. **Spot instance preemption**: Pipeline will automatically retry
+2. **Spot instance preemption**: retried when the exit status is 130–145 or 104. GCP's preemption status 14 and Azure's 50001 are currently not retried ([#31](https://github.com/gene2dis/BugBuster/issues/31))
 3. **Container pull failures**: Check network access or use pre-cached images
 4. **S3/GCS access denied**: Verify IAM roles and bucket permissions
 

@@ -6,7 +6,7 @@ Benchmark of `--read_aligner bwamem3` (bwa-mem3 0.14.0) against `bowtie2`, then 
 - reads→contigs mapping (contig depth, binning, featureCounts),
 - co-assembly bin depth.
 
-Woltka, HUMAnN and RGI keep bowtie2 with their own databases.
+Woltka and HUMAnN keep bowtie2 with their own databases; RGI keeps its own aligner (KMA by default).
 
 **Outcome:** bwa-mem3 is now the default. `--read_aligner bowtie2` remains as a fallback for CPUs without AVX2 and for nodes without ~75 GB RAM for the human index build.
 
@@ -170,6 +170,7 @@ Below 0.1× the filtered value is lower than bowtie2's. The old per-bin method a
 - `bin/filter_alignments.sh` runs in `BWAMEM3_SAMTOOLS` (contig depth, binning, featureCounts and co-assembly bin depth). Defaults are `--bwamem3_min_identity 0.95` and `--bwamem3_min_aligned_length 50`.
 - A failing read stays in the BAM as unmapped, and `samtools fixmate` updates its mate.
 - Reads clipped at a contig end still count when 50 bases align.
+- Added after this benchmark: a read shorter than `--bwamem3_min_aligned_length` (a 2×50 library, or reads trimmed below 50 bp) needs 80% of its length aligned instead. With the 2×151 bp reads here it only concerns reads fastp trimmed below 50 bp (fastp keeps reads of 15 bp or more); the benchmark was not re-run with it.
 
 ### Validation with the filter in the pipeline
 

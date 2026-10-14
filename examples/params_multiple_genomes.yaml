@@ -14,6 +14,10 @@ quality_control: true
 custom_host_fasta: "/data/genomes/human_GRCh38.fasta,/data/genomes/mouse_GRCm39.fasta"
 custom_phiX_fasta: "/data/genomes/phix174.fasta"
 
+# The bwa-mem3 index build requests ~24 GB RAM per Gbp of combined genome
+# (human + mouse ~5.8 Gbp)
+max_memory: "150.GB"
+
 # ==============================================================================
 # Example 2: Multiple Contaminants (Host + Vector + Adapter)
 # ==============================================================================
@@ -39,16 +43,11 @@ custom_phiX_fasta: "/data/genomes/phix174.fasta"
 # custom_decontamination_index: "/data/databases/contaminants_index"
 
 # ==============================================================================
-# Example 4: Multiple Genomes with Quoted Paths (Spaces in Filenames)
+# Example 4: Paths with Spaces in File Names
 # ==============================================================================
-# Use quotes if your file paths contain spaces
-
-# input: "samplesheet.csv"
-# output: "results"
-# quality_control: true
-# 
-# custom_host_fasta: '"/data/genomes/human genome.fasta","/data/genomes/mouse genome.fasta"'
-# custom_phiX_fasta: "/data/genomes/phix174.fasta"
+# Not supported (the list is split on commas and the index build reads the
+# staged names unquoted): link such files under plain names first, e.g.
+#   ln -s "/data/genomes/human genome.fasta" /data/genomes/human.fasta
 
 # ==============================================================================
 # Example 5: YAML List Format (Alternative Syntax)

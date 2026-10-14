@@ -42,7 +42,9 @@ nextflow run main.nf \
 # ==============================================================================
 # Example 4: Multiple Contaminant Genomes
 # ==============================================================================
-# Remove reads mapping to phiX, human, mouse, and E. coli
+# Remove reads mapping to phiX, human, mouse, and E. coli: --custom_host_fasta takes
+# a comma-separated list, all built into one index. The bwa-mem3 build requests
+# ~24 GB RAM per Gbp of genome (~140 GB here), so raise --max_memory
 
 nextflow run main.nf \
   --input samplesheet.csv \
@@ -50,13 +52,15 @@ nextflow run main.nf \
   --quality_control true \
   --custom_phiX_fasta /data/genomes/phix.fasta \
   --custom_host_fasta /data/genomes/human.fasta,/data/genomes/mouse.fasta,/data/genomes/ecoli.fasta \
+  --max_memory 150.GB \
   -profile docker
 
 # ==============================================================================
 # Example 5: Low Disk Space Mode
 # ==============================================================================
 # Enable automatic work-dir cleanup and clean-reads publishing
-# Minimizes disk usage; note: low_disk runs are not resumable (cleanup = true)
+# Frees the work dir after a successful run; a completed low_disk run cannot be
+# resumed (cleanup = true), an interrupted one can
 
 nextflow run main.nf \
   --input samplesheet.csv \
@@ -69,7 +73,8 @@ nextflow run main.nf \
 # ==============================================================================
 # The --bowtie_* options apply only under --read_aligner bowtie2 (the fallback
 # for CPUs without AVX2 or nodes with < ~75 GB RAM); the default bwa-mem3 uses
-# --decontam_min_score
+# --decontam_min_score. bowtie2 runs in --local mode, so --bowtie_score_min takes
+# the local form G,<a>,<b> (default G,15,6)
 
 nextflow run main.nf \
   --input samplesheet.csv \
@@ -77,7 +82,7 @@ nextflow run main.nf \
   --quality_control true \
   --read_aligner bowtie2 \
   --bowtie_k 5 \
-  --bowtie_score_min 'L,-0.6,-0.6' \
+  --bowtie_score_min 'G,20,8' \
   -profile docker
 
 # ==============================================================================
@@ -100,7 +105,9 @@ nextflow run main.nf \
 cat phix.fasta human.fasta > contaminants.fasta
 
 # Step 2: Build the bwa-mem3 index (default aligner; ~75 GB RAM for a human host).
-# For --read_aligner bowtie2, build a Bowtie2 index instead:
+# For --read_aligner bowtie2, build a Bowtie2 index instead (and add
+# --read_aligner bowtie2 in step 3):
+#   mkdir -p contaminants_index
 #   bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants
 mkdir -p contaminants_index
 bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
@@ -153,7 +160,9 @@ nextflow run main.nf \
 # ==============================================================================
 # Example 12: Custom Database Directory
 # ==============================================================================
-# Store databases in a specific location for sharing across runs
+# Publish the downloaded databases and built indexes to a shared location. Later
+# runs reuse them only when passed back with the --custom_* options (e.g.
+# --custom_decontamination_index /shared/databases/bwamem3_index/contaminants_index)
 
 nextflow run main.nf \
   --input samplesheet.csv \
@@ -174,7 +183,7 @@ nextflow run main.nf \
 nextflow run main.nf --input samplesheet.csv --output results --store_clean_reads true -profile docker
 
 # Tip 3: Use the low_disk profile for constrained systems
-# (enables Nextflow's 'cleanup = true' work-dir cleanup; runs are not resumable)
+# (enables Nextflow's 'cleanup = true' work-dir cleanup; a completed run cannot be resumed)
 nextflow run main.nf --input samplesheet.csv --output results -profile docker,low_disk
 
 # ==============================================================================

@@ -27,8 +27,8 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Read Quality Control**: Filtering, trimming, and host decontamination
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
 - **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
-- **Metagenomic Binning**: MAG recovery with MetaBAT2, SemiBin, and COMEBin
-- **Bin Refinement**: Quality improvement with MetaWRAP
+- **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
+- **Bin Refinement**: Quality improvement with MetaWRAP (when two or more binners run)
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
@@ -46,9 +46,10 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
                                             ↓
                               ┌─────────────┴─────────────┐
                               ↓                           ↓
-                      Binning (3 tools)           Contig Analysis
-                              ↓                    (BlobTools, DeepARG)
-                      Refinement (MetaWRAP)
+                      Binning (SemiBin;           Contig Analysis
+                       + MetaBAT2/COMEBin)         (BlobTools, DeepARG)
+                              ↓
+                      Refinement (MetaWRAP, ≥2 binners)
                               ↓
                       Quality (CheckM2)
                               ↓
@@ -73,10 +74,24 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
 
 | Analysis Type | Memory | CPUs | Storage |
 |---------------|--------|------|---------|
-| QC + Taxonomy only | 16 GB (75 GB once, to build the human bwa-mem3 index) | 4 | 50 GB |
+| QC + Taxonomy only | 16 GB (75 GB to build the human bwa-mem3 index, see below) | 4 | 50 GB |
 | QC + Taxonomy + Assembly | 64 GB | 16 | 100 GB |
 | Full pipeline with binning | 128 GB | 16 | 200 GB |
 | Large datasets / co-assembly | 256 GB | 32 | 500 GB |
+
+- **CPU:** the default aligner, bwa-mem3, needs an x86-64 CPU with AVX2
+  (x86-64-v3, Haswell 2013 or newer). On older CPUs use `--read_aligner bowtie2`.
+- **Set `--max_memory` to the node's RAM** (default 128 GB). Task requests are
+  capped by it, and on a local machine it is also the memory pool Nextflow
+  schedules from, so it decides what runs, not the table above. Decontamination
+  and MEGAHIT request 72 GB each on the first attempt (`process_high`), although
+  decontamination peaked at ~16 GB.
+- **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
+  ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
+  every fresh run unless you pass the published index
+  (`<databases_dir>/bwamem3_index/contaminants_index`) with
+  `--custom_decontamination_index`. Below ~75 GB, pass a pre-built index or use
+  `--read_aligner bowtie2` (~6 GB to build).
 
 #### Functional annotation branches
 
@@ -164,7 +179,7 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use. Databases are stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, so they can be reused across pipeline runs.
+BugBuster automatically downloads required databases on first use. Databases are published to `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. The pipeline does not read that directory back: a fresh run downloads (and builds) them again, while `-resume` reuses them from the work directory's task cache. To reuse them across runs, pass the published paths with the `--custom_*` options.
 
 ### Automatic Download Databases
 
@@ -178,7 +193,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
-| **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` |
+| **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
@@ -200,7 +215,7 @@ For shared HPC systems or repeated runs, pre-download databases to shared storag
 
 ```bash
 # Create database directory
-mkdir -p /shared/databases/bugbuster
+mkdir -p /shared/databases/bugbuster/kraken2_standard8
 
 # Download Kraken2 Standard-8
 wget -O - https://genome-idx.s3.amazonaws.com/kraken/k2_standard_08gb_20250402.tar.gz | \
@@ -223,7 +238,11 @@ wget -P /shared/databases/bugbuster/sylph/ \
 # Download CheckM2
 wget -O /shared/databases/bugbuster/checkm2_db.tar.gz \
     "https://zenodo.org/records/14897628/files/checkm2_database.tar.gz?download=1"
-tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/
+# The tarball holds CheckM2_database/uniref100.KO.1.dmnd; move the .dmnd up so
+# it is .../checkm2/uniref100.KO.1.dmnd (--custom_checkm2_db)
+mkdir -p /shared/databases/bugbuster/checkm2
+tar -xzf /shared/databases/bugbuster/checkm2_db.tar.gz -C /shared/databases/bugbuster/checkm2
+find /shared/databases/bugbuster/checkm2 -mindepth 2 -name '*.dmnd' -exec mv {} /shared/databases/bugbuster/checkm2/ \;
 
 # Download GTDB-TK (large download)
 wget -O /shared/databases/bugbuster/gtdbtk_r232.tar.gz \
@@ -435,6 +454,8 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
+| `--store_clean_reads` | `false` | `true`, `false` | Publish the decontaminated reads to `<output>/clean_reads/` (publishing only; `-resume` is the task cache) |
+| `--featurecounts_multimap` | `primary` | `primary`, `all`, `none` | featureCounts multi-mapping policy for gene counts: primary alignments only, every reported alignment (`-M`), or no multi-mapping reads |
 
 > **Container note for `--contig_level_functional`:** the branch uses eggNOG-mapper
 > 3.0.0-beta6, whose authors publish only an Apptainer image. Under
@@ -800,7 +821,7 @@ Control taxonomic output visualization and formatting:
 |-----------|---------|-------------|
 | `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
 
-By default, databases are stored in a `databases/` directory at the same level as your output directory. This allows database reuse across multiple pipeline runs.
+By default, databases are published to a `databases/` directory at the same level as your output directory. Later runs reuse them only through the `--custom_*` options (or `-resume` on the same work directory); see [Database Management](#4-database-management).
 
 ### 6.15 Resource Limit Options
 
@@ -930,7 +951,8 @@ results/
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
 │   ├── bracken/                                # Bracken abundance estimates (kraken2 only)
-│   │   └── {sample}_*.bracken                  # Per-sample Bracken results
+│   │   ├── {sample}_{sample}.tsv               # Per-sample Bracken abundances
+│   │   └── {sample}_{sample}.kraken2.report_bracken.txt  # Kraken-style report
 │   ├── sourmash/                               # Sourmash results (if taxonomic_profiler='sourmash')
 │   │   └── *.with-lineages.csv                 # Per-sample Sourmash results
 │   ├── sylph/                                  # Sylph results (if taxonomic_profiler='sylph')
@@ -993,9 +1015,12 @@ results/
 │   │   │   └── {sample}_args_oap_s1_out/
 │   │   ├── rgi/                                # RGI per-sample results (if rgi_prediction=true)
 │   │   │   └── {sample}/
-│   │   │       ├── *_allele_mapping_data.txt
-│   │   │       ├── *_gene_mapping_data.txt
-│   │   │       └── *_sorted.length_100.bam
+│   │   │       ├── {sample}_rgi_bwt.allele_mapping_data.txt
+│   │   │       ├── {sample}_rgi_bwt.gene_mapping_data.txt
+│   │   │       ├── {sample}_rgi_bwt.overall_mapping_stats.txt
+│   │   │       ├── {sample}_rgi_bwt.reference_mapping_stats.txt
+│   │   │       ├── {sample}_rgi_bwt.artifacts_mapping_stats.txt  # when RGI writes it
+│   │   │       └── {sample}_rgi_bwt.sorted.length_100.bam        # absent for a sample without hits
 │   │   ├── rgi_kmer/                           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   │   └── {sample}/
 │   │   │       ├── *_61mer_analysis.json
@@ -1290,7 +1315,8 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
-| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA/KARGVA ARG predictions |
+| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA ARG predictions |
+| `05_arg_prediction/read_level/kargva/` | `read_arg_prediction=true` | KARGVA ARG variant predictions |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |

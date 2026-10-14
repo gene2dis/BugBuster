@@ -147,10 +147,11 @@ exitCode: 137
    nextflow run main.nf --max_memory '256.GB' ...
    ```
 
-2. For specific processes, edit `conf/base.config`:
+2. For specific processes, put the setting in a config file and pass it with
+   `-c custom.config` (requests above `--max_memory` are still capped by it):
    ```groovy
    process {
-       withName: 'MEGAHIT.*' {
+       withName: 'MEGAHIT' {
            memory = '128.GB'
        }
    }
@@ -861,25 +862,23 @@ index (`*.bwt.2bit.64`).
 1. Check the index files (under your databases directory, `<output>/../databases` by default):
    ```bash
    ls -lh <databases_dir>/bowtie_index/contaminants_index/
-   # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2
+   # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2 (.bt2l for a large index)
    # (the default bwa-mem3 index is in bwamem3_index/contaminants_index/:
    #  contaminants.amb .ann .bwt.2bit.64 .pac)
    ```
 2. Verify read files decompress cleanly: `zcat sample_R1.fastq.gz | head -n 4`
 3. Check disk space: `df -h .`
 
-### Multiple host genomes not being used
+### Multiple host genomes
 
-**Symptom:** only one genome is used for decontamination.
-
-`custom_host_fasta` takes a **comma-separated string** — not a YAML list, and
-with no spaces after the commas:
+`custom_host_fasta` takes a **comma-separated string**, not a YAML list; spaces
+around the commas are ignored, and the paths themselves may not contain commas
+or spaces. Earlier versions read the whole string as one path, so a list failed
+with a missing-file error.
 
 ```yaml
 # Correct - comma-separated string
 custom_host_fasta: "/path/file1.fasta,/path/file2.fasta,/path/file3.fasta"
-
-# Incorrect - spaces after commas
 custom_host_fasta: "/path/file1.fasta, /path/file2.fasta"
 
 # Incorrect - YAML list (not supported)
@@ -888,18 +887,23 @@ custom_host_fasta:
   - "/path/file2.fasta"
 ```
 
+All the genomes go into one index; the bwa-mem3 build requests ~24 GB RAM per
+Gbp of combined genome, so raise `--max_memory` accordingly.
+
 ### Slow index building or decontamination
 
 - Pre-build the index once and reuse it:
   ```bash
   cat phix.fasta host.fasta > contaminants.fasta
+  mkdir -p contaminants_index
   bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 
   nextflow run main.nf ... --custom_decontamination_index contaminants_index
   ```
 - Under `--read_aligner bowtie2`, the human index build takes about an hour
-  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`),
-  and faster, less sensitive settings are available: `--bowtie_k 1 --bowtie_score_min "L,-0.6,-0.6"`
+  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`;
+  pass the index with `--read_aligner bowtie2`). bowtie2 runs with `--local`, so
+  `--bowtie_score_min` takes the local form `G,<a>,<b>` (default `G,15,6`)
 
 ---
 
@@ -1084,7 +1088,7 @@ nextflow run main.nf -profile docker --input samplesheet.csv --output ./results 
 - [ ] Samplesheet exists and is formatted correctly (`sample,r1,r2,s` header)
 - [ ] FASTA/FASTQ files exist and paths are absolute
 - [ ] Sufficient disk space and memory allocated
-- [ ] YAML syntax is correct (comma-separated strings, no spaces after commas)
+- [ ] YAML syntax is correct (lists such as `custom_host_fasta` and `binners` are comma-separated strings)
 - [ ] Work directory exists (for `-resume`)
 - [ ] Container runtime works (Docker/Singularity)
 

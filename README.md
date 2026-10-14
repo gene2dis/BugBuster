@@ -30,7 +30,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
 5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
    - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
-6. Normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+6. If requested (`--read_arg_prediction`), normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
 7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
    - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
@@ -59,7 +59,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 
 - [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=25.10.0`)
 - Container runtime: [Docker](https://docs.docker.com/engine/installation/), [Singularity](https://sylabs.io/guides/), or [Podman](https://podman.io/)
-- An x86-64 CPU with AVX2 (Haswell 2013 or newer) for the default aligner, bwa-mem3, and ~75 GB RAM once to build its human decontamination index. On older CPUs or smaller nodes, use `--read_aligner bowtie2`
+- An x86-64 CPU with AVX2 (Haswell 2013 or newer) for the default aligner, bwa-mem3, and ~75 GB RAM to build its human decontamination index (set `--max_memory` to the node's RAM). A fresh run rebuilds the index unless you pass the published one (`<databases_dir>/bwamem3_index/contaminants_index`) with `--custom_decontamination_index`. On older CPUs or smaller nodes, use `--read_aligner bowtie2`
 
 ### Basic Usage
 
@@ -126,7 +126,7 @@ See [docs/deployment.md](docs/deployment.md) for detailed deployment instruction
 
 ## Databases
 
-All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Only databases required for your selected pipeline options will be downloaded.
+All databases are automatically downloaded on first use and published to `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Only databases required for your selected pipeline options will be downloaded. The pipeline does not read that directory back: a fresh run downloads them again, so pass the published paths with the `--custom_*` parameters to reuse them (`-resume` reuses them from the work directory).
 
 You can use custom databases by specifying paths with `--custom_*` parameters (see table below).
 
@@ -142,7 +142,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **Sylph GTDB r232 (c200, two-stage .syl2db)** + sylph-tax metadata | 19 GB + 5.5 MB (`gtdb_r226` 18 GB, `gtdb_r220` 13.1 GB) | Taxonomic profiling | `taxonomic_profiler='sylph'` | `--custom_sylph_db`, `--custom_sylph_taxonomy` |
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
-| **DeepARG** | 4.8 GB | Contig ARG prediction | `contig_tax_and_arg=true` | `--custom_deeparg_db` |
+| **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` | `--custom_deeparg_db` |
 | **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
 | **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |

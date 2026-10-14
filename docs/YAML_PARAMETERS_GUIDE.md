@@ -103,17 +103,13 @@ custom_phiX_fasta: "/data/genomes/phix174.fasta.gz"
 
 ## Advanced Configurations
 
-### With Quoted Paths (Spaces in Filenames)
+### Paths with Spaces or Commas
 
-If your paths contain spaces, use quotes:
+Not supported: the list is split on commas, and the index build reads the staged
+file names unquoted. Link such files under plain names first:
 
-```yaml
-input: "samplesheet.csv"
-output: "results"
-quality_control: true
-
-# Note the single quotes around the entire string, and double quotes around each path
-custom_host_fasta: '"/data/genomes/human genome.fasta","/data/genomes/mouse genome.fasta"'
+```bash
+ln -s "/data/genomes/human genome.fasta" /data/genomes/human.fasta
 ```
 
 ### Pre-built Combined Index
@@ -139,6 +135,7 @@ mkdir contaminants_index
 bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
 
 # Or a Bowtie2 index, used with read_aligner: "bowtie2"
+mkdir bowtie2_index
 bowtie2-build --threads 16 contaminants.fasta bowtie2_index/contaminants
 ```
 
@@ -175,8 +172,9 @@ bowtie_L: 20
 bowtie_R: 2
 bowtie_i: "S,1,0.75"
 
-# Resource limits
-max_memory: "128.GB"
+# Resource limits: building the bwa-mem3 index of human + mouse + rat
+# (~8.4 Gbp) requests ~200 GB (see "Memory Considerations")
+max_memory: "200.GB"
 max_cpus: 32
 max_time: "240.h"
 
@@ -204,15 +202,13 @@ include_binning: false
 
 ### 1. Comma-Separated Format
 
-✅ **Correct:**
+Spaces around the commas are ignored, so both forms work:
 ```yaml
 custom_host_fasta: "/path/file1.fasta,/path/file2.fasta,/path/file3.fasta"
-```
-
-❌ **Incorrect (no spaces after commas):**
-```yaml
 custom_host_fasta: "/path/file1.fasta, /path/file2.fasta, /path/file3.fasta"
 ```
+
+`custom_phiX_fasta` takes a single FASTA.
 
 ### 2. YAML List Format
 
@@ -239,8 +235,12 @@ More genomes = larger combined index = more memory needed. The index is built
 once and can be reused with `custom_decontamination_index`.
 
 With the default aligner (bwa-mem3), the build needs about 20-25 GB RAM per Gbp
-of combined genome (measured: 57 GB peak for GRCh38 + phiX, 3.1 Gbp); the
-pipeline warns at launch when `max_memory` is below 75 GB for the human host:
+of combined genome (measured: 57 GB peak for GRCh38 + phiX, 3.1 Gbp). The task
+requests ~24 GB per Gbp, computed from the FASTA sizes (a gzipped file counts as
+4x its size), capped by `max_memory`; if that is too little, the build stops
+with exit status 3. The pipeline warns at launch when `max_memory` is below
+75 GB only for the built-in human host (`host_db`), not for
+`custom_host_fasta`, so size `max_memory` yourself for custom genomes:
 
 ```yaml
 # Human only
@@ -313,7 +313,7 @@ python3 -c "import yaml; yaml.safe_load(open('params.yaml'))"
 
 ```bash
 # Check if files exist
-for file in $(grep "custom_.*_fasta:" params.yaml | cut -d'"' -f2 | tr ',' '\n'); do
+for file in $(grep "custom_.*_fasta:" params.yaml | cut -d'"' -f2 | tr ',' '\n' | sed 's/^ *//'); do
   echo "Checking: $file"
   ls -lh "$file"
 done
@@ -364,13 +364,20 @@ nextflow run main.nf -params-file params.yaml --max_memory 128.GB
 
 **Solution:** Pre-build the index once:
 ```bash
-# Build index manually
+# Build the bwa-mem3 index (default aligner) manually
 cat genome1.fasta genome2.fasta genome3.fasta > combined.fasta
-bowtie2-build --threads 16 combined.fasta contaminants_index/contaminants
+mkdir contaminants_index
+bwa-mem3 index -t 16 -p contaminants_index/contaminants combined.fasta
 
 # Then use in YAML
 custom_decontamination_index: "/path/to/contaminants_index"
 ```
+
+A Bowtie2 index (`bowtie2-build`) is used the same way, with
+`read_aligner: "bowtie2"`; under the default aligner it is rejected at launch.
+The index the pipeline builds is also published to
+`<databases_dir>/bwamem3_index/contaminants_index` (bowtie2:
+`<databases_dir>/bowtie_index/contaminants_index`), ready to pass here.
 
 ## Complete Example Files
 
@@ -470,7 +477,7 @@ metabat_minContig: 2500
 
 ### Important Notes
 
-- `binners` accepts a **comma-separated string without spaces**: `"semibin,metabat2"` ✅, `"semibin, metabat2"` ❌
+- `binners` accepts a **comma-separated string**: `"semibin,metabat2"`; spaces around the commas are ignored in YAML (on the command line, write it without spaces)
 - `metawrap_completeness` and `metawrap_contamination` are **ignored** when only one binner is selected
 - CheckM2 and GTDB-Tk **always run** regardless of binner selection
 

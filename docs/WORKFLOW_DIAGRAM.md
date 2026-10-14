@@ -11,7 +11,7 @@ BugBuster is a comprehensive metagenomic analysis pipeline for bacterial genome 
 flowchart TD
     Start([Input Samplesheet CSV]) --> InputCheck[INPUT_CHECK<br/>Validate & Parse Samplesheet]
     
-    InputCheck --> PrepDB[PREPARE_DATABASES<br/>Download/Format Databases]
+    PrepDB[PREPARE_DATABASES<br/>Download/Format Databases] -->|decontamination index| QC
     InputCheck --> QC
     
     %% Quality Control Branch
@@ -21,7 +21,7 @@ flowchart TD
     CleanReads -->|if taxonomic_profiler != none| Taxonomy[TAXONOMY SUBWORKFLOW<br/>Kraken2, Sourmash or Sylph]
     
     %% Read-level ARG Branch
-    CleanReads -->|if read_arg_prediction| ReadARG[Read-level ARG Prediction<br/>KARGVA → KARGA → ARGS_OAP]
+    CleanReads -->|if read_arg_prediction| ReadARG[Read-level ARG Prediction<br/>KARGVA → KARGA; ARGS_OAP in parallel]
     ReadARG --> ARGNorm[ARG_NORM_REPORT]
 
     %% RGI Branch
@@ -113,6 +113,7 @@ flowchart TD
     Start --> QCdb{QC<br/>Enabled?}
     Start --> Bindb{Binning<br/>Enabled?}
     Start --> Contigdb{Contig Analysis<br/>Enabled?}
+    Start --> Argbindb{arg_bin_clustering?}
     Start --> Funcdb{Functional<br/>Enabled?}
     Start --> ReadARGdb{Read ARG<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
@@ -130,6 +131,7 @@ flowchart TD
     Bindb -->|Yes| CheckM2[FORMAT_CHECKM2_DB]
     Bindb -->|Yes| GTDBTK[DOWNLOAD_GTDBTK_DB]
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
+    Argbindb -->|Yes| DeepARG
     Contigdb -->|Yes| BLAST[FORMAT_NT_BLAST_DB]
     Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
@@ -182,7 +184,7 @@ flowchart TD
     
     Profiler -->|kraken2| Kraken2[KRAKEN2<br/>Taxonomic Classification]
     Kraken2 --> Bracken[BRACKEN<br/>Abundance Estimation]
-    Bracken --> TaxReport1[TAXONOMY_REPORT]
+    Kraken2 --> TaxReport1[TAXONOMY_REPORT]
     Bracken --> TaxPhylo1[TAXONOMY_PHYLOSEQ<br/>Generate Tables & Plots]
     TaxPhylo1 --> PhyloOpt1{create_phyloseq_rds?}
     PhyloOpt1 -->|Yes| PhyloConv1[PHYLOSEQ_CONVERTER<br/>Create R Object]
@@ -217,7 +219,8 @@ flowchart TD
     MEGAHIT1 --> BBMAP1[BBMAP<br/>Filter Contigs ≥1000bp]
     BBMAP1 --> Align1{Binning, contig analysis<br/>or functional?}
     Align1 -->|Yes| Bowtie1["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Align Reads to Contigs"]
-    Bowtie1 --> Summary1[CONTIG_FILTER_SUMMARY]
+    BBMAP1 -->|filter reports| Summary1[CONTIG_FILTER_SUMMARY]
+    Bowtie1 -->|empty-contig reports| Summary1
     
     Mode -->|coassembly| CoAssembly[Co-Assembly Mode]
     CoAssembly --> MEGAHIT2[MEGAHIT<br/>Assemble All Reads Together]
@@ -226,7 +229,8 @@ flowchart TD
     Align2 -->|Yes| Bowtie2["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Align All Reads to Contigs<br/>one pooled BAM"]
     BBMAP2 --> AlignFunc{Functional<br/>enabled?}
     AlignFunc -->|Yes| BowtiePS["BWAMEM3_SAMTOOLS_PER_SAMPLE<br/>(or BOWTIE2_SAMTOOLS_PER_SAMPLE)<br/>Per-sample alignments vs co-assembly<br/>for gene counting"]
-    Bowtie2 --> Summary2[CONTIG_FILTER_SUMMARY]
+    BBMAP2 -->|filter reports| Summary2[CONTIG_FILTER_SUMMARY]
+    Bowtie2 -->|empty-contig reports| Summary2
 ```
 
 **Outputs:**
@@ -500,17 +504,20 @@ results/
 
 ## Execution Modes
 
-### Mode 1: Full Pipeline (Default)
-- QC → Taxonomy → Assembly → Binning → ARG Prediction → Annotation
+### Mode 1: Default Run
+- QC → Taxonomy (Sourmash) → per-sample Assembly (MEGAHIT + BBMap contig filter)
+- Binning, ARG prediction and functional annotation are off by default; the
+  full pipeline needs their flags, e.g.
+  `--include_binning true --binners semibin,metabat2 --read_arg_prediction true --contig_tax_and_arg true --contig_level_functional true`
 
 ### Mode 2: QC + Taxonomy Only
 ```bash
---assembly_mode none --read_arg_prediction false
+--assembly_mode none
 ```
 
 ### Mode 3: Assembly + Binning Only
 ```bash
---taxonomic_profiler none --read_arg_prediction false
+--taxonomic_profiler none --include_binning true
 ```
 
 ### Mode 4: Co-assembly Mode
