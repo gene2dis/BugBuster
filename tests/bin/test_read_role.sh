@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# Regression tests for bin/read_role.sh, the read-role rule MEGAHIT and
-# BOWTIE2_SAMTOOLS use to split pooled co-assembly reads into R1 / R2 /
-# singleton lists (BWAMEM3_SAMTOOLS applies the same rule in Groovy, covered
-# by tests/modules/bwamem3_samtools.nf.test). A substring match on "_1."
-# put the R2 file of a sample id such as S_1.2 into R1.
+# Regression tests for bin/read_role.sh, the read-role rule MEGAHIT,
+# BOWTIE2_SAMTOOLS and BWAMEM3_SAMTOOLS use to split pooled co-assembly reads
+# into R1 / R2 / singleton lists (the bwa-mem3 path is also covered by
+# tests/modules/bwamem3_samtools.nf.test). A substring match on "_1." put
+# the R2 file of a sample id such as S_1.2 into R1.
 #
 # Requirements: bash only.
 #
@@ -31,7 +31,7 @@ expect() {
 expect "s1_R1_clean.fastq.gz"                R1
 expect "s1_R2_clean.fastq.gz"                R2
 expect "s1_Singleton_clean.fastq.gz"         S
-# Sample ids holding role-like parts: the last role token wins
+# Sample ids holding role-like parts: the last explicit role token wins
 expect "S_1.2_R1_clean.fastq.gz"             R1
 expect "S_1.2_R2_clean.fastq.gz"             R2
 expect "S_2.1_R1_clean.fastq.gz"             R1
@@ -47,6 +47,10 @@ expect "S_L001_R1_001.fastq.gz"              R1
 expect "S_L001_R2_001.fastq.gz"              R2
 expect "sample.R2.fastq.gz"                  R2
 expect "sample_unpaired.fastq.gz"            S
+# Chunked raw files: a trailing chunk number does not override R1/R2
+expect "S1_R1_2.fastq.gz"                    R1
+expect "S1_R2_1.fastq.gz"                    R2
+expect "S1_R1_001_2.fastq.gz"                R1
 # No role in the name
 expect "sample.fastq.gz"                     ""
 

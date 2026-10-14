@@ -127,55 +127,32 @@ process BWAMEM3_SAMTOOLS {
     }
 
     // Co-assembly pools every sample's reads (sorted by sample, each sample
-    // R1, R2[, singleton]); classify them by file name as BOWTIE2_SAMTOOLS
-    // does. bwa mem takes one file per mate, not bowtie2's comma lists, so
-    // each library is mapped on its own and the BAMs are merged; that also
-    // keeps bwa's insert-size estimate per library. A single sample's reads
-    // arrive positionally (raw input names when QC is off).
-    def r1_files = []
-    def r2_files = []
-    def singleton_files = []
-    if (meta.id == 'coassembly') {
-        // The same rule as bin/read_role.sh (MEGAHIT, BOWTIE2_SAMTOOLS): strip
-        // the extension, split the name on '_' and '.', and take the LAST
-        // token naming a role, so a sample id such as S_1.2 or unpaired_s2
-        // cannot move its files into another list
-        reads.each { f ->
-            def tokens = f.name.replaceFirst(/(\.fastq|\.fq)?(\.gz|\.bz2)?$/, '').tokenize('_.')
-            def role = tokens.reverse().collect { tok -> tok.toLowerCase() }.find { tok -> tok in ['r1', '1', 'r2', '2', 'singleton', 'unpaired'] }
-            if (role in ['r1', '1']) {
-                r1_files << f
-            } else if (role in ['r2', '2']) {
-                r2_files << f
-            } else if (role) {
-                singleton_files << f
-            }
-        }
-    } else {
-        r1_files        = [reads[0]]
-        r2_files        = [reads[1]]
-        singleton_files = reads.size() > 2 ? [reads[2]] : []
-    }
-    if (!r1_files || r1_files.size() != r2_files.size()) {
-        error "BWAMEM3_SAMTOOLS: could not pair R1/R2 files for ${meta.id}: ${reads.join(' ')}"
-    }
-    def map_commands = []
-    def bam_files = []
-    r1_files.eachWithIndex { r1, i ->
-        bam_files << "${prefix}_lib${i}_paired.bam"
-        map_commands << "map_reads ${bam_files[-1]} ${r1} ${r2_files[i]}"
-    }
-    singleton_files.eachWithIndex { s, i ->
-        bam_files << "${prefix}_lib${i}_singleton.bam"
-        map_commands << "map_reads ${bam_files[-1]} ${s}"
-    }
-    def merge_command = bam_files.size() == 1
-        ? "mv ${bam_files[0]} ${prefix}_all_reads.bam"
-        : "samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam ${bam_files.join(' ')}\n        rm -f ${bam_files.join(' ')}"
+    // R1, R2[, singleton]); bin/read_role.sh sorts them by file name, as in
+    // MEGAHIT and BOWTIE2_SAMTOOLS, so all three agree on the pairs. bwa mem
+    // takes one file per mate, not bowtie2's comma lists, so each library is
+    // mapped on its own and the BAMs are merged; that also keeps bwa's
+    // insert-size estimate per library. A single sample's reads arrive
+    // positionally (raw input names when QC is off).
+    def classify_reads = meta.id == 'coassembly'
+        ? """for f in ${reads.join(' ')}; do
+        case "\$(read_role.sh "\$f")" in
+            R1) R1+=("\$f") ;;
+            R2) R2+=("\$f") ;;
+            S)  S+=("\$f") ;;
+        esac
+    done"""
+        : "R1=(${reads[0]}); R2=(${reads[1]})${reads.size() > 2 ? "; S=(${reads[2]})" : ''}"
     def stage = task.process.tokenize(':')[-1]
 
     """
     set -euo pipefail
+
+    R1=(); R2=(); S=()
+    ${classify_reads}
+    if [ \${#R1[@]} -eq 0 ] || [ \${#R1[@]} -ne \${#R2[@]} ]; then
+        echo "ERROR: could not pair R1/R2 files for ${prefix}: ${reads.join(' ')}" >&2
+        exit 1
+    fi
 
     # Contig set empty after filtering (BWAMEM3_INDEX left the index empty)
     if ! grep -q '^>' "${contigs}"; then
@@ -213,9 +190,23 @@ process BWAMEM3_SAMTOOLS {
                 | samtools sort ${args2} -@ ${task.cpus} -o "\${out}" -
         }
 
-        ${map_commands.join('\n        ')}
-
-        ${merge_command}
+        bams=()
+        for i in "\${!R1[@]}"; do
+            bam="${prefix}_lib\${i}_paired.bam"
+            map_reads "\${bam}" "\${R1[i]}" "\${R2[i]}"
+            bams+=("\${bam}")
+        done
+        for i in "\${!S[@]}"; do
+            bam="${prefix}_lib\${i}_singleton.bam"
+            map_reads "\${bam}" "\${S[i]}"
+            bams+=("\${bam}")
+        done
+        if [ \${#bams[@]} -eq 1 ]; then
+            mv "\${bams[0]}" ${prefix}_all_reads.bam
+        else
+            samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam "\${bams[@]}"
+            rm -f "\${bams[@]}"
+        fi
     fi
 
     cat <<-END_VERSIONS > versions.yml

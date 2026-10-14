@@ -338,9 +338,10 @@ next release is tagged.
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
   `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer
-  matched. The role now comes from the last R1/R2/singleton token of
-  the file name (`bin/read_role.sh`, and the same rule in Groovy), tested by
-  `tests/bin/test_read_role.sh`
+  matched. The role now comes from the last explicit R1/R2/singleton token of the file
+  name, falling back to a bare 1/2 only when there is none, so a chunk number
+  (`S1_R1_2.fastq.gz`) does not override it. All three modules use `bin/read_role.sh`,
+  tested by `tests/bin/test_read_role.sh`
 - **Bin reports can no longer be skipped silently**: a CheckM2 or GTDB-Tk report whose
   file name matched no sample was dropped with a warning; if that happened for every
   sample, BIN_QUALITY_REPORT, BIN_TAX_REPORT and BIN_SUMMARY never ran. It is now an error

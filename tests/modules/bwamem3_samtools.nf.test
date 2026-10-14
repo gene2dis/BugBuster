@@ -82,7 +82,10 @@ nextflow_process {
                     // ... and so must one containing "_1.": a substring match
                     // put S_1.2's R2 file into R1 and the pairing failed
                     ['S_1.2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
-                    ['S_1.2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz']
+                    ['S_1.2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz'],
+                    // ... and a chunk number after R1/R2 must not override it
+                    ['S3_R1_2.fastq.gz', 'singleton_test_R1.fastq.gz'],
+                    ['S3_R2_2.fastq.gz', 'singleton_test_R2.fastq.gz']
                 ].collect { names ->
                     def target = pooled.resolve(names[0])
                     file("\${reads_dir}/\${names[1]}").copyTo(target)
