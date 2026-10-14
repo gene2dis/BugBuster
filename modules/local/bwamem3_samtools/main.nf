@@ -135,7 +135,8 @@ process BWAMEM3_SAMTOOLS {
     // positionally (raw input names when QC is off).
     def classify_reads = meta.id == 'coassembly'
         ? """for f in ${reads.join(' ')}; do
-        case "\$(read_role.sh "\$f")" in
+        role=\$(read_role.sh "\$f") || exit 1
+        case "\$role" in
             R1) R1+=("\$f") ;;
             R2) R2+=("\$f") ;;
             S)  S+=("\$f") ;;

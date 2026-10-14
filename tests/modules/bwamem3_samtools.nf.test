@@ -107,6 +107,39 @@ nextflow_process {
         }
     }
 
+    test("fails on a pooled read file whose name has no read role") {
+        when {
+            process {
+                """
+                // Raw names (--quality_control false): s1_reads.fastq.gz has no
+                // R1/R2/singleton token and used to drop out without an error
+                def pooled = file("${outputDir}/pooled_norole")
+                pooled.mkdirs()
+                def reads_dir = "${projectDir}/tests/data/reads"
+                def pooled_reads = [
+                    ['s1_R1.fastq.gz',    'singleton_test_R1.fastq.gz'],
+                    ['s1_R2.fastq.gz',    'singleton_test_R2.fastq.gz'],
+                    ['s1_reads.fastq.gz', 'singleton_test_S.fastq.gz']
+                ].collect { names ->
+                    def target = pooled.resolve(names[0])
+                    file("\${reads_dir}/\${names[1]}").copyTo(target)
+                    target
+                }
+                input[0] = channel.of([
+                    [ id: 'coassembly' ],
+                    pooled_reads,
+                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
+                ]).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("cannot tell the read role of s1_reads.fastq.gz") }
+        }
+    }
+
     test("writes a header-only BAM and a report for an empty contig set") {
         when {
             process {

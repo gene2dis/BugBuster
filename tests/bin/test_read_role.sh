@@ -17,7 +17,7 @@ FAIL=0
 
 expect() {
     local name="$1" want="$2" got
-    got=$("${ROLE}" "${name}")
+    got=$("${ROLE}" "${name}" 2>/dev/null) || got=""
     if [ "${got}" = "${want}" ]; then
         echo "✓ ${name} -> ${want:-<none>}"
         PASS=$((PASS + 1))
@@ -47,12 +47,27 @@ expect "S_L001_R1_001.fastq.gz"              R1
 expect "S_L001_R2_001.fastq.gz"              R2
 expect "sample.R2.fastq.gz"                  R2
 expect "sample_unpaired.fastq.gz"            S
+expect "sample2_singletons.fastq.gz"         S
 # Chunked raw files: a trailing chunk number does not override R1/R2
 expect "S1_R1_2.fastq.gz"                    R1
 expect "S1_R2_1.fastq.gz"                    R2
 expect "S1_R1_001_2.fastq.gz"                R1
-# No role in the name
-expect "sample.fastq.gz"                     ""
+# No role in the name: an error, so the file cannot drop out unnoticed
+expect_error() {
+    local name="$1" err
+    if err=$("${ROLE}" "${name}" 2>&1 >/dev/null); then
+        echo "✗ ${name}: expected an error, got exit 0"
+        FAIL=$((FAIL + 1))
+    elif [[ "${err}" == *"cannot tell the read role"* ]]; then
+        echo "✓ ${name} -> error"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ ${name}: unexpected message '${err}'"
+        FAIL=$((FAIL + 1))
+    fi
+}
+expect_error "sample.fastq.gz"
+expect_error "sampleA_single.fastq.gz"
 
 echo
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

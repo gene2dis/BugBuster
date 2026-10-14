@@ -376,6 +376,16 @@ assembly use singletons as well.
 - **Paired-end**: Required (R1 and R2)
 - **Naming**: Sample names must be unique
 - **Paths**: Use absolute paths for cloud/HPC execution
+- **Read file names in co-assembly without QC** (`--assembly_mode coassembly
+  --quality_control false`): the pooled reads are sorted into R1, R2 and
+  singleton lists by file name (`bin/read_role.sh`), so each name needs a role.
+  The name minus its extension is split on `_` and `.`; the last `R1`, `R2`,
+  `singleton`, `singletons` or `unpaired` token wins (any case), otherwise the
+  last bare `1` or `2` (`sample_1.fastq.gz`). A trailing chunk number does not
+  override an explicit token (`S1_R1_2.fastq.gz` is R1). A file whose name has
+  no role (`sample.fastq.gz`) stops the run with an error. With QC on the clean
+  reads are renamed `<sample>_{R1,R2,Singleton}_clean.fastq.gz`, so any input
+  names work
 
 ### Cloud Storage Paths
 

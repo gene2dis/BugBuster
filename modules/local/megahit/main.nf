@@ -64,8 +64,10 @@ process MEGAHIT {
         
         # Role from the file name's last R1/R2/singleton token (bin/read_role.sh),
         # so a sample id such as S_1.2 cannot pull its R2 file into R1
+        # (it fails on a name without a role, so no file drops out unnoticed)
         for read_file in ${reads}; do
-            case "\$(read_role.sh "\$read_file")" in
+            role=\$(read_role.sh "\$read_file") || exit 1
+            case "\$role" in
                 R1) R1_files+=("\$read_file") ;;
                 R2) R2_files+=("\$read_file") ;;
                 S)  Singleton_files+=("\$read_file") ;;

@@ -341,8 +341,10 @@ next release is tagged.
   `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer
   matched. The role now comes from the last explicit R1/R2/singleton token of the file
   name, falling back to a bare 1/2 only when there is none, so a chunk number
-  (`S1_R1_2.fastq.gz`) does not override it. All three modules use `bin/read_role.sh`,
-  tested by `tests/bin/test_read_role.sh`
+  (`S1_R1_2.fastq.gz`) does not override it. A file whose name has no role (with
+  `--quality_control false`, e.g. `sample.fastq.gz`) was silently left out of the
+  co-assembly; it is now an error, and `singletons` counts as a singleton token. All
+  three modules use `bin/read_role.sh`, tested by `tests/bin/test_read_role.sh`
 - **Bin reports can no longer be skipped silently**: a CheckM2 or GTDB-Tk report whose
   file name matched no sample was dropped with a warning; if that happened for every
   sample, BIN_QUALITY_REPORT, BIN_TAX_REPORT and BIN_SUMMARY never ran. It is now an error
