@@ -5,10 +5,10 @@
     Build a single bwa-mem3 index from multiple FASTA files (phiX + host) for
     single-pass decontamination (--read_aligner bwamem3)
 
-    Peak memory is ~12 bytes per base of doubled text (~75 GB for CHM13 + phiX),
-    so the task runs under process_high_memory: the input FASTA is usually
-    gzipped, and a size-based memory estimate taken before the task runs would
-    undershoot by the compression ratio. --max-memory is pinned to the task
+    Peak memory is ~12 bytes per base of doubled text (~75 GB for CHM13 + phiX).
+    config/modules.config sizes the request from the staged FASTA sizes,
+    counting a gzipped file at 4x (the input is usually gzipped, and its size
+    alone would undershoot by the compression ratio). --max-memory is pinned to the task
     allocation because bwa-mem3 otherwise budgets against the whole node's RAM
     (it is only cgroup-aware); a budget that cannot fit the reference makes
     bwa-mem3 exit 3 before building, which config/modules.config retries.
@@ -20,7 +20,6 @@ process BWAMEM3_BUILD_COMBINED {
     container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
 
     label 'process_medium'
-    label 'process_high_memory'
 
     input:
     path(fasta_files)

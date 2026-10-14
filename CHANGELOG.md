@@ -282,8 +282,9 @@ next release is tagged.
   stays as the fallback, unchanged. What changes for an existing setup:
   - building the human decontamination index needs ~75 GB RAM (bowtie2: ~6 GB) and
     mapping ~14 GB per task (~4 GB). The pipeline warns at launch when `--max_memory`
-    is lower, and the build no longer repeats an exit-3 retry that `--max_memory`
-    caps at the same memory
+    is lower. The build's request is sized from the genome FASTA (~90 GB for the
+    default gzipped human genome, 8 GB minimum) instead of a fixed 256 GB, and it no
+    longer repeats an exit-3 retry that `--max_memory` caps at the same memory
   - the index is published to `<databases_dir>/bwamem3_index/`; a Bowtie2
     `--custom_decontamination_index` is rejected at launch, with a message naming
     `--read_aligner bowtie2`
