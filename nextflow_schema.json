@@ -667,7 +667,7 @@
                 },
                 "deeparg_arg_alignment_evalue": {
                     "type": "string",
-                    "default": 1e-10,
+                    "default": "1e-10",
                     "description": "Maximum E-value for DeepARG alignments.",
                     "fa_icon": "fas fa-calculator"
                 },
@@ -747,7 +747,7 @@
             "title": "Bowtie2 alignment options",
             "type": "object",
             "fa_icon": "fas fa-align-center",
-            "description": "Parameters for Bowtie2 read alignment and filtering.",
+            "description": "Parameters for Bowtie2 read alignment during host filtering; they apply only under --read_aligner bowtie2.",
             "hidden": true,
             "properties": {
                 "bowtie_ma": {

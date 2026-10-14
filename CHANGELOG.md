@@ -350,6 +350,10 @@ next release is tagged.
   stops with a clear message when its index has no `*.bt2` files. Both index checks now run
   with the other launch checks, before any channel starts: raised later, the error could
   be reported as "Cannot find samplesheet file" instead
+- **bwa-mem3 contig and bin index builds** no longer repeat an exit-3 (memory budget)
+  retry that `--max_memory` caps at the same memory
+- `nextflow_schema.json`: the `deeparg_arg_alignment_evalue` default is the string
+  `"1e-10"`, matching its type and `nextflow.config`
 - **A run in which no sample yields a bin now finishes**: BIN_TAX_REPORT, BIN_QUALITY_REPORT
   and BIN_SUMMARY warn when every input report is empty and write header-only tables (and
   placeholder plots), instead of failing (audit #13 made them fail; with SemiBin and MetaWRAP
