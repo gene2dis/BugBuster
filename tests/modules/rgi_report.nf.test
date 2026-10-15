@@ -7,6 +7,10 @@
     *mer_analysis.txt (which rgi kmer_query --bwt never writes), so it always
     logged "Found 0 k-mer files". Fixtures in tests/data/rgi/ are a minimal
     rgi bwt gene/allele table pair for one sample plus a k-mer JSON.
+
+    Also checks that a sample where rgi bwt mapped too few reads is reported
+    with zero genes: s2's tables are bin/rgi_bwt_lowcov_fallback.sh's
+    placeholders (one all-NA row), which RGI_REPORT counted as one gene.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -40,6 +44,52 @@ nextflow_process {
             def lines = summary.readLines()
             assert lines[0] == "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families"
             assert lines[1] == "s1,2,17,2,2"
+        }
+    }
+
+    test("reports a low-coverage fallback sample with zero genes") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/rgi/s1_rgi_bwt.allele_mapping_data.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/rgi/s2_rgi_bwt.allele_mapping_data.txt", checkIfExists: true)
+                ]
+                input[1] = [
+                    file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/rgi/s2_rgi_bwt.gene_mapping_data.txt", checkIfExists: true)
+                ]
+                input[2] = [ file("${projectDir}/tests/data/rgi/s1_rgi_kmer_61mer_analysis.json", checkIfExists: true) ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def lines = path(process.out.summary.get(0)).readLines()
+            assert lines == [
+                "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families",
+                "s1,2,17,2,2",
+                "s2,0,0,0,0"
+            ]
+        }
+    }
+
+    test("reports every sample with zero genes when all are fallbacks") {
+        when {
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/rgi/s2_rgi_bwt.allele_mapping_data.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/rgi/s2_rgi_bwt.gene_mapping_data.txt", checkIfExists: true) ]
+                input[2] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.summary.get(0)).readLines()[1] == "s2,0,0,0,0"
         }
     }
 }

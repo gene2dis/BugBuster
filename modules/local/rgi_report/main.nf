@@ -45,39 +45,48 @@ process RGI_REPORT {
         print(f"Found {len(gene_files)} gene files")
         print(f"Found {len(kmer_files)} k-mer files")
         
-        # Process gene-level data
+        # Process gene-level data. A sample where rgi bwt mapped too few reads
+        # gets a placeholder table with one all-NA row (rgi_bwt_lowcov_fallback.sh);
+        # that row is dropped, so the sample is reported with zero genes
+        samples = []
         gene_data_list = []
         for gene_file in gene_files:
             try:
                 sample_id = gene_file.name.replace('_rgi_bwt.gene_mapping_data.txt', '')
                 df = pd.read_csv(gene_file, sep='\\t')
+                if 'ARO Term' in df.columns:
+                    df = df[df['ARO Term'].notna()].copy()
                 df['Sample'] = sample_id
+                samples.append(sample_id)
                 gene_data_list.append(df)
             except Exception as e:
                 print(f"Warning: Could not process {gene_file}: {e}")
+        samples = sorted(samples)
         
+        summary_columns = ['Sample', 'Total_AMR_Genes', 'Total_Mapped_Reads',
+                           'Unique_Drug_Classes', 'Unique_AMR_Families']
         if gene_data_list:
             combined_gene_data = pd.concat(gene_data_list, ignore_index=True)
             
-            # Create summary report
+            # Create summary report, one row per sample (zero-hit samples included)
             summary_data = []
-            for sample in combined_gene_data['Sample'].unique():
+            for sample in samples:
                 sample_data = combined_gene_data[combined_gene_data['Sample'] == sample]
                 summary_data.append({
                     'Sample': sample,
                     'Total_AMR_Genes': len(sample_data),
-                    'Total_Mapped_Reads': sample_data['All Mapped Reads'].sum() if 'All Mapped Reads' in sample_data.columns else 0,
+                    'Total_Mapped_Reads': int(sample_data['All Mapped Reads'].sum()) if 'All Mapped Reads' in sample_data.columns else 0,
                     'Unique_Drug_Classes': sample_data['Drug Class'].nunique() if 'Drug Class' in sample_data.columns else 0,
                     'Unique_AMR_Families': sample_data['AMR Gene Family'].nunique() if 'AMR Gene Family' in sample_data.columns else 0
                 })
             
-            summary_df = pd.DataFrame(summary_data)
+            summary_df = pd.DataFrame(summary_data, columns=summary_columns)
             summary_df.to_csv('RGI_summary_report.csv', index=False)
             
             # Generate plots
             try:
                 # Plot 1: AMR Gene Family distribution
-                if 'AMR Gene Family' in combined_gene_data.columns:
+                if 'AMR Gene Family' in combined_gene_data.columns and combined_gene_data['AMR Gene Family'].notna().any():
                     top_families = combined_gene_data['AMR Gene Family'].value_counts().head(15)
                     plt.figure(figsize=(14, 8))
                     top_families.plot(kind='barh')
@@ -89,7 +98,7 @@ process RGI_REPORT {
                     plt.close()
                 
                 # Plot 2: Drug Class profile
-                if 'Drug Class' in combined_gene_data.columns:
+                if 'Drug Class' in combined_gene_data.columns and combined_gene_data['Drug Class'].notna().any():
                     drug_classes = combined_gene_data['Drug Class'].str.split(';').explode()
                     top_drugs = drug_classes.value_counts().head(15)
                     plt.figure(figsize=(14, 8))
@@ -102,7 +111,7 @@ process RGI_REPORT {
                     plt.close()
                 
                 # Plot 3: Resistance Mechanism
-                if 'Resistance Mechanism' in combined_gene_data.columns:
+                if 'Resistance Mechanism' in combined_gene_data.columns and combined_gene_data['Resistance Mechanism'].notna().any():
                     mechanisms = combined_gene_data['Resistance Mechanism'].str.split(';').explode()
                     top_mechanisms = mechanisms.value_counts().head(10)
                     plt.figure(figsize=(12, 8))
@@ -114,9 +123,9 @@ process RGI_REPORT {
                     plt.savefig('RGI_resistance_mechanisms.png', dpi=300)
                     plt.close()
                 
-                # Plot 4: Per-sample AMR gene count
+                # Plot 4: Per-sample AMR gene count (zero-hit samples shown as 0)
                 plt.figure(figsize=(12, 6))
-                sample_counts = combined_gene_data.groupby('Sample').size()
+                sample_counts = combined_gene_data.groupby('Sample').size().reindex(samples, fill_value=0)
                 sample_counts.plot(kind='bar', color='mediumseagreen')
                 plt.xlabel('Sample')
                 plt.ylabel('Number of AMR Genes')
@@ -130,8 +139,7 @@ process RGI_REPORT {
                 print(f"Warning: Could not generate plots: {e}")
         else:
             # Create empty summary if no data
-            summary_df = pd.DataFrame(columns=['Sample', 'Total_AMR_Genes', 'Total_Mapped_Reads', 
-                                              'Unique_Drug_Classes', 'Unique_AMR_Families'])
+            summary_df = pd.DataFrame(columns=summary_columns)
             summary_df.to_csv('RGI_summary_report.csv', index=False)
         
         # Create versions file
