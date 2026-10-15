@@ -1,0 +1,93 @@
+name: results_summary
+description: Run-level summary of QC, taxonomy and read-level ARG (K-MARVEL) results (bin/results_summary.py) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures and a self-contained HTML report. Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. The same script runs outside the pipeline on several published results directories (batches).
+keywords:
+  - report
+  - summary
+  - taxonomy
+  - antimicrobial resistance
+tools:
+  - pandas:
+      description: Python data analysis library used by the summary script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+  - matplotlib:
+      description: Figures (PNG, PDF and SVG; the SVGs are embedded in the HTML report)
+      homepage: https://matplotlib.org
+      documentation: https://matplotlib.org/stable/
+      licence: ["PSF-based"]
+  - openpyxl:
+      description: Excel workbook output
+      homepage: https://openpyxl.readthedocs.io
+      documentation: https://openpyxl.readthedocs.io
+      licence: ["MIT"]
+
+input:
+  - reads_report:
+      type: file
+      description: Reads_report.csv (read counts per step in single reads; the TAXONOMY_REPORT version adds the profiler's classified fraction)
+      pattern: "*.csv"
+  - fastp_jsons:
+      type: file
+      description: Per-sample fastp JSON reports (mean read length); empty without QC
+      pattern: "*.fastp.json"
+  - taxonomy_tables:
+      type: file
+      description: TAXONOMY_PHYLOSEQ OTU, taxonomy and (sylph) read-count tables; empty without a profiler
+      pattern: "*_{otu_table,tax_table,read_counts}.tsv"
+  - sylph_profiles:
+      type: file
+      description: Raw per-sample sylph profiles (ANI, coverage); empty unless the profiler is sylph
+      pattern: "*_sylph_*.tsv"
+  - kmarvel_tsvs:
+      type: file
+      description: Per-sample K-MARVEL tables; empty unless --kmarvel_prediction
+      pattern: "*_kmarvel.tsv"
+  - kmarvel_db:
+      type: directory
+      description: K-MARVEL CARD directory; its snps.txt is used to check variant-model hits for resistance mutations
+  - software_versions:
+      type: file
+      description: The run's aggregated software_versions.yml, shown in the report
+      pattern: "software_versions.yml"
+  - sample_metadata:
+      type: file
+      description: Optional TSV/CSV with a 'sample' column (or sample names in the first column) and any metadata columns
+      pattern: "*.{tsv,csv,txt}"
+  - card_prevalence:
+      type: file
+      description: Optional WildCARD card_prevalence.txt; adds candidate ARG hosts (co-occurring known carriers) and CARD plasmid association
+      pattern: "card_prevalence.txt"
+  - arg_priority:
+      type: file
+      description: ARG tier rule table (default assets/arg_priority_tiers.tsv)
+      pattern: "*.tsv"
+  - watchlist:
+      type: file
+      description: Watchlist taxa (default assets/summary_watchlist.tsv)
+      pattern: "*.tsv"
+
+output:
+  - html:
+      type: file
+      description: Self-contained HTML report (inline SVG figures, sortable tables; no network access needed)
+      pattern: "results_summary.html"
+  - xlsx:
+      type: file
+      description: Excel workbook with every table and a README sheet defining the columns
+      pattern: "results_summary.xlsx"
+  - tables:
+      type: file
+      description: samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence, arg_drug_class_rpkm, arg_priority_panel and (with a grouping column) group_arg_detection
+      pattern: "tables/*.tsv"
+  - figures:
+      type: file
+      description: QC read fate, taxonomy heatmaps and bars, watchlist, ARG heatmaps, ARG detection versus depth, and (with grouping and ordering columns) a tier 1 ARG timeline; PNG, PDF and SVG
+      pattern: "figures/*"
+  - versions:
+      type: file
+      description: Software versions (python, pandas, matplotlib, openpyxl)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

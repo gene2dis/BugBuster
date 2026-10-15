@@ -516,13 +516,17 @@ def watchlist_table(tx, watch):
     return pd.DataFrame(rows), pd.DataFrame(long_rows)
 
 
-def arg_tables(arg, samples, order, ran, group_by, order_by):
+def arg_status(samples, order, ran):
+    """Per sample: ok, NA_low_depth (absence not informative) or NA_not_run (no K-MARVEL output)."""
+    low = samples["low_depth"].fillna(False).astype(bool) if "low_depth" in samples else pd.Series(False, samples.index)
+    return {s: NA_NOT_RUN if s not in ran else (NA_LOW_DEPTH if low[s] else "ok") for s in order}
+
+
+def arg_tables(arg, samples, order, status, group_by, order_by):
     """Wide ARG matrices; a cell for a gene not found is 0, NA_low_depth or NA_not_run."""
     out = {}
     arg = arg[arg["gene_representative"]]
     cols = [s for s in order]
-    low = samples["low_depth"].fillna(False).astype(bool) if "low_depth" in samples else pd.Series(False, samples.index)
-    status = {s: NA_NOT_RUN if s not in ran else (NA_LOW_DEPTH if low[s] else "ok") for s in cols}
 
     def fill_missing(mat):
         mat = mat.reindex(columns=cols)
@@ -597,7 +601,7 @@ def arg_tables(arg, samples, order, ran, group_by, order_by):
                     "pattern": " ".join(pattern),
                 })
         out["group_arg_detection"] = pd.DataFrame(rows)
-    return out, status
+    return out
 
 
 # --------------------------------------------------------------------------- figures
@@ -1367,7 +1371,7 @@ def main(argv=None):
         spw = tx["wide"][sp].reindex(columns=order).fillna(0)
         p = spw / 100
         with np.errstate(divide="ignore", invalid="ignore"):
-            shannon = -(p * np.log(p.where(p > 0))).sum(axis=0)
+            shannon = -(p * np.log(p.where(p > 0))).sum(axis=0) + 0.0  # + 0.0: no "-0.0" for one species
         samples["taxonomy_db"] = tx["label"]
         samples["n_species"] = (spw > 0).sum(axis=0).reindex(order)
         samples["shannon"] = shannon.reindex(order)
@@ -1410,15 +1414,24 @@ def main(argv=None):
         if snps is None:
             warn("no --kmarvel-db: tier 4 calls cannot be checked for resistance mutations")
         prevalence = load_prevalence(args.card_prevalence) if args.card_prevalence else None
-        arg = annotate_args(pd.concat(kframes, ignore_index=True), samples, rules, snps, prevalence, species_by_sample)
-        mats, status = arg_tables(arg, samples, order, ran, args.group_by, args.order_by)
+        status = arg_status(samples, order, ran)
         samples["arg_status"] = [status[s] for s in order]
+        not_run = [s for s in order if status[s] == NA_NOT_RUN]
+        calls = pd.concat(kframes, ignore_index=True)
+    if kframes and ran and calls.empty:
+        warn("K-MARVEL found no ARG in any sample: ARG tables and figures are skipped")
+        for col in [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]:
+            samples[col] = 0
+        samples.loc[not_run, [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]] = np.nan
+        summary["n_tier1"], summary["n_tier1_genes"] = 0, 0
+    elif kframes and ran:
+        arg = annotate_args(calls, samples, rules, snps, prevalence, species_by_sample)
+        mats = arg_tables(arg, samples, order, status, args.group_by, args.order_by)
         for t in (1, 2, 3, 4):
             samples[f"n_arg_calls_tier{t}"] = arg[arg["tier"] == t].groupby("sample").size().reindex(order).fillna(0).astype(int)
         acq = arg[(arg["tier"] <= 2) & arg["gene_representative"]]
         samples["acquired_genes"] = acq.groupby("sample")["gene"].nunique().reindex(order).fillna(0).astype(int)
         samples["acquired_rpkm"] = acq.groupby("sample")["rpkm"].sum().reindex(order).fillna(0)
-        not_run = [s for s in order if status[s] == NA_NOT_RUN]
         samples.loc[not_run, [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]] = np.nan
         lead = ["sample", "batch"] + meta_cols + ["tier", "category", "gene", "aro_full_name", "aro_id", "gene_family",
                                                    "drug_class", "resistance_mechanism", "model", "identity",

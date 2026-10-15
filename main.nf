@@ -74,6 +74,14 @@ def printHelp() {
       --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
 
+    \u001B[1;33mResults summary (00_summary/):\u001B[0m
+      --results_summary             Tables, Excel workbook, figures and HTML report of QC, taxonomy and K-MARVEL results (default: ${params.results_summary})
+      --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
+      --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
+      --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)
+      --summary_min_clean_pairs     Flag samples below this many clean read pairs as low depth (default: ${params.summary_min_clean_pairs})
+      --card_prevalence             WildCARD card_prevalence.txt, adds candidate ARG hosts (default: none)
+
     \u001B[1;33mResource options:\u001B[0m
       --max_cpus                    Maximum CPUs per process (default: ${params.max_cpus})
       --max_memory                  Maximum memory per process (default: ${params.max_memory})
@@ -148,6 +156,9 @@ include { RGI_REPORT       } from './modules/local/rgi_report/main'
 	// K-MARVEL AMR PREDICTION
 include { KMARVEL          } from './modules/local/kmarvel/main'
 include { KMARVEL_REPORT   } from './modules/local/kmarvel_report/main'
+
+	// RUN-LEVEL SUMMARY (00_summary/)
+include { RESULTS_SUMMARY  } from './modules/local/results_summary/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
 include { DEEPARG_BINS             } from './modules/local/deeparg/main'
@@ -249,6 +260,10 @@ workflow {
     def valid_read_functional = ['woltka', 'superfocus', 'humann', 'none']
     if (!(params.read_level_functional in valid_read_functional)) {
         error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
+    }
+    // The summary's grouping/ordering columns live in the metadata table
+    if ((params.summary_group_by || params.summary_order_by) && !params.sample_metadata) {
+        error("--summary_group_by and --summary_order_by name columns of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
     }
     // A sylph database and its sylph-tax metadata must come from the same
     // release: a custom database with the registry's metadata (or the reverse)
@@ -359,6 +374,13 @@ workflow {
     //
     // SUBWORKFLOW: Taxonomic profiling
     //
+    // Inputs of the run-level summary; each stays empty when its stage is off
+    ch_summary_tax_report = channel.empty()
+    ch_summary_tax_tables = channel.empty()
+    ch_summary_sylph      = channel.empty()
+    ch_summary_kmarvel    = channel.empty()
+    ch_summary_kmarvel_db = channel.empty()
+
     if ( params.taxonomic_profiler != "none" ) {
         TAXONOMY(
             ch_clean_reads,
@@ -369,6 +391,9 @@ workflow {
             PREPARE_DATABASES.out.sylph_taxonomy
         )
         ch_versions = ch_versions.mix(TAXONOMY.out.versions)
+        ch_summary_tax_report = TAXONOMY.out.reads_report
+        ch_summary_tax_tables = TAXONOMY.out.tables
+        ch_summary_sylph      = TAXONOMY.out.sylph_profiles
     }
 
     //
@@ -448,6 +473,8 @@ workflow {
             KMARVEL.out.versions.first(),
             KMARVEL_REPORT.out.versions
         )
+        ch_summary_kmarvel    = KMARVEL.out.tsv.map { _meta, file -> file }
+        ch_summary_kmarvel_db = ch_kmarvel_db
     }
 
     //
@@ -678,7 +705,7 @@ workflow {
     // so content-level unique() collapses them to one block per process.
     // stripIndent() normalizes the varying heredoc indentation across modules.
     //
-    ch_versions
+    ch_software_versions = ch_versions
         .map { yml -> yml.text.stripIndent() }
         .mix( channel.of(
             ( "\"${workflow.manifest.name}\":\n" +
@@ -692,6 +719,32 @@ workflow {
             sort: true,
             newLine: false
         )
+
+    //
+    // MODULE: Run-level summary (00_summary/): QC, taxonomy and K-MARVEL
+    // tables, Excel workbook, figures and HTML report. It reads the
+    // aggregated software_versions.yml, so its own versions.yml is not part
+    // of that file.
+    //
+    if ( flagOn(params.results_summary) ) {
+        // the profiler's Reads_report.csv adds the classified fraction
+        ch_summary_reads_report = params.taxonomic_profiler != 'none'
+            ? ch_summary_tax_report
+            : ch_reads_report.flatten().filter { report -> report.name.endsWith('.csv') }
+        RESULTS_SUMMARY(
+            ch_summary_reads_report.first(),
+            QC.out.fastp_json.toSortedList { a, b -> a.name <=> b.name },
+            ch_summary_tax_tables.toSortedList { a, b -> a.name <=> b.name },
+            ch_summary_sylph.toSortedList { a, b -> a.name <=> b.name },
+            ch_summary_kmarvel.toSortedList { a, b -> a.name <=> b.name },
+            ch_summary_kmarvel_db.toList(),
+            ch_software_versions,
+            params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : [],
+            params.card_prevalence ? file(params.card_prevalence, checkIfExists: true) : [],
+            file(params.arg_priority_table, checkIfExists: true),
+            file(params.summary_watchlist, checkIfExists: true)
+        )
+    }
 
     //
     // COMPLETION HANDLERS

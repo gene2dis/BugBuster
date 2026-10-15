@@ -22,6 +22,7 @@ workflow QC {
 
     main:
     ch_versions = channel.empty()
+    ch_fastp_json = channel.empty()
 
     if ( flagOn(params.quality_control) ) {
         //
@@ -56,6 +57,9 @@ workflow QC {
             false,  // save_trimmed_fail
             false   // save_merged
         )
+
+        // Paired-read fastp reports for the results summary (read length)
+        ch_fastp_json = FASTP.out.json.map { _meta, json_file -> json_file }
 
         // Collect versions
         ch_versions = ch_versions.mix(FASTP.out.versions.first())
@@ -156,5 +160,6 @@ workflow QC {
     emit:
     reads              = ch_clean_reads            // channel: [ val(meta), [ reads ] ]
     report             = ch_report                 // channel: path(report)
+    fastp_json         = ch_fastp_json             // channel: path(<sample>.fastp.json); empty without QC
     versions           = ch_versions               // channel: path(versions.yml)
 }

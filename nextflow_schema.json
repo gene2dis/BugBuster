@@ -1020,6 +1020,73 @@
                 }
             }
         },
+        "results_summary_options": {
+            "title": "Results summary options",
+            "type": "object",
+            "fa_icon": "fas fa-clipboard-list",
+            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures and a self-contained HTML report of the QC, taxonomy and K-MARVEL results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
+            "properties": {
+                "results_summary": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Write the run-level summary (00_summary/).",
+                    "fa_icon": "fas fa-clipboard-list"
+                },
+                "sample_metadata": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "pattern": "^\\S+\\.(tsv|csv|txt)$",
+                    "description": "TSV or CSV with a 'sample' column (or sample names in the first column) and any metadata columns, carried into every summary table.",
+                    "fa_icon": "fas fa-table"
+                },
+                "summary_group_by": {
+                    "type": "string",
+                    "description": "Metadata column that groups samples in the summary figures and the per-group ARG detection table (e.g. subject, site). Needs --sample_metadata.",
+                    "fa_icon": "fas fa-object-group"
+                },
+                "summary_order_by": {
+                    "type": "string",
+                    "description": "Metadata column that orders samples within a group (e.g. visit, day); with --summary_group_by it also draws the tier 1 ARG timeline. Needs --sample_metadata.",
+                    "fa_icon": "fas fa-sort"
+                },
+                "summary_min_clean_pairs": {
+                    "type": "integer",
+                    "default": 1000000,
+                    "minimum": 0,
+                    "description": "Samples with fewer clean read pairs are flagged as low depth: an ARG or taxon not found there is reported as unknown (NA_low_depth), not absent. Samples are never dropped.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "summary_top_n": {
+                    "type": "integer",
+                    "default": 40,
+                    "minimum": 1,
+                    "description": "Maximum rows in the summary taxonomy and ARG heatmaps.",
+                    "fa_icon": "fas fa-sort-numeric-down"
+                },
+                "card_prevalence": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "WildCARD card_prevalence.txt (in an RGI WildCARD database: wildcard/card_prevalence.txt). Adds, per ARG call, the species of the same sample that CARD lists as carriers of the ARO (co-occurrence, not linkage) and whether CARD finds it on plasmids.",
+                    "fa_icon": "fas fa-file"
+                },
+                "arg_priority_table": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "ARG reporting tier rules (regular expressions on CARD names and gene families); copy and edit the default to change the tiers.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "summary_watchlist": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Taxa reported in the summary watchlist (species or genus; GTDB suffixes are ignored when matching).",
+                    "fa_icon": "fas fa-binoculars"
+                }
+            }
+        },
         "functional_annotation_options": {
             "title": "Functional annotation options",
             "type": "object",
@@ -1307,6 +1374,9 @@
         },
         {
             "$ref": "#/$defs/kmarvel_options"
+        },
+        {
+            "$ref": "#/$defs/results_summary_options"
         },
         {
             "$ref": "#/$defs/functional_annotation_options"
