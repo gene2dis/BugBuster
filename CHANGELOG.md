@@ -12,6 +12,39 @@ next release is tagged.
 
 ### Added
 
+- **Run-level results summary (`00_summary/`, `--results_summary`, on by default)**
+  - `RESULTS_SUMMARY` (`bin/results_summary.py`) consolidates the QC, taxonomy
+    and K-MARVEL results into tidy and wide TSV tables, an Excel workbook
+    (README sheet with column definitions), PDF/PNG/SVG figures and a
+    self-contained HTML report (inline SVG, sortable tables, no network)
+  - Counts in read pairs (`Reads_report.csv` counts single reads); a
+    low-depth flag (`--summary_min_clean_pairs`, default 1,000,000 clean
+    pairs) turns "not detected" into `NA_low_depth` instead of absent
+  - K-MARVEL abundance as RPM and RPKM of clean read pairs (the
+    `kmarvel_summary/` matrices are raw counts); each gene is represented by
+    its best-supported allele, as alleles of one gene share their reads
+  - ARG reporting tiers from an editable rule table
+    (`assets/arg_priority_tiers.tsv`, `--arg_priority_table`): 1 clinical
+    priority, 2 other acquired, 3 intrinsic/efflux/regulator, 4 mutation
+    dependent; tier 4 hits are checked against the K-MARVEL database's CARD
+    `snps.txt` (`resistance_snp_status`), since K-MARVEL lists every
+    difference from the reference, not resistance mutations
+  - Taxonomy tables named by taxon per rank, a long table with sylph ANI,
+    ANI interval and coverage (`species_call_uncertain`), species prevalence,
+    and a watchlist of priority pathogens (`assets/summary_watchlist.tsv`,
+    `--summary_watchlist`)
+  - Optional `--sample_metadata` with `--summary_group_by` /
+    `--summary_order_by`: grouped and ordered figures, per-group ARG
+    detection patterns and a tier 1 ARG timeline
+  - Optional `--card_prevalence` (WildCARD): candidate ARG hosts among the
+    species of the same sample (co-occurrence, not linkage) and CARD plasmid
+    association
+  - The script also runs on finished results directories, merging several
+    batches without rerunning any tool (manual, Example 13); pinned Seqera
+    image with pandas, matplotlib and openpyxl
+  - `docs/REPORTING_ROADMAP.md`: reporting improvements planned for the
+    modules without example results yet
+
 - **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
   - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by
     containment ANI against a sylph database with `-u` (unknown-fraction
@@ -341,6 +374,15 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Report plots readable on large runs**
+  - `Box_plot_reads.png`: the y axis had a tick every 5M reads (57
+    overlapping labels at 285M); ticks are now chosen automatically
+  - Taxonomy bar plots: `--taxonomy_top_n_taxa` taxa are chosen so that each
+    sample's most abundant taxa are shown (the global top-N by mean abundance
+    put whole samples in "Other"); samples in natural order (`V2` before
+    `V10`), figure height and label size follow the sample count
+  - Classified-reads plot: samples sorted, legend outside the bars
 
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on

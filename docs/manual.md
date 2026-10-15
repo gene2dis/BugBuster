@@ -810,7 +810,7 @@ Control taxonomic output visualization and formatting:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Comma-separated taxonomic levels to plot |
-| `--taxonomy_top_n_taxa` | `10` | Number of top taxa to display in plots |
+| `--taxonomy_top_n_taxa` | `10` | Maximum taxa per plot; each sample's most abundant taxa are included first, then the most abundant overall |
 | `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files for downstream analysis |
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
@@ -830,6 +830,36 @@ By default, databases are published to a `databases/` directory at the same leve
 | `--max_cpus` | `16` | Maximum CPUs per process |
 | `--max_memory` | `128.GB` | Maximum memory per process |
 | `--max_time` | `240.h` | Maximum time per process |
+
+### 6.16 Results Summary Options
+
+The run-level summary in `00_summary/` consolidates the QC, taxonomy and K-MARVEL results: tidy and wide
+TSV tables, an Excel workbook (`results_summary.xlsx`, with a README sheet defining every column), PDF/PNG/SVG
+figures and a self-contained HTML report (`results_summary.html`, no network access needed to view it).
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--results_summary` | `true` | Write `00_summary/` |
+| `--sample_metadata` | none | TSV/CSV with a `sample` column (or sample names in the first column) and any metadata columns; carried into every table |
+| `--summary_group_by` | none | Metadata column that groups samples (subject, site, ...) in the figures and the per-group ARG detection table |
+| `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...); with `--summary_group_by` it adds the tier 1 ARG timeline |
+| `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
+| `--summary_top_n` | `40` | Maximum rows in the summary heatmaps |
+| `--card_prevalence` | none | WildCARD `card_prevalence.txt` (an RGI WildCARD database has it in `wildcard/`); adds candidate hosts and CARD plasmid association to each ARG call |
+| `--arg_priority_table` | `assets/arg_priority_tiers.tsv` | ARG reporting tier rules |
+| `--summary_watchlist` | `assets/summary_watchlist.tsv` | Taxa reported in the watchlist table and figure |
+
+How the summary reports the results:
+
+- **Read pairs throughout.** `Reads_report.csv` counts single reads (both mates); the summary divides by two, the unit K-MARVEL and sylph use.
+- **ARG abundance is normalised.** K-MARVEL's supporting read pairs become RPM (per million clean read pairs) and RPKM (RPM per kb of the CARD reference gene). The raw matrices in `kmarvel_summary/` are not comparable between samples of different depth.
+- **ARG tiers.** Each call is assigned a tier by `--arg_priority_table`: 1 clinical priority (carbapenemases, mcr, vanA/B/D/M, mecA/C, 16S rRNA methyltransferases, cfr/optrA/poxtA, tet(X3+)), 2 other acquired, 3 intrinsic, efflux or regulator, 4 mutation dependent. The rules are regular expressions on CARD gene families and names; copy the file to change them.
+- **Mutation-dependent hits are checked.** For variant-model hits (gyrA, parC, rpoB, ...), K-MARVEL lists every difference from the reference. The summary checks them against the CARD `snps.txt` of the K-MARVEL database. Only rows with `resistance_snp_status = card_snp_present` carry a mutation CARD lists for resistance; the others are detections of the gene, not of resistance.
+- **Genes, not alleles.** Read-level allele calls among close variants are unstable and share their reads (TEM-1 and TEM-256 with 16,032 and 16,029 pairs), so each gene is represented by its best-supported allele, never by the sum.
+- **Candidate hosts are co-occurrence.** With `--card_prevalence`, each ARG call lists the species of the same sample that CARD finds carrying that ARO. Reads are not linked to a host; confirming one needs assembly or long reads.
+- **Sylph confidence.** `taxonomy_long.tsv` adds sylph's ANI, ANI interval and coverage per genome; `species_call_uncertain` marks genomes whose ANI interval reaches below 95%.
+
+The same script summarises several finished results directories (batches) without rerunning any tool; see [Example 13](#example-13-summarise-several-batches).
 
 ---
 
@@ -936,6 +966,14 @@ results/
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
+├── 00_summary/                                 # Run-level summary (if results_summary=true)
+│   ├── results_summary.html                    # Self-contained report: figures, sortable tables, methods
+│   ├── results_summary.xlsx                    # Every table, plus a README sheet defining the columns
+│   ├── tables/                                 # samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence,
+│   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence,
+│   │                                           # arg_drug_class_rpkm, arg_priority_panel, group_arg_detection
+│   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist,
+│                                               # ARG heatmaps, arg_vs_depth, arg_tier1_timeline (.png/.pdf/.svg)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control
@@ -1307,6 +1345,7 @@ The following outputs are only generated when specific parameters are enabled:
 
 | Output Directory | Required Parameter | Description |
 |------------------|-------------------|-------------|
+| `00_summary/` | `results_summary=true` (default) | Run-level summary: tables, Excel workbook, figures, HTML report |
 | `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
 | `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`, extended with taxonomy when a profiler runs) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
@@ -1560,6 +1599,27 @@ nextflow run main.nf \
     --include_binning true \
     -profile singularity
 ```
+
+### Example 13: Summarise several batches
+
+Large studies are often run in batches (one results directory each). `bin/results_summary.py` reads the
+published results only, so it merges finished batches without rerunning any tool. Sample names must be unique
+across batches; taxa are matched by genome/taxon ID, and all batches must use the same taxonomy database.
+
+```bash
+# The pipeline's summary image has pandas, matplotlib and openpyxl
+IMG=community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_openpyxl:26abe1de4b35cb08
+docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -v /dbs:/dbs:ro -w $PWD $IMG \
+    python /bb/bin/results_summary.py \
+        --results batch1/results batch2/results batch3/results \
+        --outdir project_summary \
+        --metadata samples.tsv --group-by subject --order-by visit \
+        --kmarvel-db /dbs/kmarvel/card_v4.0.1 \
+        --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
+```
+
+`--metadata`, `--group-by` and `--order-by` are optional. Without `--kmarvel-db`, mutation-dependent ARG hits
+are reported as `not_checked`. `results_summary.py --help` lists every option.
 
 ---
 

@@ -13,13 +13,14 @@ Complete reference for all BugBuster pipeline parameters.
 5. [Quality Control Parameters](#quality-control-parameters)
 6. [Taxonomy Profiling Parameters](#taxonomy-profiling-parameters)
 7. [Taxonomy Visualization Parameters](#taxonomy-visualization-parameters)
-8. [Assembly Parameters](#assembly-parameters)
-9. [Binning Parameters](#binning-parameters)
-10. [ARG Prediction Parameters](#arg-prediction-parameters)
-11. [Functional Annotation Parameters](#functional-annotation-parameters)
-12. [Alignment Parameters](#alignment-parameters)
-13. [Resource Limit Parameters](#resource-limit-parameters)
-14. [Advanced Parameters](#advanced-parameters)
+8. [Results Summary Parameters](#results-summary-parameters)
+9. [Assembly Parameters](#assembly-parameters)
+10. [Binning Parameters](#binning-parameters)
+11. [ARG Prediction Parameters](#arg-prediction-parameters)
+12. [Functional Annotation Parameters](#functional-annotation-parameters)
+13. [Alignment Parameters](#alignment-parameters)
+14. [Resource Limit Parameters](#resource-limit-parameters)
+15. [Advanced Parameters](#advanced-parameters)
 
 ---
 
@@ -562,7 +563,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Type**: Integer
 - **Default**: `10`
 - **Minimum**: `1`
-- **Description**: Number of top taxa to display in plots
+- **Description**: Maximum taxa per plot. Each sample's most abundant taxa are included first, then the most abundant overall, so a taxon that dominates a few samples is not hidden in "Other"
 - **Example**: `--taxonomy_top_n_taxa 20`
 
 ### `--create_phyloseq_rds`
@@ -570,6 +571,70 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Default**: `false`
 - **Description**: Generate R phyloseq RDS files for downstream analysis
 - **Example**: `--create_phyloseq_rds true`
+
+---
+
+## Results Summary Parameters
+
+The run-level summary (`00_summary/`) consolidates the QC, taxonomy and K-MARVEL results into TSV tables, an
+Excel workbook, figures and a self-contained HTML report. Counts are read pairs, ARG abundance is RPM/RPKM of
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.16, for how the results are reported.
+
+### `--results_summary`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Write the run-level summary to `00_summary/`
+- **Example**: `--results_summary false`
+
+### `--sample_metadata`
+- **Type**: String (path to a `.tsv`, `.csv` or `.txt` file)
+- **Default**: none
+- **Description**: Table with a `sample` column (or sample names in the first column) and any metadata columns; the columns are carried into every summary table
+- **Example**: `--sample_metadata samples.tsv`
+
+### `--summary_group_by`
+- **Type**: String
+- **Default**: none
+- **Description**: Metadata column that groups samples (e.g. subject, site) in the summary figures and in `group_arg_detection.tsv`. Needs `--sample_metadata`
+- **Example**: `--summary_group_by subject`
+
+### `--summary_order_by`
+- **Type**: String
+- **Default**: none
+- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it adds the tier 1 ARG timeline. Needs `--sample_metadata`
+- **Example**: `--summary_order_by visit`
+
+### `--summary_min_clean_pairs`
+- **Type**: Integer
+- **Default**: `1000000`
+- **Minimum**: `0`
+- **Description**: Samples with fewer clean read pairs are flagged as low depth. A gene or taxon not found in such a sample is reported as `NA_low_depth`, not as absent. Samples are never dropped
+- **Example**: `--summary_min_clean_pairs 5000000`
+
+### `--summary_top_n`
+- **Type**: Integer
+- **Default**: `40`
+- **Minimum**: `1`
+- **Description**: Maximum rows in the summary taxonomy and ARG heatmaps
+- **Example**: `--summary_top_n 60`
+
+### `--card_prevalence`
+- **Type**: String (path)
+- **Default**: none
+- **Description**: WildCARD `card_prevalence.txt` (in an RGI WildCARD database: `wildcard/card_prevalence.txt`). Adds to each ARG call the species of the same sample that CARD finds carrying that ARO, with their abundance, and whether CARD finds the ARO on plasmids. This is co-occurrence, not linkage
+- **Example**: `--card_prevalence /dbs/rgi/wildcard/card_prevalence.txt`
+
+### `--arg_priority_table`
+- **Type**: String (path)
+- **Default**: `assets/arg_priority_tiers.tsv`
+- **Description**: ARG reporting tier rules: regular expressions on CARD ARO names or gene families, first match wins. Copy and edit the default to change the tiers
+- **Example**: `--arg_priority_table my_tiers.tsv`
+
+### `--summary_watchlist`
+- **Type**: String (path)
+- **Default**: `assets/summary_watchlist.tsv`
+- **Description**: Taxa (species or genus) reported in the summary watchlist table and figure; GTDB suffixes are ignored when matching
+- **Example**: `--summary_watchlist my_taxa.tsv`
 
 ---
 
