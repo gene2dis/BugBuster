@@ -36,9 +36,10 @@ process RESULTS_SUMMARY {
     def metadata_arg    = sample_metadata ? "--metadata ${sample_metadata}" : ''
     def prevalence_arg  = card_prevalence ? "--card-prevalence ${card_prevalence}" : ''
     // results_summary.py reads a BugBuster results directory; lay the staged
-    // files out as one. Its name is the 'batch' column (ext.batch_label: the
-    // output directory's name), stable across -resume
-    def run_dir = "${task.ext.batch_label ?: 'run'}/results"
+    // files out as one. The 'batch' column is ext.batch_label
+    // (--summary_batch_label, or the output directory's name)
+    def run_dir = "run/results"
+    def batch_label = task.ext.batch_label ?: 'run'
     """
     mkdir -p ${run_dir}/01_quality_control/summary ${run_dir}/01_quality_control/fastp \\
         ${run_dir}/02_taxonomy/tables ${run_dir}/02_taxonomy/sylph \\
@@ -70,6 +71,7 @@ process RESULTS_SUMMARY {
 
     results_summary.py \\
         --results ${run_dir} \\
+        --batch-labels '${batch_label}' \\
         --outdir . \\
         --arg-priority ${arg_priority} \\
         --watchlist ${watchlist} \\

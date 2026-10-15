@@ -138,6 +138,18 @@ for name in ("arg_long", "arg_presence", "taxonomy_species_wide"):
 qc = pd.read_csv("merged/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert qc.at["sampleA", "batch"] == "batchA" and qc.at["sampleB", "batch"] == "batchB"
 PYEOF
+check "--batch-labels names the batches" \
+    py "${SUMMARY}" --results batchA/results batchB/results --batch-labels b1 b2 --outdir labelled \
+        --min-clean-pairs 10000 --no-excel
+check "batch column holds the given labels" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("labelled/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleA", "batch"] == "b1" and qc.at["sampleB", "batch"] == "b2"
+PYEOF
+check "--batch-labels with fewer labels than directories fails" \
+    fails py "${SUMMARY}" --results batchA/results batchB/results --batch-labels b1 --outdir bad --no-excel
+check "duplicate --batch-labels fail" \
+    fails py "${SUMMARY}" --results batchA/results batchB/results --batch-labels b1 b1 --outdir bad --no-excel
 check "K-MARVEL ran but found no ARG in any sample" \
     py "${SUMMARY}" --results batchB/results --outdir noarg --min-clean-pairs 100 --no-excel
 check "no-ARG run: zero calls reported, no ARG matrices" py - <<'PYEOF'

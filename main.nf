@@ -79,6 +79,7 @@ def printHelp() {
       --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
       --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)
+      --summary_batch_label         Label in the summary's 'batch' column (default: the output directory's name)
       --summary_min_clean_pairs     Flag samples below this many clean read pairs as low depth (default: ${params.summary_min_clean_pairs})
       --card_prevalence             WildCARD card_prevalence.txt, adds candidate ARG hosts (default: none)
 

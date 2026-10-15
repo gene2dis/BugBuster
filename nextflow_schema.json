@@ -1050,6 +1050,12 @@
                     "description": "Metadata column that orders samples within a group (e.g. visit, day); with --summary_group_by it also draws the tier 1 ARG timeline. Needs --sample_metadata.",
                     "fa_icon": "fas fa-sort"
                 },
+                "summary_batch_label": {
+                    "type": "string",
+                    "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
+                    "description": "Label in the 'batch' column of the summary tables (letters, digits, '.', '_', '-'). Defaults to the name of the --output directory; set it when the batches of a project share an output directory name such as 'results', so their summaries can be merged and told apart.",
+                    "fa_icon": "fas fa-tag"
+                },
                 "summary_min_clean_pairs": {
                     "type": "integer",
                     "default": 1000000,

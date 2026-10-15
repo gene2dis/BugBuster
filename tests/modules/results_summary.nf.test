@@ -6,7 +6,7 @@
     K-MARVEL tables in tests/data/kmarvel/ (sampleA: TEM + CTX-M, sampleB: no
     ARGs). The module lays the staged files out as a results directory for
     bin/results_summary.py; this checks that layout, the ext.args built from
-    the summary params (grouping, ordering, low-depth threshold) and the
+    the summary params (grouping, ordering, low-depth threshold, batch label) and the
     published outputs. Numeric checks of the script are in
     tests/bin/test_results_summary.sh.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -25,6 +25,7 @@ nextflow_process {
                 summary_min_clean_pairs = 10000
                 summary_group_by        = "subject"
                 summary_order_by        = "visit"
+                summary_batch_label     = "batch1"
             }
             process {
                 """
@@ -68,8 +69,8 @@ nextflow_process {
             assert rows["sampleA"][header.indexOf("subject")] == "S1"
             assert rows["sampleB"][header.indexOf("low_depth")] == "True"
             assert rows["sampleB"][header.indexOf("arg_status")] == "NA_low_depth"
-            // the batch column is the output directory's name (ext.batch_label)
-            assert rows["sampleA"][header.indexOf("batch")] == file(params.output).name
+            // the batch column is --summary_batch_label (ext.batch_label)
+            assert rows["sampleA"][header.indexOf("batch")] == "batch1"
 
             def presence = tables["arg_presence.tsv"]
             assert presence.any { line -> line.startsWith("CTX-M\t2\t1\tNA_low_depth") }

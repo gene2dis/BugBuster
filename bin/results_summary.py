@@ -1273,6 +1273,9 @@ def write_html(outdir, title, ctx):
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--results", nargs="+", required=True, help="BugBuster results directories (one per batch)")
+    p.add_argument("--batch-labels", nargs="+", metavar="LABEL",
+                   help="batch labels, one per --results directory in the same order "
+                        "(default: each directory's name, or its parent's when it is called 'results')")
     p.add_argument("--outdir", required=True, help="output directory")
     p.add_argument("--metadata", help="TSV/CSV with a 'sample' column (or sample names in the first column)")
     p.add_argument("--group-by", help="metadata column that groups samples (e.g. subject, site)")
@@ -1298,14 +1301,26 @@ def main(argv=None):
     if args.order_by and not args.group_by:
         warn("--order-by without --group-by orders all samples as one series")
 
+    if args.batch_labels is not None:
+        if len(args.batch_labels) != len(args.results):
+            die(f"--batch-labels has {len(args.batch_labels)} labels for {len(args.results)} --results directories")
+        if any(not lab.strip() for lab in args.batch_labels):
+            die("--batch-labels: a label is empty")
+        dups = sorted({lab for lab in args.batch_labels if args.batch_labels.count(lab) > 1})
+        if dups:
+            die(f"--batch-labels: {', '.join(dups)} given more than once; batch labels must be unique")
+
     batches, seen, labels = [], {}, set()
     for i, r in enumerate(args.results):
         root = Path(r)
         if not root.is_dir():
             die(f"{root} is not a directory")
-        label = batch_label(root)
-        if label in labels:
-            label = f"{label}_{i + 1}"
+        if args.batch_labels is not None:
+            label = args.batch_labels[i]
+        else:
+            label = batch_label(root)
+            if label in labels:
+                label = f"{label}_{i + 1}"
         labels.add(label)
         reads = load_reads_report(root)
         fastp = load_fastp_lengths(root)

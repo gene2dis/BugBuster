@@ -843,6 +843,7 @@ figures and a self-contained HTML report (`results_summary.html`, no network acc
 | `--sample_metadata` | none | TSV/CSV with a `sample` column (or sample names in the first column) and any metadata columns; carried into every table |
 | `--summary_group_by` | none | Metadata column that groups samples (subject, site, ...) in the figures and the per-group ARG detection table |
 | `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...); with `--summary_group_by` it adds the tier 1 ARG timeline |
+| `--summary_batch_label` | output directory name | Label in the `batch` column; set it when batches share an output directory name such as `results` |
 | `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
 | `--summary_top_n` | `40` | Maximum rows in the summary heatmaps |
 | `--card_prevalence` | none | WildCARD `card_prevalence.txt` (an RGI WildCARD database has it in `wildcard/`); adds candidate hosts and CARD plasmid association to each ARG call |
@@ -1618,7 +1619,9 @@ docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -
         --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
 ```
 
-`--metadata`, `--group-by` and `--order-by` are optional. Without `--kmarvel-db`, mutation-dependent ARG hits
+`--metadata`, `--group-by` and `--order-by` are optional. The `batch` column is each directory's name, or its
+parent's when it is called `results` (`batch1` above); `--batch-labels` sets the labels instead, one per
+`--results` directory in the same order. Without `--kmarvel-db`, mutation-dependent ARG hits
 are reported as `not_checked`. `results_summary.py --help` lists every option.
 
 ---

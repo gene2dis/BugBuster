@@ -604,6 +604,12 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it adds the tier 1 ARG timeline. Needs `--sample_metadata`
 - **Example**: `--summary_order_by visit`
 
+### `--summary_batch_label`
+- **Type**: String (letters, digits, `.`, `_`, `-`)
+- **Default**: the name of the `--output` directory
+- **Description**: Label written in the `batch` column of the summary tables. Set it when the batches of a project share an output directory name (e.g. every batch writes to `results/`), so that merged summaries tell the batches apart
+- **Example**: `--summary_batch_label batch1`
+
 ### `--summary_min_clean_pairs`
 - **Type**: Integer
 - **Default**: `1000000`

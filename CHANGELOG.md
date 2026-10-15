@@ -39,6 +39,8 @@ next release is tagged.
   - Optional `--card_prevalence` (WildCARD): candidate ARG hosts among the
     species of the same sample (co-occurrence, not linkage) and CARD plasmid
     association
+  - `batch` column: the output directory's name, or `--summary_batch_label`
+    (script: `--batch-labels`) when batches share an output directory name
   - The script also runs on finished results directories, merging several
     batches without rerunning any tool (manual, Example 13); pinned Seqera
     image with pandas, matplotlib and openpyxl
