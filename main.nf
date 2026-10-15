@@ -728,11 +728,12 @@ workflow {
     //
     if ( flagOn(params.results_summary) ) {
         // the profiler's Reads_report.csv adds the classified fraction
+        // (TAXONOMY_REPORT's output is already a value channel)
         ch_summary_reads_report = params.taxonomic_profiler != 'none'
             ? ch_summary_tax_report
-            : ch_reads_report.flatten().filter { report -> report.name.endsWith('.csv') }
+            : ch_reads_report.flatten().filter { report -> report.name.endsWith('.csv') }.first()
         RESULTS_SUMMARY(
-            ch_summary_reads_report.first(),
+            ch_summary_reads_report,
             QC.out.fastp_json.toSortedList { a, b -> a.name <=> b.name },
             ch_summary_tax_tables.toSortedList { a, b -> a.name <=> b.name },
             ch_summary_sylph.toSortedList { a, b -> a.name <=> b.name },
