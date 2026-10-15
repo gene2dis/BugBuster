@@ -18,12 +18,12 @@ input:
       description: Existing CARD database directory with card.json and card_database_v*.fasta; copied with symlinks dereferenced and self-referencing 'rgi' symlinks removed
   - wildcard_dir:
       type: directory
-      description: Decompressed WildCARD variants directory, including index-for-model-sequences.txt; copied into the output as wildcard_data/
+      description: Decompressed WildCARD variants directory, including index-for-model-sequences.txt and the k-mer database for --rgi_kmer_size (<k>_kmer_db.json, all_amr_<k>mers.txt); copied into the output as wildcard_data/
 
 output:
   - card_db:
       type: directory
-      description: Local RGI database directory with CARD and WildCARD loaded (localDB/, wildcard_data/, database_version.txt)
+      description: Local RGI database directory with CARD, WildCARD and the WildCARD k-mer database loaded (localDB/, wildcard_data/, database_version.txt)
       pattern: "card_db_with_wildcard"
   - versions:
       type: file

@@ -22,12 +22,12 @@ input:
       pattern: "*.sorted.length_100.bam"
   - card_db:
       type: directory
-      description: Database directory prepared by 'rgi load --local' (must contain localDB/, with the CARD k-mer data); its localDB files are symlinked into the task directory rather than copied
+      description: Database directory prepared by 'rgi load --local' (must contain localDB/ with the k-mer database for --rgi_kmer_size, localDB/<k>mer_database.json and localDB/amr_<k>mer.txt; the task fails when they are missing); its localDB files are symlinked into the task directory rather than copied
 
 output:
   - kmer_json:
       type: file
-      description: Tuple of meta and the k-mer analysis JSON ('{}' when rgi kmer_query writes none)
+      description: Tuple of meta and the k-mer analysis JSON ('{}' when rgi kmer_query writes none although the k-mer database is loaded)
       pattern: "*_${params.rgi_kmer_size ?: 61}mer_analysis.json"
   - allele_predictions:
       type: file

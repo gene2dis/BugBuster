@@ -1,0 +1,37 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RGI_KMER Module Test
+
+    rgi kmer_query logs an error and exits 0 when the RGI database has no
+    k-mer database loaded, and RGI_KMER then wrote an empty '{}' result for
+    every sample. It now fails before running kmer_query. Fixture:
+    tests/data/rgi/card_db_no_kmers/ is a localDB/ with CARD and WildCARD
+    recorded and no k-mers (the BAM is never read).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RGI_KMER Process"
+    script "../../modules/local/rgi_kmer/main.nf"
+    process "RGI_KMER"
+
+    test("fails when the RGI database has no k-mer database") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 's1' ],
+                    file("${projectDir}/tests/data/rgi/s1_rgi_kmer_61mer_analysis.json", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/rgi/card_db_no_kmers", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert process.errorReport.contains("the RGI database has no 61-mer database")
+        }
+    }
+}

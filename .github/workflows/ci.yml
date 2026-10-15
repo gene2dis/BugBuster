@@ -174,6 +174,10 @@ jobs:
         run: |
           tests/bin/test_rgi_bwt_fallback.sh
 
+      - name: Run RGI k-mer database load tests (pathogen of origin)
+        run: |
+          tests/bin/test_rgi_load_kmers.sh
+
       - name: Run RGI kmer_query patch tests (KMA BAMs, dead workers, time limit)
         run: |
           tests/bin/test_rgi_kmer_kma_fix.sh

@@ -433,21 +433,29 @@ workflow {
             ch_rgi_db.collect()
         )
         
-        // RGI kmer: Pathogen-of-origin prediction
-        ch_rgi_kmer = RGI_KMER(
-            ch_rgi_bwt.bam,
-            ch_rgi_db.collect()
-        )
-        
+        // RGI kmer: Pathogen-of-origin prediction. The k-mer database comes
+        // with WildCARD, so the downloaded CARD-only database has none; a
+        // --custom_rgi_card_db must have it loaded (RGI_KMER checks)
+        ch_rgi_kmer_json = channel.value([])
+        if ( params.custom_rgi_card_db || flagOn(params.rgi_include_wildcard) ) {
+            ch_rgi_kmer = RGI_KMER(
+                ch_rgi_bwt.bam,
+                ch_rgi_db.collect()
+            )
+            ch_rgi_kmer_json = ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect(sort: true).ifEmpty([])
+            ch_versions = ch_versions.mix(ch_rgi_kmer.versions.first())
+        } else {
+            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: its k-mer database comes with WildCARD (--rgi_include_wildcard true)"
+        }
+
         // Generate summary report
         RGI_REPORT(
             ch_rgi_bwt.allele_mapping.map { _meta, file -> file }.collect(sort: true),
             ch_rgi_bwt.gene_mapping.map { _meta, file -> file }.collect(sort: true),
-            ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect(sort: true)
+            ch_rgi_kmer_json
         )
         ch_versions = ch_versions.mix(
             ch_rgi_bwt.versions.first(),
-            ch_rgi_kmer.versions.first(),
             RGI_REPORT.out.versions
         )
     }

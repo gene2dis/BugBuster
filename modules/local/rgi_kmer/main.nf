@@ -48,6 +48,16 @@ process RGI_KMER {
         fi
         mkdir localDB
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
+        # kmer_query exits 0 with no output when the k-mer database is not
+        # loaded, which turned into an empty '{}' result; fail instead
+        for f in localDB/${kmer_size}mer_database.json localDB/amr_${kmer_size}mer.txt; do
+            if [ ! -s "\$f" ]; then
+                echo "ERROR: the RGI database has no ${kmer_size}-mer database (\$f missing)." >&2
+                echo "       Load it with: rgi load --kmer_database <wildcard>/${kmer_size}_kmer_db.json" >&2
+                echo "       --amr_kmers <wildcard>/all_amr_${kmer_size}mers.txt --kmer_size ${kmer_size} --local" >&2
+                exit 1
+            fi
+        done
         
         # Run RGI kmer_query for pathogen-of-origin prediction, through
         # bin/rgi_kmer_kma_fix.py: RGI 6.0.3 misreads KMA BAMs and waits
