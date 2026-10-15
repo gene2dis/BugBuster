@@ -1,0 +1,30 @@
+# Taxa reported in the watchlist table/figure of bin/results_summary.py (edit freely and pass with --watchlist).
+# Columns: taxon, rank (species or genus), note.
+# Names are matched after removing GTDB suffixes on both sides ("Enterococcus_B faecium" matches
+# "Enterococcus faecium", "Enterobacter hormaechei_C" matches "Enterobacter hormaechei"), so NCBI-style names work
+# for GTDB, Kraken2 and sourmash outputs alike. A genus row reports the summed abundance of the genus.
+taxon	rank	note
+Enterococcus faecium	species	ESKAPE; VRE
+Enterococcus faecalis	species	VRE
+Staphylococcus aureus	species	ESKAPE; MRSA
+Klebsiella pneumoniae	species	ESKAPE; CRE/ESBL
+Klebsiella variicola	species	K. pneumoniae species complex
+Klebsiella oxytoca	species	CRE/ESBL
+Klebsiella michiganensis	species	K. oxytoca species complex
+Acinetobacter baumannii	species	ESKAPE; CRAB
+Pseudomonas aeruginosa	species	ESKAPE; CRPA
+Enterobacter	genus	ESKAPE; E. cloacae complex, CRE
+Escherichia coli	species	CRE/ESBL (GTDB includes Shigella)
+Citrobacter freundii	species	CRE
+Serratia marcescens	species	CRE
+Proteus mirabilis	species	ESBL
+Morganella morganii	species	ESBL
+Salmonella enterica	species	WHO priority
+Clostridioides difficile	species	CDI
+Streptococcus pneumoniae	species	WHO priority
+Streptococcus agalactiae	species	Group B Streptococcus
+Haemophilus influenzae	species	WHO priority
+Campylobacter jejuni	species	WHO priority
+Helicobacter pylori	species	WHO priority
+Neisseria gonorrhoeae	species	WHO priority
+Stenotrophomonas maltophilia	species	intrinsically multidrug resistant
