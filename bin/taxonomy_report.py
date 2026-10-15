@@ -33,6 +33,11 @@ PROFILERS = {
 }
 
 
+def natural_key(value) -> list:
+    """Sort key that orders V2 before V10."""
+    return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', str(value))]
+
+
 class TaxonomyReportGenerator:
     """Generate unified taxonomy classification reports and visualizations."""
     
@@ -224,12 +229,12 @@ class TaxonomyReportGenerator:
             plot_data['Classified'] = plot_data['Classified'] / 100.0
             plot_data['Unclassified'] = plot_data['Unclassified'] / 100.0
         
-        # Create figure
-        fig, ax = plt.subplots(figsize=(16, 8))
-        
-        # Get sample IDs and sort
-        samples = plot_data['Id'].unique()
-        y_positions = range(len(samples))
+        # Samples top to bottom in natural order (V2 before V10); figure height
+        # and label size follow the number of samples so labels never overlap
+        samples = sorted(plot_data['Id'].unique(), key=natural_key)
+        n_samples = len(samples)
+        fig, ax = plt.subplots(figsize=(16, max(6, 0.3 * n_samples + 2)))
+        y_positions = range(n_samples)
         
         # Plot stacked bars
         unclassified_vals = []
@@ -252,7 +257,8 @@ class TaxonomyReportGenerator:
         
         # Customize plot
         ax.set_yticks(y_positions)
-        ax.set_yticklabels(samples, fontsize=18)
+        ax.set_yticklabels(samples, fontsize=max(6, min(18, 500 / max(n_samples, 1))))
+        ax.set_ylim(n_samples - 0.5, -0.5)
         ax.set_xlabel('Reads Classified', fontsize=20)
         ax.set_ylabel('Samples', fontsize=20)
         
@@ -262,7 +268,8 @@ class TaxonomyReportGenerator:
         ax.set_xticklabels(['0%', '25%', '50%', '75%', '100%'], fontsize=18)
         
         # Add legend
-        ax.legend(loc='upper right', fontsize=16, frameon=True)
+        # outside the axes: inside, it covered the bars of the top samples
+        ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1), fontsize=16, frameon=False)
         
         # Add grid
         ax.grid(False)

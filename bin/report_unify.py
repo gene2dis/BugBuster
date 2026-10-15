@@ -12,6 +12,7 @@ import sys
 import glob
 import pandas as pd
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter, MaxNLocator
 import seaborn as sns
 import numpy as np
 from pathlib import Path
@@ -199,18 +200,19 @@ def create_boxplot(data_plot, output_file="Box_plot_reads.png"):
             ax.set_ylabel('Total reads', fontsize=20, fontweight='normal')
         
         # Y-axis formatting
-        y_ticks = np.arange(0, max_round + 5000000, 5000000)
+        # A fixed 5M step gave dozens of overlapping labels on deep runs
         ax.set_ylim(0, max_round)
-        ax.set_yticks(y_ticks)
-        ax.set_yticklabels([f'{int(y/1e6)}M' for y in y_ticks])
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=8, steps=[1, 2, 2.5, 5, 10]))
+        ax.yaxis.set_major_formatter(FuncFormatter(
+            lambda y, _: f'{y / 1e6:g}M' if y >= 1e6 or y == 0 else f'{y / 1e3:g}K'))
         
         # X-axis
         ax.set_xticks(positions)
         ax.set_xticklabels(processes, rotation=60, ha='right', va='top')
         
         # Facet label with custom background
-        ax.text(0.5, 0.98, read_type, transform=ax.transAxes,
-               fontsize=20, ha='center', va='top',
+        ax.text(0.5, 1.02, read_type, transform=ax.transAxes,
+               fontsize=20, ha='center', va='bottom',
                bbox=dict(boxstyle='round,pad=0.5', 
                        facecolor='#CDDEFF', edgecolor='#CDDEFF', linewidth=0))
         

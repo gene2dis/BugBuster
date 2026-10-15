@@ -22,8 +22,10 @@ stable, so compare samples at gene-family level. A gene family is kept exactly
 as CARD lists it: a combined family such as "AAC(6');AAC(6')-Ib-cr" is one row,
 so no read is counted twice.
 A sample with no ARGs (header-only table) is kept as an all-zero column.
-Counts are not normalised: K-MARVEL can run without ARGs-OAP, which provides
-the cell counts the KARGA/KARGVA report uses.
+Counts are raw supporting read pairs, not normalised: do not compare them
+between samples of different depth. The results summary
+(bin/results_summary.py, 00_summary/) reports RPM/RPKM per clean read pair,
+reporting tiers, CARD SNP checks for variant models and depth flags.
 """
 
 import sys
