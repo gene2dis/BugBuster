@@ -22,7 +22,7 @@ input:
 output:
   - arg_reports:
       type: file
-      description: One row per contig (or per contig and ARG hit) with Sample, contig_name, contig_length, GC, coverage, taxonomy ranks and the DeepARG columns (ARG_gene, predicted_ARG_class, best_hit, probability, identity, alignment_evalue, counts; empty for contigs without an ARG); written comma-separated despite the .tsv extension
+      description: One row per contig (or per contig and ARG hit) with Sample, contig_name, contig_length, GC, coverage, taxonomy ranks and the DeepARG columns (ARG_gene, predicted_ARG_class, best_hit, probability, identity, alignment_evalue, counts; empty for contigs without an ARG); tab-separated
       pattern: "Contig_tax_and_arg_prediction.tsv"
   - versions:
       type: file

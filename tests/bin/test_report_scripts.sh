@@ -10,6 +10,8 @@
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
 #   - and the happy paths still produce their real outputs,
+#   - bin/arg_contig_level_report.py writes a real TSV, and bin/arg_blobplot.py
+#     plots only the ARG-carrying contigs (contigs without an ARG were "Other"),
 #   - bin/blobplot.py and bin/arg_blobplot.py pickle their figure without
 #     error (design doc T9 finding: lambda tick formatters broke pickle.dump).
 #
@@ -423,6 +425,31 @@ NEXT_WORKDIR="${ABP_WORK}"
 expect_pass "arg_blobplot: contig ARG table plotted and pickled" arg_blobplot.py
 check_file "arg_blobplot: PNG created" "ARG_blob_plot.png"
 check_pickle "arg_blobplot: pickled figure loads back" arg_blobplot "ARG_final_blobplot.pkl"
+# The fixture has 7 ARG-carrying contigs out of 40 in 5 classes; the 33
+# contigs without an ARG used to be plotted as "Other"
+check_grep "arg_blobplot: only the ARG-carrying contigs are plotted" "../arg_blobplot.log" "Total contigs: 7$"
+check_grep "arg_blobplot: five ARG classes and no 'Other'" "../arg_blobplot.log" \
+    "Class distribution: {'Aminoglycoside': 14.29, 'Beta-Lactam': 28.57, 'Fosmidomycin': 14.29, 'Multidrug': 28.57, 'Tetracycline': 14.29}$"
+
+#
+# arg_contig_level_report.py: the contig table is written tab-separated, as
+# its .tsv name says (it was comma-separated). Inputs: the real BlobTools
+# table above and a synthetic DeepARG mapping file (DeepARG 1.0.4 header,
+# one acrA hit on contig k141_0, values taken from a real test_sample1 hit).
+#
+echo "--- arg_contig_level_report.py ---"
+ACR_WORK="${WORK}/arg_contig_level_report"
+mkdir -p "${ACR_WORK}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_WORK}/"
+NEXT_WORKDIR="${ACR_WORK}"
+expect_pass "arg_contig_level_report: BlobTools and DeepARG tables joined" arg_contig_level_report.py
+check_grep "arg_contig_level_report: tab-separated header" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	.*	counts$"
+check_grep "arg_contig_level_report: ARG joined to its contig" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	.*	ACRA	multidrug	"
+check_grep "arg_contig_level_report: contig without an ARG kept with empty ARG columns" \
+    "Contig_tax_and_arg_prediction.tsv" "^test_sample2	k141_820	.*						$"
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

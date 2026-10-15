@@ -48,7 +48,7 @@ def main():
     
     # Read contig ARG and taxonomy data
     try:
-        contig_arg_data = pd.read_csv('Contig_tax_and_arg_prediction.tsv')
+        contig_arg_data = pd.read_csv('Contig_tax_and_arg_prediction.tsv', sep='\t')
     except FileNotFoundError:
         print("ERROR: Contig_tax_and_arg_prediction.tsv not found", file=sys.stderr)
         sys.exit(1)
@@ -75,14 +75,17 @@ def main():
         data_to_plot['predicted_ARG_class'] = data_to_plot['predicted_ARG_class'].str.title()
         data_to_plot['coverage'] = np.log10(data_to_plot['coverage'].replace(0, np.nan))
     else:
-        # Keep top classes, group rest as "Other"
+        # Plot the ARG-carrying contigs only (as ARG_blob_plot.R did): drop the
+        # contigs without an ARG before the top-class relabel, which would
+        # otherwise put every one of them in "Other"
         top_classes = arg_class_summary['predicted_ARG_class'].head(max_num_pull).tolist()
         data_to_plot = contig_arg_data[['contig_name', 'contig_length', 'GC', 'coverage', 'predicted_ARG_class']].copy()
+        data_to_plot = data_to_plot.dropna(subset=['predicted_ARG_class'])
+        # Keep top classes, group rest as "Other"
         data_to_plot['predicted_ARG_class'] = data_to_plot['predicted_ARG_class'].apply(
             lambda x: x if x in top_classes else 'Other'
         )
         data_to_plot['predicted_ARG_class'] = data_to_plot['predicted_ARG_class'].str.title()
-        data_to_plot = data_to_plot.dropna(subset=['predicted_ARG_class'])
         
         # Log transform coverage, handle -Inf
         data_to_plot['coverage'] = np.log10(data_to_plot['coverage'].replace(0, np.nan))

@@ -96,8 +96,8 @@ def main():
         'identity', 'alignment_evalue', 'counts'
     ]]
     
-    # Write output
-    all_data.to_csv('Contig_tax_and_arg_prediction.tsv', index=False)
+    # Write output (tab-separated, as the file name says)
+    all_data.to_csv('Contig_tax_and_arg_prediction.tsv', sep='\t', index=False)
     
     print(f"Successfully generated Contig_tax_and_arg_prediction.tsv with {len(all_data)} contigs")
     print(f"  - Contigs with ARG predictions: {all_data['ARG_gene'].notna().sum()}")
