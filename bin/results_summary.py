@@ -130,7 +130,13 @@ def load_reads_report(root):
         "clean_pairs": df[clean] // 2,
     })
     if "Classified" in df.columns:
-        out["classified_fraction"] = pd.to_numeric(df["Classified"], errors="coerce")
+        classified = pd.to_numeric(df["Classified"], errors="coerce")
+        # TAXONOMY_REPORT writes kraken2's as a percentage (0-100) and sylph's /
+        # sourmash's as a fraction; the profiler's DB column tells them apart
+        # (a value test would misread a batch where every sample is <= 1% classified)
+        if "Kraken DB" in df.columns:
+            classified = classified / 100
+        out["classified_fraction"] = classified
     return out
 
 

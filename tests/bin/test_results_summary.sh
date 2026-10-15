@@ -158,6 +158,17 @@ cp "${FIX}/Reads_report.csv" qconly/results/01_quality_control/summary/
 check "QC-only results directory" py "${SUMMARY}" --results qconly/results --outdir qc --no-excel
 check "QC-only: only samples_qc.tsv" test "$(ls qc/tables)" = "samples_qc.tsv"
 
+# kraken2's Reads_report.csv holds Classified as a percentage
+mkdir -p kraken/results/01_quality_control/summary
+printf 'Id,Raw reads,Fastp,Clean reads (contaminants removed),Kraken DB,Unclassified,Classified\nk1,2000,1900,1800,standard-8,14.5,85.5\nk2,2000,1900,1800,standard-8,99.5,0.5\n' \
+    > kraken/results/01_quality_control/summary/Reads_report.csv
+check "kraken2 Reads_report.csv" py "${SUMMARY}" --results kraken/results --outdir kr --no-excel
+check "kraken2 classified percentage becomes a fraction" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("kr/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2", "classified_fraction"] - 0.005) < 1e-9
+PYEOF
+
 check "CARD snps.txt check of variant-model mutations" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys, importlib.util, tempfile, os
 spec = importlib.util.spec_from_file_location("rs", os.path.join(sys.argv[1], "results_summary.py"))
