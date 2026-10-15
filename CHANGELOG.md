@@ -384,6 +384,24 @@ next release is tagged.
     `V10`), figure height and label size follow the sample count
   - Classified-reads plot: samples sorted, legend outside the bars
 
+- **RGI summary counted a zero-hit sample as one gene**: when `rgi bwt` maps too
+  few reads, `RGI_BWT` writes placeholder tables with one all-NA row, and
+  `RGI_REPORT` counted that row (`Total_AMR_Genes` 1). The row is now dropped:
+  the sample is reported with 0 genes and 0 reads, and shown as 0 in
+  `RGI_sample_amr_counts.png`. `Total_Mapped_Reads` is written as an integer
+  (a mixed run turned it into `17.0`), and samples are sorted
+
+- **ARG blob plot showed every contig without an ARG as "Other"**
+  (`ARG_blob_plot.png`): their class is empty, and the top-nine relabel turned
+  it into "Other" (82.5% of the contigs in the test data). The plot now shows
+  the ARG-carrying contigs only, as the original R script did, so "Other"
+  holds only the ARG classes beyond the top nine; the bar panel gives
+  percentages of the ARG-carrying contigs
+
+- **`Contig_tax_and_arg_prediction.tsv` is tab-separated**: it was written
+  comma-separated despite its name. Scripts that read it as CSV must switch
+  to tab-separated
+
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
   `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer

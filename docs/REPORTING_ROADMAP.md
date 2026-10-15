@@ -74,10 +74,9 @@ Example data needed: a `--read_arg_prediction` run on samples that also ran K-MA
 
 `RGI_REPORT` (inline Python in `modules/local/rgi_report/main.nf`) publishes `RGI_summary_report.csv` and four PNGs.
 
-- **Zero-hit samples report one gene (bug).**
-  - `bin/rgi_bwt_lowcov_fallback.sh` writes a single `NA` row.
-  - `Total_AMR_Genes = len(sample_data)` counts it, so a zero-hit sample reports 1 gene.
-  - The fallback table also lacks the `All Mapped Reads` column.
+- **Fallback table headers.** Zero-hit samples are now reported with 0 genes (fixed; RGI_REPORT drops the
+  `NA` row of `bin/rgi_bwt_lowcov_fallback.sh`). The fallback's gene table header is not the real
+  `gene_mapping_data` header (it lacks `All Mapped Reads`, for one). Check it against a real RGI 6.x table.
 - **Pathogen of origin is never parsed.** It is RGI's main advantage: `*_61mer_analysis.json` is published per sample, but the report only counts the files. Parse it. It gives read-level ARG→species evidence, stronger than the summary's `card_prevalence` co-occurrence; when both exist, show RGI's.
 - **No filter on `Reference Model Type`.** Variant-model hits are counted as resistance. Apply the tier 4 `snps.txt` check, which shares the CARD tiers asset. There are also no coverage or MAPQ filters.
 - **Counts are raw.** `Total_Mapped_Reads` is a raw sum: normalise it to clean read pairs.
@@ -90,8 +89,10 @@ Example data needed: an `--rgi_prediction` run with WildCARD on the batch that a
 
 `bin/arg_contig_level_report.py` writes `Contig_tax_and_arg_prediction.tsv`. `bin/arg_blobplot.py` and `bin/blobplot.py` draw the blob plots.
 
-- **The ".tsv" is comma-separated.** It is written with `to_csv` defaults and read back as CSV. Write a real TSV, or rename it to `.csv`.
-- **Contigs without an ARG are labelled "Other" (bug).** Their class is `NaN`, which becomes "Other" before `dropna()` runs. "Other" therefore mixes minor ARG classes with every ARG-free contig.
+- **Fixed:** the table is now tab-separated, and `ARG_blob_plot.png` shows only the ARG-carrying contigs (contigs
+  without an ARG were labelled "Other"). Both were confirmed on the test fixtures, not yet on a real run.
+- **A contig with several ARGs is plotted once per ARG.** The table has one row per contig and ARG hit, and the blob
+  plot draws every row.
 - **Blob plots pool all samples.**
   - `blobplot.py` shows only 8 phyla (`<=` threshold), and lets `no-hit` take a colour slot.
   - Percentages are of contigs or rows, not of length or coverage.
