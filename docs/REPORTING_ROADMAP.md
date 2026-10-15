@@ -74,9 +74,16 @@ Example data needed: a `--read_arg_prediction` run on samples that also ran K-MA
 
 `RGI_REPORT` (inline Python in `modules/local/rgi_report/main.nf`) publishes `RGI_summary_report.csv` and four PNGs.
 
-- **Fallback table headers.** Zero-hit samples are now reported with 0 genes (fixed; RGI_REPORT drops the
-  `NA` row of `bin/rgi_bwt_lowcov_fallback.sh`). The fallback's gene table header is not the real
-  `gene_mapping_data` header (it lacks `All Mapped Reads`, for one). Check it against a real RGI 6.x table.
+- **Fallback table headers (confirmed).** Zero-hit samples are now reported with 0 genes (fixed; RGI_REPORT
+  drops the `NA` row of `bin/rgi_bwt_lowcov_fallback.sh`). The fallback's headers are not RGI 6.0.3's `rgi bwt`
+  headers: a real `gene_mapping_data.txt` has 26 columns starting `ARO Term`, `ARO Accession`, `Reference Model Type`
+  (with `All Mapped Reads`, `Average Percent Coverage`, `Reference Length`, `AMR Gene Family`, `Drug Class`,
+  `Resistance Mechanism`), and a real `allele_mapping_data.txt` has 24; the fallback writes the 16 and 27 columns of
+  `rgi main` (contig) tables. RGI_REPORT copes with either, but anything else reading them would not. Checked
+  2026-10-15 on a 500k read-pair run of a batch1 sample.
+- **Pathogen of origin was always empty (fixed 2026-10-15).** The k-mer database was never loaded, so
+  `rgi kmer_query` wrote nothing and RGI_KMER `{}`. With it loaded, a 500k read-pair test gave species calls for
+  50 of 147 genes (`<sample>_rgi_kmer_61mer_analysis.gene.txt`, column `CARD*kmer Prediction`).
 - **Pathogen of origin is never parsed.** It is RGI's main advantage: `*_61mer_analysis.json` is published per sample, but the report only counts the files. Parse it. It gives read-level ARG→species evidence, stronger than the summary's `card_prevalence` co-occurrence; when both exist, show RGI's.
 - **No filter on `Reference Model Type`.** Variant-model hits are counted as resistance. Apply the tier 4 `snps.txt` check, which shares the CARD tiers asset. There are also no coverage or MAPQ filters.
 - **Counts are raw.** `Total_Mapped_Reads` is a raw sum: normalise it to clean read pairs.

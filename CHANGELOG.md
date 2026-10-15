@@ -402,6 +402,21 @@ next release is tagged.
   comma-separated despite its name. Scripts that read it as CSV must switch
   to tab-separated
 
+- **RGI pathogen of origin was always empty**: neither database step
+  (`RGI_LOAD`, `RGI_LOAD_WILDCARD`) loaded the WildCARD k-mer database, and
+  `rgi kmer_query` exits 0 without output when it is missing, so `RGI_KMER`
+  wrote `{}` for every sample. Both steps now load it
+  (`bin/rgi_load_kmers.sh`, for `--rgi_kmer_size`) and fail when the WildCARD
+  files lack it; `RGI_KMER` stops with an error when the database has no k-mer
+  database (a `--custom_rgi_card_db` prepared without it), and is skipped with
+  a warning on the downloaded CARD-only database (`--rgi_include_wildcard
+  false`), which has none. Databases prepared by earlier runs lack the k-mers:
+  load them as in `docs/RGI_WILDCARD_USAGE.md` (Step 4) or prepare again
+- **RGI CARD version read as empty on the download path**: `RGI_LOAD` looked for
+  `"version"` in `card.json`, which stores it as `"_version"`, so
+  `rgi wildcard_annotation` got no version and `software_versions.yml` a blank
+  `card:`
+
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
   `_R1_` or `_1.`, so `S_1.2_R2_clean.fastq.gz` went to R1 and the R1/R2 lists no longer
