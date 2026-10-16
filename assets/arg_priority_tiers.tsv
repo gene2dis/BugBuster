@@ -2,6 +2,8 @@
 # Columns: match (name = regex searched in the ARO name, family = regex searched in the CARD AMR gene family),
 #          pattern, tier, category, note.
 # Rules are tried top to bottom and the first match wins, so put name rules before the family rule they refine.
+# A name rule also wins over every family rule below it: keep genes of a tier 1 family out of the name lists
+# (cfr genes match the tier 1 Cfr family rule, not the tier 2 'acquired_other' names).
 # Applied before this table: any ARO with CARD SNP definitions (snps.txt), any "protein variant model" and any ARO
 # whose name says "mutant" / "mutation" is tier 4 (mutation_dependent); its resistance_snp_status column says
 # whether a known resistance mutation was seen.
@@ -18,7 +20,7 @@ name	^tet\(X([3-9]|[1-9][0-9])\)	1	tigecycline	tet(X3) and later: high-level tig
 name	^(optrA|poxtA)	1	oxazolidinone	transferable linezolid resistance
 name	^tet[A-Z]?\(	2	tetracycline	acquired tetracycline gene (efflux or protection)
 name	^mup[AB]|mupA conferring|mupB conferring	2	mupirocin	acquired high-level mupirocin resistance
-name	^(qac|mef|msr|mel|lsa|vga|sal|lnu|vat|mph|ere|cfr|fexA|floR|cml)	2	acquired_other	acquired gene matched by name
+name	^(qac|mef|msr|mel|lsa|vga|sal|lnu|vat|mph|ere|fexA|floR|cml)	2	acquired_other	acquired gene matched by name
 family	KPC beta-lactamase|NDM beta-lactamase|VIM beta-lactamase|IMP beta-lactamase|GIM beta-lactamase|SIM beta-lactamase|SPM beta-lactamase|DIM beta-lactamase|AIM beta-lactamase|KHM beta-lactamase|IMI beta-lactamase|SME beta-lactamase|FRI beta-lactamase|BKC Beta-lactamase	1	carbapenemase	acquired carbapenemase family
 family	OXA-48-like|OXA-23-like|OXA-24-like|OXA-58-like|OXA-143-like|OXA-235-like	1	carbapenemase	carbapenem-hydrolysing class D (OXA) family
 family	MCR phosphoethanolamine transferase	1	colistin_mcr	mobile colistin resistance

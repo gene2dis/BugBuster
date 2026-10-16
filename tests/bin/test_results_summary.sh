@@ -8,7 +8,7 @@
 #   - a gene not found in a low-depth sample is NA_low_depth, not 0
 #   - sylph ANI interval below 95% -> species_call_uncertain
 #   - two results directories merge (taxa outer-joined), a sample in both fails
-#   - CARD snps.txt check of variant-model mutations
+#   - CARD snps.txt check of variant-model mutations, gene names and tier rules (cfr genes are tier 1)
 #   - HTML is self-contained (no external URLs)
 #
 # Python runs inside the image pinned in modules/local/results_summary/main.nf
@@ -181,7 +181,7 @@ qc = pd.read_csv("kr/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2", "classified_fraction"] - 0.005) < 1e-9
 PYEOF
 
-check "CARD snps.txt check of variant-model mutations" py - "${REPO_DIR}/bin" <<'PYEOF'
+check "CARD snps.txt check, gene names and tier rules" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys, tempfile, os
 sys.dont_write_bytecode = True
 sys.path.insert(0, sys.argv[1])
@@ -206,6 +206,16 @@ assert rs.gene_name("MCR-9.1", "MCR phosphoethanolamine transferase") == "MCR-9"
 assert rs.gene_name("QnrB19", "quinolone resistance protein (qnr)") == "QnrB"
 assert rs.gene_name("tet(Q)", "tetracycline-resistant ribosomal protection protein") == "tet(Q)"
 assert strip_gtdb("Enterococcus_B faecium") == "Enterococcus faecium"
+rules = rs.load_rules(os.path.join(sys.argv[1], "..", "assets", "arg_priority_tiers.tsv"))
+def tier(name, family, mech="antibiotic target alteration"):
+    row = {"aro_full_name": name, "gene_family": family, "aro_id": "ARO:0", "model": "protein homolog model",
+           "resistance_mechanism": mech}
+    return rs.assign_tier(row, rules, None)[0]
+# a name rule wins over every later family rule: cfr genes must reach the tier 1 Cfr family rule
+assert tier("cfrE", "Cfr 23S ribosomal RNA methyltransferase") == 1
+assert tier("cfr(B)", "Cfr 23S ribosomal RNA methyltransferase") == 1
+assert tier("qacEdelta1", "major facilitator superfamily (MFS) antibiotic efflux pump", "antibiotic efflux") == 2
+assert tier("poxtA", "Miscellaneous ABC-F subfamily ATP-binding cassette ribosomal protection proteins") == 1
 PYEOF
 
 echo
