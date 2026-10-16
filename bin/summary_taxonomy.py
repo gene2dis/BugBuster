@@ -163,3 +163,32 @@ def watchlist_table(tx, watch):
             uncertain = bool(sub["species_call_uncertain"].fillna(False).all()) if "species_call_uncertain" in sub else False
             long_rows.append({"taxon": w.taxon, "sample": s, "relative_abundance": ab, "uncertain": uncertain})
     return pd.DataFrame(rows), pd.DataFrame(long_rows)
+
+
+def bray_curtis_pcoa(rel, n_axes=3):
+    """Relative abundance (taxa x samples) -> (coordinates: samples x PC1..PCn, % variance of each axis).
+
+    Bray-Curtis dissimilarity between samples (on proportions), then classical PCoA (Gower double
+    centring). Bray-Curtis is not Euclidean, so some eigenvalues are negative; the % variance of an
+    axis is its eigenvalue over the sum of the positive ones.
+    """
+    x = rel.fillna(0).T.astype(float)
+    x = x[x.sum(axis=1) > 0]
+    if len(x) < 3:
+        return None, None
+    p = x.values / x.values.sum(axis=1, keepdims=True)
+    n = len(p)
+    d = np.zeros((n, n))
+    for i in range(n):
+        d[i] = np.abs(p - p[i]).sum(axis=1) / (p + p[i]).sum(axis=1)
+    j = np.eye(n) - np.ones((n, n)) / n
+    b = -0.5 * j @ (d ** 2) @ j
+    vals, vecs = np.linalg.eigh(b)
+    idx = np.argsort(vals)[::-1]
+    vals, vecs = vals[idx], vecs[:, idx]
+    pos = vals[vals > 1e-12]
+    k = min(n_axes, len(pos))
+    coords = pd.DataFrame(vecs[:, :k] * np.sqrt(vals[:k]), index=x.index,
+                          columns=[f"PC{i + 1}" for i in range(k)])
+    pct = list(vals[:k] / pos.sum() * 100)
+    return coords, pct

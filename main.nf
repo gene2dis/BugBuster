@@ -381,6 +381,8 @@ workflow {
     ch_summary_sylph      = channel.empty()
     ch_summary_kmarvel    = channel.empty()
     ch_summary_kmarvel_db = channel.empty()
+    ch_summary_rgi        = channel.empty()
+    ch_summary_rgi_kmer   = channel.empty()
 
     if ( params.taxonomic_profiler != "none" ) {
         TAXONOMY(
@@ -433,6 +435,7 @@ workflow {
             ch_clean_reads,
             ch_rgi_db.collect()
         )
+        ch_summary_rgi = ch_rgi_bwt.allele_mapping.map { _meta, file -> file }
         
         // RGI kmer: Pathogen-of-origin prediction. The k-mer database comes
         // with WildCARD, so the downloaded CARD-only database has none; a
@@ -444,6 +447,7 @@ workflow {
                 ch_rgi_db.collect()
             )
             ch_rgi_kmer_json = ch_rgi_kmer.kmer_json.map { _meta, file -> file }.collect(sort: true).ifEmpty([])
+            ch_summary_rgi_kmer = ch_rgi_kmer.gene_predictions.map { _meta, file -> file }
             ch_versions = ch_versions.mix(ch_rgi_kmer.versions.first())
         } else {
             log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: its k-mer database comes with WildCARD (--rgi_include_wildcard true)"
@@ -730,10 +734,10 @@ workflow {
         )
 
     //
-    // MODULE: Run-level summary (00_summary/): QC, taxonomy and K-MARVEL
-    // tables, Excel workbook, figures and HTML report. It reads the
-    // aggregated software_versions.yml, so its own versions.yml is not part
-    // of that file.
+    // MODULE: Run-level summary (00_summary/): QC, taxonomy and read-level
+    // ARG (K-MARVEL, RGI) tables, Excel workbook, figures and HTML report.
+    // It reads the aggregated software_versions.yml, so its own versions.yml
+    // is not part of that file.
     //
     if ( flagOn(params.results_summary) ) {
         // the profiler's Reads_report.csv adds the classified fraction
@@ -748,6 +752,8 @@ workflow {
             ch_summary_sylph.toSortedList { a, b -> a.name <=> b.name },
             ch_summary_kmarvel.toSortedList { a, b -> a.name <=> b.name },
             ch_summary_kmarvel_db.toList(),
+            ch_summary_rgi.toSortedList { a, b -> a.name <=> b.name },
+            ch_summary_rgi_kmer.toSortedList { a, b -> a.name <=> b.name },
             ch_software_versions,
             params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : [],
             params.card_prevalence ? file(params.card_prevalence, checkIfExists: true) : [],

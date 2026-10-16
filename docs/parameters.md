@@ -601,7 +601,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--summary_order_by`
 - **Type**: String
 - **Default**: none
-- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it adds the tier 1 ARG timeline. Needs `--sample_metadata`
+- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it adds the per-group timeline of watchlist taxa and tier 1 ARGs and the diversity lines. Needs `--sample_metadata`
 - **Example**: `--summary_order_by visit`
 
 ### `--summary_batch_label`
@@ -621,8 +621,21 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Type**: Integer
 - **Default**: `40`
 - **Minimum**: `1`
-- **Description**: Maximum rows in the summary taxonomy and ARG heatmaps
+- **Description**: Maximum rows in the summary ARG heatmap (the taxonomy heatmaps use `--summary_taxa_per_sample`)
 - **Example**: `--summary_top_n 60`
+
+### `--summary_taxa_per_sample`
+- **Type**: Integer
+- **Default**: `10`
+- **Minimum**: `1`
+- **Description**: The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap, grouped by phylum
+- **Example**: `--summary_taxa_per_sample 5`
+
+### `--summary_depth_marks`
+- **Type**: String (comma-separated read-pair counts)
+- **Default**: `10000000,20000000`
+- **Description**: Clean read-pair depths drawn as dotted reference lines in the summary QC figure, counted in the report header ("samples with >=10M clean pairs") and used for the `depth_class` column. `''` for none. The low-depth threshold (`--summary_min_clean_pairs`) is always drawn
+- **Example**: `--summary_depth_marks 5000000,10000000,20000000`
 
 ### `--card_prevalence`
 - **Type**: String (path)
@@ -822,6 +835,13 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Default**: `10`
 - **Description**: Minimum k-mer coverage threshold for pathogen prediction
 - **Example**: `--rgi_min_kmer_coverage 10`
+
+### `--rgi_summary_min_coverage`
+- **Type**: Number
+- **Default**: `80`
+- **Range**: 0-100
+- **Description**: `rgi bwt` lists every gene with at least one mapped read; it has no detection rule. In the summaries an RGI gene counts when reads cover at least this % of its best-covered reference sequence (`Percent Coverage` in the allele table): the `*_cov<N>` columns and the plots of `RGI_REPORT`, and the RGI calls in `00_summary/`. The raw RGI tables and the existing `RGI_summary_report.csv` columns are not filtered
+- **Example**: `--rgi_summary_min_coverage 60`
 
 ### `--kmarvel_min_coverage`
 - **Type**: Integer

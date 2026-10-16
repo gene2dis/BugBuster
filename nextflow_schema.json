@@ -985,6 +985,14 @@
                     "default": 10,
                     "description": "Minimum k-mer coverage for pathogen-of-origin prediction.",
                     "fa_icon": "fas fa-layer-group"
+                },
+                "rgi_summary_min_coverage": {
+                    "type": "number",
+                    "default": 80,
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "rgi bwt lists every gene with at least one mapped read. In the summaries (RGI_REPORT's *_cov<N> columns and plots, and 00_summary) an RGI gene counts when reads cover at least this % of its best-covered reference sequence. The raw RGI tables are not filtered.",
+                    "fa_icon": "fas fa-percentage"
                 }
             }
         },
@@ -1067,8 +1075,22 @@
                     "type": "integer",
                     "default": 40,
                     "minimum": 1,
-                    "description": "Maximum rows in the summary taxonomy and ARG heatmaps.",
+                    "description": "Maximum rows in the summary ARG heatmap (the taxonomy heatmaps use --summary_taxa_per_sample).",
                     "fa_icon": "fas fa-sort-numeric-down"
+                },
+                "summary_taxa_per_sample": {
+                    "type": "integer",
+                    "default": 10,
+                    "minimum": 1,
+                    "description": "The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap.",
+                    "fa_icon": "fas fa-th"
+                },
+                "summary_depth_marks": {
+                    "type": "string",
+                    "default": "10000000,20000000",
+                    "pattern": "^(\\d+(,\\d+)*)?$",
+                    "description": "Comma-separated clean read-pair depths drawn as reference lines in the summary QC figure and counted in the report header ('' for none).",
+                    "fa_icon": "fas fa-ruler-vertical"
                 },
                 "card_prevalence": {
                     "type": "string",

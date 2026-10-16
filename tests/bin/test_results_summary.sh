@@ -8,7 +8,13 @@
 #   - a gene not found in a low-depth sample is NA_low_depth, not 0
 #   - sylph ANI interval below 95% -> species_call_uncertain
 #   - two results directories merge (taxa outer-joined), a sample in both fails
-#   - CARD snps.txt check of variant-model mutations, gene names and tier rules (cfr genes are tier 1)
+#   - CARD snps.txt check of variant-model mutations, gene names and tier rules
+#     (cfr genes are tier 1)
+#   - RGI bwt (tests/data/summary/rgi/): genes at the --rgi-min-coverage cutoff
+#     (best reference sequence), reads summed per ARO and gene, k-mer host
+#     check against the watchlist, the K-MARVEL vs RGI comparison and overlap
+#     counts; an RGI-only directory makes RGI the primary ARG method
+#   - depth classes, --taxa-per-sample, Bray-Curtis PCoA
 #   - HTML is self-contained (no external URLs)
 #
 # Python runs inside the image pinned in modules/local/results_summary/main.nf
@@ -66,6 +72,14 @@ make_results() {
         mkdir -p "${dir}/05_arg_prediction/read_level/kmarvel/${s}"
         cp "${KM}/${s}_kmarvel.tsv" "${dir}/05_arg_prediction/read_level/kmarvel/${s}/"
         [ -e "${FIX}/${s}_sylph_gtdb.tsv" ] && cp "${FIX}/${s}_sylph_gtdb.tsv" "${dir}/02_taxonomy/sylph/"
+        if [ -e "${FIX}/rgi/${s}_rgi_bwt.allele_mapping_data.txt" ]; then
+            mkdir -p "${dir}/05_arg_prediction/read_level/rgi/${s}"
+            cp "${FIX}/rgi/${s}_rgi_bwt.allele_mapping_data.txt" "${dir}/05_arg_prediction/read_level/rgi/${s}/"
+        fi
+        if [ -e "${FIX}/rgi/${s}_rgi_kmer_61mer_analysis.gene.txt" ]; then
+            mkdir -p "${dir}/05_arg_prediction/read_level/rgi_kmer/${s}"
+            cp "${FIX}/rgi/${s}_rgi_kmer_61mer_analysis.gene.txt" "${dir}/05_arg_prediction/read_level/rgi_kmer/${s}/"
+        fi
     done
     # the tables hold sampleA only (sampleB has no sylph genome, so a run of
     # sampleB alone has no taxonomy tables)
@@ -122,6 +136,72 @@ assert tax.at["GCF_000009045.1", "est_read_pairs"] == 12507
 grp = pd.read_csv("out/tables/group_arg_detection.tsv", sep="\t")
 assert set(grp["pattern"]) == {"V1:+ V2:NA"}, grp["pattern"]
 PYEOF
+
+check "RGI genes at the coverage cutoff, k-mer hosts and the method comparison" py - <<'PYEOF'
+import pandas as pd
+arg = pd.read_csv("out/tables/arg_long.tsv", sep="\t")
+rgi = arg[arg["method"] == "rgi"].set_index("aro_full_name")
+# KPC-3 (30%) and CTX-M-15 (50%) are below the 80% cutoff
+assert set(rgi.index) == {"KPC-2", "TEM-1", "poxtA", "cfrE"}, set(rgi.index)
+kpc = rgi.loc["KPC-2"]
+# two reference sequences: best coverage 100%, reads summed (30 + 10); read pairs = reads / 2
+assert kpc["rgi_mapped_reads"] == 40 and kpc["assembly_coverage"] == 100 and kpc["supporting_reads"] == 20
+rpkm = 20 / 60000 * 1e6 / 0.882
+assert abs(kpc["rpkm"] - rpkm) < 1e-6
+# the gene sums all its AROs, KPC-3's 4 reads (2 pairs) included
+assert abs(kpc["gene_rpkm"] - (rpkm + 2 / 60000 * 1e6 / 0.882)) < 1e-6
+assert kpc["rgi_kmer_hosts"].startswith("Klebsiella pneumoniae (25)") and kpc["rgi_host_check"] == "watchlist_host"
+assert rgi.at["poxtA", "rgi_host_check"] == "non_watchlist_host"
+assert rgi.at["poxtA", "rgi_best_ref"] == "WildCARD: Blautia producta"
+assert rgi.at["cfrE", "rgi_host_check"] == "no_kmer_host" and rgi.at["cfrE", "tier"] == 1
+assert rgi.at["TEM-1", "rgi_host_check"] == "watchlist_host"
+comp = pd.read_csv("out/tables/arg_method_comparison.tsv", sep="\t").set_index("gene")
+assert comp.at["TEM", "detected_by"] == "K-MARVEL + RGI"
+assert comp.at["CTX-M", "detected_by"] == "K-MARVEL only" and bool(comp.at["CTX-M", "rgi_below_cutoff"])
+assert comp.at["KPC", "detected_by"] == "RGI only" and comp.at["KPC", "rgi_read_pairs"] == 22
+ov = pd.read_csv("out/tables/arg_method_overlap.tsv", sep="\t")
+row = ov[(ov["unit"] == "genes") & (ov["level"] == "all")].iloc[0]
+got = (row["K-MARVEL + RGI"], row["K-MARVEL only"], row["RGI only"], row["K-MARVEL only, RGI below cutoff"], row["total"])
+assert got == (1, 1, 3, 1, 5), got
+qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+got = (qc.at["sampleA", "n_genes_kmarvel"], qc.at["sampleA", "n_genes_rgi"], qc.at["sampleA", "n_genes_all_methods"])
+assert got == (2, 4, 1), got
+assert qc.at["sampleB", "n_genes_rgi"] == 0
+# depth classes: --min-clean-pairs 10000 and the default marks (10M, 20M)
+assert qc.at["sampleA", "depth_class"] == "10k-10M" and qc.at["sampleB", "depth_class"] == "<10k"
+html = open("out/results_summary.html").read()
+assert "Comparison of ARG methods" in html and "possibly a related gene of a commensal" in html
+assert "samples with &gt;=10M clean pairs" in html
+PYEOF
+check "method comparison figures written" test -s out/figures/arg_method_upset.svg -a -s out/figures/arg_method_by_category.png
+check "--rgi-min-coverage 20 detects the low-coverage genes" \
+    py "${SUMMARY}" --results run1/results --outdir cut20 --min-clean-pairs 10000 --rgi-min-coverage 20 --no-excel
+check "cutoff 20: KPC-3 and CTX-M-15 are RGI calls" py - <<'PYEOF'
+import pandas as pd
+arg = pd.read_csv("cut20/tables/arg_long.tsv", sep="\t")
+assert {"KPC-3", "CTX-M-15"} <= set(arg.loc[arg["method"] == "rgi", "aro_full_name"])
+comp = pd.read_csv("cut20/tables/arg_method_comparison.tsv", sep="\t").set_index("gene")
+assert comp.at["CTX-M", "detected_by"] == "K-MARVEL + RGI"
+PYEOF
+check "--taxa-per-sample 1 draws one species row" \
+    py "${SUMMARY}" --results run1/results --outdir top1 --min-clean-pairs 10000 --taxa-per-sample 1 --no-excel
+check "species heatmap caption gives one row" grep -q "most abundant species taxa (1 row)" top1/results_summary.html
+
+# RGI without K-MARVEL: RGI is the primary ARG method, nothing to compare
+make_results rgionly/results sampleA sampleB
+rm -r rgionly/results/05_arg_prediction/read_level/kmarvel
+check "RGI-only results directory" py "${SUMMARY}" --results rgionly/results --outdir rgi1 --min-clean-pairs 10000 --no-excel
+check "RGI-only: RGI drives the ARG matrices, no comparison" py - <<'PYEOF'
+import os
+import pandas as pd
+assert set(pd.read_csv("rgi1/tables/arg_long.tsv", sep="\t")["method"]) == {"rgi"}
+panel = pd.read_csv("rgi1/tables/arg_priority_panel.tsv", sep="\t", index_col=0)
+assert {"KPC", "cfrE", "poxtA"} <= set(panel.index), panel.index
+assert not os.path.exists("rgi1/tables/arg_method_comparison.tsv")
+assert "Antimicrobial resistance genes (RGI)" in open("rgi1/results_summary.html").read()
+PYEOF
+check "--arg-primary kmarvel without K-MARVEL output fails" \
+    fails py "${SUMMARY}" --results rgionly/results --outdir bad --arg-primary kmarvel --no-excel
 
 # Two results directories; sampleB's has no taxonomy tables
 make_results batchA/results sampleA
@@ -181,12 +261,15 @@ qc = pd.read_csv("kr/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2", "classified_fraction"] - 0.005) < 1e-9
 PYEOF
 
-check "CARD snps.txt check, gene names and tier rules" py - "${REPO_DIR}/bin" <<'PYEOF'
+check "CARD snps.txt check, gene names, tier rules, PCoA and k-mer parsing" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys, tempfile, os
+import numpy as np
+import pandas as pd
 sys.dont_write_bytecode = True
 sys.path.insert(0, sys.argv[1])
 import summary_args as rs
 from summary_common import strip_gtdb
+from summary_taxonomy import bray_curtis_pcoa
 d = tempfile.mkdtemp()
 with open(os.path.join(d, "snps.txt"), "w") as fh:
     fh.write("Accession\tName\tModel Type\tParameter Type\tMutations\tCARD Short Name\tsource\tcitation\n")
@@ -216,6 +299,14 @@ assert tier("cfrE", "Cfr 23S ribosomal RNA methyltransferase") == 1
 assert tier("cfr(B)", "Cfr 23S ribosomal RNA methyltransferase") == 1
 assert tier("qacEdelta1", "major facilitator superfamily (MFS) antibiotic efflux pump", "antibiotic efflux") == 2
 assert tier("poxtA", "Miscellaneous ABC-F subfamily ATP-binding cassette ribosomal protection proteins") == 1
+# Bray-Curtis PCoA: identical samples get identical coordinates, a different one does not
+rel = pd.DataFrame({"a": [50, 50, 0], "b": [50, 50, 0], "c": [0, 10, 90]}, index=["t1", "t2", "t3"])
+coords, pct = bray_curtis_pcoa(rel)
+assert np.allclose(coords.loc["a"], coords.loc["b"]) and not np.allclose(coords.loc["a"], coords.loc["c"])
+assert 99.9 < sum(pct) < 100.1 or len(pct) < 3
+# RGI k-mer prediction strings
+assert rs.parse_kmer_prediction("Klebsiella pneumoniae (chromosome or plasmid): 83; Escherichia coli (plasmid): 2; ") \
+    == {"Klebsiella pneumoniae": 83, "Escherichia coli": 2}
 PYEOF
 
 echo

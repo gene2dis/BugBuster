@@ -47,12 +47,14 @@ import pandas as pd
 # write no __pycache__ into the pipeline's bin/ (read-only in a container image)
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from summary_common import NA_NOT_RUN, die, natural_key, norm_taxon, strip_gtdb, warn  # noqa: E402
-from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, prevalence_table,  # noqa: E402
-                              species_rank, watchlist_table)
-from summary_args import (annotate_args, arg_status, arg_tables, load_kmarvel, load_prevalence,  # noqa: E402
-                          load_rules, load_snps)
-from summary_figures import FigureWriter, fig_args, fig_qc, fig_taxonomy, fig_watchlist  # noqa: E402
+from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, natural_key, norm_taxon, strip_gtdb, warn  # noqa: E402
+from summary_taxonomy import (bray_curtis_pcoa, build_taxonomy, load_taxonomy, load_watchlist,  # noqa: E402
+                              prevalence_table, species_rank, watchlist_table)
+from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_status, arg_tables,  # noqa: E402
+                          compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules, load_snps)
+from summary_figures import (FigureWriter, fig_args, fig_diversity, fig_group_timeline,  # noqa: E402
+                             fig_method_by_category, fig_method_upset, fig_pcoa, fig_qc, fig_taxonomy,
+                             fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
 
 
@@ -145,6 +147,75 @@ def sample_order(samples, group_by, order_by):
     return [k[-1] for k in sorted(keys)]
 
 
+def depth_classes(pairs, cuts):
+    """Clean read pairs -> '<1M', '1M-10M', '10M-20M', '>=20M' style classes from the sorted cut points."""
+    cuts = sorted(set(cuts))
+    labels = [f"<{short_count(cuts[0])}"] + [f"{short_count(a)}-{short_count(b)}" for a, b in zip(cuts, cuts[1:])] \
+        + [f">={short_count(cuts[-1])}"]
+    idx = np.searchsorted(cuts, pairs.fillna(-1).values, side="right")
+    return pd.Series([labels[i] if p >= 0 else "" for i, p in zip(idx, pairs.fillna(-1))], index=pairs.index)
+
+
+def tier1_table(calls, comparison, primary):
+    """Tier 1 calls of the primary method with the other method's evidence (when both ran)."""
+    t1 = calls[calls["tier"] == 1].copy()
+    keep = ["sample", "method", "gene", "aro_full_name", "gene_family", "category", "assembly_coverage",
+            "supporting_reads", "rpkm"]
+    keep += [c for c in ("rgi_kmer_hosts", "rgi_host_check", "candidate_hosts") if c in t1.columns]
+    t1 = t1[keep]
+    if comparison is not None:
+        c = comparison["comp"]
+        cols = ["sample", "gene", "detected_by"] + [x for x in ("rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check")
+                                                     if x in c.columns]
+        t1 = t1.drop(columns=[x for x in ("rgi_kmer_hosts", "rgi_host_check") if x in t1.columns])
+        t1 = t1.merge(c[cols], on=["sample", "gene"], how="left")
+    return t1
+
+
+def attention_flags(tier1, comparison, low_samples):
+    """Short findings for the report header: [(kind, text, anchor)].
+
+    Tier 1 genes come from the method comparison when several ARG methods ran (so a gene only one method found
+    is listed too), else from the primary method's tier 1 calls.
+    """
+    flags = []
+    rows = None
+    if comparison is not None:
+        rows = comparison["comp"]
+        rows = rows[rows["tier"] == 1]
+    elif tier1 is not None:
+        rows = tier1.drop_duplicates(["sample", "gene"])
+    if rows is not None and not rows.empty:
+        for gene, sub in rows.groupby("gene", sort=True):
+            n = len(sub)
+            hosts = [h.split(" (")[0] for h in sub.get("rgi_kmer_hosts", pd.Series(dtype=str)).fillna("") if h]
+            tops = sorted(((hosts.count(h), h) for h in set(hosts)), key=lambda x: (-x[0], x[1]))
+            host_txt = ("; RGI k-mer top host: " + ", ".join(
+                f"{h} ({c} sample{'s' if c > 1 else ''})" for c, h in tops[:3])) if tops else ""
+            checks = set(sub.get("rgi_host_check", pd.Series(dtype=str)).fillna(""))
+            text = f"{gene}: {n} sample{'s' if n > 1 else ''} ({', '.join(sub['sample'])}){host_txt}"
+            if comparison is not None:
+                by = sub["detected_by"].fillna("")
+                n_all = int(by.str.contains(r"\+", regex=True).sum())
+                single = sorted({b for b in by if "+" not in b})
+            if "non_watchlist_host" in checks and "watchlist_host" not in checks:
+                kind, note = "homolog", ("the RGI k-mer host is not a watchlist pathogen: possibly a related gene "
+                                         "of a commensal")
+            elif comparison is not None and n_all == 0:
+                kind, note = "single", f"found by {' / '.join(single)}"
+            elif comparison is not None:
+                kind, note = "tier1", f"found by every method in {n_all} of {n} samples"
+            else:
+                kind, note = "tier1", ""
+            flags.append((kind, text + (f" - {note}" if note else ""), "compare" if kind != "tier1" and
+                          comparison is not None else "args"))
+    if low_samples:
+        flags.append(("low_depth", f"{len(low_samples)} low-depth sample{'s' if len(low_samples) > 1 else ''}: "
+                                   f"{', '.join(low_samples)} (absence of a gene or taxon there is not informative)",
+                      "qc"))
+    return flags
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--results", nargs="+", required=True, help="BugBuster results directories (one per batch)")
@@ -163,7 +234,18 @@ def parse_args(argv=None):
                    help="ARG tier rule table (default: assets/arg_priority_tiers.tsv)")
     p.add_argument("--watchlist", default=str(DEFAULT_ASSETS / "summary_watchlist.tsv"),
                    help="watchlist taxa (default: assets/summary_watchlist.tsv)")
-    p.add_argument("--top-n", type=int, default=40, help="maximum rows in the taxonomy and ARG heatmaps (default 40)")
+    p.add_argument("--rgi-min-coverage", type=float, default=80,
+                   help="RGI bwt: a gene is detected when reads cover at least this %% of its best-covered "
+                        "reference sequence (default 80). RGI itself reports every gene with any mapped read")
+    p.add_argument("--arg-primary", choices=("auto", "kmarvel", "rgi"), default="auto",
+                   help="read-level ARG method behind the ARG matrices and figures (default auto: K-MARVEL when "
+                        "present, else RGI); every method's calls are in arg_long.tsv")
+    p.add_argument("--depth-marks", default="10000000,20000000",
+                   help="comma-separated clean read-pair depths marked in the QC figure and counted in the report "
+                        "header (default 10000000,20000000; '' for none)")
+    p.add_argument("--taxa-per-sample", type=int, default=10,
+                   help="the taxonomy heatmaps show the union of each sample's N most abundant taxa (default 10)")
+    p.add_argument("--top-n", type=int, default=40, help="maximum rows in the ARG heatmap (default 40)")
     p.add_argument("--title", default="BugBuster results summary", help="HTML report title")
     p.add_argument("--no-excel", action="store_true", help="do not write the Excel workbook")
     return p.parse_args(argv)
@@ -175,6 +257,10 @@ def main(argv=None):
     outdir.mkdir(parents=True, exist_ok=True)
     if args.order_by and not args.group_by:
         warn("--order-by without --group-by orders all samples as one series")
+    try:
+        depth_marks = sorted({int(float(x)) for x in str(args.depth_marks).split(",") if x.strip()})
+    except ValueError:
+        die(f"--depth-marks: '{args.depth_marks}' is not a comma-separated list of read-pair counts")
 
     if args.batch_labels is not None:
         if len(args.batch_labels) != len(args.results):
@@ -201,12 +287,13 @@ def main(argv=None):
         fastp = load_fastp_lengths(root)
         taxonomy = load_taxonomy(root)
         kmarvel, kran = load_kmarvel(root)
+        rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
         names = set()
         if reads is not None:
             names |= set(reads["sample"])
         if taxonomy is not None:
             names |= set(taxonomy["otu"].columns)
-        names |= kran
+        names |= kran | rgi_ran
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
@@ -214,7 +301,8 @@ def main(argv=None):
                 die(f"sample {s} is in both {seen[s]} and {root}; sample names must be unique across results directories")
             seen[s] = str(root)
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
-                        "kmarvel": kmarvel, "kmarvel_ran": kran, "samples": names, "versions": load_versions(root)})
+                        "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
+                        "rgi_kmer_ran": rgi_kmer_ran, "samples": names, "versions": load_versions(root)})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
     samples = pd.DataFrame(
@@ -248,6 +336,7 @@ def main(argv=None):
         samples["pct_removed_decontam"] = (samples["qc_pass_pairs"] - samples["clean_pairs"]) / samples["raw_pairs"] * 100
         samples["pct_clean"] = samples["clean_pairs"] / samples["raw_pairs"] * 100
         samples["low_depth"] = samples["clean_pairs"] < args.min_clean_pairs
+        samples["depth_class"] = depth_classes(samples["clean_pairs"], [args.min_clean_pairs] + depth_marks)
     else:
         warn("no Reads_report.csv: depth flags and ARG normalisation are unavailable")
     lengths = pd.concat([b["fastp"] for b in batches])
@@ -257,7 +346,12 @@ def main(argv=None):
 
     tables = {}
     figs = FigureWriter(outdir)
-    summary = {"n_samples": len(order), "n_batches": len(batches), "n_low_depth": len(low)}
+    summary = {"n_samples": len(order), "n_batches": len(batches), "n_low_depth": len(low),
+               "low_depth_samples": [s for s in order if s in low]}
+    if "clean_pairs" in samples:
+        summary["depth_marks"] = [(m, int((samples["clean_pairs"] >= m).sum())) for m in depth_marks]
+
+    watch = load_watchlist(args.watchlist) if args.watchlist and Path(args.watchlist).exists() else None
 
     # ---- taxonomy
     tx = build_taxonomy(batches, samples, order)
@@ -289,69 +383,145 @@ def main(argv=None):
             agg = sub.groupby(sp)["relative_abundance"].sum()
             species_by_sample[s] = {norm_taxon(n): (strip_gtdb(n), ab) for n, ab in agg.items() if n}
         summary["n_species"] = int((spw > 0).any(axis=1).sum())
-        watch = load_watchlist(args.watchlist) if args.watchlist and Path(args.watchlist).exists() else None
         wl_wide = wl_long = None
         if watch is not None:
             wl_wide, wl_long = watchlist_table(tx, watch)
             tables["watchlist"] = (wl_wide, False)
-        fig_taxonomy(figs, tx, [s for s in order if s in tx["rel"].columns],
-                     [samples.at[s, args.group_by] if args.group_by else "" for s in order if s in tx["rel"].columns],
-                     low, args.top_n, tx["label"])
         tcols = [s for s in order if s in tx["rel"].columns]
-        fig_watchlist(figs, wl_wide, wl_long, tcols,
-                      [samples.at[s, args.group_by] if args.group_by else "" for s in tcols], low)
+        tgroups = [samples.at[s, args.group_by] if args.group_by else "" for s in tcols]
+        fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
+        fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name)
+        fig_diversity(figs, samples, tcols, tgroups, low, args.group_by, args.order_by)
+        coords, pct = bray_curtis_pcoa(spw.reindex(columns=tcols))
+        if coords is not None:
+            fig_pcoa(figs, coords, pct, samples, dict(zip(tcols, tgroups)), low, args.group_by, args.order_by)
+            pc = coords.rename(columns={c: f"{c} ({p:.1f}%)" for c, p in zip(coords.columns, pct)})
+            pc = samples[["batch"] + meta_cols].join(pc, how="inner").reindex([s for s in order if s in pc.index])
+            tables["taxonomy_pcoa"] = (pc.rename_axis("sample").reset_index(), False)
 
-    # ---- ARGs
-    kframes = [b["kmarvel"] for b in batches if b["kmarvel"] is not None]
-    ran = set().union(*[b["kmarvel_ran"] for b in batches])
-    if kframes and ran:
+    # ---- ARGs (read level): K-MARVEL calls, and RGI bwt genes at or above --rgi-min-coverage
+    methods_ran = {}
+    kran = set().union(*[b["kmarvel_ran"] for b in batches])
+    rgi_ran = set().union(*[b["rgi_ran"] for b in batches])
+    if kran:
+        methods_ran["kmarvel"] = kran
+    if rgi_ran:
+        methods_ran["rgi"] = rgi_ran
+    comparison, rgi_all, calls_by = None, None, {}
+    if methods_ran:
+        primary = args.arg_primary
+        if primary == "auto":
+            primary = "kmarvel" if "kmarvel" in methods_ran else "rgi"
+        elif primary not in methods_ran:
+            die(f"--arg-primary {primary}: no {METHOD_LABELS[primary]} output in the results directories")
         rules = load_rules(args.arg_priority)
-        snps = load_snps(args.kmarvel_db)
-        if snps is None:
-            warn("no --kmarvel-db: tier 4 calls cannot be checked for resistance mutations")
         prevalence = load_prevalence(args.card_prevalence) if args.card_prevalence else None
-        status = arg_status(samples, order, ran)
+        if "kmarvel" in methods_ran:
+            snps = load_snps(args.kmarvel_db)
+            if snps is None:
+                warn("no --kmarvel-db: tier 4 calls cannot be checked for resistance mutations")
+            kcalls = pd.concat([b["kmarvel"] for b in batches if b["kmarvel"] is not None], ignore_index=True)
+            calls_by["kmarvel"] = annotate_args(kcalls, samples, rules, snps, prevalence, species_by_sample)
+        if "rgi" in methods_ran:
+            alleles = pd.concat([b["rgi"] for b in batches if b["rgi"] is not None], ignore_index=True)
+            kmer = pd.concat([b["rgi_kmer"] for b in batches if b["rgi_kmer"] is not None], ignore_index=True)
+            kmer_ran = set().union(*[b["rgi_kmer_ran"] for b in batches])
+            rgi_all = annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by_sample, watch,
+                                   args.rgi_min_coverage)
+            calls_by["rgi"] = rgi_all[rgi_all["rgi_detected"]].copy() if not rgi_all.empty else rgi_all
+        summary["arg_primary"] = METHOD_LABELS[primary]
+        summary["arg_methods"] = [METHOD_LABELS[m] for m in methods_ran]
+        status = arg_status(samples, order, methods_ran[primary])
         samples["arg_status"] = [status[s] for s in order]
         not_run = [s for s in order if status[s] == NA_NOT_RUN]
-        calls = pd.concat(kframes, ignore_index=True)
-    if kframes and ran and calls.empty:
-        warn("K-MARVEL found no ARG in any sample: ARG tables and figures are skipped")
-        for col in [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]:
-            samples[col] = 0
-        samples.loc[not_run, [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]] = np.nan
-        summary["n_tier1"], summary["n_tier1_genes"] = 0, 0
-    elif kframes and ran:
-        arg = annotate_args(calls, samples, rules, snps, prevalence, species_by_sample)
-        mats = arg_tables(arg, samples, order, status, args.group_by, args.order_by)
-        for t in (1, 2, 3, 4):
-            samples[f"n_arg_calls_tier{t}"] = arg[arg["tier"] == t].groupby("sample").size().reindex(order).fillna(0).astype(int)
-        acq = arg[(arg["tier"] <= 2) & arg["gene_representative"]]
-        samples["acquired_genes"] = acq.groupby("sample")["gene"].nunique().reindex(order).fillna(0).astype(int)
-        samples["acquired_rpkm"] = acq.groupby("sample")["rpkm"].sum().reindex(order).fillna(0)
-        samples.loc[not_run, [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]] = np.nan
-        lead = ["sample", "batch"] + meta_cols + ["tier", "category", "gene", "aro_full_name", "aro_id", "gene_family",
-                                                   "drug_class", "resistance_mechanism", "model", "identity",
-                                                   "assembly_coverage", "supporting_reads", "median_kmer_depth",
-                                                   "gene_length_nt", "rpm", "rpkm", "resistance_snp_status",
-                                                   "resistance_snps_found", "kmer_blast_discordant",
-                                                   "blast_predicted_aro_name", "gene_representative"]
-        lead += [c for c in ("card_plasmid_associated", "candidate_hosts") if c in arg.columns]
-        arg = arg.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
-        arg["_o"] = arg["sample"].map({s: i for i, s in enumerate(order)})
-        arg = arg.sort_values(["_o", "tier", "gene"]).drop(columns="_o")
-        arg_out = arg[lead + ["tier_note", "mutation_data"]]
-        tables["arg_long"] = (arg_out, False)
-        for name, df in mats.items():
-            tables[name] = (df, name != "group_arg_detection")
-        hit1 = arg[arg["tier"] == 1]
-        summary["n_tier1"] = int(hit1["sample"].nunique())
-        summary["n_tier1_genes"] = int(hit1["gene"].nunique())
-        fig_args(figs, arg[arg["gene_representative"]], mats, samples, order, groups, low, status, args.top_n, args.group_by, args.order_by)
+        count_cols = [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]
+        arg = calls_by[primary]
+        if arg.empty:
+            warn(f"{METHOD_LABELS[primary]} found no ARG in any sample: ARG tables and figures are skipped")
+            for col in count_cols:
+                samples[col] = 0
+            samples.loc[not_run, count_cols] = np.nan
+            summary["n_tier1"], summary["n_tier1_genes"] = 0, 0
+        else:
+            mats = arg_tables(arg, samples, order, status, args.group_by, args.order_by)
+            for t in (1, 2, 3, 4):
+                samples[f"n_arg_calls_tier{t}"] = arg[arg["tier"] == t].groupby("sample").size().reindex(order).fillna(0).astype(int)
+            acq = arg[(arg["tier"] <= 2) & arg["gene_representative"]]
+            samples["acquired_genes"] = acq.groupby("sample")["gene"].nunique().reindex(order).fillna(0).astype(int)
+            samples["acquired_rpkm"] = acq.groupby("sample")["gene_rpkm"].sum().reindex(order).fillna(0)
+            samples.loc[not_run, count_cols] = np.nan
+            for name, df in mats.items():
+                tables[name] = (df, name != "group_arg_detection")
+            hit1 = arg[arg["tier"] == 1]
+            summary["n_tier1"] = int(hit1["sample"].nunique())
+            summary["n_tier1_genes"] = int(hit1["gene"].nunique())
+            fig_args(figs, arg[arg["gene_representative"]], mats, samples, order, groups, low, status, args.top_n,
+                     args.group_by, args.order_by, METHOD_LABELS[primary])
+        # arg_long: every method's calls, the primary method first
+        lead = ["sample", "batch"] + meta_cols + ["method", "tier", "category", "gene", "aro_full_name", "aro_id",
+                                                   "gene_family", "drug_class", "resistance_mechanism", "model",
+                                                   "identity", "assembly_coverage", "supporting_reads",
+                                                   "median_kmer_depth", "gene_length_nt", "rpm", "rpkm", "gene_rpkm",
+                                                   "resistance_snp_status", "resistance_snps_found",
+                                                   "kmer_blast_discordant", "blast_predicted_aro_name",
+                                                   "gene_representative"]
+        frames = [calls_by[m] for m in [primary] + [m for m in calls_by if m != primary] if not calls_by[m].empty]
+        if frames:
+            allc = pd.concat(frames, ignore_index=True)
+            extra = [c for c in ("card_plasmid_associated", "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref",
+                                 "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check") if c in allc.columns]
+            allc = allc.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
+            allc["_o"] = allc["sample"].map({s: i for i, s in enumerate(order)})
+            allc["_m"] = (allc["method"] != primary).astype(int)
+            allc = allc.sort_values(["_o", "_m", "tier", "gene"], kind="stable").drop(columns=["_o", "_m"])
+            tables["arg_long"] = (allc[lead + extra + ["tier_note", "mutation_data"]], False)
+        if len(calls_by) > 1:
+            comp, overlap, gene_sets = compare_methods(calls_by, rgi_all, methods_ran)
+            if not comp.empty:
+                lead_c = ["sample", "batch"] + meta_cols
+                comp = comp.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
+                comp["_o"] = comp["sample"].map({s: i for i, s in enumerate(order)})
+                comp = comp.sort_values(["_o", "tier", "gene"], kind="stable").drop(columns="_o")
+                comp = comp[lead_c + [c for c in comp.columns if c not in lead_c]]
+                tables["arg_method_comparison"] = (comp, False)
+                tables["arg_method_overlap"] = (overlap, False)
+                common = set.intersection(*[set(v) for v in methods_ran.values()])
+                for m in calls_by:
+                    n = comp[comp[f"detected_{m}"]].groupby("sample")["gene"].nunique()
+                    samples[f"n_genes_{m}"] = n.reindex(order).fillna(0).astype(int)
+                both = comp[comp[[f"detected_{m}" for m in calls_by]].all(axis=1)]
+                samples["n_genes_all_methods"] = both.groupby("sample")["gene"].nunique().reindex(order).fillna(0).astype(int)
+                outside = [s for s in order if s not in common]
+                samples.loc[outside, [f"n_genes_{m}" for m in calls_by] + ["n_genes_all_methods"]] = np.nan
+                summary["n_tier1_genes_all_methods"] = int(both.loc[both["tier"] == 1, "gene"].nunique())
+                comparison = {"comp": comp, "overlap": overlap, "gene_sets": gene_sets,
+                              "methods": [m for m in ("kmarvel", "rgi") if m in calls_by]}
+                fig_method_upset(figs, comp, gene_sets, comparison["methods"])
+                fig_method_by_category(figs, comp, comparison["methods"])
+
+    # ---- per-group view: watchlist taxa and tier 1 genes across the order values
+    prim_arg = None
+    tl_status = {s: (NA_LOW_DEPTH if s in low else "ok") for s in order}
+    if methods_ran:
+        tl_status = status
+        prim_arg = calls_by[primary]
+        prim_arg = prim_arg[prim_arg["gene_representative"]] if not prim_arg.empty else prim_arg
+    rgi_hosts = {}
+    if rgi_all is not None and not rgi_all.empty:
+        rep = rgi_all[rgi_all["gene_representative"]]
+        rgi_hosts = {(s, g): h for s, g, h in zip(rep["sample"], rep["gene"], rep["rgi_kmer_hosts"]) if h}
+    if args.group_by and args.order_by:
+        fig_group_timeline(figs, prim_arg, samples, order, tl_status, args.group_by, args.order_by,
+                           wl_long if tx is not None else None, tx["rel"].columns if tx is not None else (), rgi_hosts)
+    tier1_view = None
+    if prim_arg is not None and not prim_arg.empty:
+        tier1_view = tier1_table(calls_by[primary], comparison, primary)
+    summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"])
 
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]
     tables = {"samples_qc": (qc.reset_index(), False), **tables}
-    fig_qc(figs, samples, order, groups, low, args.min_clean_pairs)
+    fig_qc(figs, samples, order, groups, low, args.min_clean_pairs, depth_marks)
 
     write_tables(outdir, tables)
     if not args.no_excel:
@@ -361,13 +531,16 @@ def main(argv=None):
     for flag, val in (("metadata", args.metadata), ("group-by", args.group_by), ("order-by", args.order_by),
                       ("kmarvel-db", args.kmarvel_db), ("card-prevalence", args.card_prevalence),
                       ("arg-priority", args.arg_priority), ("watchlist", args.watchlist),
-                      ("min-clean-pairs", args.min_clean_pairs)):
+                      ("min-clean-pairs", args.min_clean_pairs), ("rgi-min-coverage", args.rgi_min_coverage),
+                      ("arg-primary", args.arg_primary), ("depth-marks", args.depth_marks),
+                      ("taxa-per-sample", args.taxa_per_sample)):
         if val:
             inputs.append(f"--{flag} {val}")
     write_html(outdir, args.title, {
         "figures": figs, "tables": tables, "summary": summary, "versions": versions, "inputs": inputs,
         "min_pairs": args.min_clean_pairs, "meta_cols": meta_cols, "key_meta": key_meta,
-        "group_by": args.group_by,
+        "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
+        "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": args.watchlist,
     })
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 

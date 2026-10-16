@@ -14,6 +14,8 @@ process RESULTS_SUMMARY {
     path(sylph_profiles, stageAs: 'in_sylph/*')     // <sample>_sylph_<db>.tsv; [] unless sylph
     path(kmarvel_tsvs, stageAs: 'in_kmarvel/*')     // <sample>_kmarvel.tsv; [] unless K-MARVEL ran
     path(kmarvel_db, stageAs: 'kmarvel_db')         // K-MARVEL CARD dir (snps.txt); []
+    path(rgi_alleles, stageAs: 'in_rgi/*')          // <sample>_rgi_bwt.allele_mapping_data.txt; [] unless RGI ran
+    path(rgi_kmer_genes, stageAs: 'in_rgi_kmer/*')  // <sample>_rgi_kmer_<k>mer_analysis.gene.txt; [] without RGI k-mer
     path(software_versions, stageAs: 'in_versions/*') // pipeline_info/software_versions.yml
     path(sample_metadata)                           // optional user metadata TSV/CSV; []
     path(card_prevalence)                           // optional WildCARD card_prevalence.txt; []
@@ -43,7 +45,8 @@ process RESULTS_SUMMARY {
     """
     mkdir -p ${run_dir}/01_quality_control/summary ${run_dir}/01_quality_control/fastp \\
         ${run_dir}/02_taxonomy/tables ${run_dir}/02_taxonomy/sylph \\
-        ${run_dir}/05_arg_prediction/read_level/kmarvel ${run_dir}/pipeline_info
+        ${run_dir}/05_arg_prediction/read_level/kmarvel ${run_dir}/pipeline_info \\
+        ${run_dir}/05_arg_prediction/read_level/rgi ${run_dir}/05_arg_prediction/read_level/rgi_kmer
     for f in in_qc/*.csv; do
         [ -e "\$f" ] && ln -s "\$PWD/\$f" ${run_dir}/01_quality_control/summary/Reads_report.csv
     done
@@ -64,6 +67,18 @@ process RESULTS_SUMMARY {
         s=\$(basename "\$f" _kmarvel.tsv)
         mkdir -p ${run_dir}/05_arg_prediction/read_level/kmarvel/"\$s"
         ln -s "\$PWD/\$f" ${run_dir}/05_arg_prediction/read_level/kmarvel/"\$s"/
+    done
+    for f in in_rgi/*_rgi_bwt.allele_mapping_data.txt; do
+        [ -e "\$f" ] || continue
+        s=\$(basename "\$f" _rgi_bwt.allele_mapping_data.txt)
+        mkdir -p ${run_dir}/05_arg_prediction/read_level/rgi/"\$s"
+        ln -s "\$PWD/\$f" ${run_dir}/05_arg_prediction/read_level/rgi/"\$s"/
+    done
+    for f in in_rgi_kmer/*mer_analysis.gene.txt; do
+        [ -e "\$f" ] || continue
+        s=\$(basename "\$f" | sed -E 's/_rgi_kmer_[0-9]+mer_analysis[.]gene[.]txt\$//')
+        mkdir -p ${run_dir}/05_arg_prediction/read_level/rgi_kmer/"\$s"
+        ln -s "\$PWD/\$f" ${run_dir}/05_arg_prediction/read_level/rgi_kmer/"\$s"/
     done
     for f in in_versions/*; do
         [ -e "\$f" ] && ln -s "\$PWD/\$f" ${run_dir}/pipeline_info/software_versions.yml

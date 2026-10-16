@@ -41,11 +41,52 @@ class FigureWriter:
         self.records.append({"key": key, "title": title, "caption": caption})
 
 
-def label_groups(ax, cols, groups, y0, y1, fontsize):
-    """Group names above the columns; alternate two heights so names of narrow groups do not overlap."""
-    for i, (g, start, end) in enumerate(group_spans(cols, groups)):
-        ax.text((start + end) / 2, y0 if i % 2 == 0 else y1, str(g), ha="center", va="bottom",
-                fontsize=fontsize, clip_on=False)
+def label_levels(cols, groups, fontsize, inch_per_col):
+    """Text row for each group name above the columns: the lowest row where it does not overlap a name already
+    placed there (names wider than their group spill over the neighbours). Returns [(name, centre, row)]."""
+    placed, out = [], []
+    for g, start, end in group_spans(cols, groups):
+        centre = (start + end) / 2
+        half = len(str(g)) * fontsize * 0.62 / 72 / inch_per_col / 2 + 0.4
+        lo, hi = centre - half, centre + half
+        row = 0
+        while any(r == row and not (hi < a or lo > b) for a, b, r in placed):
+            row += 1
+        placed.append((lo, hi, row))
+        out.append((g, centre, row))
+    return out
+
+
+def place_group_labels(fig, ax, gax, cols, groups, fontsize):
+    """Group names in gax (x shared with ax), each on the lowest text row where its measured extent does not
+    overlap a name already there. Returns the number of rows used."""
+    fig.canvas.draw()
+    renderer = fig.canvas.get_renderer()
+    px_per_col = ax.get_window_extent(renderer).width / max(len(cols), 1)
+    placed, texts = [], []
+    for g, start, end in group_spans(cols, groups):
+        centre = (start + end) / 2
+        t = gax.text(centre, 0.05, str(g), ha="center", va="bottom", fontsize=fontsize, clip_on=False)
+        # names must not move the layout: a name wider than its group would shrink the heatmap and void
+        # the measured column width
+        t.set_in_layout(False)
+        half = t.get_window_extent(renderer).width / px_per_col / 2 + 0.5
+        row = 0
+        while any(r == row and not (centre + half < lo or centre - half > hi) for lo, hi, r in placed):
+            row += 1
+        placed.append((centre - half, centre + half, row))
+        texts.append((t, row))
+    n_levels = max(r for _, r in texts) + 1
+    for t, row in texts:
+        t.set_y(row + 0.05)
+    gax.set_ylim(0, n_levels)
+    return n_levels
+
+
+def label_groups(ax, cols, groups, y0, step, fontsize, inch_per_col):
+    """Group names above the columns (data coordinates: row k at y0 + k * step), staggered so none overlap."""
+    for g, centre, row in label_levels(cols, groups, fontsize, inch_per_col):
+        ax.text(centre, y0 + row * step, str(g), ha="center", va="bottom", fontsize=fontsize, clip_on=False)
 
 
 def style_sample_ticks(labels_list, low, axis_labels):
@@ -55,17 +96,31 @@ def style_sample_ticks(labels_list, low, axis_labels):
 
 
 def heatmap(fw, key, title, caption, mat, row_labels, cols, groups, low, hatch_cols, cbar_label,
-            vmin=None, vmax=None, cmap="viridis"):
+            vmin=None, vmax=None, cmap="viridis", row_groups=None, row_group_title=""):
+    """log10 heatmap, samples as columns. Group names sit in their own strip above the columns and the title
+    is a figure title, so neither can overlap the other. row_groups (one label per row, e.g. phylum) adds a
+    colour strip left of the rows with a legend below."""
     data = mat.reindex(columns=cols).astype(float).values
     with np.errstate(divide="ignore", invalid="ignore"):
         logd = np.where(data > 0, np.log10(data), np.nan)
     if np.all(np.isnan(logd)):
         return
     nrow, ncol = logd.shape
-    fs_x, fs_y = fontsize_for(ncol), fontsize_for(nrow, scale=420)
+    row_h = 0.2 if nrow <= 60 else 0.15
+    fs_x, fs_y = fontsize_for(ncol), max(4, min(9, row_h * 72 * 0.62))
     width = min(60, max(7, 0.2 * ncol + 4))
-    height = min(60, max(3.5, 0.2 * nrow + 2.8))
-    fig, ax = plt.subplots(figsize=(width, height))
+    heat_h = max(2.0, row_h * nrow)
+    has_groups = any(groups)
+    group_h = 0.5 if has_groups else 0.0
+    legend_h = 0.0
+    if row_groups is not None:
+        legend_h = 0.3 + 0.22 * math.ceil(len(set(row_groups)) / 4)
+    fig = plt.figure(figsize=(width, heat_h + group_h + legend_h + 2.6), layout="constrained")
+    ncols_grid = 2 if row_groups is not None else 1
+    gs = fig.add_gridspec(2 if has_groups else 1, ncols_grid,
+                          height_ratios=[group_h, heat_h] if has_groups else [heat_h],
+                          width_ratios=[0.18, width] if row_groups is not None else [1])
+    ax = fig.add_subplot(gs[-1, -1])
     cm = plt.get_cmap(cmap)
     # drop the palest end so a low value never looks like the grey 'not detected' cell
     cm = matplotlib.colors.ListedColormap(cm(np.linspace(0.12, 1, 256)) if cmap.endswith("_r") else cm(np.linspace(0, 0.92, 256)))
@@ -80,23 +135,63 @@ def heatmap(fw, key, title, caption, mat, row_labels, cols, groups, low, hatch_c
                                    edgecolor="#999999", linewidth=0))
     for _, start, end in group_spans(cols, groups)[:-1]:
         ax.axvline(end + 0.5, color="white", linewidth=2.5)
-    if any(groups):
-        label_groups(ax, cols, groups, -0.8, -0.8 - max(1.0, nrow * 0.035), fs_x + 1)
     ax.set_xticks(range(ncol))
     ax.set_xticklabels(cols, rotation=90, fontsize=fs_x)
     style_sample_ticks(cols, low, ax.get_xticklabels())
-    ax.set_yticks(range(nrow))
-    ax.set_yticklabels(row_labels, fontsize=fs_y)
-    ax.set_title(title, fontsize=12, pad=38 if any(groups) else 8)
-    cb = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.01)
-    cb.set_label(cbar_label, fontsize=9)
     ax.tick_params(length=0)
     for sp in ax.spines.values():
         sp.set_visible(False)
+    if row_groups is not None:
+        sax = fig.add_subplot(gs[-1, 0], sharey=ax)
+        names = list(dict.fromkeys(row_groups))
+        palette = category_colors(names)
+        sax.imshow(np.array([[names.index(g)] for g in row_groups]), aspect="auto", interpolation="nearest",
+                   cmap=matplotlib.colors.ListedColormap([palette[n] for n in names]), vmin=-0.5,
+                   vmax=len(names) - 0.5)
+        sax.set_xticks([])
+        sax.set_yticks(range(nrow))
+        sax.set_yticklabels(row_labels, fontsize=fs_y)
+        sax.tick_params(length=0)
+        for sp in sax.spines.values():
+            sp.set_visible(False)
+        ax.tick_params(labelleft=False)
+        handles = [Rectangle((0, 0), 1, 1, color=palette[n]) for n in names]
+        fig.legend(handles, display_names(names), loc="outside lower center", ncol=4, fontsize=8,
+                   frameon=False, title=row_group_title or None, title_fontsize=8)
+    else:
+        ax.set_yticks(range(nrow))
+        ax.set_yticklabels(row_labels, fontsize=fs_y)
+    if has_groups:
+        gax = fig.add_subplot(gs[0, -1], sharex=ax)
+        gax.axis("off")
+        n_levels = place_group_labels(fig, ax, gax, cols, groups, fs_x + 1)
+        gs.set_height_ratios([0.08 + 0.22 * n_levels, heat_h])
+    cb = fig.colorbar(im, ax=ax, fraction=0.025, pad=0.01, aspect=max(20, min(60, nrow / 2)))
+    cb.set_label(cbar_label, fontsize=9)
+    fig.suptitle(title, fontsize=12)
     fw.save(fig, key, title, caption)
 
 
-def fig_qc(fw, qc, cols, groups, low, min_pairs):
+def short_count(n):
+    """10000000 -> '10M', 1500000 -> '1.5M', 250000 -> '250k'."""
+    for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+        if n >= div:
+            return f"{n / div:.3g}{suffix}"
+    return f"{n:.0f}"
+
+
+def category_colors(names):
+    """A colour per category name, in the order given: tab10 for up to 10, else tab20 with its dark shades first
+    (tab20 pairs each colour with a light shade of itself, so neighbours would look alike), then tab20b."""
+    if len(names) <= 10:
+        base = list(plt.get_cmap("tab10").colors)
+    else:
+        t20 = list(plt.get_cmap("tab20").colors)
+        base = t20[0::2] + t20[1::2] + list(plt.get_cmap("tab20b").colors)
+    return {n: base[i % len(base)] for i, n in enumerate(names)}
+
+
+def fig_qc(fw, qc, cols, groups, low, min_pairs, depth_marks=()):
     if "raw_pairs" not in qc or qc["raw_pairs"].isna().all():
         return
     q = qc.reindex(cols)
@@ -125,11 +220,21 @@ def fig_qc(fw, qc, cols, groups, low, min_pairs):
     ax.barh(y, q["clean_pairs"], color=colors)
     ax.set_xscale("log")
     ax.axvline(min_pairs, color="#c0392b", linestyle="--", linewidth=1)
-    ax.text(min_pairs, -0.9, f" min {min_pairs:,.0f}", color="#c0392b", fontsize=8, va="bottom")
+    ax.text(min_pairs, -0.9, f" min {short_count(min_pairs)}", color="#c0392b", fontsize=8, va="bottom")
+    for mark in depth_marks:
+        ax.axvline(mark, color="#555555", linestyle=":", linewidth=1)
+        ax.text(mark, -0.9, f" {short_count(mark)}", color="#555555", fontsize=8, va="bottom")
     ax.set_xlabel("clean read pairs (log)")
     if has_cls:
         ax = axes[2]
-        ax.barh(y, q["classified_fraction"] * 100, color="#56a35a")
+        pct = q["classified_fraction"] * 100
+        ax.barh(y, pct, color="#56a35a")
+        for yi, v in zip(y, pct):
+            if pd.isna(v):
+                continue
+            inside = v > 85
+            ax.text(v - 1 if inside else v + 1, yi, f"{v:.0f}%", va="center", ha="right" if inside else "left",
+                    fontsize=max(4, fs - 1), color="white" if inside else "#333333")
         ax.set_xlim(0, 100)
         ax.set_xlabel("% classified (profiler)")
     axes[0].invert_yaxis()  # shared y: first sample on top
@@ -147,17 +252,20 @@ def fig_qc(fw, qc, cols, groups, low, min_pairs):
     fw.save(fig, "qc_read_fate", "Read fate per sample",
             "Left: share of raw read pairs kept (blue), removed by host/contaminant filtering (orange) and by "
             "read QC (grey). Middle: clean read pairs on a log scale; red bars and labels mark samples below the "
-            "low-depth threshold (dashed). Right: fraction of reads the taxonomic profiler classified.")
+            "low-depth threshold (red dashed line)"
+            + (f"; dotted lines mark {', '.join(short_count(m) for m in depth_marks)} clean read pairs" if depth_marks else "")
+            + ". Right: % of reads the taxonomic profiler classified.")
 
 
-def pick_taxa(wide, per_sample_k, cap):
+def pick_taxa(wide, per_sample_k, cap=None):
+    """Union of each sample's per_sample_k most abundant taxa (unassigned excluded), by maximum abundance."""
     chosen = set()
     for s in wide.columns:
         top = wide[s][wide[s] > 0].nlargest(per_sample_k).index
         chosen.update(top)
     chosen = [t for t in wide.index if t in chosen and not t.startswith("unassigned")]
     ranked = wide.loc[chosen].max(axis=1).sort_values(ascending=False)
-    return list(ranked.index[:cap])
+    return list(ranked.index[:cap] if cap else ranked.index)
 
 
 def display_names(names):
@@ -166,31 +274,57 @@ def display_names(names):
     return [n if d in dup else d for n, d in zip(names, disp)]
 
 
-def fig_taxonomy(fw, tx, cols, groups, low, top_n, label):
+def parent_of(tx, rank, parent):
+    """{taxon name at rank: its parent-rank name} from the lineage table."""
+    tax = tx["tax"]
+    if parent not in tax.columns or rank not in tax.columns:
+        return {}
+    pairs = tax[[rank, parent]].replace("", np.nan).dropna().drop_duplicates(rank)
+    return dict(zip(pairs[rank], pairs[parent]))
+
+
+def lineage_order(taxa, wide, tx, rank, genus):
+    """Taxa grouped by phylum (largest phylum first), then genus, then by maximum abundance."""
+    phylum = next((r for r in tx["ranks"] if r.lower() == "phylum"), None)
+    to_phylum = parent_of(tx, rank, phylum) if phylum else {}
+    to_genus = parent_of(tx, rank, genus) if rank != genus else {t: t for t in taxa}
+    peak = wide.loc[taxa].max(axis=1)
+    ph = {t: to_phylum.get(t, "unassigned") for t in taxa}
+    ge = {t: to_genus.get(t, t) for t in taxa}
+    ph_size = pd.Series(ph).value_counts()
+    ge_peak = pd.Series({t: peak[t] for t in taxa}).groupby(pd.Series(ge)).max()
+    ordered = sorted(taxa, key=lambda t: (-ph_size[ph[t]], ph[t], -ge_peak[ge[t]], ge[t], -peak[t]))
+    return ordered, [ph[t] for t in ordered], phylum or "phylum"
+
+
+def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
     sp, ge = species_rank(tx), genus_rank(tx)
-    for rank, k, key in ((sp, 5, "taxonomy_species_heatmap"), (ge, 5, "taxonomy_genus_heatmap")):
+    for rank, key in ((sp, "taxonomy_species_heatmap"), (ge, "taxonomy_genus_heatmap")):
         wide = tx["wide"][rank].reindex(columns=cols).fillna(0)
-        taxa = pick_taxa(wide, k, top_n)
+        taxa = pick_taxa(wide, per_sample)
         if not taxa:
             continue
-        mat = wide.loc[taxa]
-        heatmap(fw, key, f"{rank}: relative abundance ({label})",
-                f"Union of each sample's {k} most abundant {rank.lower()} taxa (up to {top_n}), so every sample's "
-                f"dominant taxa are shown. Colour = log10 relative abundance (%); grey = not detected. Rows are sorted by "
-                f"maximum abundance; red sample labels mark low-depth samples.",
-                mat, display_names(taxa), cols, groups, low, set(), "log10 relative abundance (%)",
-                vmin=-2, vmax=2)
+        taxa, phyla, phylum_label = lineage_order(taxa, wide, tx, rank, ge)
+        heatmap(fw, key, f"{rank} relative abundance, top {per_sample} per sample ({label})",
+                f"Union of each sample's {per_sample} most abundant {rank.lower()} taxa ({len(taxa)} row"
+                f"{'s' if len(taxa) != 1 else ''}), so "
+                f"every sample's dominant taxa are shown. Rows are grouped by {phylum_label.lower()} (colour strip) "
+                + (f"and genus, " if rank == sp else "")
+                + "then sorted by maximum abundance. Colour = log10 relative abundance (%); grey = not detected; "
+                "red sample labels mark low-depth samples.",
+                wide.loc[taxa], display_names(taxa), cols, groups, low, set(), "log10 relative abundance (%)",
+                vmin=-2, vmax=2, row_groups=phyla, row_group_title=phylum_label)
     wide = tx["wide"][ge].reindex(columns=cols).fillna(0)
-    taxa = pick_taxa(wide, 3, 19)
+    taxa = pick_taxa(wide, 3, 12)
     if taxa:
         plot = wide.loc[taxa]
         other = (100 - plot.sum(axis=0)).clip(lower=0)
         n = len(cols)
         fig, ax = plt.subplots(figsize=(min(60, max(8, 0.22 * n + 5)), 5.5))
-        colors = list(plt.get_cmap("tab20").colors)
+        colors = category_colors(taxa)
         bottom = np.zeros(n)
-        for i, (t, disp) in enumerate(zip(taxa, display_names(taxa))):
-            ax.bar(range(n), plot.loc[t].values, bottom=bottom, color=colors[i % 20], width=0.9,
+        for t, disp in zip(taxa, display_names(taxa)):
+            ax.bar(range(n), plot.loc[t].values, bottom=bottom, color=colors[t], width=0.9,
                    label=disp, linewidth=0)
             bottom += plot.loc[t].values
         ax.bar(range(n), other.values, bottom=bottom, color="#d9d9d9", width=0.9, label="Other", linewidth=0)
@@ -202,18 +336,20 @@ def fig_taxonomy(fw, tx, cols, groups, low, top_n, label):
         for _, start, end in group_spans(cols, groups)[:-1]:
             ax.axvline(end + 0.5, color="#444444", linewidth=0.8)
         if any(groups):
-            label_groups(ax, cols, groups, 101, 105, 8)
+            label_groups(ax, cols, groups, 101, 5, 8, (min(60, max(8, 0.22 * n + 5)) - 3.5) / n)
         ax.legend(bbox_to_anchor=(1.01, 1), loc="upper left", fontsize=8, frameon=False)
         for s in ("top", "right"):
             ax.spines[s].set_visible(False)
-        ax.set_title(f"{ge} composition ({label})", fontsize=12, pad=28 if any(groups) else 6)
+        fig.suptitle(f"{ge} composition ({label})", fontsize=12)
         fig.tight_layout()
         fw.save(fig, "taxonomy_genus_bars", f"{ge} composition",
-                f"Stacked {ge.lower()} abundance; the taxa are the union of each sample's 3 most abundant "
-                f"{ge.lower()} taxa (at most 19), so 'Other' stays small. The heatmaps show more taxa.")
+                f"Stacked {ge.lower()} abundance on a linear scale: the {len(taxa)} {ge.lower()} taxa are the union of "
+                f"each sample's 3 most abundant (at most 12, by maximum abundance), each with one colour; everything "
+                f"else is 'Other'. Unlike the log-scale heatmap, the bars show proportions: which "
+                f"{ge.lower()} dominates a sample and how much of the community the named taxa cover.")
 
 
-def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low):
+def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source=""):
     if wl_wide is None or wl_wide.empty:
         return
     det = wl_wide[wl_wide["n_samples_detected"] > 0]
@@ -249,12 +385,14 @@ def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low):
     ax.set_title("Watchlist taxa", fontsize=12)
     fig.tight_layout()
     fw.save(fig, "watchlist", "Watchlist taxa",
-            "Watchlist taxa (priority pathogens by default) per sample; dot area scales with log abundance. "
-            "Hollow dots: sylph's ANI interval reaches below 95%, so the species-level call is uncertain. "
-            "Detection is not culture: low abundance can be index hopping or a related strain.")
+            f"Watchlist taxa found in at least one sample ({len(det)} of the {len(wl_wide)} listed in {source or 'the watchlist'}; "
+            "the default list holds the ESKAPE pathogens and other WHO and CDC priority bacteria, see Methods for "
+            "each taxon's source). Dot area scales with log abundance. Hollow dots: sylph's ANI interval reaches "
+            "below 95%, so the species-level call is uncertain. Detection is not culture: low abundance can be "
+            "index hopping or a related strain.")
 
 
-def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_by, order_by):
+def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_by, order_by, method="K-MARVEL"):
     gene = tables["arg_gene_rpkm"]
     num = gene[cols].apply(pd.to_numeric, errors="coerce")
     hatch = {s for s in cols if status[s] != "ok"}
@@ -266,8 +404,9 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_b
     if rows:
         labels = [f"{g}  [T{int(gene.at[g, 'tier'])}]" for g in rows]
         heatmap(fw, "arg_priority_heatmap", "Acquired ARGs: tier 1 (all) and the most prevalent tier 2 genes",
-                "log10 RPKM (supporting read pairs per kb of reference gene per million clean read pairs); alleles are "
-                "summed per gene. Grey = not detected; hatched columns = low depth or K-MARVEL not run, where "
+                "log10 RPKM (supporting read pairs per kb of reference gene per million clean read pairs), one value "
+                "per gene (K-MARVEL: its best-supported allele; RGI: summed over the gene's AROs), from "
+                f"{method}. Grey = not detected; hatched columns = low depth or {method} not run, where "
                 "'not detected' means unknown. Red labels mark low-depth samples.",
                 num.loc[rows], labels, cols, groups, low, hatch, "log10 RPKM", cmap="magma_r")
     dc = tables.get("arg_drug_class_rpkm")
@@ -284,7 +423,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_b
     if "clean_pairs" in samples:
         acq_calls = arg[arg["tier"] <= 2]
         n_genes = acq_calls.groupby("sample")["gene"].nunique().reindex(cols).fillna(0)
-        load = acq_calls.groupby("sample")["rpkm"].sum().reindex(cols)
+        load = acq_calls.groupby("sample")["gene_rpkm"].sum().reindex(cols)
         depth = samples.loc[cols, "clean_pairs"].astype(float)
         ran = [s for s in cols if status[s] != NA_NOT_RUN]
         if ran:
@@ -308,39 +447,71 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_b
                     "If the number of genes found rises with depth (left), shallow samples under-report ARGs; "
                     "compare presence/absence only between samples of similar depth. RPKM (right) is depth-"
                     "normalised. Red = below the low-depth threshold.")
-    if group_by and order_by:
-        fig_timeline(fw, arg, samples, cols, status, group_by, order_by)
 
 
-def fig_timeline(fw, arg, samples, cols, status, group_by, order_by):
-    t1 = arg[arg["tier"] == 1]
-    if t1.empty:
+def short_species(name):
+    """'Klebsiella pneumoniae' -> 'K. pneumoniae'; a genus stays as it is."""
+    parts = strip_gtdb(name).split(" ")
+    return f"{parts[0][0]}. {' '.join(parts[1:])}" if len(parts) > 1 else parts[0]
+
+
+def fig_group_timeline(fw, arg, samples, cols, status, group_by, order_by, wl_long=None, tax_cols=(), hosts=None):
+    """Per group across the order values: watchlist taxa (relative abundance) above the tier 1 genes (RPKM).
+
+    hosts: {(sample, gene): RGI k-mer host text}; the gene label shows the host most often on top in the group.
+    """
+    t1 = arg[arg["tier"] == 1] if arg is not None and not arg.empty else pd.DataFrame(columns=["sample", "gene"])
+    has_wl = wl_long is not None and not wl_long.empty
+    if t1.empty and not has_wl:
         return
     order_vals = sorted({samples.at[s, order_by] for s in cols}, key=natural_key)
     xi = {v: i for i, v in enumerate(order_vals)}
-    rows, cells = [], []
+    tax_cols = set(tax_cols)
+    rows, kinds, cells = [], [], []
     for g, members in samples.loc[cols].groupby(group_by, sort=False):
         mem = [s for s in cols if s in members.index]
+        if has_wl:
+            sub = wl_long[wl_long["sample"].isin(mem) & (wl_long["relative_abundance"] > 0)]
+            for taxon in sorted(sub["taxon"].unique(), key=lambda t: -sub.loc[sub["taxon"] == t, "relative_abundance"].max()):
+                r = len(rows)
+                rows.append(f"{g} | {short_species(taxon)}")
+                kinds.append("taxon")
+                ab = sub[sub["taxon"] == taxon].groupby("sample")["relative_abundance"].sum()
+                for s in mem:
+                    st = "ok" if s in tax_cols else NA_NOT_RUN
+                    if st == "ok" and status.get(s) == "NA_low_depth":
+                        st = status[s]
+                    cells.append((r, xi[samples.at[s, order_by]], ab.get(s, np.nan), st, "taxon"))
         sub = t1[t1["sample"].isin(mem)]
         for gene in sorted(sub["gene"].unique(), key=str.lower):
             r = len(rows)
-            rows.append(f"{g} | {gene}")
-            rpkm = sub[sub["gene"] == gene].groupby("sample")["rpkm"].sum()
+            label = f"{g} | {gene}"
+            if hosts:
+                tops = [hosts.get((s, gene), "").split(" (")[0] for s in mem]
+                tops = [t for t in tops if t]
+                if tops:
+                    label += f" [{short_species(max(set(tops), key=tops.count))}]"
+            rows.append(label)
+            kinds.append("gene")
+            rpkm = sub[sub["gene"] == gene].groupby("sample")["gene_rpkm"].sum()
             for s in mem:
-                cells.append((r, xi[samples.at[s, order_by]], rpkm.get(s, np.nan), status[s]))
+                cells.append((r, xi[samples.at[s, order_by]], rpkm.get(s, np.nan), status.get(s, "ok"), "gene"))
     if not rows:
         return
     nr, nc = len(rows), len(order_vals)
-    fig, ax = plt.subplots(figsize=(max(5, 0.45 * nc + 3.5), max(2.5, 0.28 * nr + 1.6)))
-    vals = [math.log10(v) for _, _, v, _ in cells if v and v > 0]
-    vmin, vmax = (min(vals), max(vals)) if vals else (0, 1)
-    if vmin == vmax:
-        vmin, vmax = vmin - 0.5, vmax + 0.5
-    cm = plt.get_cmap("magma_r")
-    for r, x, v, st in cells:
+    fig, ax = plt.subplots(figsize=(max(6, 0.45 * nc + 6), max(2.5, 0.26 * nr + 1.8)), layout="constrained")
+    scales = {}
+    for kind, cmap in (("taxon", "Greens"), ("gene", "Reds")):
+        vals = [math.log10(v) for _, _, v, _, k in cells if k == kind and v and v > 0]
+        lo, hi = (min(vals), max(vals)) if vals else (0, 1)
+        if lo == hi:
+            lo, hi = lo - 0.5, hi + 0.5
+        scales[kind] = (plt.get_cmap(cmap), lo, hi, bool(vals))
+    for r, x, v, st, kind in cells:
+        cm, lo, hi, _ = scales[kind]
         if v and v > 0:
             ax.add_patch(Rectangle((x - 0.45, r - 0.4), 0.9, 0.8,
-                                   color=cm((math.log10(v) - vmin) / (vmax - vmin) * 0.85 + 0.15)))
+                                   color=cm((math.log10(v) - lo) / (hi - lo) * 0.75 + 0.25)))
         elif st != "ok":
             ax.add_patch(Rectangle((x - 0.45, r - 0.4), 0.9, 0.8, fill=False, hatch="///", edgecolor="#999999"))
         else:
@@ -351,6 +522,8 @@ def fig_timeline(fw, arg, samples, cols, status, group_by, order_by):
     ax.set_xticklabels(order_vals, rotation=90 if nc > 12 else 0, fontsize=8)
     ax.set_yticks(range(nr))
     ax.set_yticklabels(rows, fontsize=8)
+    for lab, kind in zip(ax.get_yticklabels(), kinds):
+        lab.set_color("#1b6b45" if kind == "taxon" else "#7a1f2b")
     ax.set_xlabel(order_by)
     prev = None
     for i, lab in enumerate(rows):
@@ -358,14 +531,225 @@ def fig_timeline(fw, arg, samples, cols, status, group_by, order_by):
         if prev is not None and g != prev:
             ax.axhline(i - 0.5, color="#444444", linewidth=0.8)
         prev = g
-    for s in ax.spines.values():
-        s.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
     ax.tick_params(length=0)
-    sm = plt.cm.ScalarMappable(cmap=cm, norm=plt.Normalize(vmin, vmax))
-    fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01).set_label("log10 RPKM", fontsize=9)
-    ax.set_title(f"Tier 1 ARGs per {group_by} across {order_by}", fontsize=12)
+    for kind, label in (("taxon", "log10 relative abundance (%)"), ("gene", "log10 RPKM")):
+        cm, lo, hi, used = scales[kind]
+        if used:
+            sm = plt.cm.ScalarMappable(cmap=matplotlib.colors.ListedColormap(cm(np.linspace(0.25, 1.0, 256))),
+                                       norm=plt.Normalize(lo, hi))
+            fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=min(1.0, 12 / max(nr, 1)) if nr > 12 else 1.0,
+                         aspect=15).set_label(label, fontsize=9)
+    title = f"Watchlist taxa and tier 1 ARGs per {group_by} across {order_by}"
+    fig.suptitle(title, fontsize=12)
+    fw.save(fig, "group_timeline", title,
+            f"For each {group_by}: watchlist taxa found in any of its samples (green labels; colour = log10 relative "
+            f"abundance) and tier 1 genes (red labels; colour = log10 RPKM). The host in brackets is RGI's k-mer "
+            f"pathogen-of-origin call most often on top for that gene in the {group_by}; it comes from the reads, "
+            f"unlike co-occurrence. Empty box = sequenced and not detected; hatched = low depth or not run (unknown); "
+            f"no box = no sample at that {order_by}.")
+
+
+TIER_COLORS = {1: "#c0392b", 2: "#e69f00", 3: "#56b4e9", 4: "#999999"}
+METHOD_NAMES = {"kmarvel": "K-MARVEL", "rgi": "RGI"}
+
+
+def fig_method_upset(fw, comp, gene_sets, methods):
+    """UpSet plot of the distinct genes each read-level ARG method detected (in any sample), bars split by tier."""
+    if not gene_sets:
+        return
+    tier = comp.drop_duplicates("gene").set_index("gene")["tier"]
+    inter = {}
+    for g, ms in gene_sets.items():
+        inter.setdefault(ms, []).append(g)
+    combos = sorted(inter, key=lambda c: (-len(inter[c]), -len(c)))
+    names = [METHOD_NAMES.get(m, m) for m in methods]
+    nc = len(combos)
+    fig = plt.figure(figsize=(max(5.5, 1.1 * nc + 3.5), 2.2 + 0.45 * len(methods) + 2.6), layout="constrained")
+    gs = fig.add_gridspec(2, 2, width_ratios=[1.3, max(2.0, 0.8 * nc)], height_ratios=[3, 0.45 * len(methods) + 0.2])
+    bar = fig.add_subplot(gs[0, 1])
+    dots = fig.add_subplot(gs[1, 1], sharex=bar)
+    sizes = fig.add_subplot(gs[1, 0], sharey=dots)
+    bottom = np.zeros(nc)
+    for t in (1, 2, 3, 4):
+        h = np.array([sum(1 for g in inter[c] if tier.get(g) == t) for c in combos])
+        if h.any():
+            bar.bar(range(nc), h, bottom=bottom, color=TIER_COLORS[t], width=0.6, label=f"tier {t}")
+            bottom += h
+    for x, total in enumerate(bottom):
+        bar.text(x, total, f"{int(total)}", ha="center", va="bottom", fontsize=9)
+    bar.set_ylabel("distinct genes")
+    bar.legend(fontsize=8, frameon=False, loc="upper right")
+    bar.tick_params(labelbottom=False, length=0)
+    for sp in ("top", "right"):
+        bar.spines[sp].set_visible(False)
+    for x, c in enumerate(combos):
+        ys = [i for i, m in enumerate(methods) if m in c]
+        dots.scatter([x] * len(methods), range(len(methods)), s=60, color="#dddddd", zorder=1)
+        dots.scatter([x] * len(ys), ys, s=60, color="#333333", zorder=2)
+        if len(ys) > 1:
+            dots.plot([x, x], [min(ys), max(ys)], color="#333333", linewidth=2, zorder=2)
+    dots.set_ylim(len(methods) - 0.5, -0.5)
+    dots.set_xlim(-0.6, nc - 0.4)
+    dots.set_xticks([])
+    dots.tick_params(labelleft=False, length=0)
+    for sp in dots.spines.values():
+        sp.set_visible(False)
+    totals = [sum(1 for ms in gene_sets.values() if m in ms) for m in methods]
+    sizes.barh(range(len(methods)), totals, color="#555555", height=0.5)
+    for i, v in enumerate(totals):
+        sizes.text(v, i, f" {v}", va="center", ha="left", fontsize=8)
+    sizes.invert_xaxis()
+    sizes.set_yticks(range(len(methods)))
+    sizes.set_yticklabels(names, fontsize=9)
+    sizes.yaxis.tick_right()
+    sizes.set_xlabel("genes per method", fontsize=8)
+    for sp in ("top", "left"):
+        sizes.spines[sp].set_visible(False)
+    title = "Distinct ARGs found by each read-level method"
+    fig.suptitle(title, fontsize=12)
+    fw.save(fig, "arg_method_upset", title,
+            "UpSet plot: each column is one combination of methods (filled dots) and its bar counts the distinct genes "
+            "(alleles collapsed, e.g. KPC-2 and KPC-97 are both KPC) that exactly those methods detected in at least "
+            "one sample, coloured by tier. Left: genes per method. RGI counts a gene when reads cover at least the "
+            "--rgi-min-coverage share of its best reference sequence; only samples every method ran on are compared.")
+
+
+def fig_method_by_category(fw, comp, methods):
+    """Distinct genes per tier/category: found by every method, or by one only (and, for K-MARVEL-only genes,
+    whether RGI saw reads below its coverage cutoff)."""
+    if comp.empty or len(methods) < 2:
+        return
+    flags = comp.groupby("gene").agg(tier=("tier", "first"), category=("category", "first"),
+                                    **{m: (f"detected_{m}", "any") for m in methods})
+    if "rgi_below_cutoff" in comp:
+        flags["below"] = comp.groupby("gene")["rgi_below_cutoff"].any()
+    else:
+        flags["below"] = False
+    flags["label"] = "T" + flags["tier"].astype(str) + " " + flags["category"]
+    allm = flags[methods].all(axis=1)
+    parts = [("all", allm, "#333333", None)]
+    colors = ["#2a7ab9", "#e69f00", "#56a35a", "#cc79a7"]
+    for i, m in enumerate(methods):
+        only = flags[m] & ~flags[[x for x in methods if x != m]].any(axis=1)
+        if m == "kmarvel" and "rgi" in methods:
+            parts.append((f"{METHOD_NAMES[m]} only, RGI below cutoff", only & flags["below"], colors[i], "///"))
+            parts.append((f"{METHOD_NAMES[m]} only, RGI no reads", only & ~flags["below"], colors[i], None))
+        else:
+            parts.append((f"{METHOD_NAMES.get(m, m)} only", only, colors[i], None))
+    parts[0] = (" + ".join(METHOD_NAMES.get(m, m) for m in methods), allm, "#333333", None)
+    cats = flags.groupby("label").agg(tier=("tier", "first"), n=("tier", "size"))
+    cats = cats.sort_values(["tier", "n"], ascending=[True, False])
+    labels = list(cats.index)
+    n = len(labels)
+    fig, ax = plt.subplots(figsize=(10, max(3, 0.28 * n + 1.8)))
+    left = np.zeros(n)
+    for name, mask, color, hatch in parts:
+        vals = np.array([int((mask & (flags["label"] == lab)).sum()) for lab in labels])
+        ax.barh(range(n), vals, left=left, color=color if hatch is None else "white", edgecolor=color,
+                hatch=hatch, label=name, height=0.7, linewidth=0.8 if hatch else 0)
+        left += vals
+    ax.set_yticks(range(n))
+    ax.set_yticklabels(labels, fontsize=8)
+    for lab, t in zip(ax.get_yticklabels(), cats["tier"]):
+        lab.set_color(TIER_COLORS.get(t, "#333333"))
+    ax.invert_yaxis()
+    ax.set_xlabel("distinct genes")
+    ax.legend(fontsize=8, frameon=False, loc="lower right")
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    title = "ARG method agreement by tier and category"
+    ax.set_title(title, fontsize=12)
     fig.tight_layout()
-    fw.save(fig, "arg_tier1_timeline", f"Tier 1 ARGs per {group_by} across {order_by}",
-            f"Each row is a tier 1 gene found at least once in that {group_by}. Filled = detected (colour = log10 "
-            f"RPKM); empty box = sequenced and not detected; hatched = low depth or not run (unknown); no box = no "
-            f"sample at that {order_by}.")
+    fw.save(fig, "arg_method_by_category", title,
+            "Distinct genes per reporting tier and category, split by which methods found them in at least one "
+            "sample. Hatched: K-MARVEL calls where RGI had reads below the coverage cutoff (partial coverage, not "
+            "absence). Category labels are coloured by tier.")
+
+
+def fig_diversity(fw, samples, cols, groups, low, group_by, order_by):
+    """Shannon index per sample: one line per group across the order values, or one strip per group."""
+    if "shannon" not in samples or samples.loc[cols, "shannon"].isna().all():
+        return
+    sh = samples.loc[cols, "shannon"].astype(float)
+    fig, ax = plt.subplots(figsize=(9, 4.2))
+    if group_by and order_by:
+        order_vals = sorted({samples.at[s, order_by] for s in cols}, key=natural_key)
+        xi = {v: i for i, v in enumerate(order_vals)}
+        names = list(dict.fromkeys(groups))
+        palette = category_colors(names)
+        for g in names:
+            mem = [s for s, gg in zip(cols, groups) if gg == g and not np.isnan(sh[s])]
+            mem.sort(key=lambda s: xi[samples.at[s, order_by]])
+            xs = [xi[samples.at[s, order_by]] for s in mem]
+            ax.plot(xs, sh[mem], color=palette[g], linewidth=1.2, label=str(g))
+            ax.scatter(xs, sh[mem], color=[("white" if s in low else palette[g]) for s in mem],
+                       edgecolors=palette[g], s=28, zorder=3)
+        ax.set_xticks(range(len(order_vals)))
+        ax.set_xticklabels(order_vals, rotation=90 if len(order_vals) > 12 else 0, fontsize=8)
+        ax.set_xlabel(order_by)
+        if len(names) <= 20:
+            ax.legend(title=group_by, fontsize=8, title_fontsize=8, frameon=False, bbox_to_anchor=(1.01, 1),
+                      loc="upper left")
+    elif group_by:
+        names = list(dict.fromkeys(groups))
+        for i, g in enumerate(names):
+            mem = [s for s, gg in zip(cols, groups) if gg == g]
+            jitter = np.linspace(-0.15, 0.15, len(mem)) if len(mem) > 1 else [0]
+            ax.scatter(i + np.asarray(jitter), sh[mem], color=["white" if s in low else "#2a7ab9" for s in mem],
+                       edgecolors="#2a7ab9", s=28)
+        ax.set_xticks(range(len(names)))
+        ax.set_xticklabels(names, rotation=90 if len(names) > 12 else 0, fontsize=8)
+        ax.set_xlabel(group_by)
+    else:
+        ax.scatter(range(len(cols)), sh, color=["white" if s in low else "#2a7ab9" for s in cols],
+                   edgecolors="#2a7ab9", s=28)
+        ax.set_xticks(range(len(cols)))
+        ax.set_xticklabels(cols, rotation=90, fontsize=fontsize_for(len(cols)))
+    ax.set_ylabel("Shannon index (species)")
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    ax.set_title("Species diversity", fontsize=12)
+    fig.tight_layout()
+    fw.save(fig, "taxonomy_diversity", "Species diversity",
+            "Shannon index (natural log) of species relative abundance per sample"
+            + (f", one line per {group_by} across {order_by}" if group_by and order_by else "")
+            + ". Hollow points are low-depth samples, where diversity is underestimated.")
+
+
+def fig_pcoa(fw, coords, pct, samples, groups_by_sample, low, group_by, order_by):
+    """PCoA of Bray-Curtis dissimilarity, coloured by group; a group's samples are joined in order."""
+    if coords is None or coords.shape[1] < 2:
+        return
+    fig, ax = plt.subplots(figsize=(8, 6))
+    names = list(dict.fromkeys(groups_by_sample[s] for s in coords.index)) if group_by else [""]
+    palette = category_colors(names)
+    for g in names:
+        mem = [s for s in coords.index if (groups_by_sample[s] if group_by else "") == g]
+        if order_by:
+            mem.sort(key=lambda s: natural_key(samples.at[s, order_by]))
+        c = palette[g]
+        if group_by and order_by and len(mem) > 1:
+            ax.plot(coords.loc[mem, "PC1"], coords.loc[mem, "PC2"], color=c, linewidth=0.8, alpha=0.7)
+        ax.scatter(coords.loc[mem, "PC1"], coords.loc[mem, "PC2"], color=["white" if s in low else c for s in mem],
+                   edgecolors=c, s=36, zorder=3, label=str(g) if group_by else None)
+        if group_by and order_by and mem:
+            ax.annotate(str(samples.at[mem[0], order_by]), (coords.at[mem[0], "PC1"], coords.at[mem[0], "PC2"]),
+                        fontsize=6, color=c, xytext=(3, 3), textcoords="offset points")
+    ax.set_xlabel(f"PC1 ({pct[0]:.1f}%)")
+    ax.set_ylabel(f"PC2 ({pct[1]:.1f}%)")
+    if group_by and len(names) <= 20:
+        ax.legend(title=group_by, fontsize=8, title_fontsize=8, frameon=False, bbox_to_anchor=(1.01, 1),
+                  loc="upper left")
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    title = "Community composition (Bray-Curtis PCoA, species)"
+    ax.set_title(title, fontsize=12)
+    fig.tight_layout()
+    fw.save(fig, "taxonomy_pcoa", title,
+            "Principal coordinates of Bray-Curtis dissimilarity between samples' species profiles; samples close "
+            "together have similar communities. "
+            + (f"Colour = {group_by}; lines join a {group_by}'s samples in {order_by} order, starting at the "
+               f"labelled one. " if group_by and order_by else (f"Colour = {group_by}. " if group_by else ""))
+            + "Hollow points are low-depth samples. Axis labels give the share of variation each axis shows.")

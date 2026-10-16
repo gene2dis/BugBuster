@@ -70,27 +70,39 @@ Example data needed: a kraken2 + Bracken run and a sourmash run on the same samp
 
 Example data needed: a `--read_arg_prediction` run on samples that also ran K-MARVEL, to compare the two.
 
-## Read-level ARGs: RGI bwt / kmer (unverified)
+## Read-level ARGs: RGI bwt / kmer (verified on batch1, 32 samples, 2026-10-16)
 
-`RGI_REPORT` (inline Python in `modules/local/rgi_report/main.nf`) publishes `RGI_summary_report.csv` and four PNGs.
+`RGI_REPORT` (inline Python in `modules/local/rgi_report/main.nf`) publishes `RGI_summary_report.csv` and four PNGs;
+`RESULTS_SUMMARY` reads the RGI allele and k-mer gene tables.
 
-- **Fallback table headers (confirmed).** Zero-hit samples are now reported with 0 genes (fixed; RGI_REPORT
-  drops the `NA` row of `bin/rgi_bwt_lowcov_fallback.sh`). The fallback's headers are not RGI 6.0.3's `rgi bwt`
-  headers: a real `gene_mapping_data.txt` has 26 columns starting `ARO Term`, `ARO Accession`, `Reference Model Type`
-  (with `All Mapped Reads`, `Average Percent Coverage`, `Reference Length`, `AMR Gene Family`, `Drug Class`,
-  `Resistance Mechanism`), and a real `allele_mapping_data.txt` has 24; the fallback writes the 16 and 27 columns of
-  `rgi main` (contig) tables. RGI_REPORT copes with either, but anything else reading them would not. Checked
-  2026-10-15 on a 500k read-pair run of a batch1 sample.
-- **Pathogen of origin was always empty (fixed 2026-10-15).** The k-mer database was never loaded, so
-  `rgi kmer_query` wrote nothing and RGI_KMER `{}`. With it loaded, a 500k read-pair test gave species calls for
-  50 of 147 genes (`<sample>_rgi_kmer_61mer_analysis.gene.txt`, column `CARD*kmer Prediction`).
-- **Pathogen of origin is never parsed.** It is RGI's main advantage: `*_61mer_analysis.json` is published per sample, but the report only counts the files. Parse it. It gives read-level ARG→species evidence, stronger than the summary's `card_prevalence` co-occurrence; when both exist, show RGI's.
-- **No filter on `Reference Model Type`.** Variant-model hits are counted as resistance. Apply the tier 4 `snps.txt` check, which shares the CARD tiers asset. There are also no coverage or MAPQ filters.
-- **Counts are raw.** `Total_Mapped_Reads` is a raw sum: normalise it to clean read pairs.
-- **Plots pool all samples.** `value_counts()` counts sample×gene rows, and the per-sample bar is in alphabetical order.
-- **Summary work.** Add an RGI adapter beside K-MARVEL. Use the same `arg_long` columns with a `tool` column, and compare the two tools per sample.
+Done:
 
-Example data needed: an `--rgi_prediction` run with WildCARD on the batch that already has K-MARVEL results.
+- **RGI in the summary.** Genes count at `--rgi_summary_min_coverage` (80) % coverage of their best reference
+  sequence (`rgi bwt` lists every gene with any mapped read: 38-548 per batch1 sample, 0-140 at 80%). Rows go into
+  `arg_long.tsv` with a `method` column; RGI is the primary method when K-MARVEL did not run.
+- **Pathogen of origin is parsed** from `<sample>_rgi_kmer_61mer_analysis.gene.txt` (`CARD*kmer Prediction`):
+  `rgi_kmer_hosts` and `rgi_host_check` (top host a watchlist pathogen or not). On batch1 it separated real
+  priority genes (KPC, NDM -> *K. pneumoniae*; vanB -> *E. faecium*) from WildCARD sequences of gut commensals
+  (poxtA -> *Blautia producta*, *Enterocloster*; vanD in one sample -> *Enterocloster clostridioformis*).
+- **K-MARVEL vs RGI.** Gene-level comparison (alleles collapsed): batch1 212 genes found by both, 47 K-MARVEL only
+  (24 of them seen by RGI below the cutoff, 16 mutation-dependent genes RGI bwt does not test), 43 RGI only.
+- **`RGI_REPORT` counts at the cutoff.** `*_cov<N>` columns beside the unfiltered ones; the plots use them.
+
+Still open:
+
+- **Fallback table headers (confirmed).** Zero-hit samples are reported with 0 genes, but the headers of
+  `bin/rgi_bwt_lowcov_fallback.sh` are those of `rgi main` (16 and 27 columns), not RGI 6.0.3's `rgi bwt` tables
+  (26 and 24). RGI_REPORT and the summary treat a table without hits as "no hits" whatever its header; anything else
+  reading them would not.
+- **vanG is tier 1 and RGI finds it in 26 of 32 batch1 samples**, mostly from WildCARD sequences of Clostridia
+  (*Ruthenibacterium*, *Faecalibacterium*); K-MARVEL calls none. The host check flags them; decide whether vanG
+  belongs in tier 1 at all for gut metagenomes.
+- **Tier 4 for RGI.** `rgi bwt` reports homolog matches; mutation-dependent genes get `not_checked_rgi`.
+- **RGI_REPORT plots pool all samples.** `value_counts()` counts sample x gene rows, and the per-sample bar is in
+  alphabetical order. The summary's figures cover the per-sample view; consider dropping these plots.
+- **No MAPQ filter.** Reads mapping equally well to several WildCARD sequences are counted for one of them by KMA.
+- **KARGA, KARGVA and ARGs-OAP are not in the comparison.** They use MEGARes and SARG; matching them to CARD genes
+  needs a name or class map (see the KARGA section).
 
 ## Contig-level ARG and taxonomy: DeepARG + BLASTN/BlobTools (unverified)
 

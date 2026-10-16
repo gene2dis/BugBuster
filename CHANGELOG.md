@@ -13,8 +13,9 @@ next release is tagged.
 ### Added
 
 - **Run-level results summary (`00_summary/`, `--results_summary`, on by default)**
-  - `RESULTS_SUMMARY` (`bin/results_summary.py`) consolidates the QC, taxonomy
-    and K-MARVEL results into tidy and wide TSV tables, an Excel workbook
+  - `RESULTS_SUMMARY` (`bin/results_summary.py` and its `summary_*.py`
+    modules) consolidates the QC, taxonomy and read-level ARG (K-MARVEL, RGI)
+    results into tidy and wide TSV tables, an Excel workbook
     (README sheet with column definitions), PDF/PNG/SVG figures and a
     self-contained HTML report (inline SVG, sortable tables, no network)
   - Counts in read pairs (`Reads_report.csv` counts single reads); a
@@ -35,7 +36,32 @@ next release is tagged.
     `--summary_watchlist`)
   - Optional `--sample_metadata` with `--summary_group_by` /
     `--summary_order_by`: grouped and ordered figures, per-group ARG
-    detection patterns and a tier 1 ARG timeline
+    detection patterns, a per-group timeline of watchlist taxa and tier 1
+    ARGs (with the RGI k-mer host), Shannon diversity per group and a
+    Bray-Curtis PCoA of the species profiles
+  - RGI in the summary: `rgi bwt` genes count at `--rgi_summary_min_coverage`
+    (default 80) % coverage of their best reference sequence (RGI lists
+    every gene with a mapped read), with RGI's k-mer pathogen of origin
+    (`rgi_kmer_hosts`) and whether the top host is a watchlist pathogen
+    (`rgi_host_check`: WildCARD holds resistance-gene sequences of gut
+    commensals, e.g. poxtA from *Blautia*); RGI is the primary ARG method
+    when K-MARVEL did not run
+  - K-MARVEL vs RGI comparison when both ran: gene-level overlap tables
+    (`arg_method_comparison`, `arg_method_overlap`, with RGI calls below the
+    cutoff marked), an UpSet plot and agreement by tier and category
+  - QC figure marks 10M and 20M clean read pairs (`--summary_depth_marks`)
+    next to the low-depth line, and writes the % classified on each bar; the
+    report header counts the samples at each mark (`depth_class` column)
+  - Taxonomy heatmaps show each sample's 10 most abundant taxa
+    (`--summary_taxa_per_sample`, no row cap; `--summary_top_n` now caps the
+    ARG heatmap only), grouped by phylum; group names sit in their own strip,
+    so they no longer overlap the title or each other
+  - An "Attention" list at the top of the HTML report: tier 1 genes found by
+    every method, by one only or with a commensal RGI host, and low-depth
+    samples
+  - The watchlist notes name each taxon's source (ESKAPE, WHO Bacterial
+    Priority Pathogens List 2024, CDC AR Threats Report 2019), and the
+    report's Methods section shows the list
   - Optional `--card_prevalence` (WildCARD): candidate ARG hosts among the
     species of the same sample (co-occurrence, not linkage) and CARD plasmid
     association
@@ -308,6 +334,15 @@ next release is tagged.
     subworkflow and its parameters)
 
 ### Changed
+
+- **`RGI_REPORT` adds coverage-filtered counts**: `rgi bwt` lists every gene
+  with at least one mapped read (38-548 per sample in a 32-sample run), so
+  `RGI_summary_report.csv` gains `AMR_Genes_cov<N>`, `Mapped_Reads_cov<N>`,
+  `Unique_Drug_Classes_cov<N>` and `Unique_AMR_Families_cov<N>`, counting the
+  genes whose best-covered reference sequence reads cover at least
+  `--rgi_summary_min_coverage` % (default 80). The existing columns are
+  unchanged; the four plots now use the filtered genes and say so in their
+  titles
 
 - **Breaking (default aligner)**: `--read_aligner` defaults to `bwamem3` instead of
   `bowtie2`, after a benchmark on five real metagenomes and a spiked mock community

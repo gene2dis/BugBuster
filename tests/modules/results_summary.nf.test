@@ -4,10 +4,11 @@
 
     Fixtures: tests/data/summary/ (tests/bin/make_summary_fixtures.sh) and the
     K-MARVEL tables in tests/data/kmarvel/ (sampleA: TEM + CTX-M, sampleB: no
-    ARGs). The module lays the staged files out as a results directory for
+    ARGs), with the RGI bwt and k-mer tables in tests/data/summary/rgi/. The
+    module lays the staged files out as a results directory for
     bin/results_summary.py; this checks that layout, the ext.args built from
-    the summary params (grouping, ordering, low-depth threshold, batch label) and the
-    published outputs. Numeric checks of the script are in
+    the summary params (grouping, ordering, low-depth threshold, batch label,
+    RGI coverage cutoff) and the published outputs. Numeric checks of the script are in
     tests/bin/test_results_summary.sh.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -26,6 +27,7 @@ nextflow_process {
                 summary_group_by        = "subject"
                 summary_order_by        = "visit"
                 summary_batch_label     = "batch1"
+                rgi_summary_min_coverage = 80
             }
             process {
                 """
@@ -43,11 +45,16 @@ nextflow_process {
                     file("${projectDir}/tests/data/kmarvel/sampleB_kmarvel.tsv", checkIfExists: true)
                 ]
                 input[5]  = []
-                input[6]  = []
-                input[7]  = file("\${fix}/metadata.tsv", checkIfExists: true)
+                input[6]  = [
+                    file("\${fix}/rgi/sampleA_rgi_bwt.allele_mapping_data.txt", checkIfExists: true),
+                    file("\${fix}/rgi/sampleB_rgi_bwt.allele_mapping_data.txt", checkIfExists: true)
+                ]
+                input[7]  = [ file("\${fix}/rgi/sampleA_rgi_kmer_61mer_analysis.gene.txt", checkIfExists: true) ]
                 input[8]  = []
-                input[9]  = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
-                input[10] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[9]  = file("\${fix}/metadata.tsv", checkIfExists: true)
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
                 """
             }
         }
@@ -78,8 +85,18 @@ nextflow_process {
 
             assert path(process.out.html.get(0)).text.contains("BugBuster results summary")
             assert process.out.xlsx.size() == 1
-            assert process.out.figures.get(0).any { f -> file(f).name == "arg_tier1_timeline.png" } == false
             assert process.out.figures.get(0).any { f -> file(f).name == "qc_read_fate.svg" }
+
+            // RGI tables laid out by the module: genes at >= 80% coverage, compared with K-MARVEL
+            assert tables.keySet().containsAll(["arg_method_comparison.tsv", "arg_method_overlap.tsv"])
+            def comp = tables["arg_method_comparison.tsv"]
+            def ch = comp[0].split("\t") as List
+            def byGene = comp.drop(1).collectEntries { line -> def c = line.split("\t", -1); [ (c[ch.indexOf("gene")]): c ] }
+            assert byGene["TEM"][ch.indexOf("detected_by")] == "K-MARVEL + RGI"
+            assert byGene["KPC"][ch.indexOf("detected_by")] == "RGI only"
+            // the k-mer table was laid out too: KPC's top host is a watchlist pathogen
+            assert byGene["KPC"][ch.indexOf("rgi_host_check")] == "watchlist_host"
+            assert process.out.figures.get(0).any { f -> file(f).name == "arg_method_upset.svg" }
         }
     }
 
@@ -97,8 +114,10 @@ nextflow_process {
                 input[6]  = []
                 input[7]  = []
                 input[8]  = []
-                input[9]  = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
-                input[10] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
                 """
             }
         }

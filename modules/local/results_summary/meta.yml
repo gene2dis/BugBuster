@@ -1,5 +1,5 @@
 name: results_summary
-description: Run-level summary of QC, taxonomy and read-level ARG (K-MARVEL) results (bin/results_summary.py) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures and a self-contained HTML report. Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. The same script runs outside the pipeline on several published results directories (batches).
+description: Run-level summary of QC, taxonomy and read-level ARG (K-MARVEL, RGI) results (bin/results_summary.py and its summary_*.py modules) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures and a self-contained HTML report. Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. RGI bwt genes count at --rgi_summary_min_coverage % coverage of their best reference sequence and carry RGI's k-mer pathogen of origin; when both K-MARVEL and RGI ran, the two are compared gene by gene (UpSet plot, overlap tables). The same script runs outside the pipeline on several published results directories (batches).
 keywords:
   - report
   - summary
@@ -46,6 +46,14 @@ input:
   - kmarvel_db:
       type: directory
       description: K-MARVEL CARD directory; its snps.txt is used to check variant-model hits for resistance mutations
+  - rgi_alleles:
+      type: file
+      description: Per-sample RGI bwt allele tables; empty unless --rgi_prediction
+      pattern: "*_rgi_bwt.allele_mapping_data.txt"
+  - rgi_kmer_genes:
+      type: file
+      description: Per-sample RGI k-mer (pathogen of origin) gene tables; empty without RGI_KMER
+      pattern: "*_rgi_kmer_*mer_analysis.gene.txt"
   - software_versions:
       type: file
       description: The run's aggregated software_versions.yml, shown in the report
