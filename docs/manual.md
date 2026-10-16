@@ -1616,8 +1616,15 @@ Large studies are often run in batches (one results directory each). `bin/result
 published results only, so it merges finished batches without rerunning any tool. Sample names must be unique
 across batches; taxa are matched by genome/taxon ID, and all batches must use the same taxonomy database.
 
+The script needs Python 3 with pandas, numpy and matplotlib 3.7 or newer (its figure legends use a placement
+older versions lack); openpyxl or xlsxwriter adds the Excel workbook, which is skipped with a warning without
+them. The pipeline runs it with Python 3.12, pandas 2.2.3, numpy 1.26.4, matplotlib 3.9.2 and openpyxl 3.1.5
+(`modules/local/results_summary/main.nf`). Run it from a BugBuster checkout: it imports the `summary_*.py`
+modules next to it in `bin/` and reads its default tier rules and watchlist from `assets/`. Either way works:
+
+**With the pipeline's container image**, which has everything installed:
+
 ```bash
-# The pipeline's summary image has pandas, matplotlib and openpyxl
 IMG=community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_openpyxl:26abe1de4b35cb08
 docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -v /dbs:/dbs:ro -w $PWD $IMG \
     python /bb/bin/results_summary.py \
@@ -1626,6 +1633,20 @@ docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -
         --metadata samples.tsv --group-by subject --order-by visit \
         --kmarvel-db /dbs/kmarvel/card_v4.0.1 \
         --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
+```
+
+Under Singularity/Apptainer, use `singularity exec -B /path/to/BugBuster:/bb oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_openpyxl:9bdbbc7916528cdc python /bb/bin/results_summary.py ...`.
+
+**With a local Python** that has the packages above (for example
+`conda install -c conda-forge pandas numpy "matplotlib-base>=3.7" openpyxl`):
+
+```bash
+python /path/to/BugBuster/bin/results_summary.py \
+    --results batch1/results batch2/results batch3/results \
+    --outdir project_summary \
+    --metadata samples.tsv --group-by subject --order-by visit \
+    --kmarvel-db /dbs/kmarvel/card_v4.0.1 \
+    --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
 ```
 
 `--metadata`, `--group-by` and `--order-by` are optional. The `batch` column is each directory's name, or its

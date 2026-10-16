@@ -32,6 +32,11 @@ resistance call only when a known resistance mutation is among them.
 
 Outputs (in --outdir): tables/*.tsv, results_summary.xlsx (if openpyxl or xlsxwriter
 is installed), figures/*.{png,pdf,svg} and results_summary.html (self-contained, works offline).
+
+Requirements: Python 3 with pandas, numpy and matplotlib >= 3.7; openpyxl or xlsxwriter for the
+Excel workbook (optional). The pipeline's RESULTS_SUMMARY image has them all. Run the script from
+a BugBuster checkout: it imports the summary_*.py modules next to it and reads its default tier
+rules and watchlist from ../assets/.
 """
 
 import argparse
