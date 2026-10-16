@@ -439,9 +439,18 @@ workflow {
         
         // RGI kmer: Pathogen-of-origin prediction. The k-mer database comes
         // with WildCARD, so the downloaded CARD-only database has none; a
-        // --custom_rgi_card_db must have it loaded (RGI_KMER checks)
+        // --custom_rgi_card_db needs it loaded
         ch_rgi_kmer_json = channel.value([])
-        if ( params.custom_rgi_card_db || flagOn(params.rgi_include_wildcard) ) {
+        // A custom database without the k-mer files for --rgi_kmer_size cannot
+        // give a pathogen of origin: skip the step with a warning instead of
+        // running RGI_KMER on every sample (a database built here is checked
+        // by RGI_KMER itself, which also warns and skips)
+        def rgi_kmer_size = (params.rgi_kmer_size ?: 61) as Integer
+        def custom_kmers_missing = params.custom_rgi_card_db && !params.custom_rgi_wildcard &&
+            !file("${params.custom_rgi_card_db}/localDB/${rgi_kmer_size}mer_database.json").exists()
+        if ( custom_kmers_missing ) {
+            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: ${params.custom_rgi_card_db}/localDB has no ${rgi_kmer_size}mer_database.json (load the WildCARD k-mer database with rgi load --kmer_database, see docs/RGI_WILDCARD_USAGE.md)"
+        } else if ( params.custom_rgi_card_db || flagOn(params.rgi_include_wildcard) ) {
             ch_rgi_kmer = RGI_KMER(
                 ch_rgi_bwt.bam,
                 ch_rgi_db.collect()

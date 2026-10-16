@@ -412,6 +412,11 @@ next release is tagged.
 
 ### Fixed
 
+- **kraken2 classified-reads plot at low classification**: `taxonomy_report.py`
+  guessed percent vs fraction from the values, so a kraken2 run where every
+  sample was at most 1% classified was drawn as up to 100%; it now goes by
+  the profiler (kraken2 reports percent)
+
 - **Report plots readable on large runs**
   - `Box_plot_reads.png`: the y axis had a tick every 5M reads (57
     overlapping labels at 285M); ticks are now chosen automatically
@@ -443,12 +448,14 @@ next release is tagged.
   (`RGI_LOAD`, `RGI_LOAD_WILDCARD`) loaded the WildCARD k-mer database, and
   `rgi kmer_query` exits 0 without output when it is missing, so `RGI_KMER`
   wrote `{}` for every sample. Both steps now load it
-  (`bin/rgi_load_kmers.sh`, for `--rgi_kmer_size`) and fail when the WildCARD
-  files lack it; `RGI_KMER` stops with an error when the database has no k-mer
-  database (a `--custom_rgi_card_db` prepared without it), and is skipped with
-  a warning on the downloaded CARD-only database (`--rgi_include_wildcard
-  false`), which has none. Databases prepared by earlier runs lack the k-mers:
-  load them as in `docs/RGI_WILDCARD_USAGE.md` (Step 4) or prepare again
+  (`bin/rgi_load_kmers.sh`, for `--rgi_kmer_size`). A missing k-mer database
+  is never fatal, so `rgi bwt` and its reports always run: the load step warns
+  when the WildCARD files lack it, `RGI_KMER` warns and writes an empty result
+  when the database has none, and the step is skipped with a warning at launch
+  for a `--custom_rgi_card_db` without it and for the downloaded CARD-only
+  database (`--rgi_include_wildcard false`). Databases prepared by earlier
+  runs lack the k-mers: load them as in `docs/RGI_WILDCARD_USAGE.md` (Step 4)
+  or prepare again
 - **RGI CARD version read as empty on the download path**: `RGI_LOAD` looked for
   `"version"` in `card.json`, which stores it as `"_version"`, so
   `rgi wildcard_annotation` got no version and `software_versions.yml` a blank

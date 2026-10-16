@@ -4,7 +4,9 @@
 
     rgi kmer_query logs an error and exits 0 when the RGI database has no
     k-mer database loaded, and RGI_KMER then wrote an empty '{}' result for
-    every sample. It now fails before running kmer_query. Fixture:
+    every sample without saying why. It now warns and skips kmer_query (the
+    empty JSON keeps the declared output; rgi bwt results are unaffected).
+    Fixture:
     tests/data/rgi/card_db_no_kmers/ is a localDB/ with CARD and WildCARD
     recorded and no k-mers (the BAM is never read).
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -16,13 +18,14 @@ nextflow_process {
     script "../../modules/local/rgi_kmer/main.nf"
     process "RGI_KMER"
 
-    test("fails when the RGI database has no k-mer database") {
+    test("warns and skips when the RGI database has no k-mer database") {
         when {
             process {
                 """
                 input[0] = [
                     [ id: 's1' ],
-                    file("${projectDir}/tests/data/rgi/s1_rgi_kmer_61mer_analysis.json", checkIfExists: true)
+                    // stands in for the BAM, which is never read; not named like an output
+                    file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true)
                 ]
                 input[1] = file("${projectDir}/tests/data/rgi/card_db_no_kmers", checkIfExists: true)
                 """
@@ -30,8 +33,12 @@ nextflow_process {
         }
 
         then {
-            assert process.failed
-            assert process.errorReport.contains("the RGI database has no 61-mer database")
+            assert process.success
+            assert path(process.out.kmer_json.get(0)[1]).text.trim() == "{}"
+            assert process.out.gene_predictions.size() == 0
+            def err = path(process.out.kmer_json.get(0)[1]).resolveSibling(".command.err").text
+            assert err.contains("WARNING: the RGI database has no 61-mer database")
+            assert process.out.versions.size() == 1
         }
     }
 }

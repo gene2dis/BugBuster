@@ -193,6 +193,26 @@ check "--taxa-per-sample 1 draws one species row" \
     py "${SUMMARY}" --results run1/results --outdir top1 --min-clean-pairs 10000 --taxa-per-sample 1 --no-excel
 check "species heatmap caption gives one row" grep -q "most abundant species taxa (1 row)" top1/results_summary.html
 
+# Edge cases that used to crash the report: no tier 1-2 gene in any group, an empty watchlist,
+# metadata columns named like summary columns
+printf 'match\tpattern\ttier\tcategory\tnote\nname\t.\t3\tall_tier3\ttest: every gene tier 3\n' > tier3.tsv
+printf 'taxon\trank\tnote\n' > empty_watchlist.tsv
+printf 'sample\tsubject\tvisit\tclean_pairs\ttier\nsampleA\tS1\tV1\t5\tx\nsampleB\tS1\tV2\t6\ty\n' > clash_meta.tsv
+check "no tier 1-2 gene with --group-by, empty watchlist, clashing metadata columns" \
+    py "${SUMMARY}" --results run1/results --outdir edge --min-clean-pairs 10000 --no-excel \
+        --metadata clash_meta.tsv --group-by subject --order-by visit --arg-priority tier3.tsv \
+        --watchlist empty_watchlist.tsv
+check "edge cases: metadata renamed, computed columns kept, empty tables typed" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("edge/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleA", "clean_pairs"] == 60000 and str(qc.at["sampleA", "meta_clean_pairs"]) == "5"
+assert qc.at["sampleA", "meta_tier"] == "x"
+grp = pd.read_csv("edge/tables/group_arg_detection.tsv", sep="\t")
+assert grp.empty and "tier" in grp.columns
+wl = pd.read_csv("edge/tables/watchlist.tsv", sep="\t")
+assert wl.empty and "n_samples_detected" in wl.columns
+PYEOF
+
 # RGI without K-MARVEL: RGI is the primary ARG method, nothing to compare
 make_results rgionly/results sampleA sampleB
 rm -r rgionly/results/05_arg_prediction/read_level/kmarvel
@@ -315,6 +335,10 @@ order, phyla, label = lineage_order(["Zeta b", "Aaa e", "Beta d", "alpha_A c"], 
                                     "Species")
 assert order == ["alpha_A c", "Beta d", "Zeta b", "Aaa e"], order
 assert phyla == ["Bacillota"] * 3 + ["Bacteroidota"] and label == "Phylum"
+# RGI host check: a tie goes to the host rgi_kmer_hosts lists first (alphabetical)
+is_watch = rs.watchlist_matcher(pd.DataFrame({"taxon": ["Klebsiella pneumoniae"], "rank": ["species"]}))
+assert rs.host_check({"Klebsiella pneumoniae": 5, "Blautia producta": 5}, is_watch, True) == "non_watchlist_host"
+assert rs.host_check({"Klebsiella pneumoniae": 6, "Blautia producta": 5}, is_watch, True) == "watchlist_host"
 # RGI k-mer prediction strings
 assert rs.parse_kmer_prediction("Klebsiella pneumoniae (chromosome or plasmid): 83; Escherichia coli (plasmid): 2; ") \
     == {"Klebsiella pneumoniae": 83, "Escherichia coli": 2}

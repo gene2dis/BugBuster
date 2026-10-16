@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 
 from summary_common import warn
+from summary_figures import short_count
 
 
 COLUMN_DOCS = {
@@ -301,13 +302,6 @@ def reading_guide(ctx):
     return units + (tiers if s.get("n_tier1") is not None else "") + method_html
 
 
-def short_pairs(n):
-    for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
-        if n >= div:
-            return f"{n / div:.3g}{suffix}"
-    return f"{n:.0f}"
-
-
 def write_html(outdir, title, ctx):
     fig_by_key = {r["key"]: r for r in ctx["figures"].records}
     fdir = ctx["figures"].dir
@@ -322,10 +316,10 @@ def write_html(outdir, title, ctx):
     s = ctx["summary"]
     cards = [
         (s["n_samples"], "samples"), (s["n_batches"], "results directories"),
-        (s["n_low_depth"], f"low-depth samples (<{short_pairs(ctx['min_pairs'])} clean pairs)", s["n_low_depth"] > 0),
+        (s["n_low_depth"], f"low-depth samples (<{short_count(ctx['min_pairs'])} clean pairs)", s["n_low_depth"] > 0),
     ]
     for mark, n in s.get("depth_marks", []):
-        cards.append((n, f"samples with >={short_pairs(mark)} clean pairs"))
+        cards.append((n, f"samples with >={short_count(mark)} clean pairs"))
     if s.get("n_tier1") is not None:
         cards += [(s["n_tier1"], f"samples with a tier 1 ARG ({s.get('arg_primary', '')})", s["n_tier1"] > 0),
                   (s["n_tier1_genes"], "distinct tier 1 genes")]
@@ -395,7 +389,7 @@ def write_html(outdir, title, ctx):
                      "k-mer pathogen-of-origin call is a watchlist pathogen; non_watchlist_host = another species "
                      "(often a related gene of a commensal); genus_level_host = the reads only resolve a genus.</p>"
                      + df_to_html(ctx["tier1_view"], table_id="t_t1"))
-        if "group_arg_detection" in t:
+        if "group_arg_detection" in t and not t["group_arg_detection"][0].empty:
             g = t["group_arg_detection"][0]
             body += (f"<h3>Detection per {html.escape(ctx['group_by'])} (tier 1)</h3>"
                      + df_to_html(g[g["tier"] == 1], table_id="t_grp"))

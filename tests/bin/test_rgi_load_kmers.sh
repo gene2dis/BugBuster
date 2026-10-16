@@ -8,7 +8,8 @@
 # (rgi load copies them without parsing), and checks:
 #   - plain and gzipped k-mer files are loaded under kmer_query's names;
 #   - the CARD/WildCARD entries of an earlier load are kept;
-#   - a k-mer size the WildCARD directory lacks fails with a clear error.
+#   - a k-mer size the WildCARD directory lacks is skipped with a warning
+#     (exit 0, nothing loaded), so the database step and rgi bwt still run.
 #
 # Requirements: docker.
 #
@@ -68,11 +69,12 @@ check "loaded_databases.json lists k=61" grep -q '"kmer_sizes": \["61"\]' localD
 check "earlier WildCARD load kept" grep -q '"card_variants": {"data_version": "9.9.9"' localDB/loaded_databases.json
 
 if run_rgi rgi_load_kmers.sh card.json wildcard 31 > load31.log 2>&1; then
-    check "missing 31-mer database fails" false
+    check "missing 31-mer database warns and exits 0 (rgi bwt still runs)" true
 else
-    check "missing 31-mer database fails" true
+    check "missing 31-mer database warns and exits 0 (rgi bwt still runs)" false
 fi
-check "failure names the missing file" grep -q "wildcard/31_kmer_db.json not found" load31.log
+check "warning names the missing file" grep -q "WARNING: wildcard/31_kmer_db.json not found" load31.log
+check "nothing loaded for k=31" test ! -e localDB/31mer_database.json
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

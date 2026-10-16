@@ -51,9 +51,9 @@ nextflow run main.nf \
 - WildCARD must already be integrated
 - The k-mer database must be loaded for the pathogen-of-origin step (RGI_KMER):
   `localDB/<k>mer_database.json` and `localDB/amr_<k>mer.txt`, for the
-  `--rgi_kmer_size` in use (61 by default). RGI_KMER fails with an error naming
-  the missing file otherwise (`rgi kmer_query` itself exits without output). See
-  Step 4 of the manual preparation below
+  `--rgi_kmer_size` in use (61 by default). Without them the pipeline warns at
+  launch and skips the pathogen-of-origin step; `rgi bwt` and its reports still
+  run. See Step 4 of the manual preparation below
 
 **Database structure:**
 ```

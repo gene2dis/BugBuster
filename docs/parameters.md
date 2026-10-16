@@ -397,7 +397,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)
-- **Description**: Path to pre-prepared CARD database directory for RGI: its `localDB/` (created by `rgi load --local`) must include WildCARD and the k-mer database for `--rgi_kmer_size` (`localDB/61mer_database.json`, `localDB/amr_61mer.txt`), which the pathogen-of-origin step needs; that step fails when they are missing. KMA indices are built by RGI when absent. Used alone, the directory is linked, not copied
+- **Description**: Path to pre-prepared CARD database directory for RGI: its `localDB/` (created by `rgi load --local`) must include WildCARD and the k-mer database for `--rgi_kmer_size` (`localDB/61mer_database.json`, `localDB/amr_61mer.txt`), which the pathogen-of-origin step needs; without them that step is skipped with a warning (rgi bwt still runs). KMA indices are built by RGI when absent. Used alone, the directory is linked, not copied
 - **Example**: `--custom_rgi_card_db /path/to/card_database`
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for database preparation instructions
 
@@ -405,7 +405,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to WildCARD directory containing variant files. Use together with `--custom_rgi_card_db` to combine separate databases
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
-- **Requirements**: Directory must contain `index-for-model-sequences.txt`, the variant FASTA files and the k-mer database for `--rgi_kmer_size` (`61_kmer_db.json`, `all_amr_61mers.txt`), all decompressed. Both directories are copied into the preparation task and the combined database is published as a full copy, so loading the database once by hand and passing `--custom_rgi_card_db` alone saves that space
+- **Requirements**: Directory must contain `index-for-model-sequences.txt`, the variant FASTA files and the k-mer database for `--rgi_kmer_size` (`61_kmer_db.json`, `all_amr_61mers.txt`; without them the pathogen-of-origin step is skipped with a warning), all decompressed. Both directories are copied into the preparation task and the combined database is published as a full copy, so loading the database once by hand and passing `--custom_rgi_card_db` alone saves that space
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
 
 ### `--custom_kmarvel_db`

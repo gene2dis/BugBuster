@@ -29,10 +29,11 @@ from matplotlib import rcParams
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 
+# natural_key is shared with bin/results_summary.py (bin/summary_common.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.dont_write_bytecode = True
+from summary_common import natural_key  # noqa: E402
 
-def natural_key(value) -> list:
-    """Sort key that orders V2 before V10."""
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', str(value))]
 
 # Set matplotlib parameters
 rcParams['font.size'] = 20

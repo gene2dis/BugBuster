@@ -118,4 +118,26 @@ nextflow_process {
             assert lines[1] == "s1,2,17,2,2,2,17,2,2"
         }
     }
+
+    test("a cutoff of 0 is kept (not read as unset)") {
+        when {
+            params {
+                rgi_summary_min_coverage = 0
+            }
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.allele_mapping_data.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true) ]
+                input[2] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.summary.get(0)).readLines()
+            assert lines[0].endsWith(",AMR_Genes_cov0,Mapped_Reads_cov0,Unique_Drug_Classes_cov0,Unique_AMR_Families_cov0")
+            assert lines[1] == "s1,2,17,2,2,2,17,2,2"
+        }
+    }
 }

@@ -128,18 +128,42 @@ def load_versions(root):
     return path.read_text() if path.exists() else ""
 
 
+# Columns the summary writes next to the metadata columns (samples_qc, taxonomy_long, arg_long,
+# arg_method_comparison). A metadata column with one of these names would make the joins fail
+# ("columns overlap") or be overwritten, so it is renamed meta_<name>.
+RESERVED_COLUMNS = {
+    "batch",
+    "raw_pairs", "qc_pass_pairs", "clean_pairs", "classified_fraction", "pct_removed_qc", "pct_removed_decontam",
+    "pct_clean", "low_depth", "depth_class", "mean_read_length", "taxonomy_db", "n_species", "shannon", "arg_status",
+    "n_arg_calls_tier1", "n_arg_calls_tier2", "n_arg_calls_tier3", "n_arg_calls_tier4", "acquired_genes",
+    "acquired_rpkm", "n_genes_kmarvel", "n_genes_rgi", "n_genes_all_methods",
+    "taxon_id", "Domain", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "relative_abundance",
+    "est_read_pairs", "sequence_abundance", "adjusted_ani", "ani_5_95", "true_cov", "eff_lambda",
+    "species_call_uncertain",
+    "method", "tier", "category", "gene", "aro_full_name", "aro_id", "gene_family", "drug_class",
+    "resistance_mechanism", "model", "identity", "assembly_coverage", "supporting_reads", "median_kmer_depth",
+    "gene_length_nt", "rpm", "rpkm", "gene_rpkm", "resistance_snp_status", "resistance_snps_found",
+    "kmer_blast_discordant", "blast_predicted_aro_name", "gene_representative", "card_plasmid_associated",
+    "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref", "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check",
+    "tier_note", "mutation_data",
+    "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
+}
+
+
 def load_metadata(path):
+    """Metadata table -> (DataFrame with a 'sample' column, {original name: new name} of renamed columns)."""
     sep = "," if str(path).lower().endswith(".csv") else "\t"
     meta = pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False)
     key = "sample" if "sample" in meta.columns else meta.columns[0]
     meta = meta.rename(columns={key: "sample"})
     if meta["sample"].duplicated().any():
         die(f"{path}: duplicate sample names: {sorted(meta.loc[meta['sample'].duplicated(), 'sample'])[:5]}")
-    reserved = {"batch"}
-    clash = reserved & set(meta.columns)
-    if clash:
-        meta = meta.rename(columns={c: f"meta_{c}" for c in clash})
-    return meta
+    renamed = {c: f"meta_{c}" for c in meta.columns if c in RESERVED_COLUMNS}
+    if renamed:
+        warn(f"{path}: metadata columns named like summary columns are renamed: "
+             + ", ".join(f"{a} -> {b}" for a, b in renamed.items()))
+        meta = meta.rename(columns=renamed)
+    return meta, renamed
 
 
 def sample_order(samples, group_by, order_by):
@@ -313,7 +337,11 @@ def main(argv=None):
         [{"sample": s, "batch": b["label"]} for b in batches for s in sorted(b["samples"])]).set_index("sample")
     meta_cols, key_meta = [], []
     if args.metadata:
-        meta = load_metadata(args.metadata).set_index("sample")
+        meta, renamed = load_metadata(args.metadata)
+        meta = meta.set_index("sample")
+        for opt in ("group_by", "order_by"):
+            if getattr(args, opt) in renamed:
+                setattr(args, opt, renamed[getattr(args, opt)])
         unknown = sorted(set(meta.index) - set(samples.index))
         missing = sorted(set(samples.index) - set(meta.index))
         if unknown:

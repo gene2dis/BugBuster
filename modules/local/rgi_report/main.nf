@@ -22,7 +22,8 @@ process RGI_REPORT {
         // plots when reads cover at least N% of its best-covered reference sequence
         // (rgi bwt itself lists every gene with a mapped read); the raw RGI tables
         // and the unfiltered columns are unchanged
-        def min_cov = params.rgi_summary_min_coverage ?: 80
+        // != null, not ?: (Groovy reads 0 as false, and 0 is a valid cutoff)
+        def min_cov = params.rgi_summary_min_coverage != null ? params.rgi_summary_min_coverage : 80
         """
         #!/usr/bin/env python3
         

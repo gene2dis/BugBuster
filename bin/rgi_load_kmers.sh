@@ -11,6 +11,9 @@
 # all_amr_<k>mers.txt (gzipped in the tarball). rgi load requires --card_json
 # on every call; it adds to the localDB/loaded_databases.json of the earlier
 # CARD/WildCARD load instead of replacing it.
+# A WildCARD directory without the k-mer files for <kmer_size> is not an
+# error: the script warns and exits 0 without loading, so the database step
+# and rgi bwt still run; RGI_KMER then warns and skips pathogen of origin.
 #
 set -euo pipefail
 
@@ -29,10 +32,11 @@ for f in "${kmer_db}" "${amr_kmers}"; do
         gunzip "${f}.gz"
     fi
     if [ ! -f "${f}" ]; then
-        echo "ERROR: ${f} not found: the WildCARD directory has no ${k}-mer database," >&2
-        echo "       which rgi kmer_query (pathogen of origin) needs. Check --rgi_kmer_size" >&2
-        echo "       against the *_kmer_db.json files in the WildCARD download." >&2
-        exit 1
+        echo "WARNING: ${f} not found: the WildCARD directory has no ${k}-mer database," >&2
+        echo "         so it is not loaded and rgi kmer_query (pathogen of origin) will be" >&2
+        echo "         skipped. Check --rgi_kmer_size against the *_kmer_db.json files in" >&2
+        echo "         the WildCARD download." >&2
+        exit 0
     fi
 done
 

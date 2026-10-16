@@ -284,7 +284,8 @@ def host_check(hosts, is_watch, has_kmer):
         return "no_kmer_data"
     if not hosts:
         return "no_kmer_host"
-    top = max(hosts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+    # the same order rgi_kmer_hosts lists them in: most reads, then name
+    top = sorted(hosts.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
     if is_watch(top):
         return "watchlist_host"
     return "genus_level_host" if len(top.split(" ")) == 1 else "non_watchlist_host"
@@ -450,7 +451,10 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
                     "first_detected": det[0] if det else "", "last_detected": det[-1] if det else "",
                     "pattern": " ".join(pattern),
                 })
-        out["group_arg_detection"] = pd.DataFrame(rows)
+        # typed columns even when no group has a tier 1-2 gene
+        out["group_arg_detection"] = pd.DataFrame(rows, columns=[
+            group_by, "gene", "tier", "category", "n_detected", "n_evaluable", "n_samples",
+            "first_detected", "last_detected", "pattern"])
     return out
 
 

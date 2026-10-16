@@ -147,19 +147,25 @@ def prevalence_table(wide, samples, group_by):
 def watchlist_table(tx, watch):
     sp, ge = species_rank(tx), genus_rank(tx)
     long = tx["long"]
+    samples = list(tx["rel"].columns)
+    # normalise each rank column once, not once per watchlist taxon
+    norm = {col: long[col].map(norm_taxon) for col in {sp, ge}}
+    has_unc = "species_call_uncertain" in long
     rows, long_rows = [], []
     for w in watch.itertuples(index=False):
         rank_col = sp if w.rank.lower() == "species" else ge
-        hit = long[long[rank_col].map(norm_taxon) == norm_taxon(w.taxon)]
-        per_sample = hit.groupby("sample")["relative_abundance"].sum()
-        names = sorted(set(hit[rank_col]))
-        row = {"taxon": w.taxon, "rank": w.rank, "note": w.note, "matched_names": "; ".join(names),
+        hit = long[norm[rank_col] == norm_taxon(w.taxon)]
+        by_sample = hit.groupby("sample")
+        per_sample = by_sample["relative_abundance"].sum()
+        uncertain = (by_sample["species_call_uncertain"].agg(lambda x: bool(x.fillna(False).all()))
+                     if has_unc else pd.Series(False, index=per_sample.index))
+        row = {"taxon": w.taxon, "rank": w.rank, "note": w.note, "matched_names": "; ".join(sorted(set(hit[rank_col]))),
                "n_samples_detected": int((per_sample > 0).sum())}
-        for s in tx["rel"].columns:
-            row[s] = float(per_sample.get(s, 0.0))
+        row.update({s: float(per_sample.get(s, 0.0)) for s in samples})
         rows.append(row)
         for s, ab in per_sample.items():
-            sub = hit[hit["sample"] == s]
-            uncertain = bool(sub["species_call_uncertain"].fillna(False).all()) if "species_call_uncertain" in sub else False
-            long_rows.append({"taxon": w.taxon, "sample": s, "relative_abundance": ab, "uncertain": uncertain})
-    return pd.DataFrame(rows), pd.DataFrame(long_rows)
+            long_rows.append({"taxon": w.taxon, "sample": s, "relative_abundance": ab, "uncertain": bool(uncertain[s])})
+    # typed columns even with no rows (an empty watchlist file)
+    wide_cols = ["taxon", "rank", "note", "matched_names", "n_samples_detected"] + samples
+    return (pd.DataFrame(rows, columns=wide_cols),
+            pd.DataFrame(long_rows, columns=["taxon", "sample", "relative_abundance", "uncertain"]))

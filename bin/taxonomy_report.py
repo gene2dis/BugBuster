@@ -19,6 +19,11 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib import rcParams
 
+# natural_key is shared with bin/results_summary.py (bin/summary_common.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.dont_write_bytecode = True
+from summary_common import natural_key  # noqa: E402
+
 # Set matplotlib parameters for publication-quality plots
 rcParams['font.size'] = 20
 rcParams['axes.linewidth'] = 1.5
@@ -31,11 +36,6 @@ PROFILERS = {
     'sourmash': ('Sourmash', 'Sourmash DB', 'sourmash_tax_classified_reads.png'),
     'sylph': ('Sylph', 'Sylph DB', 'sylph_tax_classified_reads.png'),
 }
-
-
-def natural_key(value) -> list:
-    """Sort key that orders V2 before V10."""
-    return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', str(value))]
 
 
 class TaxonomyReportGenerator:
@@ -224,8 +224,11 @@ class TaxonomyReportGenerator:
             print(f"Warning: Missing classification columns, skipping plot", file=sys.stderr)
             return
         
-        # Convert percentages to proper format (0-1 scale if needed)
-        if plot_data['Classified'].max() > 1.0:
+        # kraken2's Classified/Unclassified are percentages (0-100), sylph's and
+        # sourmash's fractions: decide by the profiler, not by the values (a
+        # kraken2 run where every sample is <= 1% classified would otherwise
+        # be drawn as up to 100%)
+        if self.profiler == 'kraken2':
             plot_data['Classified'] = plot_data['Classified'] / 100.0
             plot_data['Unclassified'] = plot_data['Unclassified'] / 100.0
         

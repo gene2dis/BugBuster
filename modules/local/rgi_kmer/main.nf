@@ -49,15 +49,25 @@ process RGI_KMER {
         mkdir localDB
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         # kmer_query exits 0 with no output when the k-mer database is not
-        # loaded, which turned into an empty '{}' result; fail instead
+        # loaded. Say so and skip it: the empty JSON keeps the declared output,
+        # and the summary reports the sample's RGI hosts as 'no_kmer_data'
+        kmer_db_ok=true
         for f in localDB/${kmer_size}mer_database.json localDB/amr_${kmer_size}mer.txt; do
             if [ ! -s "\$f" ]; then
-                echo "ERROR: the RGI database has no ${kmer_size}-mer database (\$f missing)." >&2
-                echo "       Load it with: rgi load --kmer_database <wildcard>/${kmer_size}_kmer_db.json" >&2
-                echo "       --amr_kmers <wildcard>/all_amr_${kmer_size}mers.txt --kmer_size ${kmer_size} --local" >&2
-                exit 1
+                echo "WARNING: the RGI database has no ${kmer_size}-mer database (\$f missing);" >&2
+                echo "         pathogen of origin is skipped for ${prefix}. Load it with: rgi load" >&2
+                echo "         --kmer_database <wildcard>/${kmer_size}_kmer_db.json --amr_kmers" >&2
+                echo "         <wildcard>/all_amr_${kmer_size}mers.txt --kmer_size ${kmer_size} --local" >&2
+                kmer_db_ok=false
             fi
         done
+        if [ "\$kmer_db_ok" = false ]; then
+            # a new file, never written through a staged input of the same name
+            rm -f ${prefix}_rgi_kmer_${kmer_size}mer_analysis.json
+            echo '{}' > ${prefix}_rgi_kmer_${kmer_size}mer_analysis.json
+            printf '"%s":\\n    rgi: %s\\n' "${task.process}" "\$(rgi main --version 2>/dev/null || echo unknown)" > versions.yml
+            exit 0
+        fi
         
         # Run RGI kmer_query for pathogen-of-origin prediction, through
         # bin/rgi_kmer_kma_fix.py: RGI 6.0.3 misreads KMA BAMs and waits
