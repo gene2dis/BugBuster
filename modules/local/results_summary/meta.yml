@@ -86,7 +86,7 @@ output:
       pattern: "results_summary.xlsx"
   - tables:
       type: file
-      description: samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence, arg_drug_class_rpkm, arg_priority_panel and (with a grouping column) group_arg_detection
+      description: samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence, arg_drug_class_rpkm, arg_priority_panel, (with a grouping column) group_arg_detection and (when K-MARVEL and RGI both ran) arg_method_comparison and arg_method_overlap
       pattern: "tables/*.tsv"
   - figures:
       type: file

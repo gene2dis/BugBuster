@@ -1055,7 +1055,7 @@
                 },
                 "summary_order_by": {
                     "type": "string",
-                    "description": "Metadata column that orders samples within a group (e.g. visit, day); with --summary_group_by it orders each group's samples and the per-group tier 1 detection patterns (group_arg_detection). Needs --sample_metadata.",
+                    "description": "Metadata column that orders samples within a group (e.g. visit, day); with --summary_group_by it orders each group's samples and the per-group detection patterns of tier 1 and 2 genes (group_arg_detection). Needs --sample_metadata.",
                     "fa_icon": "fas fa-sort"
                 },
                 "summary_batch_label": {
