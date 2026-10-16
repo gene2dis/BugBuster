@@ -340,6 +340,20 @@ eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
 check whether issue #620 is fixed in the new version and update or remove
 `bin/emapper_ogs_fix.py` accordingly.
 
+### RGI_BWT fails: "KMA failed" or "not the 6.0.3 method"
+
+`RGI_BWT` runs `rgi bwt` through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads KMA placed on a
+reference (RGI 6.0.3 kept every read, which made the task take hours and tens of GB of disk) and checks that
+KMA succeeded. Its messages:
+
+- **"KMA failed (exit status N)":** the alignment failed (status 2: a missing or incomplete KMA index in
+  `localDB/`; 137: killed, usually out of memory, retried with more memory). RGI itself ignored this and
+  reported the sample as having no hits. KMA 1.4.9 can exit 95 after a successful run, so 95 is accepted
+  when KMA has written its result table.
+- **"the installed RGI BWT.<method> is not the 6.0.3 method this patch targets":** the RGI container was
+  changed. Use the pinned image, or, when updating RGI, check whether the new version still writes every read
+  to the KMA SAM, then update or remove `bin/rgi_bwt_kma_fix.py`.
+
 ### RGI_KMER fails: "worker was killed", "did not finish within", or "not the 6.0.3 method"
 
 `RGI_KMER` runs `rgi kmer_query` through `bin/rgi_kmer_kma_fix.py`. That wrapper

@@ -418,14 +418,21 @@ next release is tagged.
   `"version"` in `card.json`, which stores it as `"_version"`, so
   `rgi wildcard_annotation` got no version and `software_versions.yml` a blank
   `card:`
-- **`RGI_BWT` kept its temporary files**: `rgi bwt` writes the alignment of
-  every read as an uncompressed SAM (about 250 bytes per read) plus two BAM
-  copies, and removes them only with `--clean`, which the pipeline did not
-  pass. A task kept about 390 bytes per clean read (about 80 GB for 100M read
-  pairs; 1.2 TB for a 32-sample batch). It now passes `--clean`, which keeps
-  the outputs (`*.sorted.length_100.bam`, mapping tables, stats). The log also
-  dropped the samtools warning printed once per KMA read at position 0 (3.5 GB
-  for an 81M-read sample); it now records how many were omitted
+- **`RGI_BWT` took hours per sample and kept tens of GB of temporary files**:
+  RGI 6.0.3 writes every read KMA reports, unplaced ones included (over 99%
+  of a metagenome), to the SAM, two BAM copies and a read table, and then
+  scans that table once per reference sequence with reads (81M rows times
+  7,859 references for an 81M-read sample). It also removes its temporary
+  files only with `--clean`, which the pipeline did not pass: a task kept
+  about 390 bytes per clean read (1.2 TB for a 32-sample batch). `RGI_BWT` now
+  runs rgi through `bin/rgi_bwt_kma_fix.py`, which runs RGI's own KMA command
+  but keeps only the SAM records placed on a reference, and stops when KMA
+  fails (RGI ignored it, so a failed alignment looked like a sample without
+  hits), and passes `--clean`. The placed reads, and so the gene and allele
+  tables, are unchanged; `overall_mapping_stats.txt` and
+  `artifacts_mapping_stats.txt` now count the placed reads only. The log no
+  longer holds one samtools warning per unplaced KMA read (3.5 GB for an
+  81M-read sample). Tests: `tests/bin/test_rgi_bwt_kma_fix.sh`
 
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on

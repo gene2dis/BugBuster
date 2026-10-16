@@ -55,14 +55,15 @@ process RGI_BWT {
         mkdir localDB
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
-        # Run RGI bwt. --clean deletes its *.temp.* files (the alignment of
-        # every read as an uncompressed SAM, ~250 bytes per read, plus two
-        # BAM copies of it) when it finishes; without it a 100M-pair sample
-        # leaves ~80 GB in the work directory. The output files RGI_KMER and
-        # RGI_REPORT read have no .temp in their names and are kept.
-        # samtools warns once per KMA read flagged mapped at position 0 (GBs
-        # of log on a deep sample): count those lines instead of keeping them.
-        rgi bwt \\
+        # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI 6.0.3 writes every
+        # read KMA reports, unplaced ones included (over 99% of a metagenome),
+        # to the SAM and then scans that read table once per reference with
+        # reads (hours on a deep sample, ~390 bytes per clean read on disk);
+        # the wrapper keeps the reads placed on a reference. Remove it at the
+        # RGI re-pin. --clean deletes the *.temp.* files when rgi finishes;
+        # the files RGI_KMER and RGI_REPORT read have no .temp in their names
+        # and are kept.
+        rgi_bwt_kma_fix.py bwt \\
             --read_one ${read_one} \\
             ${read_two ? "--read_two ${read_two}" : ""} \\
             --aligner ${aligner} \\
@@ -72,9 +73,7 @@ process RGI_BWT {
             --clean \\
             ${wildcard} \\
             ${args} \\
-            2>&1 | awk '/mapped query cannot have zero coordinate/ { n++; next } { print }
-                END { if (n) print "[BugBuster] " n " samtools zero-coordinate warnings omitted" }' \\
-            > ${prefix}_rgi_bwt.log
+            2>${prefix}_rgi_bwt.log
 
         # Low-coverage fallback (audit #8): if RGI produced no mapping results,
         # create every declared non-optional output (NA allele/gene tables plus

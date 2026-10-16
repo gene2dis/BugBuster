@@ -271,20 +271,14 @@ grep "version" /path/to/wildcard/index-for-model-sequences.txt
 - Use `--databases_dir` to specify location with sufficient space
 - Consider using CARD-only mode if space is limited
 
-**Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`
+**Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`, or a task takes hours
 
-`rgi bwt` writes the alignment of every read (mapped or not) as an uncompressed SAM, about 250 bytes per
-read, then two BAM copies of it. `RGI_BWT` runs it with `--clean`, so these files are removed when each task
-ends, but they exist while it runs: a running task needs about 400 bytes per clean read (about 80 GB for
-100M read pairs). Peak use is therefore the sum over the `RGI_BWT` tasks running at once (`process_medium`,
-8 CPUs each). On a disk with little space left, run fewer at a time, e.g. with a `-c` file:
-
-```groovy
-process { withName: 'RGI_BWT' { maxForks = 4 } }
-```
-
-Runs made before `--clean` was added (BugBuster 2.0.0dev, October 2026) kept these files: delete the
-`*.temp.*` files of finished `RGI_BWT` task directories, or the whole `work/` once the run is done.
+RGI 6.0.3 writes every read KMA reports, placed on a reference or not, to its SAM and then scans that read
+table once per reference sequence with reads. `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which
+keeps only the reads placed on a reference (well under 1% of a metagenome; the gene and allele tables are
+unchanged), and with `--clean`, which removes the temporary files when the task ends. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
+read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
+`RGI_BWT` task directories, or the whole `work/` once the run is done.
 
 ## Best Practices
 
