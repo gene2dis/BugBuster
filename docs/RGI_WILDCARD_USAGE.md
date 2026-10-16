@@ -271,6 +271,21 @@ grep "version" /path/to/wildcard/index-for-model-sequences.txt
 - Use `--databases_dir` to specify location with sufficient space
 - Consider using CARD-only mode if space is limited
 
+**Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`
+
+`rgi bwt` writes the alignment of every read (mapped or not) as an uncompressed SAM, about 250 bytes per
+read, then two BAM copies of it. `RGI_BWT` runs it with `--clean`, so these files are removed when each task
+ends, but they exist while it runs: a running task needs about 400 bytes per clean read (about 80 GB for
+100M read pairs). Peak use is therefore the sum over the `RGI_BWT` tasks running at once (`process_medium`,
+8 CPUs each). On a disk with little space left, run fewer at a time, e.g. with a `-c` file:
+
+```groovy
+process { withName: 'RGI_BWT' { maxForks = 4 } }
+```
+
+Runs made before `--clean` was added (BugBuster 2.0.0dev, October 2026) kept these files: delete the
+`*.temp.*` files of finished `RGI_BWT` task directories, or the whole `work/` once the run is done.
+
 ## Best Practices
 
 1. **For Production**: Pre-prepare databases once and reuse with `--custom_rgi_card_db`

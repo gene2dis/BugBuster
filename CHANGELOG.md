@@ -418,6 +418,14 @@ next release is tagged.
   `"version"` in `card.json`, which stores it as `"_version"`, so
   `rgi wildcard_annotation` got no version and `software_versions.yml` a blank
   `card:`
+- **`RGI_BWT` kept its temporary files**: `rgi bwt` writes the alignment of
+  every read as an uncompressed SAM (about 250 bytes per read) plus two BAM
+  copies, and removes them only with `--clean`, which the pipeline did not
+  pass. A task kept about 390 bytes per clean read (about 80 GB for 100M read
+  pairs; 1.2 TB for a 32-sample batch). It now passes `--clean`, which keeps
+  the outputs (`*.sorted.length_100.bam`, mapping tables, stats). The log also
+  dropped the samtools warning printed once per KMA read at position 0 (3.5 GB
+  for an 81M-read sample); it now records how many were omitted
 
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on
