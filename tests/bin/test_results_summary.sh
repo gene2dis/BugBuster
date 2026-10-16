@@ -299,6 +299,10 @@ assert tier("cfrE", "Cfr 23S ribosomal RNA methyltransferase") == 1
 assert tier("cfr(B)", "Cfr 23S ribosomal RNA methyltransferase") == 1
 assert tier("qacEdelta1", "major facilitator superfamily (MFS) antibiotic efflux pump", "antibiotic efflux") == 2
 assert tier("poxtA", "Miscellaneous ABC-F subfamily ATP-binding cassette ribosomal protection proteins") == 1
+# vanG (common on the chromosome of gut Clostridia) is tier 3; the other Van ligases stay tier 1
+assert tier("vanG", "glycopeptide resistance gene cluster;Van ligase") == 3
+for ligase in ("vanA", "vanB", "vanD"):
+    assert tier(ligase, "glycopeptide resistance gene cluster;Van ligase") == 1, ligase
 # Bray-Curtis PCoA: identical samples get identical coordinates, a different one does not
 rel = pd.DataFrame({"a": [50, 50, 0], "b": [50, 50, 0], "c": [0, 10, 90]}, index=["t1", "t2", "t3"])
 coords, pct = bray_curtis_pcoa(rel)
