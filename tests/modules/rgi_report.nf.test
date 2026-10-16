@@ -8,6 +8,10 @@
     logged "Found 0 k-mer files". Fixtures in tests/data/rgi/ are a minimal
     rgi bwt gene/allele table pair for one sample plus a k-mer JSON.
 
+    The *_cov80 columns count only the genes whose best-covered reference
+    sequence reads cover at least --rgi_summary_min_coverage (80) %: in s1,
+    tet(Q) at 100% counts and ErmF at 45% does not.
+
     Also checks that a sample where rgi bwt mapped too few reads is reported
     with zero genes: s2's tables are bin/rgi_bwt_lowcov_fallback.sh's
     placeholders (one all-NA row), which RGI_REPORT counted as one gene.
@@ -42,8 +46,8 @@ nextflow_process {
             assert log.contains("Found 1 k-mer files")
 
             def lines = summary.readLines()
-            assert lines[0] == "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families"
-            assert lines[1] == "s1,2,17,2,2"
+            assert lines[0] == "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families,AMR_Genes_cov80,Mapped_Reads_cov80,Unique_Drug_Classes_cov80,Unique_AMR_Families_cov80"
+            assert lines[1] == "s1,2,17,2,2,1,12,1,1"
         }
     }
 
@@ -69,9 +73,9 @@ nextflow_process {
 
             def lines = path(process.out.summary.get(0)).readLines()
             assert lines == [
-                "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families",
-                "s1,2,17,2,2",
-                "s2,0,0,0,0"
+                "Sample,Total_AMR_Genes,Total_Mapped_Reads,Unique_Drug_Classes,Unique_AMR_Families,AMR_Genes_cov80,Mapped_Reads_cov80,Unique_Drug_Classes_cov80,Unique_AMR_Families_cov80",
+                "s1,2,17,2,2,1,12,1,1",
+                "s2,0,0,0,0,0,0,0,0"
             ]
         }
     }
@@ -89,7 +93,29 @@ nextflow_process {
 
         then {
             assert process.success
-            assert path(process.out.summary.get(0)).readLines()[1] == "s2,0,0,0,0"
+            assert path(process.out.summary.get(0)).readLines()[1] == "s2,0,0,0,0,0,0,0,0"
+        }
+    }
+
+    test("the coverage cutoff follows --rgi_summary_min_coverage") {
+        when {
+            params {
+                rgi_summary_min_coverage = 40
+            }
+            process {
+                """
+                input[0] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.allele_mapping_data.txt", checkIfExists: true) ]
+                input[1] = [ file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true) ]
+                input[2] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.summary.get(0)).readLines()
+            assert lines[0].endsWith(",AMR_Genes_cov40,Mapped_Reads_cov40,Unique_Drug_Classes_cov40,Unique_AMR_Families_cov40")
+            assert lines[1] == "s1,2,17,2,2,2,17,2,2"
         }
     }
 }

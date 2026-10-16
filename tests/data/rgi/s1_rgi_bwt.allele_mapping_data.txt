@@ -1,2 +1,3 @@
-Reference Sequence	ARO Term	All Mapped Reads
-ARO:3000191|tet(Q)	tet(Q)	12
+Reference Sequence	ARO Term	ARO Accession	All Mapped Reads	Percent Coverage
+ARO:3000191|tet(Q)	tet(Q)	3000191	12	100.00
+ARO:3000498|ErmF	ErmF	3000498	5	45.10
