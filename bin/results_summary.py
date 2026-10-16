@@ -47,14 +47,13 @@ import pandas as pd
 # write no __pycache__ into the pipeline's bin/ (read-only in a container image)
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, natural_key, norm_taxon, strip_gtdb, warn  # noqa: E402
-from summary_taxonomy import (bray_curtis_pcoa, build_taxonomy, load_taxonomy, load_watchlist,  # noqa: E402
-                              prevalence_table, species_rank, watchlist_table)
+from summary_common import NA_NOT_RUN, die, natural_key, norm_taxon, strip_gtdb, warn  # noqa: E402
+from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, prevalence_table,  # noqa: E402
+                              species_rank, watchlist_table)
 from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_status, arg_tables,  # noqa: E402
                           compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules, load_snps)
-from summary_figures import (FigureWriter, fig_args, fig_diversity, fig_group_timeline,  # noqa: E402
-                             fig_method_by_category, fig_method_upset, fig_pcoa, fig_qc, fig_taxonomy,
-                             fig_watchlist, short_count)
+from summary_figures import (FigureWriter, fig_args, fig_method_by_category, fig_method_upset,  # noqa: E402
+                             fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
 
 
@@ -243,8 +242,8 @@ def parse_args(argv=None):
     p.add_argument("--depth-marks", default="10000000,20000000",
                    help="comma-separated clean read-pair depths marked in the QC figure and counted in the report "
                         "header (default 10000000,20000000; '' for none)")
-    p.add_argument("--taxa-per-sample", type=int, default=10,
-                   help="the taxonomy heatmaps show the union of each sample's N most abundant taxa (default 10)")
+    p.add_argument("--taxa-per-sample", type=int, default=5,
+                   help="the taxonomy heatmaps show the union of each sample's N most abundant taxa (default 5)")
     p.add_argument("--top-n", type=int, default=40, help="maximum rows in the ARG heatmap (default 40)")
     p.add_argument("--title", default="BugBuster results summary", help="HTML report title")
     p.add_argument("--no-excel", action="store_true", help="do not write the Excel workbook")
@@ -391,13 +390,6 @@ def main(argv=None):
         tgroups = [samples.at[s, args.group_by] if args.group_by else "" for s in tcols]
         fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
         fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name)
-        fig_diversity(figs, samples, tcols, tgroups, low, args.group_by, args.order_by)
-        coords, pct = bray_curtis_pcoa(spw.reindex(columns=tcols))
-        if coords is not None:
-            fig_pcoa(figs, coords, pct, samples, dict(zip(tcols, tgroups)), low, args.group_by, args.order_by)
-            pc = coords.rename(columns={c: f"{c} ({p:.1f}%)" for c, p in zip(coords.columns, pct)})
-            pc = samples[["batch"] + meta_cols].join(pc, how="inner").reindex([s for s in order if s in pc.index])
-            tables["taxonomy_pcoa"] = (pc.rename_axis("sample").reset_index(), False)
 
     # ---- ARGs (read level): K-MARVEL calls, and RGI bwt genes at or above --rgi-min-coverage
     methods_ran = {}
@@ -456,7 +448,7 @@ def main(argv=None):
             summary["n_tier1"] = int(hit1["sample"].nunique())
             summary["n_tier1_genes"] = int(hit1["gene"].nunique())
             fig_args(figs, arg[arg["gene_representative"]], mats, samples, order, groups, low, status, args.top_n,
-                     args.group_by, args.order_by, METHOD_LABELS[primary])
+                     METHOD_LABELS[primary])
         # arg_long: every method's calls, the primary method first
         lead = ["sample", "batch"] + meta_cols + ["method", "tier", "category", "gene", "aro_full_name", "aro_id",
                                                    "gene_family", "drug_class", "resistance_mechanism", "model",
@@ -499,20 +491,9 @@ def main(argv=None):
                 fig_method_upset(figs, comp, gene_sets, comparison["methods"])
                 fig_method_by_category(figs, comp, comparison["methods"])
 
-    # ---- per-group view: watchlist taxa and tier 1 genes across the order values
     prim_arg = None
-    tl_status = {s: (NA_LOW_DEPTH if s in low else "ok") for s in order}
     if methods_ran:
-        tl_status = status
         prim_arg = calls_by[primary]
-        prim_arg = prim_arg[prim_arg["gene_representative"]] if not prim_arg.empty else prim_arg
-    rgi_hosts = {}
-    if rgi_all is not None and not rgi_all.empty:
-        rep = rgi_all[rgi_all["gene_representative"]]
-        rgi_hosts = {(s, g): h for s, g, h in zip(rep["sample"], rep["gene"], rep["rgi_kmer_hosts"]) if h}
-    if args.group_by and args.order_by:
-        fig_group_timeline(figs, prim_arg, samples, order, tl_status, args.group_by, args.order_by,
-                           wl_long if tx is not None else None, tx["rel"].columns if tx is not None else (), rgi_hosts)
     tier1_view = None
     if prim_arg is not None and not prim_arg.empty:
         tier1_view = tier1_table(calls_by[primary], comparison, primary)
@@ -541,6 +522,7 @@ def main(argv=None):
         "min_pairs": args.min_clean_pairs, "meta_cols": meta_cols, "key_meta": key_meta,
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
         "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": args.watchlist,
+        "arg_priority": args.arg_priority,
     })
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 

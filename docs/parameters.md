@@ -601,7 +601,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--summary_order_by`
 - **Type**: String
 - **Default**: none
-- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it adds the per-group timeline of watchlist taxa and tier 1 ARGs and the diversity lines. Needs `--sample_metadata`
+- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it orders the samples of each group and the per-group tier 1 detection patterns (`group_arg_detection`). Needs `--sample_metadata`
 - **Example**: `--summary_order_by visit`
 
 ### `--summary_batch_label`
@@ -626,10 +626,10 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 
 ### `--summary_taxa_per_sample`
 - **Type**: Integer
-- **Default**: `10`
+- **Default**: `5`
 - **Minimum**: `1`
-- **Description**: The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap, grouped by phylum
-- **Example**: `--summary_taxa_per_sample 5`
+- **Description**: The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap, grouped by phylum and alphabetical within each phylum
+- **Example**: `--summary_taxa_per_sample 10`
 
 ### `--summary_depth_marks`
 - **Type**: String (comma-separated read-pair counts)

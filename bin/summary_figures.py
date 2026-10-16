@@ -10,7 +10,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Rectangle  # noqa: E402
 
-from summary_common import NA_NOT_RUN, natural_key, strip_gtdb  # noqa: E402
+from summary_common import NA_NOT_RUN, strip_gtdb  # noqa: E402
 from summary_taxonomy import genus_rank, species_rank  # noqa: E402
 
 
@@ -283,17 +283,13 @@ def parent_of(tx, rank, parent):
     return dict(zip(pairs[rank], pairs[parent]))
 
 
-def lineage_order(taxa, wide, tx, rank, genus):
-    """Taxa grouped by phylum (largest phylum first), then genus, then by maximum abundance."""
+def lineage_order(taxa, tx, rank):
+    """Taxa grouped by phylum (largest phylum first), alphabetical within each phylum (GTDB suffixes ignored)."""
     phylum = next((r for r in tx["ranks"] if r.lower() == "phylum"), None)
     to_phylum = parent_of(tx, rank, phylum) if phylum else {}
-    to_genus = parent_of(tx, rank, genus) if rank != genus else {t: t for t in taxa}
-    peak = wide.loc[taxa].max(axis=1)
     ph = {t: to_phylum.get(t, "unassigned") for t in taxa}
-    ge = {t: to_genus.get(t, t) for t in taxa}
     ph_size = pd.Series(ph).value_counts()
-    ge_peak = pd.Series({t: peak[t] for t in taxa}).groupby(pd.Series(ge)).max()
-    ordered = sorted(taxa, key=lambda t: (-ph_size[ph[t]], ph[t], -ge_peak[ge[t]], ge[t], -peak[t]))
+    ordered = sorted(taxa, key=lambda t: (-ph_size[ph[t]], ph[t], strip_gtdb(t).lower(), t))
     return ordered, [ph[t] for t in ordered], phylum or "phylum"
 
 
@@ -304,13 +300,13 @@ def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
         taxa = pick_taxa(wide, per_sample)
         if not taxa:
             continue
-        taxa, phyla, phylum_label = lineage_order(taxa, wide, tx, rank, ge)
+        taxa, phyla, phylum_label = lineage_order(taxa, tx, rank)
         heatmap(fw, key, f"{rank} relative abundance, top {per_sample} per sample ({label})",
                 f"Union of each sample's {per_sample} most abundant {rank.lower()} taxa ({len(taxa)} row"
                 f"{'s' if len(taxa) != 1 else ''}), so "
-                f"every sample's dominant taxa are shown. Rows are grouped by {phylum_label.lower()} (colour strip) "
-                + (f"and genus, " if rank == sp else "")
-                + "then sorted by maximum abundance. Colour = log10 relative abundance (%); grey = not detected; "
+                f"every sample's dominant taxa are shown. Rows are grouped by {phylum_label.lower()} (colour strip, "
+                f"largest group first) and alphabetical within each. Colour = log10 relative abundance (%); "
+                "grey = not detected; "
                 "red sample labels mark low-depth samples.",
                 wide.loc[taxa], display_names(taxa), cols, groups, low, set(), "log10 relative abundance (%)",
                 vmin=-2, vmax=2, row_groups=phyla, row_group_title=phylum_label)
@@ -392,7 +388,7 @@ def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source=""):
             "index hopping or a related strain.")
 
 
-def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_by, order_by, method="K-MARVEL"):
+def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method="K-MARVEL"):
     gene = tables["arg_gene_rpkm"]
     num = gene[cols].apply(pd.to_numeric, errors="coerce")
     hatch = {s for s in cols if status[s] != "ok"}
@@ -447,108 +443,6 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, group_b
                     "If the number of genes found rises with depth (left), shallow samples under-report ARGs; "
                     "compare presence/absence only between samples of similar depth. RPKM (right) is depth-"
                     "normalised. Red = below the low-depth threshold.")
-
-
-def short_species(name):
-    """'Klebsiella pneumoniae' -> 'K. pneumoniae'; a genus stays as it is."""
-    parts = strip_gtdb(name).split(" ")
-    return f"{parts[0][0]}. {' '.join(parts[1:])}" if len(parts) > 1 else parts[0]
-
-
-def fig_group_timeline(fw, arg, samples, cols, status, group_by, order_by, wl_long=None, tax_cols=(), hosts=None):
-    """Per group across the order values: watchlist taxa (relative abundance) above the tier 1 genes (RPKM).
-
-    hosts: {(sample, gene): RGI k-mer host text}; the gene label shows the host most often on top in the group.
-    """
-    t1 = arg[arg["tier"] == 1] if arg is not None and not arg.empty else pd.DataFrame(columns=["sample", "gene"])
-    has_wl = wl_long is not None and not wl_long.empty
-    if t1.empty and not has_wl:
-        return
-    order_vals = sorted({samples.at[s, order_by] for s in cols}, key=natural_key)
-    xi = {v: i for i, v in enumerate(order_vals)}
-    tax_cols = set(tax_cols)
-    rows, kinds, cells = [], [], []
-    for g, members in samples.loc[cols].groupby(group_by, sort=False):
-        mem = [s for s in cols if s in members.index]
-        if has_wl:
-            sub = wl_long[wl_long["sample"].isin(mem) & (wl_long["relative_abundance"] > 0)]
-            for taxon in sorted(sub["taxon"].unique(), key=lambda t: -sub.loc[sub["taxon"] == t, "relative_abundance"].max()):
-                r = len(rows)
-                rows.append(f"{g} | {short_species(taxon)}")
-                kinds.append("taxon")
-                ab = sub[sub["taxon"] == taxon].groupby("sample")["relative_abundance"].sum()
-                for s in mem:
-                    st = "ok" if s in tax_cols else NA_NOT_RUN
-                    if st == "ok" and status.get(s) == "NA_low_depth":
-                        st = status[s]
-                    cells.append((r, xi[samples.at[s, order_by]], ab.get(s, np.nan), st, "taxon"))
-        sub = t1[t1["sample"].isin(mem)]
-        for gene in sorted(sub["gene"].unique(), key=str.lower):
-            r = len(rows)
-            label = f"{g} | {gene}"
-            if hosts:
-                tops = [hosts.get((s, gene), "").split(" (")[0] for s in mem]
-                tops = [t for t in tops if t]
-                if tops:
-                    label += f" [{short_species(max(set(tops), key=tops.count))}]"
-            rows.append(label)
-            kinds.append("gene")
-            rpkm = sub[sub["gene"] == gene].groupby("sample")["gene_rpkm"].sum()
-            for s in mem:
-                cells.append((r, xi[samples.at[s, order_by]], rpkm.get(s, np.nan), status.get(s, "ok"), "gene"))
-    if not rows:
-        return
-    nr, nc = len(rows), len(order_vals)
-    fig, ax = plt.subplots(figsize=(max(6, 0.45 * nc + 6), max(2.5, 0.26 * nr + 1.8)), layout="constrained")
-    scales = {}
-    for kind, cmap in (("taxon", "Greens"), ("gene", "Reds")):
-        vals = [math.log10(v) for _, _, v, _, k in cells if k == kind and v and v > 0]
-        lo, hi = (min(vals), max(vals)) if vals else (0, 1)
-        if lo == hi:
-            lo, hi = lo - 0.5, hi + 0.5
-        scales[kind] = (plt.get_cmap(cmap), lo, hi, bool(vals))
-    for r, x, v, st, kind in cells:
-        cm, lo, hi, _ = scales[kind]
-        if v and v > 0:
-            ax.add_patch(Rectangle((x - 0.45, r - 0.4), 0.9, 0.8,
-                                   color=cm((math.log10(v) - lo) / (hi - lo) * 0.75 + 0.25)))
-        elif st != "ok":
-            ax.add_patch(Rectangle((x - 0.45, r - 0.4), 0.9, 0.8, fill=False, hatch="///", edgecolor="#999999"))
-        else:
-            ax.add_patch(Rectangle((x - 0.45, r - 0.4), 0.9, 0.8, fill=False, edgecolor="#bbbbbb"))
-    ax.set_xlim(-0.6, nc - 0.4)
-    ax.set_ylim(nr - 0.5, -0.5)
-    ax.set_xticks(range(nc))
-    ax.set_xticklabels(order_vals, rotation=90 if nc > 12 else 0, fontsize=8)
-    ax.set_yticks(range(nr))
-    ax.set_yticklabels(rows, fontsize=8)
-    for lab, kind in zip(ax.get_yticklabels(), kinds):
-        lab.set_color("#1b6b45" if kind == "taxon" else "#7a1f2b")
-    ax.set_xlabel(order_by)
-    prev = None
-    for i, lab in enumerate(rows):
-        g = lab.split(" | ")[0]
-        if prev is not None and g != prev:
-            ax.axhline(i - 0.5, color="#444444", linewidth=0.8)
-        prev = g
-    for sp in ax.spines.values():
-        sp.set_visible(False)
-    ax.tick_params(length=0)
-    for kind, label in (("taxon", "log10 relative abundance (%)"), ("gene", "log10 RPKM")):
-        cm, lo, hi, used = scales[kind]
-        if used:
-            sm = plt.cm.ScalarMappable(cmap=matplotlib.colors.ListedColormap(cm(np.linspace(0.25, 1.0, 256))),
-                                       norm=plt.Normalize(lo, hi))
-            fig.colorbar(sm, ax=ax, fraction=0.03, pad=0.01, shrink=min(1.0, 12 / max(nr, 1)) if nr > 12 else 1.0,
-                         aspect=15).set_label(label, fontsize=9)
-    title = f"Watchlist taxa and tier 1 ARGs per {group_by} across {order_by}"
-    fig.suptitle(title, fontsize=12)
-    fw.save(fig, "group_timeline", title,
-            f"For each {group_by}: watchlist taxa found in any of its samples (green labels; colour = log10 relative "
-            f"abundance) and tier 1 genes (red labels; colour = log10 RPKM). The host in brackets is RGI's k-mer "
-            f"pathogen-of-origin call most often on top for that gene in the {group_by}; it comes from the reads, "
-            f"unlike co-occurrence. Empty box = sequenced and not detected; hatched = low depth or not run (unknown); "
-            f"no box = no sample at that {order_by}.")
 
 
 TIER_COLORS = {1: "#c0392b", 2: "#e69f00", 3: "#56b4e9", 4: "#999999"}
@@ -666,90 +560,3 @@ def fig_method_by_category(fw, comp, methods):
             "Distinct genes per reporting tier and category, split by which methods found them in at least one "
             "sample. Hatched: K-MARVEL calls where RGI had reads below the coverage cutoff (partial coverage, not "
             "absence). Category labels are coloured by tier.")
-
-
-def fig_diversity(fw, samples, cols, groups, low, group_by, order_by):
-    """Shannon index per sample: one line per group across the order values, or one strip per group."""
-    if "shannon" not in samples or samples.loc[cols, "shannon"].isna().all():
-        return
-    sh = samples.loc[cols, "shannon"].astype(float)
-    fig, ax = plt.subplots(figsize=(9, 4.2))
-    if group_by and order_by:
-        order_vals = sorted({samples.at[s, order_by] for s in cols}, key=natural_key)
-        xi = {v: i for i, v in enumerate(order_vals)}
-        names = list(dict.fromkeys(groups))
-        palette = category_colors(names)
-        for g in names:
-            mem = [s for s, gg in zip(cols, groups) if gg == g and not np.isnan(sh[s])]
-            mem.sort(key=lambda s: xi[samples.at[s, order_by]])
-            xs = [xi[samples.at[s, order_by]] for s in mem]
-            ax.plot(xs, sh[mem], color=palette[g], linewidth=1.2, label=str(g))
-            ax.scatter(xs, sh[mem], color=[("white" if s in low else palette[g]) for s in mem],
-                       edgecolors=palette[g], s=28, zorder=3)
-        ax.set_xticks(range(len(order_vals)))
-        ax.set_xticklabels(order_vals, rotation=90 if len(order_vals) > 12 else 0, fontsize=8)
-        ax.set_xlabel(order_by)
-        if len(names) <= 20:
-            ax.legend(title=group_by, fontsize=8, title_fontsize=8, frameon=False, bbox_to_anchor=(1.01, 1),
-                      loc="upper left")
-    elif group_by:
-        names = list(dict.fromkeys(groups))
-        for i, g in enumerate(names):
-            mem = [s for s, gg in zip(cols, groups) if gg == g]
-            jitter = np.linspace(-0.15, 0.15, len(mem)) if len(mem) > 1 else [0]
-            ax.scatter(i + np.asarray(jitter), sh[mem], color=["white" if s in low else "#2a7ab9" for s in mem],
-                       edgecolors="#2a7ab9", s=28)
-        ax.set_xticks(range(len(names)))
-        ax.set_xticklabels(names, rotation=90 if len(names) > 12 else 0, fontsize=8)
-        ax.set_xlabel(group_by)
-    else:
-        ax.scatter(range(len(cols)), sh, color=["white" if s in low else "#2a7ab9" for s in cols],
-                   edgecolors="#2a7ab9", s=28)
-        ax.set_xticks(range(len(cols)))
-        ax.set_xticklabels(cols, rotation=90, fontsize=fontsize_for(len(cols)))
-    ax.set_ylabel("Shannon index (species)")
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
-    ax.set_title("Species diversity", fontsize=12)
-    fig.tight_layout()
-    fw.save(fig, "taxonomy_diversity", "Species diversity",
-            "Shannon index (natural log) of species relative abundance per sample"
-            + (f", one line per {group_by} across {order_by}" if group_by and order_by else "")
-            + ". Hollow points are low-depth samples, where diversity is underestimated.")
-
-
-def fig_pcoa(fw, coords, pct, samples, groups_by_sample, low, group_by, order_by):
-    """PCoA of Bray-Curtis dissimilarity, coloured by group; a group's samples are joined in order."""
-    if coords is None or coords.shape[1] < 2:
-        return
-    fig, ax = plt.subplots(figsize=(8, 6))
-    names = list(dict.fromkeys(groups_by_sample[s] for s in coords.index)) if group_by else [""]
-    palette = category_colors(names)
-    for g in names:
-        mem = [s for s in coords.index if (groups_by_sample[s] if group_by else "") == g]
-        if order_by:
-            mem.sort(key=lambda s: natural_key(samples.at[s, order_by]))
-        c = palette[g]
-        if group_by and order_by and len(mem) > 1:
-            ax.plot(coords.loc[mem, "PC1"], coords.loc[mem, "PC2"], color=c, linewidth=0.8, alpha=0.7)
-        ax.scatter(coords.loc[mem, "PC1"], coords.loc[mem, "PC2"], color=["white" if s in low else c for s in mem],
-                   edgecolors=c, s=36, zorder=3, label=str(g) if group_by else None)
-        if group_by and order_by and mem:
-            ax.annotate(str(samples.at[mem[0], order_by]), (coords.at[mem[0], "PC1"], coords.at[mem[0], "PC2"]),
-                        fontsize=6, color=c, xytext=(3, 3), textcoords="offset points")
-    ax.set_xlabel(f"PC1 ({pct[0]:.1f}%)")
-    ax.set_ylabel(f"PC2 ({pct[1]:.1f}%)")
-    if group_by and len(names) <= 20:
-        ax.legend(title=group_by, fontsize=8, title_fontsize=8, frameon=False, bbox_to_anchor=(1.01, 1),
-                  loc="upper left")
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
-    title = "Community composition (Bray-Curtis PCoA, species)"
-    ax.set_title(title, fontsize=12)
-    fig.tight_layout()
-    fw.save(fig, "taxonomy_pcoa", title,
-            "Principal coordinates of Bray-Curtis dissimilarity between samples' species profiles; samples close "
-            "together have similar communities. "
-            + (f"Colour = {group_by}; lines join a {group_by}'s samples in {order_by} order, starting at the "
-               f"labelled one. " if group_by and order_by else (f"Colour = {group_by}. " if group_by else ""))
-            + "Hollow points are low-depth samples. Axis labels give the share of variation each axis shows.")

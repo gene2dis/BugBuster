@@ -14,7 +14,7 @@
 #     (best reference sequence), reads summed per ARO and gene, k-mer host
 #     check against the watchlist, the K-MARVEL vs RGI comparison and overlap
 #     counts; an RGI-only directory makes RGI the primary ARG method
-#   - depth classes, --taxa-per-sample, Bray-Curtis PCoA
+#   - depth classes, --taxa-per-sample, heatmap rows by phylum then A-Z
 #   - HTML is self-contained (no external URLs)
 #
 # Python runs inside the image pinned in modules/local/results_summary/main.nf
@@ -172,6 +172,12 @@ assert qc.at["sampleA", "depth_class"] == "10k-10M" and qc.at["sampleB", "depth_
 html = open("out/results_summary.html").read()
 assert "Comparison of ARG methods" in html and "possibly a related gene of a commensal" in html
 assert "samples with &gt;=10M clean pairs" in html
+# the reading guide comes before the first figure, and explains tiers and both methods
+assert html.index("Reading this report</h2>") < html.index("<figure>")
+assert "ARG reporting tiers" in html and "RGI k-mer (pathogen of origin)" in html
+import os
+for gone in ("taxonomy_diversity", "taxonomy_pcoa", "group_timeline", "arg_tier1_timeline"):
+    assert not os.path.exists(f"out/figures/{gone}.png"), gone
 PYEOF
 check "method comparison figures written" test -s out/figures/arg_method_upset.svg -a -s out/figures/arg_method_by_category.png
 check "--rgi-min-coverage 20 detects the low-coverage genes" \
@@ -261,15 +267,14 @@ qc = pd.read_csv("kr/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2", "classified_fraction"] - 0.005) < 1e-9
 PYEOF
 
-check "CARD snps.txt check, gene names, tier rules, PCoA and k-mer parsing" py - "${REPO_DIR}/bin" <<'PYEOF'
+check "CARD snps.txt check, gene names, tier rules, heatmap row order and k-mer parsing" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys, tempfile, os
-import numpy as np
 import pandas as pd
 sys.dont_write_bytecode = True
 sys.path.insert(0, sys.argv[1])
 import summary_args as rs
 from summary_common import strip_gtdb
-from summary_taxonomy import bray_curtis_pcoa
+from summary_figures import lineage_order
 d = tempfile.mkdtemp()
 with open(os.path.join(d, "snps.txt"), "w") as fh:
     fh.write("Accession\tName\tModel Type\tParameter Type\tMutations\tCARD Short Name\tsource\tcitation\n")
@@ -303,11 +308,13 @@ assert tier("poxtA", "Miscellaneous ABC-F subfamily ATP-binding cassette ribosom
 assert tier("vanG", "glycopeptide resistance gene cluster;Van ligase") == 3
 for ligase in ("vanA", "vanB", "vanD"):
     assert tier(ligase, "glycopeptide resistance gene cluster;Van ligase") == 1, ligase
-# Bray-Curtis PCoA: identical samples get identical coordinates, a different one does not
-rel = pd.DataFrame({"a": [50, 50, 0], "b": [50, 50, 0], "c": [0, 10, 90]}, index=["t1", "t2", "t3"])
-coords, pct = bray_curtis_pcoa(rel)
-assert np.allclose(coords.loc["a"], coords.loc["b"]) and not np.allclose(coords.loc["a"], coords.loc["c"])
-assert 99.9 < sum(pct) < 100.1 or len(pct) < 3
+# heatmap rows: grouped by phylum (largest first), alphabetical within each phylum, GTDB suffixes ignored
+tax = pd.DataFrame({"Phylum": ["Bacillota", "Bacillota", "Bacillota", "Bacteroidota"],
+                    "Species": ["Zeta b", "alpha_A c", "Beta d", "Aaa e"]}, index=["g1", "g2", "g3", "g4"])
+order, phyla, label = lineage_order(["Zeta b", "Aaa e", "Beta d", "alpha_A c"], {"tax": tax, "ranks": ["Phylum", "Species"]},
+                                    "Species")
+assert order == ["alpha_A c", "Beta d", "Zeta b", "Aaa e"], order
+assert phyla == ["Bacillota"] * 3 + ["Bacteroidota"] and label == "Phylum"
 # RGI k-mer prediction strings
 assert rs.parse_kmer_prediction("Klebsiella pneumoniae (chromosome or plasmid): 83; Escherichia coli (plasmid): 2; ") \
     == {"Klebsiella pneumoniae": 83, "Escherichia coli": 2}

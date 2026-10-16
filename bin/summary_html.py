@@ -3,6 +3,7 @@
 import html
 import re
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -37,10 +38,6 @@ COLUMN_DOCS = {
                                                          "estimated coverage and effective lambda"),
         ("species_call_uncertain", "the lower bound of sylph's ANI interval is below 95%: the genome present may be "
                                    "a different species of the same genus"),
-    ],
-    "taxonomy_pcoa": [
-        ("PC1 (x%) ...", "Bray-Curtis PCoA coordinates of the species profiles; the % is the share of variation of "
-                         "each axis"),
     ],
     "arg_long": [
         ("tier, category, tier_note", "reporting tier from the tier table (1 clinical priority, 2 other acquired, "
@@ -196,6 +193,8 @@ td.na{color:var(--muted);font-style:italic}
 input.filter{margin:8px;padding:5px 8px;width:min(320px,90%);border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)}
 pre{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto;font-size:12px}
 ul.caveats li{margin:6px 0}
+ul.tight{margin:0;padding-left:16px}ul.tight li{margin:1px 0}
+#guide td{white-space:normal;vertical-align:top}
 details.attention{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:8px 14px;margin:4px 0 8px}
 details.attention summary{font-weight:600;cursor:pointer}
 details.attention>ul{margin:6px 0;padding-left:18px}details.attention ul ul{padding-left:18px;font-size:13.5px}
@@ -229,6 +228,77 @@ document.querySelectorAll('input.filter').forEach(function(inp){
   });
 });
 """
+
+
+TIER_MEANING = {
+    1: ("Clinical priority", "last-line or highly transmissible resistance, usually on mobile elements"),
+    2: ("Other acquired", "acquired genes of common resistance (ESBL, AmpC, aminoglycoside-modifying enzymes, "
+                          "tetracycline, macrolide, sulfonamide/trimethoprim genes, ...)"),
+    3: ("Intrinsic, efflux or regulator", "chromosomal or housekeeping genes that most strains of a species carry; "
+                                          "they say little about acquired resistance"),
+    4: ("Mutation dependent", "genes that confer resistance only with a specific mutation (gyrA, parC, rpoB, ...)"),
+}
+
+
+def tier_categories(rules_path):
+    """{tier: ['category (note)', ...]} from the tier rule file, in rule order, plus the built-in rules."""
+    out = {1: [], 2: [], 3: [], 4: ["mutation_dependent (CARD variant models and AROs with CARD SNP definitions)"]}
+    try:
+        rules = pd.read_csv(rules_path, sep="\t", comment="#", dtype=str, keep_default_na=False)
+    except (OSError, ValueError):
+        rules = pd.DataFrame(columns=["tier", "category", "note"])
+    seen = set()
+    for tier, cat, note in zip(rules.get("tier", []), rules.get("category", []), rules.get("note", [])):
+        key = (int(tier), cat)
+        if key in seen:
+            continue
+        seen.add(key)
+        out.setdefault(int(tier), []).append(f"{cat} ({note})" if note else cat)
+    out[3].append("efflux_permeability (efflux pumps, porins and overexpression models without a rule)")
+    out[2].append("acquired_unreviewed (no rule matched)")
+    return out
+
+
+def reading_guide(ctx):
+    """The 'Reading this report' section: units, ARG tiers and the read-level ARG methods."""
+    s = ctx["summary"]
+    rows = []
+    for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
+        label, meaning = TIER_MEANING[tier]
+        rows.append(f"<tr><td><b>Tier {tier}</b><br>{html.escape(label)}</td><td>{html.escape(meaning)}</td>"
+                    f"<td><ul class='tight'>{''.join(f'<li>{html.escape(c)}</li>' for c in cats)}</ul></td></tr>")
+    tiers = ("<h3>ARG reporting tiers</h3><p>Every ARG call gets a tier from an editable rule table ("
+             + html.escape(Path(ctx.get("arg_priority", "")).name or "arg_priority_tiers.tsv")
+             + "): rules match CARD gene names or gene families, top to bottom, first match wins. Tier 1 is what to "
+             "look at first; tier 2 is the common acquired resistome; tiers 3 and 4 are mostly background.</p>"
+             "<div class='tablewrap'><table><thead><tr><th>Tier</th><th>Meaning</th><th>Categories (rule notes)</th>"
+             "</tr></thead><tbody>" + "".join(rows) + "</tbody></table></div>")
+    methods = s.get("arg_methods", [])
+    m = []
+    if "K-MARVEL" in methods:
+        m.append("<li><b>K-MARVEL</b> assembles resistance genes from the reads and reports a call per gene (CARD), "
+                 "with its supporting read pairs.</li>")
+    if "RGI" in methods:
+        m.append(f"<li><b>RGI bwt</b> maps the reads to CARD and WildCARD and lists every gene with at least one "
+                 f"mapped read, fragments of related genes included. This summary counts an RGI gene when reads cover "
+                 f"at least {ctx.get('rgi_min_coverage', 80):g}% of its best-covered reference sequence.</li>"
+                 "<li><b>RGI k-mer (pathogen of origin)</b> assigns a gene's reads to the species they come from "
+                 "(<i>rgi_kmer_hosts</i>). <i>rgi_host_check</i> says whether the top species is a watchlist pathogen; "
+                 "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point to a "
+                 "commensal may be a related gene, not the clinical one.</li>")
+    method_html = ""
+    if m:
+        primary = s.get("arg_primary", "")
+        method_html = ("<h3>ARG methods</h3><ul>" + "".join(m) + "</ul><p>The ARG figures and matrices use "
+                       f"<b>{html.escape(primary)}</b>"
+                       + ("; the other method's calls are in arg_long.tsv and in the method comparison section."
+                          if len(methods) > 1 else ".") + "</p>")
+    units = ("<h3>Units</h3><ul><li>Counts are read pairs (Reads_report.csv counts single reads).</li>"
+             "<li>ARG abundance is RPKM: read pairs per kb of reference gene per million clean read pairs, comparable "
+             "between samples of different depth.</li>"
+             f"<li>Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
+             "found there is reported as NA_low_depth (unknown), not as absent.</li></ul>")
+    return units + (tiers if s.get("n_tier1") is not None else "") + method_html
 
 
 def short_pairs(n):
@@ -277,7 +347,9 @@ def write_html(outdir, title, ctx):
                 items.append(f"<li class='{kind}'><b>{html.escape(flag_titles[kind])}</b><ul>"
                              + "".join(f"<li><a href='#{a}'>{html.escape(text)}</a></li>" for _, text, a in sub)
                              + "</ul></li>")
-        attention = "<details class='attention' open><summary>Attention</summary><ul>" + "".join(items) + "</ul></details>"
+        attention = ("<details class='attention' open><summary>Attention</summary><p class='muted'>Tiers, ARG "
+                     "methods and the RGI host are explained in <a href='#guide'>Reading this report</a>.</p><ul>"
+                     + "".join(items) + "</ul></details>")
 
     sections = []
     nav = []
@@ -287,13 +359,14 @@ def write_html(outdir, title, ctx):
         sections.append(f"<section id='{anchor}'><h2>{html.escape(heading)}</h2>{body}</section>")
 
     t = ctx["tables"]
+    section("guide", "Reading this report", reading_guide(ctx))
     qc_cols = [c for c in t["samples_qc"][0].columns if c not in ctx["meta_cols"] or c in ctx["key_meta"]]
     section("qc", "Samples and sequencing depth",
             figure("qc_read_fate") + "<h3>Per-sample summary</h3>"
             + df_to_html(t["samples_qc"][0][qc_cols], table_id="t_qc"))
     if "taxonomy_long" in t:
         body = (figure("taxonomy_species_heatmap") + figure("taxonomy_genus_heatmap") + figure("taxonomy_genus_bars")
-                + figure("taxonomy_diversity") + figure("taxonomy_pcoa") + figure("watchlist"))
+                + figure("watchlist"))
         if "watchlist" in t:
             wl = t["watchlist"][0]
             body += ("<h3>Watchlist (relative abundance %)</h3><p class='muted'>Watchlist taxa detected in at least "
@@ -302,8 +375,6 @@ def write_html(outdir, title, ctx):
         body += ("<h3>Species prevalence (top 100)</h3>"
                  + df_to_html(t["taxonomy_species_prevalence"][0].head(100), index=True, table_id="t_prev"))
         section("taxonomy", "Taxonomy", body)
-    if figure("group_timeline") and "arg_long" not in t:
-        section("groups", f"Per {ctx['group_by']}", figure("group_timeline"))
     if "arg_long" in t:
         al = t["arg_long"][0]
         primary = s.get("arg_primary", "")
@@ -317,7 +388,7 @@ def write_html(outdir, title, ctx):
                     if len(s.get("arg_methods", [])) > 1 else "")
                  + f". RGI genes are counted at >= {ctx['rgi_min_coverage']:g}% coverage of their best reference "
                  "sequence (RGI itself reports every gene with a mapped read).</p>")
-        body = (intro + figure("arg_priority_heatmap") + figure("group_timeline") + figure("arg_drug_class_heatmap")
+        body = (intro + figure("arg_priority_heatmap") + figure("arg_drug_class_heatmap")
                 + figure("arg_vs_depth"))
         if ctx.get("tier1_view") is not None:
             body += ("<h3>Tier 1 (clinical priority) calls</h3><p class='muted'>rgi_host_check: watchlist_host = RGI's "

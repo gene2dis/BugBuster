@@ -842,11 +842,11 @@ figures and a self-contained HTML report (`results_summary.html`, no network acc
 | `--results_summary` | `true` | Write `00_summary/` |
 | `--sample_metadata` | none | TSV/CSV with a `sample` column (or sample names in the first column) and any metadata columns; carried into every table |
 | `--summary_group_by` | none | Metadata column that groups samples (subject, site, ...) in the figures and the per-group ARG detection table |
-| `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...); with `--summary_group_by` it adds the per-group timeline of watchlist taxa and tier 1 ARGs |
+| `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...) in the figures and the per-group detection patterns |
 | `--summary_batch_label` | output directory name | Label in the `batch` column; set it when batches share an output directory name such as `results` |
 | `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
 | `--summary_top_n` | `40` | Maximum rows in the summary ARG heatmap |
-| `--summary_taxa_per_sample` | `10` | The taxonomy heatmaps show the union of each sample's N most abundant taxa (no row cap) |
+| `--summary_taxa_per_sample` | `5` | The taxonomy heatmaps show the union of each sample's N most abundant taxa (no row cap), grouped by phylum, A-Z within |
 | `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure and counted in the report header |
 | `--rgi_summary_min_coverage` | `80` | An RGI gene counts when reads cover at least this % of its best reference sequence (summaries only) |
 | `--card_prevalence` | none | WildCARD `card_prevalence.txt` (an RGI WildCARD database has it in `wildcard/`); adds candidate hosts and CARD plasmid association to each ARG call |
@@ -866,7 +866,7 @@ How the summary reports the results:
 - **RGI pathogen of origin.** RGI's k-mer step assigns the gene's reads to species. `rgi_kmer_hosts` lists the top ones and `rgi_host_check` says whether the top host is a watchlist pathogen. WildCARD holds resistance-gene sequences from many species, gut commensals among them, so a tier 1 gene whose reads point to a commensal (poxtA from *Blautia*, vanD-type genes from *Enterocloster*) is flagged as a possible related gene rather than reported as a pathogen's resistance.
 - **Method comparison.** When K-MARVEL and RGI both ran, `arg_method_comparison.tsv`, `arg_method_overlap.tsv`, an UpSet plot and a per-category bar chart show, gene by gene (alleles collapsed), what each method found. A K-MARVEL gene RGI saw below its cutoff is marked `rgi_below_cutoff`, which is partial coverage, not absence. The ARG matrices and figures use one method (`--arg-primary` in the script; K-MARVEL when present); `arg_long.tsv` holds every method's calls.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
-- **Attention list.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples, each linked to its table.
+- **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
 
 The same script summarises several finished results directories (batches) without rerunning any tool; see [Example 13](#example-13-summarise-several-batches).
 
@@ -979,12 +979,11 @@ results/
 │   ├── results_summary.html                    # Self-contained report: figures, sortable tables, methods
 │   ├── results_summary.xlsx                    # Every table, plus a README sheet defining the columns
 │   ├── tables/                                 # samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence,
-│   │                                           # taxonomy_pcoa, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
+│   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
 │   │                                           # arg_presence, arg_drug_class_rpkm, arg_priority_panel, group_arg_detection,
 │   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran)
-│   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, taxonomy_diversity,
-│                                               # taxonomy_pcoa, watchlist, ARG heatmaps, arg_vs_depth, group_timeline,
-│                                               # arg_method_upset, arg_method_by_category (.png/.pdf/.svg)
+│   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
+│                                               # arg_vs_depth, arg_method_upset, arg_method_by_category (.png/.pdf/.svg)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control

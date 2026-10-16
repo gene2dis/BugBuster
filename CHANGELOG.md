@@ -36,9 +36,7 @@ next release is tagged.
     `--summary_watchlist`)
   - Optional `--sample_metadata` with `--summary_group_by` /
     `--summary_order_by`: grouped and ordered figures, per-group ARG
-    detection patterns, a per-group timeline of watchlist taxa and tier 1
-    ARGs (with the RGI k-mer host), Shannon diversity per group and a
-    Bray-Curtis PCoA of the species profiles
+    detection patterns
   - RGI in the summary: `rgi bwt` genes count at `--rgi_summary_min_coverage`
     (default 80) % coverage of their best reference sequence (RGI lists
     every gene with a mapped read), with RGI's k-mer pathogen of origin
@@ -52,13 +50,15 @@ next release is tagged.
   - QC figure marks 10M and 20M clean read pairs (`--summary_depth_marks`)
     next to the low-depth line, and writes the % classified on each bar; the
     report header counts the samples at each mark (`depth_class` column)
-  - Taxonomy heatmaps show each sample's 10 most abundant taxa
+  - Taxonomy heatmaps show each sample's 5 most abundant taxa
     (`--summary_taxa_per_sample`, no row cap; `--summary_top_n` now caps the
-    ARG heatmap only), grouped by phylum; group names sit in their own strip,
-    so they no longer overlap the title or each other
-  - An "Attention" list at the top of the HTML report: tier 1 genes found by
+    ARG heatmap only), grouped by phylum and alphabetical within each; group
+    names sit in their own strip, so they no longer overlap the title or each
+    other
+  - An "Attention" list at the top of the HTML report (tier 1 genes found by
     every method, by one only or with a commensal RGI host, and low-depth
-    samples
+    samples), and a first "Reading this report" section explaining the units,
+    the ARG tiers (from the tier rule file in use) and the ARG methods
   - The watchlist notes name each taxon's source (ESKAPE, WHO Bacterial
     Priority Pathogens List 2024, CDC AR Threats Report 2019), and the
     report's Methods section shows the list

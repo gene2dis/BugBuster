@@ -1080,9 +1080,9 @@
                 },
                 "summary_taxa_per_sample": {
                     "type": "integer",
-                    "default": 10,
+                    "default": 5,
                     "minimum": 1,
-                    "description": "The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap.",
+                    "description": "The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap, grouped by phylum and alphabetical within each phylum.",
                     "fa_icon": "fas fa-th"
                 },
                 "summary_depth_marks": {
