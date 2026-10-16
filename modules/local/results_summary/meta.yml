@@ -90,7 +90,7 @@ output:
       pattern: "tables/*.tsv"
   - figures:
       type: file
-      description: QC read fate, taxonomy heatmaps and bars, watchlist, ARG heatmaps, ARG detection versus depth, and (with grouping and ordering columns) a tier 1 ARG timeline; PNG, PDF and SVG
+      description: QC read fate (with depth marks), species and genus heatmaps, genus bars, watchlist, ARG heatmaps, ARG detection versus depth, and, when K-MARVEL and RGI both ran, the method comparison (UpSet plot and agreement by tier and category); PNG, PDF and SVG
       pattern: "figures/*"
   - versions:
       type: file

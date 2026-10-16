@@ -412,6 +412,12 @@ next release is tagged.
 
 ### Fixed
 
+- **RGI_BWT memory**: `rgi bwt` with WildCARD peaked at 56-58 GB on deep
+  samples (14-125M read pairs), above the 36 GB of its `process_medium`
+  label. Docker does not enforce the limit, so this went unnoticed; under
+  Slurm or an enforcing runtime the task would be killed. It now requests
+  64 GB (doubled on an out-of-memory retry, clamped by `--max_memory`)
+
 - **Report plots readable on large runs**
   - `Box_plot_reads.png`: the y axis had a tick every 5M reads (57
     overlapping labels at 285M); ticks are now chosen automatically
