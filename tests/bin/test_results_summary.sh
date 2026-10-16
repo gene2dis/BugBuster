@@ -182,11 +182,11 @@ assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2"
 PYEOF
 
 check "CARD snps.txt check of variant-model mutations" py - "${REPO_DIR}/bin" <<'PYEOF'
-import sys, importlib.util, tempfile, os
-spec = importlib.util.spec_from_file_location("rs", os.path.join(sys.argv[1], "results_summary.py"))
-rs = importlib.util.module_from_spec(spec)
+import sys, tempfile, os
 sys.dont_write_bytecode = True
-spec.loader.exec_module(rs)
+sys.path.insert(0, sys.argv[1])
+import summary_args as rs
+from summary_common import strip_gtdb
 d = tempfile.mkdtemp()
 with open(os.path.join(d, "snps.txt"), "w") as fh:
     fh.write("Accession\tName\tModel Type\tParameter Type\tMutations\tCARD Short Name\tsource\tcitation\n")
@@ -205,7 +205,7 @@ assert rs.gene_name("OXA-181", "OXA-48-like beta-lactamase") == "OXA-48-like"
 assert rs.gene_name("MCR-9.1", "MCR phosphoethanolamine transferase") == "MCR-9"
 assert rs.gene_name("QnrB19", "quinolone resistance protein (qnr)") == "QnrB"
 assert rs.gene_name("tet(Q)", "tetracycline-resistant ribosomal protection protein") == "tet(Q)"
-assert rs.strip_gtdb("Enterococcus_B faecium") == "Enterococcus faecium"
+assert strip_gtdb("Enterococcus_B faecium") == "Enterococcus faecium"
 PYEOF
 
 echo
