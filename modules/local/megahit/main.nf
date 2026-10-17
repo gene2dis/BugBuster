@@ -49,6 +49,12 @@ process MEGAHIT {
         error "MEGAHIT: No read files provided for sample ${meta.id}"
     }
     
+    // MEGAHIT runs through bin/megahit_run.sh: -m from the task memory (MEGAHIT
+    // otherwise sizes its graph build to the host's RAM, and the container
+    // kills it at the task limit), and out of memory exits 137 so the task is
+    // retried with more memory
+    def mem_bytes = task.memory ? task.memory.toBytes() : '-'
+
     // Determine if this is coassembly mode based on meta.id
     def is_coassembly = (meta.id == 'coassembly')
     
@@ -88,7 +94,7 @@ process MEGAHIT {
         
         # Run MEGAHIT with appropriate arguments
         if [ -n "\$Singleton_list" ]; then
-            megahit \\
+            megahit_run.sh ${mem_bytes} \\
                 -1 \$R1_list \\
                 -2 \$R2_list \\
                 --read \$Singleton_list \\
@@ -96,7 +102,7 @@ process MEGAHIT {
                 ${args} \\
                 -o ${prefix}_assembly
         else
-            megahit \\
+            megahit_run.sh ${mem_bytes} \\
                 -1 \$R1_list \\
                 -2 \$R2_list \\
                 -t ${task.cpus} \\
@@ -138,7 +144,7 @@ process MEGAHIT {
         # Check for singleton reads
         if [ ${reads.size()} -gt 2 ]; then
             SINGLETON=${reads[2]}
-            megahit \\
+            megahit_run.sh ${mem_bytes} \\
                 -1 \$R1 \\
                 -2 \$R2 \\
                 --read \$SINGLETON \\
@@ -146,7 +152,7 @@ process MEGAHIT {
                 ${args} \\
                 -o ${prefix}_assembly
         else
-            megahit \\
+            megahit_run.sh ${mem_bytes} \\
                 -1 \$R1 \\
                 -2 \$R2 \\
                 -t ${task.cpus} \\

@@ -85,7 +85,11 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   capped by it, and on a local machine it is also the memory pool Nextflow
   schedules from, so it decides what runs, not the table above. Decontamination
   and MEGAHIT request 72 GB each on the first attempt (`process_high`), although
-  decontamination peaked at ~16 GB.
+  decontamination peaked at ~16 GB. A deep co-assembly needs more: three
+  samples with 404M clean reads in total needed ~86 GB at k=21, so MEGAHIT ran
+  out of memory and is retried with 144 GB. To skip the failed attempt on
+  deep co-assemblies, raise the request in a `-c` config file (see
+  [Out of memory](troubleshooting.md#out-of-memory)).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
   every fresh run unless you pass the published index

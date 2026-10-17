@@ -412,6 +412,16 @@ next release is tagged.
 
 ### Fixed
 
+- **MEGAHIT out of memory on a large host**: MEGAHIT was run without `-m`, so
+  it sized its graph build to 90% of the host's RAM instead of the task's
+  memory, and the container killed it at the task limit (a 404M-read
+  co-assembly needed ~86 GB at k=21 against the 72 GB first attempt). Its
+  exit status, 247, was not in the retry list, so the run stopped instead of
+  retrying with more memory. MEGAHIT now runs through `bin/megahit_run.sh`:
+  `-m` is 90% of the task memory (a `-m` in `ext.args` still wins), and
+  running out of memory exits 137, so the task is retried with twice the
+  memory
+
 - **kraken2 classified-reads plot at low classification**: `taxonomy_report.py`
   guessed percent vs fraction from the values, so a kraken2 run where every
   sample was at most 1% classified was drawn as up to 100%; it now goes by

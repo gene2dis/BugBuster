@@ -159,6 +159,14 @@ exitCode: 137
 
 3. Use a larger instance type (cloud) or node (HPC)
 
+A process that runs out of memory is retried twice with more memory each time
+(exit statuses 130-145 and 104). MEGAHIT reports running out of memory as 137
+too (`bin/megahit_run.sh`), and its graph build is held to 90% of the task
+memory. MEGAHIT takes the minimum a step needs even above that budget, so a
+deep co-assembly can still need a larger request: its log
+(`<work dir>/coassembly_assembly/log`) gives each step's "Minimum memory
+required" in bytes.
+
 The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
 on a real co-assembly; it requests 96 GB on the first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
 see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step are
