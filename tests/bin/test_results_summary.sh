@@ -328,6 +328,14 @@ assert tier("poxtA", "Miscellaneous ABC-F subfamily ATP-binding cassette ribosom
 assert tier("vanG", "glycopeptide resistance gene cluster;Van ligase") == 3
 for ligase in ("vanA", "vanB", "vanD"):
     assert tier(ligase, "glycopeptide resistance gene cluster;Van ligase") == 1, ligase
+# chromosomal genes of Actinomycetota are tier 3: RbpA, and the vanO cluster (Rhodococcus); vanR of other
+# clusters stays an accessory gene (tier 2)
+assert tier("RbpA", "RbpA bacterial RNA polymerase-binding protein", "antibiotic target protection") == 3
+assert tier("vanO", "Van ligase;glycopeptide resistance gene cluster") == 3
+assert tier("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;vanR") == 3
+assert tier("vanR gene in vanA cluster", "glycopeptide resistance gene cluster;vanR") == 2
+assert rs.gene_name("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;vanR") \
+    == "vanR gene in vanO cluster"
 # heatmap rows: grouped by phylum (largest first), alphabetical within each phylum, GTDB suffixes ignored
 tax = pd.DataFrame({"Phylum": ["Bacillota", "Bacillota", "Bacillota", "Bacteroidota"],
                     "Species": ["Zeta b", "alpha_A c", "Beta d", "Aaa e"]}, index=["g1", "g2", "g3", "g4"])

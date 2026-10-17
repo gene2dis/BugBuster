@@ -12,7 +12,8 @@
 # Tiers: 1 = clinical priority (last-line resistance, usually mobile), 2 = other acquired, 3 = intrinsic,
 # housekeeping, efflux or regulator, 4 = mutation dependent.
 match	pattern	tier	category	note
-name	^vanC|in vanC cluster|^vanG$|^vanT gene in vanG|in vanG cluster	3	intrinsic_glycopeptide	vanC/vanG clusters: low-level glycopeptide resistance, intrinsic in E. gallinarum/casseliflavus; the vanG ligase is common on the chromosome of gut Clostridia
+name	^vanC|in vanC cluster|^vanG$|^vanT gene in vanG|in vanG cluster|^vanO$|in vanO cluster	3	intrinsic_glycopeptide	vanC/vanG/vanO clusters: low-level glycopeptide resistance, intrinsic in E. gallinarum/casseliflavus; the vanG ligase is common on the chromosome of gut Clostridia, the vanO cluster on the chromosome of Rhodococcus (Actinomycetota)
+name	^RbpA$	3	intrinsic_rifamycin	RNA polymerase-binding protein of Actinomycetota (Streptomyces, Mycobacterium): chromosomal, low-level rifampin tolerance
 name	^van[ABDELMN]$	1	glycopeptide_VRE	Van ligase; vanB-type ligases also occur in gut anaerobes (Clostridia), so check the candidate hosts
 name	gene in van[A-Z] cluster	2	glycopeptide_cluster_accessory	accessory gene of a van operon; resistance needs the ligase
 name	^mec[IR]	3	regulator	mec regulator; resistance needs mecA/mecC
