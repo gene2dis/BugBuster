@@ -3,7 +3,7 @@
 import numpy as np
 import pandas as pd
 
-from summary_common import ACCESSION, die, norm_taxon
+from summary_common import ACCESSION, NA_LOW_DEPTH, die, norm_taxon
 
 
 def load_taxonomy(root):
@@ -127,12 +127,17 @@ def genus_rank(tx):
     return tx["ranks"][-2] if len(tx["ranks"]) > 1 else tx["ranks"][-1]
 
 
-def prevalence_table(wide, samples, group_by):
+def prevalence_table(wide, samples, group_by, low=()):
+    """Per species: detections and abundance. A low-depth sample counts only where the species is detected:
+    elsewhere its absence is unknown, so it is left out of the denominator and of the mean."""
     present = wide > 0
+    low_cols = pd.Series([c in set(low) for c in wide.columns], index=wide.columns)
+    evaluable = present | ~low_cols.values[None, :]
     out = pd.DataFrame({
         "n_samples_detected": present.sum(axis=1),
-        "pct_samples_detected": present.mean(axis=1) * 100,
-        "mean_abundance": wide.mean(axis=1),
+        "n_samples_evaluable": evaluable.sum(axis=1),
+        "pct_samples_detected": present.sum(axis=1) / evaluable.sum(axis=1).replace(0, np.nan) * 100,
+        "mean_abundance": wide.where(evaluable).mean(axis=1),
         "median_abundance_when_detected": wide.where(present).median(axis=1),
         "max_abundance": wide.max(axis=1),
     })
@@ -141,6 +146,15 @@ def prevalence_table(wide, samples, group_by):
         out.insert(2, f"n_{group_by}_detected", present.T.groupby(groups.values).any().sum(axis=0))
     out = out[out["n_samples_detected"] > 0].sort_values(["n_samples_detected", "mean_abundance"],
                                                           ascending=False)
+    return out
+
+
+def mark_low_depth(wide, low, sample_cols):
+    """Copy of a wide table with 0 -> NA_low_depth in the low-depth sample columns (absence there is unknown)."""
+    out = wide.copy()
+    for s in sample_cols:
+        if s in low and s in out.columns:
+            out[s] = out[s].astype(object).where(out[s] != 0, NA_LOW_DEPTH)
     return out
 
 

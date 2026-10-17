@@ -160,8 +160,31 @@ def load_rules(path):
     return compiled
 
 
-def gene_name(aro, family):
-    """Collapse allele numbers, which are unstable in read-level calls (KPC-2 -> KPC)."""
+def gene_name(aro, family, families=None):
+    """Collapse allele numbers, which are unstable in read-level calls (KPC-2 -> KPC). families ({ARO name:
+    gene family}) keeps an ARO's own name when the collapsed name is another gene: CRP-1 (a CRP beta-lactamase)
+    must not become CRP (an RND efflux regulator)."""
+    gene = _collapse(aro, family)
+    if families and gene != aro and gene in families and norm_list(families[gene]) != norm_list(family):
+        return aro
+    return gene
+
+
+def card_families(kmarvel_db, *frames):
+    """{ARO name: AMR gene family} from the CARD metadata of the K-MARVEL database (every ARO) and the calls."""
+    out = {}
+    if kmarvel_db and (Path(kmarvel_db) / "metadata.tsv").exists():
+        meta = pd.read_csv(Path(kmarvel_db) / "metadata.tsv", sep="\t", dtype=str, keep_default_na=False)
+        if {"ARO Name", "AMR Gene Family"} <= set(meta.columns):
+            out.update(zip(meta["ARO Name"], meta["AMR Gene Family"]))
+    for df, name_col, fam_col in frames:
+        if df is not None and not df.empty:
+            for n, f in zip(df[name_col], df[fam_col]):
+                out.setdefault(n, f)
+    return out
+
+
+def _collapse(aro, family):
     if aro.startswith("OXA-"):
         m = re.search(r"(OXA-\d+-like)", family)
         return m.group(1) if m else aro
@@ -178,6 +201,11 @@ def gene_name(aro, family):
     if m:
         return m.group(1)
     return aro
+
+
+def norm_list(text):
+    """CARD ';'-separated lists without the spaces some tools add ("a; b" -> "a;b")."""
+    return ";".join(p.strip() for p in str(text or "").split(";") if p.strip())
 
 
 def snp_status(aro_id, mutation_data, snps):
@@ -214,10 +242,12 @@ def assign_tier(row, rules, snps):
     return 2, "acquired_unreviewed", "no tier rule matched; review and add a rule to the tier table"
 
 
-def annotate_args(arg, samples, rules, snps, prevalence, species_by_sample):
+def annotate_args(arg, samples, rules, snps, prevalence, species_by_sample, families=None):
     if arg.empty:
         return arg
     arg = arg.copy()
+    for col in ("gene_family", "drug_class"):
+        arg[col] = arg[col].map(norm_list)
     for col in ("identity", "assembly_coverage", "supporting_reads", "median_kmer_depth"):
         arg[col] = pd.to_numeric(arg[col], errors="coerce")
     arg["gene_length_nt"] = arg["reference_sequence"].str.replace(r"[^A-Za-z]", "", regex=True).str.len() * 3
@@ -227,7 +257,7 @@ def annotate_args(arg, samples, rules, snps, prevalence, species_by_sample):
     arg["rpkm"] = arg["rpm"] / (arg["gene_length_nt"] / 1000)
     tiers = arg.apply(lambda r: assign_tier(r, rules, snps), axis=1, result_type="expand")
     arg["tier"], arg["category"], arg["tier_note"] = tiers[0].astype(int), tiers[1], tiers[2]
-    arg["gene"] = [gene_name(a, f) for a, f in zip(arg["aro_full_name"], arg["gene_family"])]
+    arg["gene"] = [gene_name(a, f, families) for a, f in zip(arg["aro_full_name"], arg["gene_family"])]
     status = [
         snp_status(a, m, snps) if t == 4 else ("", "")
         for a, m, t in zip(arg["aro_id"], arg["mutation_data"], arg["tier"])
@@ -291,7 +321,8 @@ def host_check(hosts, is_watch, has_kmer):
     return "genus_level_host" if len(top.split(" ")) == 1 else "non_watchlist_host"
 
 
-def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by_sample, watch, min_coverage):
+def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by_sample, watch, min_coverage,
+                 snps=None, families=None):
     """RGI bwt alleles -> one row per sample x ARO in the arg_long layout, plus RGI columns.
 
     coverage (assembly_coverage) = Percent Coverage of the ARO's best-covered reference sequence;
@@ -315,7 +346,7 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     arg = pd.DataFrame({
         "sample": best["sample"], "method": "rgi",
         "aro_id": "ARO:" + best["ARO Accession"], "aro_full_name": best["ARO Term"],
-        "gene_family": best["AMR Gene Family"], "drug_class": best["Drug Class"],
+        "gene_family": best["AMR Gene Family"].map(norm_list), "drug_class": best["Drug Class"].map(norm_list),
         "resistance_mechanism": best["Resistance Mechanism"], "model": best["Reference Model Type"],
         "identity": np.nan, "assembly_coverage": best["cov"], "supporting_reads": best["reads"] / 2,
         "median_kmer_depth": np.nan, "gene_length_nt": best["length"],
@@ -326,9 +357,10 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     clean = arg["sample"].map(samples["clean_pairs"]) if "clean_pairs" in samples else np.nan
     arg["rpm"] = arg["supporting_reads"] / clean * 1e6
     arg["rpkm"] = arg["rpm"] / (arg["gene_length_nt"] / 1000)
-    tiers = arg.apply(lambda r: assign_tier(r, rules, None), axis=1, result_type="expand")
+    # the same tier input as K-MARVEL (CARD snps.txt when given), so a gene gets one tier from both methods
+    tiers = arg.apply(lambda r: assign_tier(r, rules, snps), axis=1, result_type="expand")
     arg["tier"], arg["category"], arg["tier_note"] = tiers[0].astype(int), tiers[1], tiers[2]
-    arg["gene"] = [gene_name(n, f) for n, f in zip(arg["aro_full_name"], arg["gene_family"])]
+    arg["gene"] = [gene_name(n, f, families) for n, f in zip(arg["aro_full_name"], arg["gene_family"])]
     arg["resistance_snp_status"] = np.where(arg["tier"] == 4, "not_checked_rgi", "")
     arg["resistance_snps_found"] = ""
     arg["kmer_blast_discordant"] = ""
@@ -365,6 +397,36 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     arg["rgi_kmer_hosts"], arg["rgi_host_check"] = hosts_txt, checks
     add_candidate_hosts(arg, prevalence, species_by_sample)
     return arg
+
+
+def unify_gene_tiers(frames, order):
+    """One tier per gene across the ARG methods, in place: a gene takes its tier, category and note from the
+    first method in `order` that has it (its lowest-tier row). Returns the genes whose tiers differed."""
+    ref = {}
+    for m in order:
+        d = frames.get(m)
+        if d is None or d.empty:
+            continue
+        best = d.sort_values("tier", kind="stable").drop_duplicates("gene")
+        for g, t, c, n in zip(best["gene"], best["tier"], best["category"], best["tier_note"]):
+            ref.setdefault(g, (t, c, n))
+    conflicts = set()
+    for m in order:
+        d = frames.get(m)
+        if d is None or d.empty:
+            continue
+        want = d["gene"].map(ref)
+        tier = want.map(lambda x: x[0])
+        differs = tier != d["tier"]
+        conflicts |= set(d.loc[differs, "gene"])
+        d["tier"] = tier.astype(int)
+        d["category"] = want.map(lambda x: x[1])
+        d["tier_note"] = want.map(lambda x: x[2])
+        if m == "rgi" and "resistance_snp_status" in d:
+            d["resistance_snp_status"] = np.where(d["tier"] == 4, "not_checked_rgi", "")
+        elif "resistance_snp_status" in d:
+            d.loc[(d["tier"] != 4), ["resistance_snp_status", "resistance_snps_found"]] = ""
+    return sorted(conflicts)
 
 
 def arg_status(samples, order, ran):

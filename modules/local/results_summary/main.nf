@@ -21,12 +21,16 @@ process RESULTS_SUMMARY {
     path(card_prevalence)                           // optional WildCARD card_prevalence.txt; []
     path(arg_priority)                              // ARG tier rule table
     path(watchlist)                                 // watchlist taxa
+    path(stage_reports, stageAs: 'in_reports/*')   // run-level tables of other stages, by file name (see the case below); []
 
     output:
     path("results_summary.html"), emit: html
     path("results_summary.xlsx"), emit: xlsx, optional: true
     path("tables/*.tsv")        , emit: tables
     path("figures/*")           , emit: figures, optional: true
+    path("README.md")           , emit: readme
+    path("README.docx")         , emit: readme_docx
+    path("LLM_GUIDE.md")        , emit: llm_guide
     path "versions.yml"         , emit: versions
 
     when:
@@ -83,6 +87,25 @@ process RESULTS_SUMMARY {
     for f in in_versions/*; do
         [ -e "\$f" ] && ln -s "\$PWD/\$f" ${run_dir}/pipeline_info/software_versions.yml
     done
+    # run-level tables of the other stages, laid out at their published paths by file name; a new stage
+    # adds one case here and one mix() into ch_summary_reports in main.nf
+    for f in in_reports/*; do
+        [ -e "\$f" ] || continue
+        name=\$(basename "\$f")
+        case "\$name" in
+            KARGA_norm.csv|KARGVA_norm.csv)
+                dest=${run_dir}/05_arg_prediction/read_level/summary ;;
+            read_function_abundance.tsv|read_annotated_fraction.tsv|read_sample_summary.tsv)
+                dest=${run_dir}/07_functional_annotation/summary ;;
+            *.ags.tsv)
+                dest=${run_dir}/07_functional_annotation/microbecensus/\${name%.ags.tsv} ;;
+            *)
+                echo "WARNING: RESULTS_SUMMARY does not read \$name; skipped" >&2
+                continue ;;
+        esac
+        mkdir -p "\$dest"
+        ln -s "\$PWD/\$f" "\$dest/"
+    done
 
     results_summary.py \\
         --results ${run_dir} \\
@@ -108,6 +131,7 @@ process RESULTS_SUMMARY {
     """
     mkdir -p tables figures
     touch results_summary.html results_summary.xlsx tables/samples_qc.tsv figures/qc_read_fate.png
+    touch README.md README.docx LLM_GUIDE.md
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

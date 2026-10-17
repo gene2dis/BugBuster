@@ -16,6 +16,14 @@
 #     counts; an RGI-only directory makes RGI the primary ARG method
 #   - depth classes, --taxa-per-sample, heatmap rows by phylum then A-Z
 #   - HTML is self-contained (no external URLs)
+#   - KARGA / KARGVA (tests/data/summary/arg_norm/): filtered genes, the deepest
+#     allele per MEGARes group, copies per cell, low-depth cells
+#   - read functional and MicrobeCensus (tests/data/summary/functional/): CPGE
+#     tables against the source, COG names, NA_no_ags without MicrobeCensus
+#   - README.md / README.docx (well-formed WordprocessingML) / LLM_GUIDE.md, the
+#     stages read from an invalid software_versions.yml, "ran, no table found"
+#   - every emitted column documented; taxonomy NA_low_depth and prevalence
+#     denominator; one tier per gene across methods; CRP-1 keeps its name
 #
 # Python runs inside the image pinned in modules/local/results_summary/main.nf
 # (docker; set RS_TEST_HOST=1 to use the host python3 instead).
@@ -84,6 +92,28 @@ make_results() {
     # the tables hold sampleA only (sampleB has no sylph genome, so a run of
     # sampleB alone has no taxonomy tables)
     case " $* " in *" sampleA "*) cp "${FIX}"/sylph_gtdb_*.tsv "${dir}/02_taxonomy/tables/" ;; esac
+    # run-level KARGA / KARGVA and read functional tables, with this directory's samples only
+    local norm="${dir}/05_arg_prediction/read_level/summary" func="${dir}/07_functional_annotation/summary"
+    mkdir -p "${norm}" "${func}"
+    for t in KARGA_norm KARGVA_norm; do
+        head -1 "${FIX}/arg_norm/${t}.csv" > "${norm}/${t}.csv"
+        for s in "$@"; do grep "^${s}," "${FIX}/arg_norm/${t}.csv" >> "${norm}/${t}.csv" || true; done
+    done
+    for t in read_function_abundance read_annotated_fraction read_sample_summary; do
+        head -1 "${FIX}/functional/${t}.tsv" > "${func}/${t}.tsv"
+        for s in "$@"; do grep "^${s}"$'\t' "${FIX}/functional/${t}.tsv" >> "${func}/${t}.tsv" || true; done
+    done
+    for s in "$@"; do
+        if [ -e "${FIX}/functional/${s}.ags.tsv" ]; then
+            mkdir -p "${dir}/07_functional_annotation/microbecensus/${s}"
+            cp "${FIX}/functional/${s}.ags.tsv" "${dir}/07_functional_annotation/microbecensus/${s}/"
+        fi
+    done
+    # software_versions.yml as published: the KARGVA entry indented with its heredoc terminator left in
+    # (tab-indented module) and RGI's multi-line junk, so it is not valid YAML
+    mkdir -p "${dir}/pipeline_info"
+    printf '       "KARGVA":\n           kargva: 1.0\n       END_VERSIONS\n"KARGA":\n    karga: 1.1\n"KMARVEL":\n    kmarvel: 1.0.0\n"RGI_BWT":\n    rgi:\n\n\nunknown\n    kma:  Invalid option:\t--version\n"QC:FASTP":\n    fastp: 1.0.1\n"READ_FUNCTIONAL:WOLTKA_CLASSIFY":\n    woltka: 0.1.7\n"TAXONOMY:SYLPH_PROFILE":\n    sylph: 1.0.0\n' \
+        > "${dir}/pipeline_info/software_versions.yml"
 }
 
 echo "=== results_summary.py test suite ==="
@@ -137,6 +167,94 @@ grp = pd.read_csv("out/tables/group_arg_detection.tsv", sep="\t")
 assert set(grp["pattern"]) == {"V1:+ V2:NA"}, grp["pattern"]
 PYEOF
 
+check "KARGA / KARGVA tables: filtered genes, deepest allele per group, copies per cell" py - <<'PYEOF'
+import pandas as pd
+kl = pd.read_csv("out/tables/arg_karga_long.tsv", sep="\t")
+# TEM (40% coverage) was filtered by ARG_NORM_REPORT; sampleA ANT9, TETQ, PCOA; sampleB TETQ
+assert sorted(zip(kl["sample"], kl["group"])) == [("sampleA", "ANT9"), ("sampleA", "PCOA"), ("sampleA", "TETQ"),
+                                                   ("sampleB", "TETQ")], kl[["sample", "group"]]
+assert kl["group_representative"].all() and kl.at[0, "megares_id"].startswith("MEG_")
+tet = kl[(kl["sample"] == "sampleA") & (kl["group"] == "TETQ")].iloc[0]
+assert tet["copies_per_cell"] == 0.5 and tet["type"] == "Drugs" and tet["class"] == "Tetracyclines"
+cls = pd.read_csv("out/tables/arg_karga_class_cpc.tsv", sep="\t", index_col=[0, 1])
+assert cls.at[("Drugs", "Tetracyclines"), "sampleA"] == 0.5
+# sampleB is low depth (--min-clean-pairs 10000): its TETQ is kept, a class not found there is unknown
+assert float(cls.at[("Drugs", "Tetracyclines"), "sampleB"]) == 1.0
+assert cls.at[("Metals", "Copper"), "sampleB"] == "NA_low_depth"
+kv = pd.read_csv("out/tables/arg_kargva_long.tsv", sep="\t")
+assert list(kv["sample"]) == ["sampleA"] and kv.at[0, "mutation"] == "S83L" and kv.at[0, "gene"] == "gyrA"
+qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleA", "args_oap_ncell"] == 20 and qc.at["sampleA", "karga_n_groups"] == 3
+assert abs(qc.at["sampleA", "karga_copies_per_cell"] - 0.8) < 1e-9
+assert qc.at["sampleA", "kargva_n_variants"] == 1 and qc.at["sampleB", "kargva_n_variants"] == 0
+PYEOF
+check "KARGA figure written" test -s out/figures/arg_karga_class_heatmap.svg
+
+check "read functional and MicrobeCensus: CPGE tables, COG names, samples_qc columns" py - "${FIX}" <<'PYEOF'
+import sys
+import pandas as pd
+fix = sys.argv[1]
+ko = pd.read_csv("out/tables/function_read_ko.tsv", sep="\t", index_col=0)
+src = pd.read_csv(f"{fix}/functional/read_function_abundance.tsv", sep="\t")
+row = src[(src["sample_id"] == "sampleA") & (src["ontology"] == "ko") & (src["accession"] == "K00001")].iloc[0]
+assert abs(float(ko.at["K00001", "sampleA"]) - row["abundance_cpge"]) < 1e-9
+assert ko.at["K00001", "description"].startswith("E1.1.1.1")
+# sampleB is low depth and has no MicrobeCensus: no CPGE, absence unknown
+assert set(ko["sampleB"]) == {"NA_low_depth"}
+cog = pd.read_csv("out/tables/function_read_cog.tsv", sep="\t", index_col=0)
+assert cog.at["E", "description"] == "Amino acid transport and metabolism"
+long = pd.read_csv("out/tables/function_read_long.tsv", sep="\t")
+assert set(long["sample"]) == {"sampleA", "sampleB"} and "abundance_tpm" not in long
+assert (long.loc[long["ontology"] == "cog", "description"] != "").all()
+qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleA", "mc_genome_equivalents"] == 2.0 and qc.at["sampleA", "mc_avg_genome_size_bp"] == 3e6
+assert qc.at["sampleA", "func_reads_assigned"] == 20 and qc.at["sampleA", "func_fraction_annotated"] == 0.9
+assert pd.isna(qc.at["sampleB", "mc_genome_equivalents"])
+PYEOF
+check "COG figure written" test -s out/figures/function_cog_heatmap.png
+check "--min-clean-pairs 100: a sample without MicrobeCensus is NA_no_ags in the CPGE tables" \
+    py "${SUMMARY}" --results run1/results --outdir lowmin --min-clean-pairs 100 --no-excel
+check "NA_no_ags" py - <<'PYEOF'
+import pandas as pd
+ko = pd.read_csv("lowmin/tables/function_read_ko.tsv", sep="\t", index_col=0)
+assert set(ko["sampleB"]) == {"NA_no_ags"} and pd.to_numeric(ko["sampleA"]).gt(0).any()
+PYEOF
+
+check "README.md, README.docx and LLM_GUIDE.md" py - <<'PYEOF'
+import re, zipfile
+from xml.dom import minidom
+md = open("out/README.md").read()
+for text in ("## What ran", "## Tables", "## Figures", "## Units and missing values", "## ARG reporting tiers",
+             "`tables/arg_karga_long.tsv`", "## Software versions", "KARGA / KARGVA"):
+    assert text in md, text
+# stage table: the fixture's versions file lists KARGA, so KARGA ran; no assembly
+row = next(l for l in md.splitlines() if l.startswith("| Read-level ARGs: KARGA"))
+assert "| ran |" in row, row
+assert re.search(r"\| Assembly \(MEGAHIT\) \| not run \|", md)
+# versions read line by line from the invalid YAML
+assert "| KARGVA | kargva | 1.0 |" in md and "| RGI_BWT | kma | unknown |" in md
+z = zipfile.ZipFile("out/README.docx")
+assert {"[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/numbering.xml"} <= set(z.namelist())
+for name in z.namelist():
+    minidom.parseString(z.read(name))
+doc = z.read("word/document.xml").decode()
+assert 'w:val="Heading2"' in doc and "What ran" in doc and "<w:tbl>" in doc
+guide = open("out/LLM_GUIDE.md").read()
+for text in ("## Run facts", "n_samples: 2", "## Pitfalls", "### arg_karga_long.tsv", "### samples_qc.tsv",
+             "`05_arg_prediction/read_level/summary/KARGA_norm.csv`", "### Binning and MAGs", "## Recipes"):
+    assert text in guide, text
+# every column row of the guide has a meaning
+cols = re.findall(r"^\| `([^`]+)` \| (.*) \|$", guide, flags=re.M)
+assert cols and all(meaning.strip() for _, meaning in cols), [c for c, m in cols if not m.strip()][:5]
+PYEOF
+check "Excel README sheet lists every table written" py - <<'PYEOF'
+import os
+import pandas as pd
+readme = pd.read_excel("out/results_summary.xlsx", sheet_name="README")
+tables = {f[:-4][:31] for f in os.listdir("out/tables")}
+assert set(readme["table"]) == tables, set(readme["table"]) ^ tables
+PYEOF
+
 check "RGI genes at the coverage cutoff, k-mer hosts and the method comparison" py - <<'PYEOF'
 import pandas as pd
 arg = pd.read_csv("out/tables/arg_long.tsv", sep="\t")
@@ -180,6 +298,29 @@ for gone in ("taxonomy_diversity", "taxonomy_pcoa", "group_timeline", "arg_tier1
     assert not os.path.exists(f"out/figures/{gone}.png"), gone
 PYEOF
 check "method comparison figures written" test -s out/figures/arg_method_upset.svg -a -s out/figures/arg_method_by_category.png
+documented() {
+    # documented <outdir> <args...>: a run whose every emitted column is in summary_docs.TABLE_DOCS
+    local out="$1"
+    shift
+    py "${SUMMARY}" --outdir "${out}" --no-excel "$@" > "${out}.log" 2>&1 || return 1
+    ! grep -q "columns without documentation" "${out}.log"
+}
+check "every column documented (metadata, grouping, every method)" \
+    documented docs1 --results run1/results --metadata "${FIX}/metadata.tsv" --group-by subject --order-by visit \
+        --min-clean-pairs 10000
+
+# low depth in the taxonomy tables: sampleA below --min-clean-pairs
+check "--min-clean-pairs 100000 makes sampleA low depth" \
+    py "${SUMMARY}" --results run1/results --outdir lowA --min-clean-pairs 100000 --no-excel
+check "taxonomy: a taxon not found in a low-depth sample is NA_low_depth; prevalence leaves it out" py - <<'PYEOF'
+import pandas as pd
+wl = pd.read_csv("lowA/tables/watchlist.tsv", sep="\t").set_index("taxon")
+assert wl.at["Klebsiella pneumoniae", "sampleA"] == "NA_low_depth", wl.loc["Klebsiella pneumoniae"]
+prev = pd.read_csv("lowA/tables/taxonomy_species_prevalence.tsv", sep="\t")
+assert (prev["n_samples_evaluable"] == prev["n_samples_detected"]).all()
+assert (prev["pct_samples_detected"] == 100).all()
+PYEOF
+
 check "--rgi-min-coverage 20 detects the low-coverage genes" \
     py "${SUMMARY}" --results run1/results --outdir cut20 --min-clean-pairs 10000 --rgi-min-coverage 20 --no-excel
 check "cutoff 20: KPC-3 and CTX-M-15 are RGI calls" py - <<'PYEOF'
@@ -350,7 +491,33 @@ assert rs.host_check({"Klebsiella pneumoniae": 6, "Blautia producta": 5}, is_wat
 # RGI k-mer prediction strings
 assert rs.parse_kmer_prediction("Klebsiella pneumoniae (chromosome or plasmid): 83; Escherichia coli (plasmid): 2; ") \
     == {"Klebsiella pneumoniae": 83, "Escherichia coli": 2}
+# a collapsed allele name that is another CARD gene keeps its own name: CRP-1 (CRP beta-lactamase) is not CRP
+fams = {"CRP": "resistance-nodulation-cell division (RND) antibiotic efflux pump", "CfxA": "CfxA beta-lactamase"}
+assert rs.gene_name("CRP-1", "CRP beta-lactamase", fams) == "CRP-1"
+assert rs.gene_name("CfxA2", "CfxA beta-lactamase", fams) == "CfxA"
+assert rs.gene_name("CRP-1", "CRP beta-lactamase") == "CRP"
+assert rs.norm_list("a; b ;c") == "a;b;c"
+# software_versions.yml read line by line: a tab-indented heredoc's terminator and RGI's junk do not break it
+from summary_common import parse_versions
+v = parse_versions('       "KARGVA":\n           kargva: 1.0\n       END_VERSIONS\n"QC:FASTP":\n    fastp: 1.0.1\n'
+                   '"RGI_BWT":\n    rgi:\n\n\nunknown\n    kma:  Invalid option:\t--version\n')
+assert v == {"KARGVA": {"kargva": "1.0"}, "FASTP": {"fastp": "1.0.1"},
+             "RGI_BWT": {"rgi": "unknown", "kma": "unknown"}}, v
+# one tier per gene across methods: the first method's tier wins
+k = pd.DataFrame({"gene": ["g1"], "tier": [2], "category": ["a"], "tier_note": [""],
+                  "resistance_snp_status": [""], "resistance_snps_found": [""]})
+r = pd.DataFrame({"gene": ["g1"], "tier": [3], "category": ["b"], "tier_note": [""], "resistance_snp_status": [""]})
+assert rs.unify_gene_tiers({"kmarvel": k, "rgi": r}, ["kmarvel", "rgi"]) == ["g1"]
+assert r.at[0, "tier"] == 2 and r.at[0, "category"] == "a"
 PYEOF
+
+# a stage that ran (software_versions.yml) without its table in the results directory is reported
+make_results notable/results sampleA
+rm -r notable/results/05_arg_prediction/read_level/summary
+check "KARGA in software_versions.yml without KARGA_norm.csv" \
+    py "${SUMMARY}" --results notable/results --outdir notab --min-clean-pairs 10000 --no-excel
+check "stage reported as 'ran, no table found'" \
+    grep -q "| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran, no table found |" notab/README.md
 
 echo
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

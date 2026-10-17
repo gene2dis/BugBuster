@@ -29,7 +29,7 @@ process ARG_NORM_REPORT {
 
     stub:
     """
-    touch arg_norm_report.csv
+    touch KARGA_norm.csv KARGVA_norm.csv
     touch versions.yml
     """
 }

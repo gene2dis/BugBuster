@@ -9,83 +9,8 @@ import numpy as np
 import pandas as pd
 
 from summary_common import warn
+from summary_docs import table_doc, tier_categories, TIER_MEANING
 from summary_figures import short_count
-
-
-COLUMN_DOCS = {
-    "samples_qc": [
-        ("sample / batch", "sample name and the results directory it came from"),
-        ("raw_pairs, qc_pass_pairs, clean_pairs", "read pairs before QC, after fastp, after host/contaminant removal "
-                                                  "(Reads_report.csv counts single reads; these are reads / 2)"),
-        ("pct_removed_qc, pct_removed_decontam, pct_clean", "share of raw read pairs removed by fastp, removed by "
-                                                            "host/contaminant filtering, and kept"),
-        ("low_depth", "clean_pairs below --min-clean-pairs; absence calls in this sample are not informative"),
-        ("classified_fraction", "fraction of reads the taxonomic profiler classified (sylph: skewed upward when "
-                                "--sylph_read_seq_id is not set and many reads come from genomes absent from the database)"),
-        ("n_species, shannon", "species detected and Shannon index (natural log) of species relative abundance"),
-        ("arg_status", "ok, NA_low_depth or NA_not_run (K-MARVEL output missing)"),
-        ("n_arg_calls_tier1..4", "K-MARVEL calls per tier (tier 4 = mutation dependent; only rows with "
-                                 "resistance_snp_status card_snp_present carry a known resistance mutation)"),
-        ("acquired_genes, acquired_rpkm", "distinct tier 1-2 genes and their summed RPKM (primary ARG method)"),
-        ("depth_class", "clean read pairs binned at --min-clean-pairs and --depth-marks (e.g. <1M, 1M-10M, >=20M)"),
-        ("n_genes_kmarvel, n_genes_rgi, n_genes_all_methods", "distinct genes per read-level ARG method and found "
-                                                              "by all of them (when more than one ran)"),
-    ],
-    "taxonomy_long": [
-        ("relative_abundance", "% of the profiled (classified) community; sylph: taxonomic abundance"),
-        ("est_read_pairs", "read pairs assigned to the taxon (sylph: sequence_abundance / 100 x clean read pairs)"),
-        ("sequence_abundance", "sylph: % of all reads, unclassified included"),
-        ("adjusted_ani, ani_5_95, true_cov, eff_lambda", "sylph containment ANI, its 5-95% interval (low coverage), "
-                                                         "estimated coverage and effective lambda"),
-        ("species_call_uncertain", "the lower bound of sylph's ANI interval is below 95%: the genome present may be "
-                                   "a different species of the same genus"),
-    ],
-    "arg_long": [
-        ("tier, category, tier_note", "reporting tier from the tier table (1 clinical priority, 2 other acquired, "
-                                      "3 intrinsic/efflux/regulator, 4 mutation dependent)"),
-        ("gene", "allele numbers collapsed (KPC-2 -> KPC; OXA alleles -> their CARD OXA subgroup)"),
-        ("supporting_reads", "K-MARVEL supporting read pairs"),
-        ("gene_length_nt", "CARD reference protein length x 3"),
-        ("rpm, rpkm", "read pairs per million clean read pairs; RPM per kb of reference gene"),
-        ("resistance_snp_status", "tier 4: card_snp_present (a CARD snps.txt resistance mutation is among "
-                                  "K-MARVEL's mutation_data), no_card_snp, no_snp_definition, not_checked (no "
-                                  "--kmarvel-db). CARD lists some common polymorphisms (E. coli MarR Y137H), so "
-                                  "card_snp_present is necessary, not sufficient, evidence of resistance"),
-        ("gene_representative", "True for the best-supported allele of each gene in a sample; matrices and "
-                                "figures use these rows only, because alleles of one gene share their reads"),
-        ("method", "kmarvel or rgi; every method's calls are listed, the matrices use the primary method only"),
-        ("assembly_coverage", "K-MARVEL: coverage of the assembled gene; RGI: % of the ARO's best-covered reference "
-                              "sequence covered by reads"),
-        ("gene_rpkm", "RPKM of the gene in the sample, on its gene_representative row (K-MARVEL: the best-supported "
-                      "allele; RGI: summed over the gene's AROs)"),
-        ("rgi_mapped_reads, rgi_best_ref", "RGI: mapped reads (mates counted separately) and the source of the best "
-                                           "reference sequence (CARD, or WildCARD and the species it came from)"),
-        ("rgi_gene_coverage", "RGI: best coverage of any ARO of the gene"),
-        ("rgi_kmer_hosts, rgi_host_check", "RGI k-mer pathogen of origin (top hosts, reads) and whether the top host "
-                                           "is a watchlist taxon (watchlist_host, non_watchlist_host, "
-                                           "genus_level_host, no_kmer_host, no_kmer_data)"),
-        ("kmer_blast_discordant", "K-MARVEL's k-mer assignment and its BLAST best hit name different AROs"),
-        ("card_plasmid_associated", "CARD prevalence lists this ARO on NCBI plasmids"),
-        ("candidate_hosts", "species detected in the same sample that CARD prevalence lists as carriers of this "
-                            "ARO, with their abundance. Co-occurrence only: reads are not linked to a host"),
-    ],
-    "arg matrices": [
-        ("arg_gene_rpkm / arg_family_rpkm", "RPKM of the gene's best-supported allele / summed over a CARD family's "
-                                            "genes; 0 = not detected in a sample of "
-                                            "adequate depth; NA_low_depth / NA_not_run = unknown"),
-        ("arg_presence", "1 detected, 0 not detected, NA_low_depth / NA_not_run unknown"),
-        ("arg_drug_class_rpkm", "RPKM per drug class, split into acquired (tiers 1-2), intrinsic/efflux (tier 3) "
-                                "and tier 4 calls with a CARD resistance mutation; a multi-class gene counts in "
-                                "each class"),
-        ("arg_priority_panel", "tier 1 genes only"),
-        ("arg_method_comparison", "per sample and gene (alleles collapsed): detected by each method, read pairs, RGI "
-                                  "coverage, rgi_below_cutoff (RGI reads with partial coverage), RGI hosts"),
-        ("arg_method_overlap", "distinct genes, and sample x gene detections, found by every method or by one only, "
-                               "overall, per tier and per category"),
-        ("group_arg_detection", "per group and tier 1-2 gene: detections, evaluable samples and the detection "
-                                "pattern in --order-by order (+ detected, - not detected, NA unknown)"),
-    ],
-}
 
 
 def write_tables(outdir, tables):
@@ -95,7 +20,7 @@ def write_tables(outdir, tables):
         df.to_csv(tdir / f"{name}.tsv", sep="\t", index=index)
 
 
-def write_excel(outdir, tables):
+def write_excel(outdir, tables, group_by=None, units=None):
     engine = None
     for mod in ("openpyxl", "xlsxwriter"):
         try:
@@ -108,10 +33,17 @@ def write_excel(outdir, tables):
         warn("neither openpyxl nor xlsxwriter is installed: no Excel workbook written")
         return None
     path = outdir / "results_summary.xlsx"
+    # README sheet: every table written, its description, then its documented columns
     readme = []
-    for section, cols in COLUMN_DOCS.items():
-        for col, desc in cols:
-            readme.append({"table": section, "column": col, "description": desc})
+    for name in tables:
+        doc = table_doc(name, group_by)
+        if doc is None:
+            continue
+        unit = (units or {}).get(name)
+        readme.append({"table": name[:31], "column": "", "description": doc["title"] + (f" ({unit})" if unit else "")
+                       + ": " + doc["description"]})
+        for col, desc in doc["columns"]:
+            readme.append({"table": name[:31], "column": col, "description": desc})
     with pd.ExcelWriter(path, engine=engine) as xw:
         pd.DataFrame(readme).to_excel(xw, sheet_name="README", index=False)
         for name, (df, index) in tables.items():
@@ -231,35 +163,6 @@ document.querySelectorAll('input.filter').forEach(function(inp){
 """
 
 
-TIER_MEANING = {
-    1: ("Clinical priority", "last-line or highly transmissible resistance, usually on mobile elements"),
-    2: ("Other acquired", "acquired genes of common resistance (ESBL, AmpC, aminoglycoside-modifying enzymes, "
-                          "tetracycline, macrolide, sulfonamide/trimethoprim genes, ...)"),
-    3: ("Intrinsic, efflux or regulator", "chromosomal or housekeeping genes that most strains of a species carry; "
-                                          "they say little about acquired resistance"),
-    4: ("Mutation dependent", "genes that confer resistance only with a specific mutation (gyrA, parC, rpoB, ...)"),
-}
-
-
-def tier_categories(rules_path):
-    """{tier: ['category (note)', ...]} from the tier rule file, in rule order, plus the built-in rules."""
-    out = {1: [], 2: [], 3: [], 4: ["mutation_dependent (CARD variant models and AROs with CARD SNP definitions)"]}
-    try:
-        rules = pd.read_csv(rules_path, sep="\t", comment="#", dtype=str, keep_default_na=False)
-    except (OSError, ValueError):
-        rules = pd.DataFrame(columns=["tier", "category", "note"])
-    seen = set()
-    for tier, cat, note in zip(rules.get("tier", []), rules.get("category", []), rules.get("note", [])):
-        key = (int(tier), cat)
-        if key in seen:
-            continue
-        seen.add(key)
-        out.setdefault(int(tier), []).append(f"{cat} ({note})" if note else cat)
-    out[3].append("efflux_permeability (efflux pumps, porins and overexpression models without a rule)")
-    out[2].append("acquired_unreviewed (no rule matched)")
-    return out
-
-
 def reading_guide(ctx):
     """The 'Reading this report' section: units, ARG tiers and the read-level ARG methods."""
     s = ctx["summary"]
@@ -287,6 +190,11 @@ def reading_guide(ctx):
                  "(<i>rgi_kmer_hosts</i>). <i>rgi_host_check</i> says whether the top species is a watchlist pathogen; "
                  "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point to a "
                  "commensal may be a related gene, not the clinical one.</li>")
+    if ctx.get("karga"):
+        m.append("<li><b>KARGA / KARGVA</b> find MEGARes resistance genes and variants from read k-mers. ARG_NORM_REPORT "
+                 "keeps genes with at least 90% k-mer coverage and divides their k-mer depth by the ARGs-OAP cell "
+                 "estimate: <i>copies per cell</i>. MEGARes names its genes differently from CARD, so KARGA is "
+                 "reported in its own section, not compared gene by gene, and has no tiers.</li>")
     method_html = ""
     if m:
         primary = s.get("arg_primary", "")
@@ -295,9 +203,13 @@ def reading_guide(ctx):
                        + ("; the other method's calls are in arg_long.tsv and in the method comparison section."
                           if len(methods) > 1 else ".") + "</p>")
     units = ("<h3>Units</h3><ul><li>Counts are read pairs (Reads_report.csv counts single reads).</li>"
-             "<li>ARG abundance is RPKM: read pairs per kb of reference gene per million clean read pairs, comparable "
-             "between samples of different depth.</li>"
-             f"<li>Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
+             "<li>K-MARVEL / RGI ARG abundance is RPKM: read pairs per kb of reference gene per million clean read "
+             "pairs, comparable between samples of different depth.</li>"
+             + ("<li>KARGA / KARGVA abundance is copies per cell (k-mer depth / ARGs-OAP cells), a different unit: do "
+                "not add it to RPKM.</li>" if ctx.get("karga") else "")
+             + ("<li>The functional profile is in copies per genome equivalent (CPGE: reads per kb / MicrobeCensus "
+                "genome equivalents).</li>" if (ctx.get("functional") or {}).get("unit") == "cpge" else "")
+             + f"<li>Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
              "found there is reported as NA_low_depth (unknown), not as absent.</li></ul>")
     return units + (tiers if s.get("n_tier1") is not None else "") + method_html
 
@@ -322,7 +234,7 @@ def write_html(outdir, title, ctx):
         cards.append((n, f"samples with >={short_count(mark)} clean pairs"))
     if s.get("n_tier1") is not None:
         cards += [(s["n_tier1"], f"samples with a tier 1 ARG ({s.get('arg_primary', '')})", s["n_tier1"] > 0),
-                  (s["n_tier1_genes"], "distinct tier 1 genes")]
+                  (s["n_tier1_genes"], f"distinct tier 1 genes ({s.get('arg_primary', '')})")]
     if s.get("n_tier1_genes_all_methods") is not None:
         cards.append((s["n_tier1_genes_all_methods"], "tier 1 genes found by every ARG method"))
     if s.get("n_species") is not None:
@@ -384,11 +296,18 @@ def write_html(outdir, title, ctx):
                  "sequence (RGI itself reports every gene with a mapped read).</p>")
         body = (intro + figure("arg_priority_heatmap") + figure("arg_drug_class_heatmap")
                 + figure("arg_vs_depth"))
-        if ctx.get("tier1_view") is not None:
-            body += ("<h3>Tier 1 (clinical priority) calls</h3><p class='muted'>rgi_host_check: watchlist_host = RGI's "
-                     "k-mer pathogen-of-origin call is a watchlist pathogen; non_watchlist_host = another species "
-                     "(often a related gene of a commensal); genus_level_host = the reads only resolve a genus.</p>"
-                     + df_to_html(ctx["tier1_view"], table_id="t_t1"))
+        t1 = ctx.get("tier1_view")
+        body += "<h3>Tier 1 (clinical priority) calls</h3>"
+        if t1 is not None and not t1.empty:
+            body += ("<p class='muted'>rgi_host_check: watchlist_host = RGI's k-mer pathogen-of-origin call is a "
+                     "watchlist pathogen; non_watchlist_host = another species (often a related gene of a commensal); "
+                     "genus_level_host = the reads only resolve a genus.</p>" + df_to_html(t1, table_id="t_t1"))
+        else:
+            other = [m for m in s.get("arg_methods", []) if m != primary]
+            body += (f"<p class='muted'>{html.escape(primary)} found no tier 1 gene"
+                     + (f"; tier 1 genes found only by {html.escape(', '.join(other))} are in the "
+                        "<a href='#compare'>comparison of ARG methods</a> and the Attention list."
+                        if other and ctx.get("comparison") is not None else ".") + "</p>")
         if "group_arg_detection" in t and not t["group_arg_detection"][0].empty:
             g = t["group_arg_detection"][0]
             body += (f"<h3>Detection per {html.escape(ctx['group_by'])} (tier 1)</h3>"
@@ -408,12 +327,46 @@ def write_html(outdir, title, ctx):
                 f"read, so an RGI gene counts when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference "
                 "sequence. 'RGI below cutoff' marks K-MARVEL genes RGI saw with partial coverage, which is not absence."
                 " Tier 4 (mutation-dependent) genes are mostly K-MARVEL calls: RGI bwt reports homolog matches and does "
-                "not test resistance mutations. KARGA, KARGVA and ARGs-OAP use other databases (MEGARes, SARG) and are "
-                "not compared.</p>"
+                "not test resistance mutations. KARGA and KARGVA use MEGARes, whose gene names differ from CARD's: they "
+                "are reported in their own section, not compared here.</p>"
                 + figure("arg_method_upset") + figure("arg_method_by_category")
                 + "<h3>Overlap counts</h3>" + df_to_html(ov, table_id="t_ov")
                 + "<h3>Per sample and gene</h3>" + df_to_html(comp["comp"], max_rows=2000, table_id="t_cmp"))
         section("compare", "Comparison of ARG methods", body)
+    if ctx.get("karga"):
+        k = ctx["karga"]
+        body = (f"<p class='muted'>KARGA genes (MEGARes) with at least 90% k-mer coverage in {k['n_samples']} samples, "
+                f"{k['n_groups']} MEGARes groups; KARGVA resistance variants: {k['n_variants']}. Abundance is copies "
+                "per cell: k-mer depth of each group's deepest allele (alleles share k-mers) over the ARGs-OAP cell "
+                "estimate (samples_qc args_oap_ncell). It is not RPKM and MEGARes classes are not CARD drug classes: "
+                "compare samples within this section only.</p>" + figure("arg_karga_class_heatmap"))
+        if "arg_karga_class_cpc" in t:
+            body += "<h3>Copies per cell by MEGARes class</h3>" + df_to_html(t["arg_karga_class_cpc"][0], index=True,
+                                                                             table_id="t_kcls")
+        if "arg_kargva_long" in t:
+            kv = t["arg_kargva_long"][0]
+            body += ("<h3>KARGVA resistance variants</h3><p class='muted'>Variants with at least 2 SNP k-mers and 80% "
+                     "coverage. A variant from reads may come from a minority strain.</p>"
+                     + df_to_html(kv[[c for c in ("sample", "gene", "mutation", "description", "drug",
+                                                  "percent_covered", "kmer_depth", "copies_per_cell") if c in kv]],
+                                  table_id="t_kv"))
+        section("karga", "KARGA / KARGVA (MEGARes)", body)
+    if ctx.get("functional"):
+        f = ctx["functional"]
+        unit = "copies per genome equivalent (CPGE)" if f["unit"] == "cpge" else f["unit"]
+        body = (f"<p class='muted'>Read-level functional profile from {html.escape(f['backend'])} on "
+                f"{f['n_samples']} samples, ontologies {html.escape(', '.join(f['ontologies']))}, in {html.escape(unit)}. "
+                "An ORF can carry several terms, so the terms of an ontology do not add up to the annotated reads. "
+                "Every ontology is a table (function_read_&lt;ontology&gt;.tsv) and the long table has every value in "
+                "the backend's own unit.</p>" + figure("function_cog_heatmap"))
+        qc = t["samples_qc"][0]
+        fcols = [c for c in ("sample", "func_reads_assigned", "func_fraction_annotated", "mc_avg_genome_size_bp",
+                             "mc_genome_equivalents", "args_oap_ncell") if c in qc.columns]
+        body += "<h3>Per sample</h3>" + df_to_html(qc[fcols], table_id="t_func")
+        if "function_read_ko" in t:
+            body += ("<h3>Most abundant KEGG orthologs (top 50)</h3>"
+                     + df_to_html(t["function_read_ko"][0].head(50), index=True, table_id="t_ko"))
+        section("functional", "Functional profile (read level)", body)
 
     caveats = [
         "All counts are read pairs. Reads_report.csv counts single reads (both mates), so its numbers are twice those here.",
@@ -451,6 +404,17 @@ def write_html(outdir, title, ctx):
                        "row every species of the genus, GTDB suffixes removed.")
     methods = ("<ul class='caveats'>" + "".join(f"<li>{html.escape(c)}</li>" for c in caveats) + "</ul>"
                + "<h3>Inputs</h3><pre>" + html.escape("\n".join(ctx["inputs"])) + "</pre>")
+    if ctx.get("stage_status"):
+        labels = list(ctx["stage_status"])
+        rows = "".join(
+            "<tr><td>" + html.escape(st["title"]) + "</td>"
+            + "".join(f"<td>{html.escape(ctx['stage_status'][b][i][1])}</td>" for b in labels)
+            + f"<td>{html.escape(st['summary'])}</td></tr>"
+            for i, (st, _) in enumerate(ctx["stage_status"][labels[0]]))
+        methods += ("<h3>Pipeline stages</h3><p class='muted'>From each results directory's software_versions.yml; "
+                    "README.md and LLM_GUIDE.md list every stage's files.</p><div class='tablewrap'><table><thead><tr>"
+                    "<th>Stage</th>" + "".join(f"<th>{html.escape(b)}</th>" for b in labels)
+                    + "<th>In this summary</th></tr></thead><tbody>" + rows + "</tbody></table></div>")
     if ctx.get("watchlist") is not None:
         methods += "<h3>Watchlist</h3>" + df_to_html(ctx["watchlist"], table_id="t_wldef")
     if ctx["versions"]:

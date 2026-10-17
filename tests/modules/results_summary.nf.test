@@ -4,7 +4,9 @@
 
     Fixtures: tests/data/summary/ (tests/bin/make_summary_fixtures.sh) and the
     K-MARVEL tables in tests/data/kmarvel/ (sampleA: TEM + CTX-M, sampleB: no
-    ARGs), with the RGI bwt and k-mer tables in tests/data/summary/rgi/. The
+    ARGs), with the RGI bwt and k-mer tables in tests/data/summary/rgi/ and the
+    KARGA/KARGVA, read functional and MicrobeCensus tables in
+    tests/data/summary/{arg_norm,functional}/ (the stage_reports input). The
     module lays the staged files out as a results directory for
     bin/results_summary.py; this checks that layout, the ext.args built from
     the summary params (grouping, ordering, low-depth threshold, batch label,
@@ -55,6 +57,14 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = [
+                    file("\${fix}/arg_norm/KARGA_norm.csv", checkIfExists: true),
+                    file("\${fix}/arg_norm/KARGVA_norm.csv", checkIfExists: true),
+                    file("\${fix}/functional/read_function_abundance.tsv", checkIfExists: true),
+                    file("\${fix}/functional/read_annotated_fraction.tsv", checkIfExists: true),
+                    file("\${fix}/functional/read_sample_summary.tsv", checkIfExists: true),
+                    file("\${fix}/functional/sampleA.ags.tsv", checkIfExists: true)
+                ]
                 """
             }
         }
@@ -97,6 +107,17 @@ nextflow_process {
             // the k-mer table was laid out too: KPC's top host is a watchlist pathogen
             assert byGene["KPC"][ch.indexOf("rgi_host_check")] == "watchlist_host"
             assert process.out.figures.get(0).any { f -> file(f).name == "arg_method_upset.svg" }
+
+            // the stage reports laid out by file name: KARGA/KARGVA, read functional, MicrobeCensus
+            assert tables.keySet().containsAll(["arg_karga_long.tsv", "arg_karga_class_cpc.tsv", "arg_kargva_long.tsv",
+                                                "function_read_long.tsv", "function_read_ko.tsv"])
+            assert rows["sampleA"][header.indexOf("mc_genome_equivalents")] == "2.0"
+            assert rows["sampleA"][header.indexOf("args_oap_ncell")] == "20.0"
+            def readme = path(process.out.readme.get(0)).text
+            assert readme.contains("| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran |")
+            assert readme.contains("`tables/function_read_ko.tsv`")
+            assert path(process.out.llm_guide.get(0)).text.contains("### arg_karga_long.tsv")
+            assert process.out.readme_docx.size() == 1
         }
     }
 
@@ -118,6 +139,7 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = []
                 """
             }
         }
@@ -125,6 +147,7 @@ nextflow_process {
         then {
             assert process.success
             assert process.out.html.size() == 1
+            assert process.out.llm_guide.size() == 1
             assert process.out.versions.size() == 1
         }
     }

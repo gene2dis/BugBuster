@@ -1,5 +1,5 @@
 name: results_summary
-description: Run-level summary of QC, taxonomy and read-level ARG (K-MARVEL, RGI) results (bin/results_summary.py and its summary_*.py modules) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures and a self-contained HTML report. Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. RGI bwt genes count at --rgi_summary_min_coverage % coverage of their best reference sequence and carry RGI's k-mer pathogen of origin; when both K-MARVEL and RGI ran, the two are compared gene by gene (UpSet plot, overlap tables). The same script runs outside the pipeline on several published results directories (batches).
+description: Run-level summary of QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results (bin/results_summary.py and its summary_*.py modules) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md (the results folder and every summary column, for a language model or a script). Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. RGI bwt genes count at --rgi_summary_min_coverage % coverage of their best reference sequence and carry RGI's k-mer pathogen of origin; when both K-MARVEL and RGI ran, the two are compared gene by gene (UpSet plot, overlap tables). The same script runs outside the pipeline on several published results directories (batches).
 keywords:
   - report
   - summary
@@ -74,6 +74,10 @@ input:
       type: file
       description: Watchlist taxa (default assets/summary_watchlist.tsv)
       pattern: "*.tsv"
+  - stage_reports:
+      type: file
+      description: Run-level tables of other stages, laid out at their published paths by file name - ARG_NORM_REPORT's KARGA_norm.csv and KARGVA_norm.csv, AGGREGATE_READ_FUNCTIONS' read_function_abundance.tsv, read_annotated_fraction.tsv and read_sample_summary.tsv, and MicrobeCensus <sample>.ags.tsv; [] when none ran
+      pattern: "{KARGA_norm.csv,KARGVA_norm.csv,read_*.tsv,*.ags.tsv}"
 
 output:
   - html:
@@ -86,12 +90,24 @@ output:
       pattern: "results_summary.xlsx"
   - tables:
       type: file
-      description: samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence, arg_drug_class_rpkm, arg_priority_panel, (with a grouping column) group_arg_detection and (when K-MARVEL and RGI both ran) arg_method_comparison and arg_method_overlap
+      description: samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm, arg_presence, arg_drug_class_rpkm, arg_priority_panel, (with a grouping column) group_arg_detection, (when K-MARVEL and RGI both ran) arg_method_comparison and arg_method_overlap, (KARGA/KARGVA) arg_karga_long, arg_karga_group_cpc, arg_karga_class_cpc, arg_kargva_long, and (read functional) function_read_long and function_read_<ontology>
       pattern: "tables/*.tsv"
   - figures:
       type: file
-      description: QC read fate (with depth marks), species and genus heatmaps, genus bars, watchlist, ARG heatmaps, ARG detection versus depth, and, when K-MARVEL and RGI both ran, the method comparison (UpSet plot and agreement by tier and category); PNG, PDF and SVG
+      description: QC read fate (with depth marks), species and genus heatmaps, genus bars, watchlist, ARG heatmaps, ARG detection versus depth, and, when K-MARVEL and RGI both ran, the method comparison (UpSet plot and agreement by tier and category), KARGA copies per cell by MEGARes class and the COG categories of the read functional profile; PNG, PDF and SVG
       pattern: "figures/*"
+  - readme:
+      type: file
+      description: What the summary holds - stages run per results directory, tables, figures, units, tiers, caveats and software versions
+      pattern: "README.md"
+  - readme_docx:
+      type: file
+      description: README.md as a Word document (written with the Python standard library)
+      pattern: "README.docx"
+  - llm_guide:
+      type: file
+      description: Guide for a language model or a script - run facts (YAML), every pipeline stage's published files with sample identification and units, every summary column, pitfalls and recipes
+      pattern: "LLM_GUIDE.md"
   - versions:
       type: file
       description: Software versions (python, pandas, matplotlib, openpyxl)

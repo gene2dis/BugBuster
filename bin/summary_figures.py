@@ -560,3 +560,31 @@ def fig_method_by_category(fw, comp, methods):
             "Distinct genes per reporting tier and category, split by which methods found them in at least one "
             "sample. Hatched: K-MARVEL calls where RGI had reads below the coverage cutoff (partial coverage, not "
             "absence). Category labels are coloured by tier.")
+
+
+def fig_karga(fw, mat, cols, groups, low, hatch):
+    """KARGA copies per cell per MEGARes class (type in brackets), samples as columns."""
+    if mat is None or mat.empty:
+        return
+    num = mat[cols].apply(pd.to_numeric, errors="coerce")
+    num = num[num.fillna(0).gt(0).any(axis=1)]
+    if num.empty:
+        return
+    num = num.loc[num.max(axis=1).sort_values(ascending=False).index]
+    labels = [f"{cls.replace('_', ' ')}  [{typ}]" for typ, cls in num.index]
+    heatmap(fw, "arg_karga_class_heatmap", "KARGA (MEGARes): resistance gene copies per cell by class",
+            "log10 copies per cell: KARGA k-mer depth of each MEGARes group's deepest allele, summed per class, divided "
+            "by the ARGs-OAP cell estimate. MEGARes classes (drugs, metals, biocides) are not CARD drug classes, and "
+            "copies per cell is not RPKM: do not compare with the K-MARVEL / RGI figures. Grey = not detected; "
+            "hatched = low depth or KARGA not run. Red labels mark low-depth samples.",
+            num, labels, cols, groups, low, hatch, "log10 copies per cell", cmap="magma_r")
+
+
+def fig_cog(fw, mat, unit, cols, groups, low, hatch, backend):
+    """COG functional categories x samples from the read functional profile."""
+    unit_txt = "copies per genome equivalent (CPGE)" if unit == "cpge" else unit
+    heatmap(fw, "function_cog_heatmap", f"Functional profile ({backend}): COG categories",
+            f"log10 {unit_txt} of each COG functional category, from the read-level profile. An ORF in several "
+            "categories counts in each, so the categories do not add up to the annotated reads. Grey = not found; "
+            "hatched = low depth, no MicrobeCensus estimate or no functional profile.",
+            mat, list(mat.index), cols, groups, low, hatch, f"log10 {unit.upper() if unit == 'cpge' else unit}", cmap="viridis")

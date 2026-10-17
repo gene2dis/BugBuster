@@ -1,0 +1,5 @@
+sample,nRead,n16S,nCell,GeneIdx,Meg_drug,Compound,Gen,PercentGeneCovered,AverageKMerDepth,CPM_ARGs,copies_per_cell
+sampleB,4000,2.0,1.0,>MEG_7300|Drugs|Tetracyclines|Tetracycline_resistance_ribosomal_protection_proteins|TETQ,Tetracyclines,Drugs,TETQ,91.0,1.0,250.0,1.0
+sampleA,120000,40.0,20.0,>MEG_1006|Drugs|Aminoglycosides|Aminoglycoside_O-nucleotidyltransferases|ANT9,Aminoglycosides,Drugs,ANT9,99.6,4.0,33.333333333333336,0.2
+sampleA,120000,40.0,20.0,>MEG_7300|Drugs|Tetracyclines|Tetracycline_resistance_ribosomal_protection_proteins|TETQ,Tetracyclines,Drugs,TETQ,95.0,10.0,83.33333333333334,0.5
+sampleA,120000,40.0,20.0,>MEG_4001|Metals|Copper|Copper_resistance_protein|PCOA,Metal resistance,Metals,PCOA,92.0,2.0,16.666666666666668,0.1

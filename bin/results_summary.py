@@ -14,8 +14,13 @@ rerunning any tool, and merges any number of results directories (one per batch)
   02_taxonomy/tables/<label>_{otu,tax}_table.tsv   any taxonomic profiler (+ _read_counts.tsv)
   02_taxonomy/sylph/*_sylph_<db>.tsv              sylph ANI / coverage (optional)
   05_arg_prediction/read_level/kmarvel/*/*_kmarvel.tsv   K-MARVEL ARG calls
-  pipeline_info/software_versions.yml             tool and database versions
-Each section is skipped when its inputs are absent.
+  05_arg_prediction/read_level/rgi/*/*_rgi_bwt.allele_mapping_data.txt  RGI bwt (+ rgi_kmer/ pathogen of origin)
+  05_arg_prediction/read_level/summary/KARGA_norm.csv, KARGVA_norm.csv   KARGA / KARGVA (ARG_NORM_REPORT)
+  07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
+  07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
+  pipeline_info/software_versions.yml             tool and database versions; which stages ran
+Each section is skipped when its inputs are absent; README.md, README.docx and LLM_GUIDE.md list every
+pipeline stage and whether it ran.
 
 Units: Reads_report.csv counts single reads (both mates); every count here is in read
 pairs (= reads / 2), the unit K-MARVEL and sylph use. ARG abundance is normalised to the
@@ -31,7 +36,9 @@ mutation_data lists every difference from the reference, so a variant-model hit 
 resistance call only when a known resistance mutation is among them.
 
 Outputs (in --outdir): tables/*.tsv, results_summary.xlsx (if openpyxl or xlsxwriter
-is installed), figures/*.{png,pdf,svg} and results_summary.html (self-contained, works offline).
+is installed), figures/*.{png,pdf,svg}, results_summary.html (self-contained, works offline),
+README.md and README.docx (what is in the summary) and LLM_GUIDE.md (the results folder and every
+summary column, for a language model or a script).
 
 Requirements: Python 3 with pandas, numpy and matplotlib >= 3.7; openpyxl or xlsxwriter for the
 Excel workbook (optional). The pipeline's RESULTS_SUMMARY image has them all. Run the script from
@@ -52,14 +59,23 @@ import pandas as pd
 # write no __pycache__ into the pipeline's bin/ (read-only in a container image)
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from summary_common import NA_NOT_RUN, die, natural_key, norm_taxon, strip_gtdb, warn  # noqa: E402
-from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, prevalence_table,  # noqa: E402
-                              species_rank, watchlist_table)
+from summary_common import (NA_NOT_RUN, die, natural_key, norm_taxon, parse_versions, strip_gtdb,  # noqa: E402
+                            warn)
+from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mark_low_depth,  # noqa: E402
+                              prevalence_table, species_rank, watchlist_table)
 from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_status, arg_tables,  # noqa: E402
-                          compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules, load_snps)
-from summary_figures import (FigureWriter, fig_args, fig_method_by_category, fig_method_upset,  # noqa: E402
-                             fig_qc, fig_taxonomy, fig_watchlist, short_count)
+                          card_families, compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules,
+                          load_snps, unify_gene_tiers)
+from summary_megares import (karga_representatives, karga_sample_counts, karga_status,  # noqa: E402
+                             karga_tables, load_karga)
+from summary_functional import (cog_matrix, function_long, function_sample_columns,  # noqa: E402
+                                function_status, function_tables, load_microbecensus, load_read_functional,
+                                merge_read_functional)
+from summary_catalog import stage_status  # noqa: E402
+from summary_figures import (FigureWriter, fig_args, fig_cog, fig_karga, fig_method_by_category,  # noqa: E402
+                             fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
+from summary_docs import undocumented_columns, write_docs  # noqa: E402
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
@@ -147,6 +163,12 @@ RESERVED_COLUMNS = {
     "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref", "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check",
     "tier_note", "mutation_data",
     "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
+    "rgi_gene_read_pairs", "args_oap_n16S", "args_oap_ncell", "karga_n_groups", "karga_copies_per_cell",
+    "kargva_n_variants", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
+    "func_fraction_annotated", "n_samples_evaluable", "megares_id", "type", "class", "mechanism", "group",
+    "snp_confirmation_required", "percent_covered", "kmer_depth", "copies_per_cell", "cpm_kmer",
+    "group_representative", "kargva_id", "mutation", "description", "drug", "backend", "ontology", "accession",
+    "abundance_cpge", "abundance_native", "native_unit",
 }
 
 
@@ -244,6 +266,29 @@ def attention_flags(tier1, comparison, low_samples):
     return flags
 
 
+def method_notes(ctx):
+    """One line per read-level method that ran, for the README (the HTML has its own reading guide)."""
+    s, notes = ctx["summary"], []
+    if "K-MARVEL" in s.get("arg_methods", []):
+        notes.append("K-MARVEL assembles resistance genes from the reads and reports calls against CARD, with their "
+                     "supporting read pairs (RPKM in the summary).")
+    if "RGI" in s.get("arg_methods", []):
+        notes.append(f"RGI bwt maps the reads to CARD and WildCARD and lists every gene with a mapped read; the summary "
+                     f"counts a gene when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference sequence. "
+                     "RGI k-mer assigns a gene's reads to species (pathogen of origin, rgi_kmer_hosts).")
+    if ctx.get("karga"):
+        notes.append("KARGA and KARGVA find MEGARes genes and resistance variants from read k-mers; ARG_NORM_REPORT "
+                     "keeps genes with >= 90% k-mer coverage (variants: >= 2 SNP k-mers, >= 80%) and divides their "
+                     "k-mer depth by the ARGs-OAP cell estimate (copies per cell). MEGARes names differ from CARD's, "
+                     "so they are not compared gene by gene with K-MARVEL and RGI.")
+    if ctx.get("functional"):
+        f = ctx["functional"]
+        notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
+                     f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if f['unit'] == 'cpge' else f['unit']}. "
+                     "Reported apart from any contig-level functional profile.")
+    return notes
+
+
 def parse_args(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--results", nargs="+", required=True, help="BugBuster results directories (one per batch)")
@@ -316,21 +361,30 @@ def main(argv=None):
         taxonomy = load_taxonomy(root)
         kmarvel, kran = load_kmarvel(root)
         rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
+        karga, kargva, args_oap, karga_ran = load_karga(root)
+        func = load_read_functional(root)
+        mc = load_microbecensus(root)
         names = set()
         if reads is not None:
             names |= set(reads["sample"])
         if taxonomy is not None:
             names |= set(taxonomy["otu"].columns)
-        names |= kran | rgi_ran
+        names |= kran | rgi_ran | karga_ran | (func["ran"] if func else set()) | set(mc["sample"])
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
             if s in seen:
                 die(f"sample {s} is in both {seen[s]} and {root}; sample names must be unique across results directories")
             seen[s] = str(root)
+        versions = load_versions(root)
+        found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
+                                ("rgi", rgi_ran), ("karga", karga_ran), ("read_functional", func is not None),
+                                ("microbecensus", not mc.empty)) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
-                        "rgi_kmer_ran": rgi_kmer_ran, "samples": names, "versions": load_versions(root)})
+                        "rgi_kmer_ran": rgi_kmer_ran, "karga": karga, "kargva": kargva, "args_oap": args_oap,
+                        "karga_ran": karga_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
+                        "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
     samples = pd.DataFrame(
@@ -407,10 +461,12 @@ def main(argv=None):
         long["_o"] = long["sample"].map({s: i for i, s in enumerate(order)})
         long = long.sort_values(["_o", "relative_abundance"], ascending=[True, False]).drop(columns="_o")
         tables["taxonomy_long"] = (long, False)
+        tcols_all = list(tx["rel"].columns)
         for rank, wide in tx["wide"].items():
-            tables[f"taxonomy_{rank.lower()}_wide"] = (wide[wide.sum(axis=1) > 0], True)
+            tables[f"taxonomy_{rank.lower()}_wide"] = (mark_low_depth(wide[wide.sum(axis=1) > 0], low, tcols_all),
+                                                       True)
         tables["taxonomy_species_prevalence"] = (
-            prevalence_table(spw, samples, args.group_by).rename_axis(sp), True)
+            prevalence_table(tx["wide"][sp], samples, args.group_by, low).rename_axis(sp), True)
         for s, sub in long.groupby("sample"):
             agg = sub.groupby(sp)["relative_abundance"].sum()
             species_by_sample[s] = {norm_taxon(n): (strip_gtdb(n), ab) for n, ab in agg.items() if n}
@@ -418,7 +474,7 @@ def main(argv=None):
         wl_wide = wl_long = None
         if watch is not None:
             wl_wide, wl_long = watchlist_table(tx, watch)
-            tables["watchlist"] = (wl_wide, False)
+            tables["watchlist"] = (mark_low_depth(wl_wide, low, tcols_all), False)
         tcols = [s for s in order if s in tx["rel"].columns]
         tgroups = [samples.at[s, args.group_by] if args.group_by else "" for s in tcols]
         fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
@@ -441,18 +497,34 @@ def main(argv=None):
             die(f"--arg-primary {primary}: no {METHOD_LABELS[primary]} output in the results directories")
         rules = load_rules(args.arg_priority)
         prevalence = load_prevalence(args.card_prevalence) if args.card_prevalence else None
+        snps = load_snps(args.kmarvel_db)
+        kcalls = alleles = None
         if "kmarvel" in methods_ran:
-            snps = load_snps(args.kmarvel_db)
-            if snps is None:
-                warn("no --kmarvel-db: tier 4 calls cannot be checked for resistance mutations")
             kcalls = pd.concat([b["kmarvel"] for b in batches if b["kmarvel"] is not None], ignore_index=True)
-            calls_by["kmarvel"] = annotate_args(kcalls, samples, rules, snps, prevalence, species_by_sample)
         if "rgi" in methods_ran:
             alleles = pd.concat([b["rgi"] for b in batches if b["rgi"] is not None], ignore_index=True)
+        # gene names: allele numbers collapsed, unless the collapsed name is another CARD gene
+        families = card_families(args.kmarvel_db, (kcalls, "aro_full_name", "gene_family"),
+                                 (alleles, "ARO Term", "AMR Gene Family"))
+        if "kmarvel" in methods_ran:
+            if snps is None:
+                warn("no --kmarvel-db: tier 4 calls cannot be checked for resistance mutations")
+            calls_by["kmarvel"] = annotate_args(kcalls, samples, rules, snps, prevalence, species_by_sample,
+                                                families)
+        if "rgi" in methods_ran:
             kmer = pd.concat([b["rgi_kmer"] for b in batches if b["rgi_kmer"] is not None], ignore_index=True)
             kmer_ran = set().union(*[b["rgi_kmer_ran"] for b in batches])
             rgi_all = annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by_sample, watch,
-                                   args.rgi_min_coverage)
+                                   args.rgi_min_coverage, snps, families)
+        # one tier per gene, from the primary method first; RGI's rows below the cutoff follow the same tiers
+        frames = dict(calls_by)
+        if rgi_all is not None:
+            frames["rgi"] = rgi_all
+        conflicts = unify_gene_tiers(frames, [primary] + [m for m in frames if m != primary])
+        if conflicts:
+            warn(f"{len(conflicts)} genes had different tiers in different ARG methods; each takes the "
+                 f"{METHOD_LABELS[primary]} tier: {', '.join(conflicts[:10])}")
+        if rgi_all is not None:
             calls_by["rgi"] = rgi_all[rgi_all["rgi_detected"]].copy() if not rgi_all.empty else rgi_all
         summary["arg_primary"] = METHOD_LABELS[primary]
         summary["arg_methods"] = [METHOD_LABELS[m] for m in methods_ran]
@@ -494,7 +566,8 @@ def main(argv=None):
         if frames:
             allc = pd.concat(frames, ignore_index=True)
             extra = [c for c in ("card_plasmid_associated", "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref",
-                                 "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check") if c in allc.columns]
+                                 "rgi_gene_coverage", "rgi_gene_read_pairs", "rgi_kmer_hosts", "rgi_host_check")
+                     if c in allc.columns]
             allc = allc.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
             allc["_o"] = allc["sample"].map({s: i for i, s in enumerate(order)})
             allc["_m"] = (allc["method"] != primary).astype(int)
@@ -524,6 +597,72 @@ def main(argv=None):
                 fig_method_upset(figs, comp, gene_sets, comparison["methods"])
                 fig_method_by_category(figs, comp, comparison["methods"])
 
+    # ---- KARGA / KARGVA (MEGARes, ARG_NORM_REPORT): their own tables, not matched to CARD genes
+    table_units = {}
+    karga_ctx = None
+    karga_ran = set().union(*[b["karga_ran"] for b in batches])
+    if karga_ran:
+        kstatus = karga_status(order, karga_ran, low)
+        meta_join = samples[["batch"] + meta_cols]
+
+        def with_meta(df, lead_cols):
+            df = df.merge(meta_join, left_on="sample", right_index=True, how="left")
+            df["_o"] = df["sample"].map({s: i for i, s in enumerate(order)})
+            df = df.sort_values(["_o"] + lead_cols, kind="stable").drop(columns="_o")
+            first = ["sample", "batch"] + meta_cols
+            return df[first + [c for c in df.columns if c not in first]]
+        kparts = [b["karga"] for b in batches if b["karga"] is not None]
+        vparts = [b["kargva"] for b in batches if b["kargva"] is not None]
+        karga = karga_representatives(pd.concat(kparts, ignore_index=True)) if kparts else None
+        kargva = pd.concat(vparts, ignore_index=True) if vparts else None
+        cells = pd.concat([b["args_oap"] for b in batches if b["args_oap"] is not None]).drop_duplicates("sample")
+        cells = cells.set_index("sample").reindex(order)
+        samples["args_oap_n16S"] = cells["args_oap_n16S"]
+        samples["args_oap_ncell"] = cells["args_oap_ncell"]
+        counts = karga_sample_counts(karga, kargva, order, kstatus)
+        for c in counts.columns:
+            samples[c] = counts[c]
+        if karga is not None:
+            tables["arg_karga_long"] = (with_meta(karga, ["class", "group", "kmer_depth"]), False)
+            for name, df in karga_tables(karga, order, kstatus).items():
+                tables[name] = (df, True)
+            fig_karga(figs, tables.get("arg_karga_class_cpc", (None,))[0], order, groups, low,
+                      {s for s in order if kstatus[s] != "ok"})
+        if kargva is not None and not kargva.empty:
+            tables["arg_kargva_long"] = (with_meta(kargva, ["class", "group"]), False)
+        karga_ctx = {"n_samples": len(karga_ran & set(order)),
+                     "n_groups": int(karga.loc[karga["group_representative"], "group"].nunique())
+                     if karga is not None else 0,
+                     "n_variants": 0 if kargva is None else len(kargva)}
+
+    # ---- read-level functional profile and MicrobeCensus
+    func = merge_read_functional([b["func"] for b in batches])
+    mc_parts = [b["mc"] for b in batches if not b["mc"].empty]
+    mc = pd.concat(mc_parts, ignore_index=True) if mc_parts else None
+    func_ctx = None
+    fcols = function_sample_columns(func, mc, order)
+    for c in fcols.columns:
+        samples[c] = fcols[c]
+    if func is not None:
+        fstatus = function_status(order, func["ran"], low)
+        ftables = function_tables(func, order, fstatus)
+        long_f = function_long(func)
+        long_f = long_f.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
+        long_f["_o"] = long_f["sample"].map({s: i for i, s in enumerate(order)})
+        long_f = long_f.sort_values(["_o", "ontology", "accession"], kind="stable").drop(columns="_o")
+        first = ["sample", "batch"] + meta_cols
+        tables["function_read_long"] = (long_f[first + [c for c in long_f.columns if c not in first]], False)
+        for ont, (mat, unit) in ftables.items():
+            tables[f"function_read_{ont}"] = (mat, True)
+            table_units[f"function_read_{ont}"] = unit
+        cog, cog_unit = cog_matrix(ftables, order)
+        if cog is not None:
+            fig_cog(figs, cog, cog_unit, order, groups, low,
+                    {s for s in order if fstatus[s] != "ok" or cog[s].isna().all()}, func["backend"])
+        func_ctx = {"backend": func["backend"], "ontologies": sorted(ftables),
+                    "unit": next(iter(ftables.values()))[1] if ftables else "",
+                    "n_samples": len(func["ran"] & set(order))}
+
     prim_arg = None
     if methods_ran:
         prim_arg = calls_by[primary]
@@ -539,7 +678,11 @@ def main(argv=None):
 
     write_tables(outdir, tables)
     if not args.no_excel:
-        write_excel(outdir, tables)
+        write_excel(outdir, tables, args.group_by, table_units)
+    missing_docs = undocumented_columns(tables, meta_cols, order, args.group_by)
+    if missing_docs:
+        warn("columns without documentation (summary_docs.TABLE_DOCS): "
+             + ", ".join(f"{t}.{c}" for t, c in missing_docs[:20]))
     versions = "\n".join(f"# {b['label']} ({b['root']})\n{b['versions']}" for b in batches if b["versions"])
     inputs = [f"{b['label']}: {b['root'].resolve()}" for b in batches]
     for flag, val in (("metadata", args.metadata), ("group-by", args.group_by), ("order-by", args.order_by),
@@ -550,13 +693,30 @@ def main(argv=None):
                       ("taxa-per-sample", args.taxa_per_sample)):
         if val:
             inputs.append(f"--{flag} {val}")
-    write_html(outdir, args.title, {
+    stage_by_batch = {b["label"]: stage_status(b["processes"], b["found"]) for b in batches}
+    for b in batches:
+        for st, status in stage_by_batch[b["label"]]:
+            if status == "ran, no table found":
+                warn(f"{b['root']}: {st['title']} ran (software_versions.yml) but its table is not in the results "
+                     "directory")
+    versions_table = []
+    for b in batches:
+        for proc, tools in sorted(b["processes"].items()):
+            for tool, ver in tools.items():
+                row = [proc, tool, ver] if len(batches) == 1 else [f"{b['label']}: {proc}", tool, ver]
+                versions_table.append(row)
+    ctx = {
         "figures": figs, "tables": tables, "summary": summary, "versions": versions, "inputs": inputs,
         "min_pairs": args.min_clean_pairs, "meta_cols": meta_cols, "key_meta": key_meta,
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
         "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": args.watchlist,
-        "arg_priority": args.arg_priority,
-    })
+        "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
+        "karga": karga_ctx, "functional": func_ctx, "table_units": table_units, "title": args.title,
+        "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
+    }
+    ctx["method_notes"] = method_notes(ctx)
+    write_html(outdir, args.title, ctx)
+    write_docs(outdir, ctx)
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 
 

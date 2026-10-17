@@ -383,6 +383,8 @@ workflow {
     ch_summary_kmarvel_db = channel.empty()
     ch_summary_rgi        = channel.empty()
     ch_summary_rgi_kmer   = channel.empty()
+    // run-level tables of other stages, laid out by file name in RESULTS_SUMMARY
+    ch_summary_reports    = channel.empty()
 
     if ( params.taxonomic_profiler != "none" ) {
         TAXONOMY(
@@ -420,6 +422,8 @@ workflow {
             KARGA.out.versions.first(),
             ARG_NORM_REPORT.out.versions
         )
+        // KARGA_norm.csv and KARGVA_norm.csv
+        ch_summary_reports = ch_summary_reports.mix(ARG_NORM_REPORT.out.arg_reports.flatten())
     }
 
     //
@@ -574,6 +578,7 @@ workflow {
         MICROBECENSUS(ch_clean_reads)
         ch_ags = MICROBECENSUS.out.ags
         ch_versions = ch_versions.mix(MICROBECENSUS.out.versions.first())
+        ch_summary_reports = ch_summary_reports.mix(MICROBECENSUS.out.ags.map { _meta, ags -> ags })
     }
 
     //
@@ -644,6 +649,11 @@ workflow {
             ch_read_cog_def
         )
         ch_versions = ch_versions.mix(READ_FUNCTIONAL.out.versions)
+        ch_summary_reports = ch_summary_reports.mix(
+            READ_FUNCTIONAL.out.function_abundance,
+            READ_FUNCTIONAL.out.annotated_fraction,
+            READ_FUNCTIONAL.out.sample_summary
+        )
     }
 
     //
@@ -743,8 +753,9 @@ workflow {
         )
 
     //
-    // MODULE: Run-level summary (00_summary/): QC, taxonomy and read-level
-    // ARG (K-MARVEL, RGI) tables, Excel workbook, figures and HTML report.
+    // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG
+    // (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables,
+    // Excel workbook, figures, HTML report, README (MD/DOCX) and LLM guide.
     // It reads the aggregated software_versions.yml, so its own versions.yml
     // is not part of that file.
     //
@@ -767,7 +778,8 @@ workflow {
             params.sample_metadata ? file(params.sample_metadata, checkIfExists: true) : [],
             params.card_prevalence ? file(params.card_prevalence, checkIfExists: true) : [],
             file(params.arg_priority_table, checkIfExists: true),
-            file(params.summary_watchlist, checkIfExists: true)
+            file(params.summary_watchlist, checkIfExists: true),
+            ch_summary_reports.toSortedList { a, b -> a.name <=> b.name }
         )
     }
 
