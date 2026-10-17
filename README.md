@@ -51,7 +51,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 22. Bin reports.
 23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only MetaWRAP quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
 24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-25. Run-level results summary (`00_summary/`, on by default): QC, taxonomy and read-level ARG (K-MARVEL, RGI) tables, an Excel workbook, figures and a self-contained HTML report, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
+25. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
 26. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
@@ -339,7 +339,7 @@ The pipeline generates organized output with numbered prefixes:
 ```
 results/
 ├── pipeline_info/              # Execution reports, logs, contig filtering summary
-├── 00_summary/                 # Run-level summary (if results_summary=true): results_summary.html, results_summary.xlsx, tables/, figures/
+├── 00_summary/                 # Run-level summary (if results_summary=true): results_summary.html, results_summary.xlsx, README.md/.docx, LLM_GUIDE.md, tables/, figures/
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
 ├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports

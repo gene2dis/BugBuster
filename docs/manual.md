@@ -837,9 +837,11 @@ By default, databases are published to a `databases/` directory at the same leve
 
 ### 6.16 Results Summary Options
 
-The run-level summary in `00_summary/` consolidates the QC, taxonomy and read-level ARG (K-MARVEL, RGI) results: tidy and wide
-TSV tables, an Excel workbook (`results_summary.xlsx`, with a README sheet defining every column), PDF/PNG/SVG
-figures and a self-contained HTML report (`results_summary.html`, no network access needed to view it).
+The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA),
+read functional and MicrobeCensus results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
+README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
+network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only
+when its stage ran; the README and the guide list every pipeline stage and whether it ran in each results directory.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -870,6 +872,9 @@ How the summary reports the results:
 - **RGI pathogen of origin.** RGI's k-mer step assigns the gene's reads to species. `rgi_kmer_hosts` lists the top ones and `rgi_host_check` says whether the top host is a watchlist pathogen. WildCARD holds resistance-gene sequences from many species, gut commensals among them, so a tier 1 gene whose reads point to a commensal (poxtA from *Blautia*, vanD-type genes from *Enterocloster*) is flagged as a possible related gene rather than reported as a pathogen's resistance.
 - **Method comparison.** When K-MARVEL and RGI both ran, `arg_method_comparison.tsv`, `arg_method_overlap.tsv`, an UpSet plot and a per-category bar chart show, gene by gene (alleles collapsed), what each method found. A K-MARVEL gene RGI saw below its cutoff is marked `rgi_below_cutoff`, which is partial coverage, not absence. The ARG matrices and figures use one method (`--arg-primary` in the script; K-MARVEL when present); `arg_long.tsv` holds every method's calls.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
+- **KARGA / KARGVA (MEGARes).** With `--read_arg_prediction`, the summary reads ARG_NORM_REPORT's `KARGA_norm.csv` and `KARGVA_norm.csv` (KARGA genes with at least 90% k-mer coverage; KARGVA variants with at least 2 SNP k-mers and 80% coverage) into `arg_karga_long`, `arg_karga_group_cpc`, `arg_karga_class_cpc` and `arg_kargva_long`. Abundance is copies per cell: k-mer depth over the ARGs-OAP cell estimate (`args_oap_ncell` in `samples_qc`). Alleles of one MEGARes group share their k-mers, so each group is represented by its deepest allele. MEGARes names its genes differently from CARD, so KARGA is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only.
+- **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
+- **README and LLM guide.** `README.md` / `README.docx` (written with the Python standard library) list the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the published results folder for a language model or a script: run facts as YAML, every stage's files with how the sample is identified and in which unit, every summary column, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
 - **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
 
 The same script summarises several finished results directories (batches) without rerunning any tool; see [Example 13](#example-13-summarise-several-batches).
@@ -982,12 +987,17 @@ results/
 ├── 00_summary/                                 # Run-level summary (if results_summary=true)
 │   ├── results_summary.html                    # Self-contained report: figures, sortable tables, methods
 │   ├── results_summary.xlsx                    # Every table, plus a README sheet defining the columns
+│   ├── README.md, README.docx                  # What the summary holds: stages run, tables, figures, units, caveats
+│   ├── LLM_GUIDE.md                            # The results folder and every summary column, for a language model or a script
 │   ├── tables/                                 # samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence,
 │   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
 │   │                                           # arg_presence, arg_drug_class_rpkm, arg_priority_panel, group_arg_detection,
-│   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran)
+│   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran),
+│   │                                           # arg_karga_long, arg_karga_group_cpc, arg_karga_class_cpc, arg_kargva_long
+│   │                                           # (KARGA/KARGVA), function_read_long, function_read_<ontology> (read functional)
 │   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
-│                                               # arg_vs_depth, arg_method_upset, arg_method_by_category (.png/.pdf/.svg)
+│                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
+│                                               # arg_karga_class_heatmap, function_cog_heatmap (.png/.pdf/.svg)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control
@@ -1657,7 +1667,10 @@ python /path/to/BugBuster/bin/results_summary.py \
 parent's when it is called `results` (`batch1` above); `--batch-labels` sets the labels instead, one per
 `--results` directory in the same order. Without `--kmarvel-db`, mutation-dependent ARG hits
 are reported as `not_checked`. RGI results (`05_arg_prediction/read_level/rgi/` and `rgi_kmer/`) are read when
-present; `--rgi-min-coverage` sets their cutoff (default 80). `results_summary.py --help` lists every option.
+present; `--rgi-min-coverage` sets their cutoff (default 80). KARGA/KARGVA (`05_arg_prediction/read_level/summary/`),
+the read functional profile (`07_functional_annotation/summary/read_*.tsv`) and MicrobeCensus
+(`07_functional_annotation/microbecensus/`) are read when present; batches without them get `NA_not_run`. The
+README and `LLM_GUIDE.md` say which stages ran in each batch. `results_summary.py --help` lists every option.
 
 ---
 

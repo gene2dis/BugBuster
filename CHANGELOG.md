@@ -72,6 +72,39 @@ next release is tagged.
     image with pandas, matplotlib and openpyxl
   - `docs/REPORTING_ROADMAP.md`: reporting improvements planned for the
     modules without example results yet
+  - KARGA / KARGVA in the summary (ARG_NORM_REPORT's tables): long tables,
+    copies per cell per MEGARes group and class (each group's deepest allele,
+    as alleles share k-mers), the KARGVA variants, a class heatmap, and the
+    ARGs-OAP 16S and cell estimates in `samples_qc`; reported apart from the
+    CARD methods (MEGARes names differ) and in their own unit
+  - Read functional profile (Woltka, SUPER-FOCUS or HUMAnN) and MicrobeCensus
+    in the summary: `function_read_long`, one wide table per ontology in CPGE
+    (`NA_no_ags` without a MicrobeCensus estimate), a COG-category heatmap,
+    and reads assigned, annotated fraction, average genome size and genome
+    equivalents in `samples_qc`
+  - `README.md` and `README.docx` (standard-library writer, no new
+    dependency) and `LLM_GUIDE.md` in `00_summary/`: the stages that ran per
+    results directory (from `software_versions.yml`, read line by line as it
+    is not always valid YAML), every table and figure, units, tiers, caveats,
+    versions; the guide maps every stage's published files, how the sample is
+    identified, every summary column, pitfalls and recipes
+  - One generic input (`stage_reports`) lays out other stages' run-level
+    tables by file name, so a stage is added with one case in the module and
+    one `mix()` in `main.nf`
+  - Every emitted column is documented (`bin/summary_docs.py`); the test
+    suite fails on an undocumented one, and the Excel README sheet lists only
+    the tables written
+  - Table audit on a real run: RbpA and the vanO cluster (chromosomal in
+    Actinomycetota, 74-82% of acquired RPKM in one batch) move to tier 3;
+    a gene gets one tier across ARG methods (RGI tiers also use CARD
+    `snps.txt`); an allele name that collapses onto another CARD gene keeps
+    its own name (CRP-1, a CRP beta-lactamase, is not CRP, an efflux
+    regulator); `rgi_gene_read_pairs` is written, so RGI gene RPKM can be
+    rebuilt from the tables; taxonomy wide and watchlist tables mark taxa
+    not found in a low-depth sample `NA_low_depth`, and species prevalence
+    leaves those samples out of its denominator; gene family and drug class
+    lists use one separator; the report says where tier 1 genes found only
+    by another method are
 
 - **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
   - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by

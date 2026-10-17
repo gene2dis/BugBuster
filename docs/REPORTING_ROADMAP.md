@@ -49,26 +49,48 @@ plot fixes (top-k union, natural order, scaled labels), and `results_summary.py`
 
 Example data needed: a kraken2 + Bracken run and a sourmash run on the same samples as a sylph run.
 
-## Read-level ARGs: KARGA / KARGVA / ARGs-OAP (unverified)
+## Read-level ARGs: KARGA / KARGVA / ARGs-OAP (verified on Pudahuel, 3 samples, 2026-10-17)
 
-`bin/arg_norm_report.py` publishes `05_arg_prediction/read_level/summary/KARGA_norm.csv` and `KARGVA_norm.csv`. There are no figures.
+`bin/arg_norm_report.py` publishes `05_arg_prediction/read_level/summary/KARGA_norm.csv` and `KARGVA_norm.csv`;
+`results_summary.py` reads them (`bin/summary_megares.py`).
 
-- **`CPM_ARGs` and `copies_per_cell` divide `AverageKMerDepth`**, a k-mer depth, not a read count. Name the units accordingly, or normalise read counts instead.
-- **Possible double counting of cells.** `nRead`, `n16S` and `nCell` are summed over the R1/R2/singleton rows of the ARGs-OAP stage-one output. Check that cells are not counted once per mate.
-- **Rows are MEGARes headers (allele level).**
-  - Shared k-mers inflate totals, as with K-MARVEL alleles.
-  - `Gen` is the MEGARes group ID, not a gene name.
-  - Collapse to gene/group, and take names from MEGARes.
-- **No SNP confirmation for KARGA.** MEGARes entries that require SNP confirmation are not flagged. KARGVA has its own SNP-hit filter (`KmerSNPHits >= 2`).
-- **Absent samples are mishandled.**
-  - A sample with no hits gets one NA row instead of zeros.
-  - A sample missing ARGs-OAP output is dropped.
-  - `nCell = 0` leaves a blank.
-- **Summary work.**
-  - Map MEGARes classes onto the tier table (a second rule file, or a `database` column in `arg_priority_tiers.tsv`).
-  - Report ARGs-OAP copies per cell next to RPM. They answer different questions, so keep both and label them.
+- **Units: k-mer depth, labelled.** `CPM_ARGs` and `copies_per_cell` divide `AverageKMerDepth`, a k-mer depth. The
+  summary reports copies per cell as the primary unit and `cpm_kmer` as k-mer depth per million single reads, apart
+  from the read-pair RPKM of K-MARVEL and RGI. Normalising read counts instead remains open.
+- **Cells are not counted twice.** ARGs-OAP stage one writes one row per sample (R1 and R2 merged), so the
+  `groupby().sum()` sees one row. Confirmed.
+- **Alleles share k-mers.** Confirmed: the AAC(6') alleles of one sample had depths 46.8 / 51.1 / 47.6 / 51.7. The
+  summary represents each MEGARes group by its deepest allele (`group_representative`). `Gen` is the MEGARes group.
+- **No SNP confirmation for KARGA.** The summary carries MEGARes' `RequiresSNPConfirmation` flag as
+  `snp_confirmation_required`; no Pudahuel hit had it. KARGVA has its own SNP-hit filter.
+- **Absent samples.** A sample with no passing KARGVA hit has one row with blank ARG fields: the summary reads it as no
+  hits. `nCell = 0` leaves a blank, kept blank in the matrices. A sample missing ARGs-OAP output is still dropped by
+  `arg_norm_report.py` (unverified).
+- **Not compared with CARD methods.** MEGARes names differ from CARD's; the owner chose a separate section without
+  tiers (2026-10-17). A MEGARes-to-tier map remains possible later.
+- **Open: ARGs-OAP `extracted.fa`** (~90 MB per sample, the stage-one candidate reads) is published but nothing reads
+  it. Only stage one runs, so there is no SARG abundance.
+- **Open: KARGVA `versions.yml`.** `modules/local/kargva/main.nf` indents its heredoc with tabs, so `END_VERSIONS` is
+  left in the file and `software_versions.yml` is not valid YAML. The summary reads the versions line by line. Fixing
+  the module reruns KARGVA (~4.5 h per sample) on `-resume`.
 
-Example data needed: a `--read_arg_prediction` run on samples that also ran K-MARVEL, to compare the two.
+## Read functional (Woltka) and MicrobeCensus (verified on Pudahuel, 2026-10-17)
+
+`results_summary.py` reads AGGREGATE_READ_FUNCTIONS' tables and MicrobeCensus (`bin/summary_functional.py`); the
+tables match the pipeline's own CPGE matrices exactly.
+
+- **Open: MetaCyc mixes reactions with pathways.** WoLr2's `function/metacyc/reaction-to-pathway.map` has 159 targets
+  that are reaction IDs (`1.1.1.39-RXN`, ...), not pathways, and absent from `pathway_name.txt`.
+  `bin/woltka_function_profile.py` follows the map, so 135 such IDs appear as MetaCyc "pathways" in a Pudahuel sample.
+  Fix: keep only targets listed in `pathway_name.txt` (changes WOLTKA_CLASSIFY's output; ask first).
+- The per-sample ORF table's sample column is `<sample>.wol` (the SAM name), unlike every other table.
+- ARGs-OAP's cell estimate (`nCell`) and MicrobeCensus genome equivalents differ by 16-22% on the same samples; the
+  summary reports both and labels them as different estimates.
+
+## Software versions (found 2026-10-17)
+
+- **Open: RGI_BWT / RGI_KMER** write multi-line junk (`rgi:` with no version, `kma --version` is not a KMA option).
+  Fixing the modules reruns RGI_BWT on `-resume` (hours per sample).
 
 ## Read-level ARGs: RGI bwt / kmer (verified on batch1, 32 samples, 2026-10-16)
 
@@ -101,8 +123,8 @@ Still open:
 - **RGI_REPORT plots pool all samples.** `value_counts()` counts sample x gene rows, and the per-sample bar is in
   alphabetical order. The summary's figures cover the per-sample view; consider dropping these plots.
 - **No MAPQ filter.** Reads mapping equally well to several WildCARD sequences are counted for one of them by KMA.
-- **KARGA, KARGVA and ARGs-OAP are not in the comparison.** They use MEGARes and SARG; matching them to CARD genes
-  needs a name or class map (see the KARGA section).
+- **KARGA and KARGVA are not in the comparison.** They use MEGARes; the summary reports them in their own section
+  (see the KARGA section).
 
 ## Contig-level ARG and taxonomy: DeepARG + BLASTN/BlobTools (unverified)
 
