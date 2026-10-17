@@ -347,7 +347,7 @@ def write_html(outdir, title, ctx):
             kv = t["arg_kargva_long"][0]
             body += ("<h3>KARGVA resistance variants</h3><p class='muted'>Variants with at least 2 SNP k-mers and 80% "
                      "coverage. A variant from reads may come from a minority strain.</p>"
-                     + df_to_html(kv[[c for c in ("sample", "gene", "mutation", "description", "drug",
+                     + df_to_html(kv[[c for c in ("sample", "gene", "kargva_mutation", "kargva_description", "kargva_drug",
                                                   "percent_covered", "kmer_depth", "copies_per_cell") if c in kv]],
                                   table_id="t_kv"))
         section("karga", "KARGA / KARGVA (MEGARes)", body)

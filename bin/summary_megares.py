@@ -37,12 +37,13 @@ def _megares(header, kargva):
     parts = str(header).lstrip(">").split("|")
     if kargva:
         parts += [""] * (9 - len(parts))
-        return {"kargva_id": parts[0], "mutation": parts[1], "aro_id": parts[2], "description": parts[3],
-                "megares_id": parts[4], "type": parts[5], "class": parts[6], "mechanism": parts[7],
-                "group": parts[8]}
+        return {"kargva_id": parts[0], "kargva_mutation": parts[1], "aro_id": parts[2],
+                "kargva_description": parts[3], "megares_id": parts[4], "megares_type": parts[5],
+                "megares_class": parts[6], "megares_mechanism": parts[7], "megares_group": parts[8]}
     parts += [""] * (5 - len(parts))
-    return {"megares_id": parts[0], "type": parts[1], "class": parts[2], "mechanism": parts[3],
-            "group": parts[4], "snp_confirmation_required": "RequiresSNPConfirmation" in parts[5:]}
+    return {"megares_id": parts[0], "megares_type": parts[1], "megares_class": parts[2],
+            "megares_mechanism": parts[3], "megares_group": parts[4],
+            "snp_confirmation_required": "RequiresSNPConfirmation" in parts[5:]}
 
 
 def load_karga(root):
@@ -63,7 +64,7 @@ def load_karga(root):
         out = pd.concat([hits[["sample"]], fields], axis=1)
         if key == "kargva":
             out["gene"] = hits.get("Gen", "")
-            out["drug"] = hits.get("Drug_resistance", "")
+            out["kargva_drug"] = hits.get("Drug_resistance", "")
         out["percent_covered"] = pd.to_numeric(hits["PercentGeneCovered"], errors="coerce")
         out["kmer_depth"] = pd.to_numeric(hits["AverageKMerDepth"], errors="coerce")
         out["copies_per_cell"] = pd.to_numeric(hits["copies_per_cell"], errors="coerce")
@@ -79,8 +80,8 @@ def karga_representatives(karga):
     if karga.empty:
         karga["group_representative"] = pd.Series(dtype=bool)
         return karga
-    karga = karga.sort_values(["sample", "group", "kmer_depth"], ascending=[True, True, False]).copy()
-    karga["group_representative"] = ~karga.duplicated(["sample", "group"])
+    karga = karga.sort_values(["sample", "megares_group", "kmer_depth"], ascending=[True, True, False]).copy()
+    karga["group_representative"] = ~karga.duplicated(["sample", "megares_group"])
     return karga
 
 
@@ -108,8 +109,8 @@ def karga_tables(karga, order, status):
         for s in blank.columns:
             mat.loc[blank[s], s] = ""
         return mat
-    out["arg_karga_group_cpc"] = wide(["type", "class", "group"])
-    out["arg_karga_class_cpc"] = wide(["type", "class"])
+    out["arg_karga_group_cpc"] = wide(["megares_type", "megares_class", "megares_group"])
+    out["arg_karga_class_cpc"] = wide(["megares_type", "megares_class"])
     return out
 
 
@@ -122,7 +123,7 @@ def karga_sample_counts(karga, kargva, order, status):
     out = pd.DataFrame(index=order)
     rep = karga[karga["group_representative"]] if karga is not None else pd.DataFrame(columns=["sample"])
     if karga is not None:
-        out["karga_n_groups"] = rep.groupby("sample")["group"].nunique().reindex(order).fillna(0).astype(int)
+        out["karga_n_groups"] = rep.groupby("sample")["megares_group"].nunique().reindex(order).fillna(0).astype(int)
         out["karga_copies_per_cell"] = rep.groupby("sample")["copies_per_cell"].sum().reindex(order).fillna(0)
     if kargva is not None:
         out["kargva_n_variants"] = kargva.groupby("sample").size().reindex(order).fillna(0).astype(int)

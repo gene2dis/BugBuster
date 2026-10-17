@@ -171,18 +171,18 @@ check "KARGA / KARGVA tables: filtered genes, deepest allele per group, copies p
 import pandas as pd
 kl = pd.read_csv("out/tables/arg_karga_long.tsv", sep="\t")
 # TEM (40% coverage) was filtered by ARG_NORM_REPORT; sampleA ANT9, TETQ, PCOA; sampleB TETQ
-assert sorted(zip(kl["sample"], kl["group"])) == [("sampleA", "ANT9"), ("sampleA", "PCOA"), ("sampleA", "TETQ"),
-                                                   ("sampleB", "TETQ")], kl[["sample", "group"]]
+assert sorted(zip(kl["sample"], kl["megares_group"])) == [("sampleA", "ANT9"), ("sampleA", "PCOA"),
+                                                           ("sampleA", "TETQ"), ("sampleB", "TETQ")], kl
 assert kl["group_representative"].all() and kl.at[0, "megares_id"].startswith("MEG_")
-tet = kl[(kl["sample"] == "sampleA") & (kl["group"] == "TETQ")].iloc[0]
-assert tet["copies_per_cell"] == 0.5 and tet["type"] == "Drugs" and tet["class"] == "Tetracyclines"
+tet = kl[(kl["sample"] == "sampleA") & (kl["megares_group"] == "TETQ")].iloc[0]
+assert tet["copies_per_cell"] == 0.5 and tet["megares_type"] == "Drugs" and tet["megares_class"] == "Tetracyclines"
 cls = pd.read_csv("out/tables/arg_karga_class_cpc.tsv", sep="\t", index_col=[0, 1])
 assert cls.at[("Drugs", "Tetracyclines"), "sampleA"] == 0.5
 # sampleB is low depth (--min-clean-pairs 10000): its TETQ is kept, a class not found there is unknown
 assert float(cls.at[("Drugs", "Tetracyclines"), "sampleB"]) == 1.0
 assert cls.at[("Metals", "Copper"), "sampleB"] == "NA_low_depth"
 kv = pd.read_csv("out/tables/arg_kargva_long.tsv", sep="\t")
-assert list(kv["sample"]) == ["sampleA"] and kv.at[0, "mutation"] == "S83L" and kv.at[0, "gene"] == "gyrA"
+assert list(kv["sample"]) == ["sampleA"] and kv.at[0, "kargva_mutation"] == "S83L" and kv.at[0, "gene"] == "gyrA"
 qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert qc.at["sampleA", "args_oap_ncell"] == 20 and qc.at["sampleA", "karga_n_groups"] == 3
 assert abs(qc.at["sampleA", "karga_copies_per_cell"] - 0.8) < 1e-9
@@ -205,7 +205,7 @@ cog = pd.read_csv("out/tables/function_read_cog.tsv", sep="\t", index_col=0)
 assert cog.at["E", "description"] == "Amino acid transport and metabolism"
 long = pd.read_csv("out/tables/function_read_long.tsv", sep="\t")
 assert set(long["sample"]) == {"sampleA", "sampleB"} and "abundance_tpm" not in long
-assert (long.loc[long["ontology"] == "cog", "description"] != "").all()
+assert long.loc[long["ontology"] == "cog", "term_description"].notna().all()
 qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert qc.at["sampleA", "mc_genome_equivalents"] == 2.0 and qc.at["sampleA", "mc_avg_genome_size_bp"] == 3e6
 assert qc.at["sampleA", "func_reads_assigned"] == 20 and qc.at["sampleA", "func_fraction_annotated"] == 0.9
@@ -308,6 +308,34 @@ documented() {
 check "every column documented (metadata, grouping, every method)" \
     documented docs1 --results run1/results --metadata "${FIX}/metadata.tsv" --group-by subject --order-by visit \
         --min-clean-pairs 10000
+check "no stale column documentation (only columns this fixture cannot produce are unused)" py - "${REPO_DIR}/bin" <<'PYEOF'
+import os, sys
+import pandas as pd
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+from summary_docs import unused_doc_columns
+tables = {}
+for f in sorted(os.listdir("docs1/tables")):
+    name = f[:-4]
+    df = pd.read_csv(f"docs1/tables/{f}", sep="\t")
+    tables[name] = (df, False)
+unused = set(unused_doc_columns(tables, "subject"))
+# --card-prevalence columns and mean_read_length (fastp JSON) have no fixture
+allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_hosts"), ("samples_qc", "mean_read_length")}
+assert unused <= allowed, sorted(unused - allowed)
+PYEOF
+
+# metadata columns named like common study variables are kept as they are
+printf 'sample\tgroup\ttype\tclass\tdescription\nsampleA\tg1\tt1\tc1\td1\nsampleB\tg2\tt2\tc2\td2\n' > common_meta.tsv
+check "metadata with group / type / class / description columns" \
+    documented commonmeta --results run1/results --metadata common_meta.tsv --group-by group --min-clean-pairs 10000
+check "those columns are not renamed" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("commonmeta/tables/samples_qc.tsv", sep="\t")
+assert {"group", "type", "class", "description"} <= set(qc.columns), qc.columns
+kl = pd.read_csv("commonmeta/tables/arg_karga_long.tsv", sep="\t")
+assert {"group", "megares_group"} <= set(kl.columns)
+PYEOF
 
 # low depth in the taxonomy tables: sampleA below --min-clean-pairs
 check "--min-clean-pairs 100000 makes sampleA low depth" \

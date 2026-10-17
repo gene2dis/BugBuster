@@ -165,9 +165,11 @@ RESERVED_COLUMNS = {
     "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
     "rgi_gene_read_pairs", "args_oap_n16S", "args_oap_ncell", "karga_n_groups", "karga_copies_per_cell",
     "kargva_n_variants", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
-    "func_fraction_annotated", "n_samples_evaluable", "megares_id", "type", "class", "mechanism", "group",
+    "func_fraction_annotated", "n_samples_evaluable", "megares_id", "megares_type", "megares_class",
+    "megares_mechanism", "megares_group",
     "snp_confirmation_required", "percent_covered", "kmer_depth", "copies_per_cell", "cpm_kmer",
-    "group_representative", "kargva_id", "mutation", "description", "drug", "backend", "ontology", "accession",
+    "group_representative", "kargva_id", "kargva_mutation", "kargva_description", "kargva_drug", "backend",
+    "ontology", "accession", "term_description",
     "abundance_cpge", "abundance_native", "native_unit",
 }
 
@@ -295,6 +297,10 @@ def parse_args(argv=None):
     p.add_argument("--batch-labels", nargs="+", metavar="LABEL",
                    help="batch labels, one per --results directory in the same order "
                         "(default: each directory's name, or its parent's when it is called 'results')")
+    p.add_argument("--results-paths", nargs="+", metavar="PATH",
+                   help="path shown for each --results directory in the README, LLM_GUIDE.md and the report, in the "
+                        "same order (default: the directory itself; the pipeline passes its --output when it stages "
+                        "the results as a copy)")
     p.add_argument("--outdir", required=True, help="output directory")
     p.add_argument("--metadata", help="TSV/CSV with a 'sample' column (or sample names in the first column)")
     p.add_argument("--group-by", help="metadata column that groups samples (e.g. subject, site)")
@@ -343,6 +349,8 @@ def main(argv=None):
         dups = sorted({lab for lab in args.batch_labels if args.batch_labels.count(lab) > 1})
         if dups:
             die(f"--batch-labels: {', '.join(dups)} given more than once; batch labels must be unique")
+    if args.results_paths is not None and len(args.results_paths) != len(args.results):
+        die(f"--results-paths has {len(args.results_paths)} paths for {len(args.results)} --results directories")
 
     batches, seen, labels = [], {}, set()
     for i, r in enumerate(args.results):
@@ -384,6 +392,7 @@ def main(argv=None):
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "karga": karga, "kargva": kargva, "args_oap": args_oap,
                         "karga_ran": karga_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
+                        "display": args.results_paths[i] if args.results_paths else str(root.resolve()),
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
@@ -623,15 +632,15 @@ def main(argv=None):
         for c in counts.columns:
             samples[c] = counts[c]
         if karga is not None:
-            tables["arg_karga_long"] = (with_meta(karga, ["class", "group", "kmer_depth"]), False)
+            tables["arg_karga_long"] = (with_meta(karga, ["megares_class", "megares_group", "kmer_depth"]), False)
             for name, df in karga_tables(karga, order, kstatus).items():
                 tables[name] = (df, True)
             fig_karga(figs, tables.get("arg_karga_class_cpc", (None,))[0], order, groups, low,
                       {s for s in order if kstatus[s] != "ok"})
         if kargva is not None and not kargva.empty:
-            tables["arg_kargva_long"] = (with_meta(kargva, ["class", "group"]), False)
+            tables["arg_kargva_long"] = (with_meta(kargva, ["megares_class", "megares_group"]), False)
         karga_ctx = {"n_samples": len(karga_ran & set(order)),
-                     "n_groups": int(karga.loc[karga["group_representative"], "group"].nunique())
+                     "n_groups": int(karga.loc[karga["group_representative"], "megares_group"].nunique())
                      if karga is not None else 0,
                      "n_variants": 0 if kargva is None else len(kargva)}
 
@@ -683,8 +692,8 @@ def main(argv=None):
     if missing_docs:
         warn("columns without documentation (summary_docs.TABLE_DOCS): "
              + ", ".join(f"{t}.{c}" for t, c in missing_docs[:20]))
-    versions = "\n".join(f"# {b['label']} ({b['root']})\n{b['versions']}" for b in batches if b["versions"])
-    inputs = [f"{b['label']}: {b['root'].resolve()}" for b in batches]
+    versions = "\n".join(f"# {b['label']} ({b['display']})\n{b['versions']}" for b in batches if b["versions"])
+    inputs = [f"{b['label']}: {b['display']}" for b in batches]
     for flag, val in (("metadata", args.metadata), ("group-by", args.group_by), ("order-by", args.order_by),
                       ("kmarvel-db", args.kmarvel_db), ("card-prevalence", args.card_prevalence),
                       ("arg-priority", args.arg_priority), ("watchlist", args.watchlist),

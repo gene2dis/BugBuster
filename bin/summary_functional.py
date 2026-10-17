@@ -160,6 +160,8 @@ def function_long(func):
     ab = func["abundance"].rename(columns={"sample_id": "sample"})
     cog = (ab["ontology"] == "cog") & (ab["description"] == "")
     ab.loc[cog, "description"] = ab.loc[cog, "accession"].map(COG_CATEGORIES).fillna("")
+    # term_description: a plain 'description' could clash with a metadata column of that name
+    ab = ab.rename(columns={"description": "term_description"})
     return ab.drop(columns=[c for c in ("abundance_tpm", "source") if c in ab.columns])
 
 

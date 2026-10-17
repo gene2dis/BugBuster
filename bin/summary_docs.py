@@ -99,13 +99,15 @@ TABLE_DOCS = {
     },
     "taxonomy_species_prevalence": {
         "title": "Species prevalence",
-        "description": "Per species: in how many samples it is detected and how abundant it is. Low-depth samples "
-                       "count only where the species is detected; they are left out of the denominator.",
+        "description": "Per species: in how many samples it is detected and how abundant it is, over the samples "
+                       "with taxonomy output. Low-depth samples count only where the species is detected; they are "
+                       "left out of the denominator.",
         "columns": [
             ("<rank>", "species name"),
             ("n_samples_detected", "samples where the species is detected"),
-            ("n_samples_evaluable", "samples where absence is informative (adequate depth) plus low-depth samples "
-                                    "where it is detected: the denominator of pct_samples_detected"),
+            ("n_samples_evaluable", "samples with taxonomy output where absence is informative (adequate depth), "
+                                    "plus low-depth samples where the species is detected: the denominator of "
+                                    "pct_samples_detected"),
             ("re:^n_.+_detected$", "groups (--group-by) with at least one detection"),
             ("pct_samples_detected", "n_samples_detected / n_samples_evaluable x 100"),
             ("mean_abundance", "mean relative abundance % over the evaluable samples"),
@@ -244,8 +246,9 @@ TABLE_DOCS = {
         "description": "KARGA genes that passed ARG_NORM_REPORT's filter (>= 90% of the gene covered by k-mers), one "
                        "row per sample and MEGARes allele. Abundance is k-mer depth, not read counts.",
         "columns": SAMPLE_KEY + [
-            ("megares_id, type, class, mechanism, group", "MEGARes header fields: accession, type (Drugs, Metals, "
-                                                          "Biocides, Multi-compound), class, mechanism and group"),
+            ("megares_id, megares_type, megares_class, megares_mechanism, megares_group",
+             "MEGARes header fields: accession, type (Drugs, Metals, Biocides, Multi-compound), class, mechanism and "
+             "group"),
             ("snp_confirmation_required", "MEGARes flags the gene as resistant only with a mutation (KARGA does not "
                                           "check it)"),
             ("percent_covered", "% of the gene covered by k-mers"),
@@ -260,22 +263,22 @@ TABLE_DOCS = {
     "arg_karga_group_cpc": {
         "title": "KARGA MEGARes groups x samples (copies per cell)",
         "description": "Copies per cell of each MEGARes group (its deepest allele).",
-        "columns": [("type, class, group", "MEGARes type, class and group"), WIDE_CELL],
+        "columns": [("megares_type, megares_class, megares_group", "MEGARes type, class and group"), WIDE_CELL],
     },
     "arg_karga_class_cpc": {
         "title": "KARGA MEGARes classes x samples (copies per cell)",
         "description": "Copies per cell summed over each MEGARes class's groups.",
-        "columns": [("type, class", "MEGARes type and class"), WIDE_CELL],
+        "columns": [("megares_type, megares_class", "MEGARes type and class"), WIDE_CELL],
     },
     "arg_kargva_long": {
         "title": "KARGVA (MEGARes variants) resistance variants",
         "description": "KARGVA variants that passed ARG_NORM_REPORT's filter (>= 2 SNP k-mers, >= 80% coverage). "
                        "Samples with no passing variant have no row.",
         "columns": SAMPLE_KEY + [
-            ("kargva_id, mutation, aro_id, description", "KARGVA variant id, the mutation, the CARD ARO and its "
-                                                          "description"),
-            ("megares_id, type, class, mechanism, group", "MEGARes fields of the gene"),
-            ("gene, drug", "gene and drug named by ARG_NORM_REPORT"),
+            ("kargva_id, kargva_mutation, aro_id, kargva_description", "KARGVA variant id, the mutation, the CARD "
+                                                                        "ARO and its description"),
+            ("megares_id, megares_type, megares_class, megares_mechanism, megares_group", "MEGARes fields of the gene"),
+            ("gene, kargva_drug", "gene and drug named by ARG_NORM_REPORT"),
             ("percent_covered, kmer_depth, copies_per_cell, cpm_kmer", "as in arg_karga_long"),
         ],
     },
@@ -288,7 +291,8 @@ TABLE_DOCS = {
             ("backend", "woltka, superfocus or humann"),
             ("ontology", "ko, ec, cog (COG functional category letters), pfam, metacyc (Woltka); seed_level1-3 "
                          "(SUPER-FOCUS); ko, ec, metacyc (HUMAnN)"),
-            ("accession, description", "term and its name (blank where the backend gives none)"),
+            ("accession, term_description", "term and its name (blank where the backend gives none; COG "
+                                             "categories named from NCBI COG)"),
             ("abundance_cpge", "copies per genome equivalent: RPK / MicrobeCensus genome equivalents (blank without "
                                "MicrobeCensus, or for SUPER-FOCUS)"),
             ("abundance_native, native_unit", "abundance in the backend's unit (Woltka, SUPER-FOCUS: reads, mates "
@@ -365,6 +369,24 @@ def undocumented_columns(tables, meta_cols, samples, group_by=None):
                 continue
             if column_meaning(name, str(c), set(meta_cols), set(samples), group_by) is None:
                 out.append((name, str(c)))
+    return out
+
+
+def unused_doc_columns(tables, group_by=None):
+    """[(table, documented name)] of TABLE_DOCS column names (tokens excepted) that no emitted column of the table
+    matches: stale entries, or columns this run did not produce."""
+    out = []
+    for name, (df, index) in tables.items():
+        doc = table_doc(name, group_by)
+        if doc is None:
+            continue
+        cols = {str(c) for c in (list(df.index.names) if index else []) + list(df.columns) if c is not None}
+        for spec, _ in doc["columns"]:
+            for n in _names(spec):
+                if n.startswith("<") or n.startswith("re:"):
+                    continue
+                if n not in cols:
+                    out.append((name, n))
     return out
 
 
@@ -697,7 +719,7 @@ def llm_guide(ctx):
            "batches:"]
     for b in ctx["batches"]:
         out.append(f"  - label: {b['label']}")
-        out.append(f"    results_dir: {b['root']}")
+        out.append(f"    results_dir: {b['display']}")
         out.append(f"    samples: [{', '.join(sorted(b['samples'], key=str))}]")
     out += [f"min_clean_pairs: {ctx['min_pairs']}",
             f"low_depth_samples: [{', '.join(s['low_depth_samples'])}]",

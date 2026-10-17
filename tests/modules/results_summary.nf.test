@@ -116,7 +116,11 @@ nextflow_process {
             def readme = path(process.out.readme.get(0)).text
             assert readme.contains("| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran |")
             assert readme.contains("`tables/function_read_ko.tsv`")
-            assert path(process.out.llm_guide.get(0)).text.contains("### arg_karga_long.tsv")
+            def guide = path(process.out.llm_guide.get(0)).text
+            assert guide.contains("### arg_karga_long.tsv")
+            // the docs name the run's output directory (ext.results_path), not the staged run/results copy
+            assert !guide.contains("run/results") && !readme.contains("run/results")
+            assert guide.contains("results_dir: ${outputDir}")
             assert process.out.readme_docx.size() == 1
         }
     }

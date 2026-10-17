@@ -102,7 +102,8 @@ next release is tagged.
     regulator); `rgi_gene_read_pairs` is written, so RGI gene RPKM can be
     rebuilt from the tables; taxonomy wide and watchlist tables mark taxa
     not found in a low-depth sample `NA_low_depth`, and species prevalence
-    leaves those samples out of its denominator; gene family and drug class
+    counts the samples with taxonomy output and leaves low-depth absences
+    out of its denominator; gene family and drug class
     lists use one separator; the report says where tier 1 genes found only
     by another method are
 
