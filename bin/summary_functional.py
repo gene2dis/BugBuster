@@ -15,7 +15,7 @@ annotated reads: the tables are not compositional.
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_LOW_DEPTH, NA_NO_AGS, NA_NOT_RUN, die, warn
+from summary_common import NA_LOW_DEPTH, NA_NO_AGS, NA_NOT_RUN, die, fill_columns, warn
 
 
 ABUNDANCE_COLUMNS = ["sample_id", "source", "backend", "ontology", "accession", "description", "abundance_tpm",
@@ -118,12 +118,11 @@ def function_tables(func, order, status):
             desc = desc.where(desc != "", desc.index.map(lambda a: COG_CATEGORIES.get(a, "")))
         # sum(min_count=1): a missing CPGE stays missing (pivot_table's sum would make it 0)
         mat = sub.groupby(["accession", "sample_id"])[value].sum(min_count=1).unstack("sample_id")
-        mat = mat.reindex(columns=order).astype(object)
-        for s in order:
-            if status[s] == "ok" and s in no_ags:
-                mat[s] = NA_NO_AGS
-            else:
-                mat[s] = mat[s].where(mat[s].notna(), 0 if status[s] == "ok" else status[s])
+        mat = mat.reindex(columns=order)
+        # a sample without a MicrobeCensus estimate has no CPGE at all: the whole column is NA_no_ags
+        no_cpge = [s for s in order if status[s] == "ok" and s in no_ags]
+        fills = {s: NA_NO_AGS if s in no_cpge else (0 if status[s] == "ok" else status[s]) for s in order}
+        mat = fill_columns(mat, fills, keep=mat.notna() & ~mat.columns.isin(no_cpge))
         mat.insert(0, "description", desc.reindex(mat.index).fillna(""))
         num = mat[order].apply(pd.to_numeric, errors="coerce")
         mat = mat.loc[num.mean(axis=1).fillna(0).sort_values(ascending=False, kind="stable").index]

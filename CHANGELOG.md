@@ -86,8 +86,10 @@ next release is tagged.
     dependency) and `LLM_GUIDE.md` in `00_summary/`: the stages that ran per
     results directory (from `software_versions.yml`, read line by line as it
     is not always valid YAML), every table and figure, units, tiers, caveats,
-    versions; the guide maps every stage's published files, how the sample is
-    identified, every summary column, pitfalls and recipes
+    versions; the guide covers the stages that ran, methods, every table
+    column and figure, pitfalls and recipes. Both describe the summary
+    folder only (the part that is shared): paths are relative to it, batches
+    appear by label and input files by name, never as local paths
   - One generic input (`stage_reports`) lays out other stages' run-level
     tables by file name, so a stage is added with one case in the module and
     one `mix()` in `main.nf`
@@ -105,7 +107,8 @@ next release is tagged.
     counts the samples with taxonomy output and leaves low-depth absences
     out of its denominator; gene family and drug class
     lists use one separator; the report says where tier 1 genes found only
-    by another method are
+    by another method are; wide tables are filled in one step, not one
+    column per sample (pandas PerformanceWarning on 100+ samples)
 
 - **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
   - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by

@@ -221,7 +221,7 @@ assert set(ko["sampleB"]) == {"NA_no_ags"} and pd.to_numeric(ko["sampleA"]).gt(0
 PYEOF
 
 check "README.md, README.docx and LLM_GUIDE.md" py - <<'PYEOF'
-import re, zipfile
+import os, re, zipfile
 from xml.dom import minidom
 md = open("out/README.md").read()
 for text in ("## What ran", "## Tables", "## Figures", "## Units and missing values", "## ARG reporting tiers",
@@ -241,8 +241,15 @@ doc = z.read("word/document.xml").decode()
 assert 'w:val="Heading2"' in doc and "What ran" in doc and "<w:tbl>" in doc
 guide = open("out/LLM_GUIDE.md").read()
 for text in ("## Run facts", "n_samples: 2", "## Pitfalls", "### arg_karga_long.tsv", "### samples_qc.tsv",
-             "`05_arg_prediction/read_level/summary/KARGA_norm.csv`", "### Binning and MAGs", "## Recipes"):
+             "`tables/samples_qc.tsv`", "## Figures (figures/)", "### Binning and MAGs", "## Recipes"):
     assert text in guide, text
+# the summary folder is what gets shared: paths relative to it, no local path, inputs by file name
+html = open("out/results_summary.html").read()
+for doc in (md, guide, html):
+    assert os.getcwd() not in doc and "00_summary/" not in doc and "results_dir" not in doc
+    assert not re.search(r"--[a-z-]+ /\w", doc)  # a flag followed by an absolute path
+assert "--arg-priority arg_priority_tiers.tsv" in md and "--results: " in md
+assert "05_arg_prediction" not in guide
 # every column row of the guide has a meaning
 cols = re.findall(r"^\| `([^`]+)` \| (.*) \|$", guide, flags=re.M)
 assert cols and all(meaning.strip() for _, meaning in cols), [c for c, m in cols if not m.strip()][:5]

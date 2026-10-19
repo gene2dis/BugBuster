@@ -38,6 +38,17 @@ def parse_versions(text):
     return out
 
 
+def fill_columns(mat, fills, keep=None):
+    """mat as object, with each column's cells outside keep (default: the non-missing ones) set to
+    fills[column], in one step: assigning a wide frame column by column leaves one block per sample (pandas
+    PerformanceWarning on the next insert, with 100+ samples)."""
+    import pandas as pd  # here: the taxonomy report scripts import this module for natural_key only
+    mat = mat.astype(object)
+    other = pd.DataFrame({c: [fills[c]] * len(mat) for c in mat.columns}, index=mat.index, columns=mat.columns,
+                         dtype=object)
+    return mat.where(mat.notna() if keep is None else keep, other)
+
+
 def die(msg):
     sys.exit(f"ERROR: {msg}")
 

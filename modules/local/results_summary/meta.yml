@@ -1,5 +1,5 @@
 name: results_summary
-description: Run-level summary of QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results (bin/results_summary.py and its summary_*.py modules) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md (the results folder and every summary column, for a language model or a script). Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. RGI bwt genes count at --rgi_summary_min_coverage % coverage of their best reference sequence and carry RGI's k-mer pathogen of origin; when both K-MARVEL and RGI ran, the two are compared gene by gene (UpSet plot, overlap tables). The same script runs outside the pipeline on several published results directories (batches).
+description: Run-level summary of QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results (bin/results_summary.py and its summary_*.py modules) - tidy and wide TSV tables, an Excel workbook, PDF/PNG/SVG figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md (the summary folder and every column, for a language model or a script). Counts are in read pairs; ARG abundance is normalised to RPM/RPKM of clean read pairs; ARGs get a reporting tier from an editable rule table, and variant-model hits are checked against CARD snps.txt. RGI bwt genes count at --rgi_summary_min_coverage % coverage of their best reference sequence and carry RGI's k-mer pathogen of origin; when both K-MARVEL and RGI ran, the two are compared gene by gene (UpSet plot, overlap tables). The same script runs outside the pipeline on several published results directories (batches).
 keywords:
   - report
   - summary
@@ -106,7 +106,7 @@ output:
       pattern: "README.docx"
   - llm_guide:
       type: file
-      description: Guide for a language model or a script - run facts (YAML), every pipeline stage's published files with sample identification and units, every summary column, pitfalls and recipes
+      description: Guide for a language model or a script - run facts (YAML), the stages that ran, methods, every table column and figure, pitfalls and recipes; paths relative to the summary folder, no local path
       pattern: "LLM_GUIDE.md"
   - versions:
       type: file

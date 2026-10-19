@@ -118,9 +118,12 @@ nextflow_process {
             assert readme.contains("`tables/function_read_ko.tsv`")
             def guide = path(process.out.llm_guide.get(0)).text
             assert guide.contains("### arg_karga_long.tsv")
-            // the docs name the run's output directory (ext.results_path), not the staged run/results copy
+            // the summary folder is shared: no local path (task dir, staged run/results copy, an input's path)
+            def taskDir = file(process.out.readme.get(0)).parent.toString()
+            assert !guide.contains(taskDir) && !readme.contains(taskDir)
             assert !guide.contains("run/results") && !readme.contains("run/results")
-            assert guide.contains("results_dir: ${outputDir}")
+            assert !(readme =~ /--[a-z-]+ \/\w/) && readme.contains("--arg-priority arg_priority_tiers.tsv")
+            assert guide.contains("`tables/samples_qc.tsv`")
             assert process.out.readme_docx.size() == 1
         }
     }

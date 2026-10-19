@@ -643,7 +643,7 @@ def readme_blocks(ctx):
                     f"from {s['n_batches']} results director{'y' if s['n_batches'] == 1 else 'ies'}. Open "
                     "`results_summary.html` for the report with figures; the tables are in `tables/` (TSV) and in "
                     "`results_summary.xlsx` (one sheet each, plus a README sheet with every column). "
-                    "`LLM_GUIDE.md` describes the results folder for a language model or a script.")]
+                    "`LLM_GUIDE.md` describes this folder for a language model or a script.")]
     labels, rows = stage_rows(ctx["stage_status"])
     blocks += [("h", 2, "What ran"),
                ("p", "Pipeline stages per results directory, and what this summary takes from each. 'not run' stages "
@@ -703,15 +703,15 @@ def readme_blocks(ctx):
 
 
 def llm_guide(ctx):
-    """LLM_GUIDE.md: the results folder and the summary tables, for a language model or a script."""
+    """LLM_GUIDE.md: this summary folder (tables, figures, methods), for a language model or a script. The
+    folder is what gets shared, so every path is relative to it and no local path is written."""
     s = ctx["summary"]
     tables = ctx["tables"]
     meta_cols, samples = set(ctx["meta_cols"]), set(ctx["order"])
-    out = ["# BugBuster results: guide for a language model", "",
-           "This file describes a BugBuster metagenomics run (or several runs merged) so that a model or a script "
-           "can find and read its results without guessing. Paths are relative to a results directory (the "
-           "pipeline's --output); the summary is in `00_summary/` of each run, or in the directory given to "
-           "`bin/results_summary.py --outdir` when several runs are merged.", "",
+    out = ["# BugBuster results summary: guide for a language model", "",
+           "This file describes the BugBuster metagenomics summary in this folder (one run, or several runs merged "
+           "as batches) so that a model or a script can read its tables and figures without guessing. Every path "
+           "below is relative to this folder.", "",
            "## Run facts", "", "```yaml",
            f"generated: {date.today().isoformat()}",
            f"n_samples: {s['n_samples']}",
@@ -719,7 +719,6 @@ def llm_guide(ctx):
            "batches:"]
     for b in ctx["batches"]:
         out.append(f"  - label: {b['label']}")
-        out.append(f"    results_dir: {b['display']}")
         out.append(f"    samples: [{', '.join(sorted(b['samples'], key=str))}]")
     out += [f"min_clean_pairs: {ctx['min_pairs']}",
             f"low_depth_samples: [{', '.join(s['low_depth_samples'])}]",
@@ -730,30 +729,34 @@ def llm_guide(ctx):
             f"group_by: {ctx.get('group_by') or 'none'}",
             "```", "",
             "## How to use this folder", "",
-            "1. Start from `00_summary/tables/samples_qc.tsv` (one row per sample): depth, low-depth flag "
+            "Contents: `tables/` (one TSV per table), `figures/` (each figure as PNG, PDF and SVG), "
+            "`results_summary.xlsx` (the same tables, one sheet each, plus a README sheet), `results_summary.html` "
+            "(the report with figures and methods), `README.md` / `README.docx` (the same content for people) and "
+            "this guide.", "",
+            "1. Start from `tables/samples_qc.tsv` (one row per sample): depth, low-depth flag "
             "(`low_depth`) and per-method counts. Treat low-depth samples as uninformative for absence.",
             "2. Long tables (`*_long.tsv`) hold one row per sample and feature with every annotation column; wide "
             "tables hold one column per sample. Join on `sample` (summary tables) and, for metadata, on the columns "
             "listed in run facts.",
             "3. Wide-table cells are numbers or the codes NA_low_depth, NA_not_run, NA_no_ags (see Units). Convert "
             "them to missing, not to 0, before statistics.",
-            "4. Go to the per-stage files below only for details the summary does not carry (raw per-read hits, "
-            "per-sample tool reports).", "",
+            "4. The per-sample tool outputs (raw hits, tool reports) are not in this folder; they stay in the "
+            "pipeline's results directory of each batch.", "",
             "## Units and codes", ""]
     out += [f"- **{t}**: {m}" for t, m in UNITS]
     out += ["", "## Pitfalls", ""] + [f"- {p}" for p in PITFALLS]
     labels, rows = stage_rows(ctx["stage_status"])
-    out += ["", "## Pipeline stages and their files", "",
-            "Status per results directory: `ran`, `not run`, or `ran, no table found`. Sample identification says "
-            "where the sample name is: a column, the file name or the directory.", ""]
+    out += ["", "## Pipeline stages", "",
+            "Status per batch: `ran`, `not run`, or `ran, no table found` (the stage ran but its table was not "
+            "found). A stage that did not run has no tables or figures here.", ""]
     for i, st in enumerate(STAGES):
         status = "; ".join(f"{b}: {ctx['stage_status'][b][i][1]}" for b in labels)
         out += [f"### {st['title']}", "", f"- Status: {status}", f"- Turned on by: {st['params']}",
-                f"- In 00_summary: {st['summary']}", "", "| Path | Content | Sample identified by | Units |",
-                "|---|---|---|---|"]
-        out += [f"| `{p}` | {_md_cell(c)} | {_md_cell(k)} | {_md_cell(u)} |" for p, c, k, u in st["files"]]
-        out.append("")
-    out += ["## Summary tables (00_summary/tables/)", "",
+                f"- In this folder: {st['summary']}", ""]
+    methods = ctx.get("method_notes", [])
+    if methods:
+        out += ["## Methods", ""] + [f"- {m}" for m in methods] + [""]
+    out += ["## Tables (tables/)", "",
             "Each table is also a sheet of `results_summary.xlsx`. Columns are listed in file order.", ""]
     for name, (df, index) in tables.items():
         doc = table_doc(name, ctx.get("group_by")) or {"title": name, "description": ""}
@@ -776,21 +779,21 @@ def llm_guide(ctx):
             out.append(f"| `{_md_cell(c)}` | {_md_cell(meaning)} |")
         out.append("")
     if ctx["figures"].records:
-        out += ["## Figures (00_summary/figures/)", ""]
-        out += [f"- `{r['key']}`: {r['title']}. {r['caption']}" for r in ctx["figures"].records]
+        out += ["## Figures (figures/)", ""]
+        out += [f"- `figures/{r['key']}.png` (.pdf, .svg): {r['title']}. {r['caption']}"
+                for r in ctx["figures"].records]
         out.append("")
     out += ["## Recipes", "",
-            "- Which samples are reliable? `samples_qc.tsv`: `low_depth == False`; `depth_class` for depth strata.",
-            "- Most abundant species of a sample: `taxonomy_long.tsv`, filter `sample`, sort `relative_abundance`.",
-            "- Clinically relevant ARGs: `arg_long.tsv` with `tier == 1` and `gene_representative == True`; check "
-            "`arg_method_comparison.tsv` (`detected_by`) for agreement between K-MARVEL and RGI, and "
+            "- Which samples are reliable? `tables/samples_qc.tsv`: `low_depth == False`; `depth_class` for depth strata.",
+            "- Most abundant species of a sample: `tables/taxonomy_long.tsv`, filter `sample`, sort `relative_abundance`.",
+            "- Clinically relevant ARGs: `tables/arg_long.tsv` with `tier == 1` and `gene_representative == True`; check "
+            "`tables/arg_method_comparison.tsv` (`detected_by`) for agreement between K-MARVEL and RGI, and "
             "`rgi_host_check` for the likely host.",
-            "- ARG load per sample in one unit: `samples_qc.tsv` `acquired_rpkm` (CARD methods) or "
+            "- ARG load per sample in one unit: `tables/samples_qc.tsv` `acquired_rpkm` (CARD methods) or "
             "`karga_copies_per_cell` (MEGARes); never add the two.",
-            "- A functional term across samples: `function_read_<ontology>.tsv` (CPGE when available), or "
-            "`function_read_long.tsv` filtered by `ontology` and `accession`.",
-            "- Software versions: `pipeline_info/software_versions.yml` of each results directory (read it line by "
-            "line: it is not always valid YAML).", ""]
+            "- A functional term across samples: `tables/function_read_<ontology>.tsv` (CPGE when available), or "
+            "`tables/function_read_long.tsv` filtered by `ontology` and `accession`.",
+            "- Software versions: `README.md`, section Software versions (per batch when several were merged).", ""]
     return "\n".join(out)
 
 

@@ -37,8 +37,9 @@ resistance call only when a known resistance mutation is among them.
 
 Outputs (in --outdir): tables/*.tsv, results_summary.xlsx (if openpyxl or xlsxwriter
 is installed), figures/*.{png,pdf,svg}, results_summary.html (self-contained, works offline),
-README.md and README.docx (what is in the summary) and LLM_GUIDE.md (the results folder and every
-summary column, for a language model or a script).
+README.md and README.docx (what is in the summary) and LLM_GUIDE.md (the summary folder and every
+column, for a language model or a script). These name no local path: the summary folder is the part
+that is shared, so paths are relative to it and inputs are shown by file name.
 
 Requirements: Python 3 with pandas, numpy and matplotlib >= 3.7; openpyxl or xlsxwriter for the
 Excel workbook (optional). The pipeline's RESULTS_SUMMARY image has them all. Run the script from
@@ -297,10 +298,6 @@ def parse_args(argv=None):
     p.add_argument("--batch-labels", nargs="+", metavar="LABEL",
                    help="batch labels, one per --results directory in the same order "
                         "(default: each directory's name, or its parent's when it is called 'results')")
-    p.add_argument("--results-paths", nargs="+", metavar="PATH",
-                   help="path shown for each --results directory in the README, LLM_GUIDE.md and the report, in the "
-                        "same order (default: the directory itself; the pipeline passes its --output when it stages "
-                        "the results as a copy)")
     p.add_argument("--outdir", required=True, help="output directory")
     p.add_argument("--metadata", help="TSV/CSV with a 'sample' column (or sample names in the first column)")
     p.add_argument("--group-by", help="metadata column that groups samples (e.g. subject, site)")
@@ -349,8 +346,6 @@ def main(argv=None):
         dups = sorted({lab for lab in args.batch_labels if args.batch_labels.count(lab) > 1})
         if dups:
             die(f"--batch-labels: {', '.join(dups)} given more than once; batch labels must be unique")
-    if args.results_paths is not None and len(args.results_paths) != len(args.results):
-        die(f"--results-paths has {len(args.results_paths)} paths for {len(args.results)} --results directories")
 
     batches, seen, labels = [], {}, set()
     for i, r in enumerate(args.results):
@@ -392,7 +387,6 @@ def main(argv=None):
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "karga": karga, "kargva": kargva, "args_oap": args_oap,
                         "karga_ran": karga_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
-                        "display": args.results_paths[i] if args.results_paths else str(root.resolve()),
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
@@ -692,8 +686,11 @@ def main(argv=None):
     if missing_docs:
         warn("columns without documentation (summary_docs.TABLE_DOCS): "
              + ", ".join(f"{t}.{c}" for t, c in missing_docs[:20]))
-    versions = "\n".join(f"# {b['label']} ({b['display']})\n{b['versions']}" for b in batches if b["versions"])
-    inputs = [f"{b['label']}: {b['display']}" for b in batches]
+    # no local paths (the summary folder is shared): batches by label, input files by name (resolved, so a file
+    # the pipeline staged under another name shows its own: kmarvel_db -> card_v4.0.1)
+    versions = "\n".join(f"# {b['label']}\n{b['versions']}" for b in batches if b["versions"])
+    inputs = [f"--results: {', '.join(b['label'] for b in batches)}"]
+    file_flags = {"metadata", "kmarvel-db", "card-prevalence", "arg-priority", "watchlist"}
     for flag, val in (("metadata", args.metadata), ("group-by", args.group_by), ("order-by", args.order_by),
                       ("kmarvel-db", args.kmarvel_db), ("card-prevalence", args.card_prevalence),
                       ("arg-priority", args.arg_priority), ("watchlist", args.watchlist),
@@ -701,7 +698,7 @@ def main(argv=None):
                       ("arg-primary", args.arg_primary), ("depth-marks", args.depth_marks),
                       ("taxa-per-sample", args.taxa_per_sample)):
         if val:
-            inputs.append(f"--{flag} {val}")
+            inputs.append(f"--{flag} {Path(val).resolve().name if flag in file_flags else val}")
     stage_by_batch = {b["label"]: stage_status(b["processes"], b["found"]) for b in batches}
     for b in batches:
         for st, status in stage_by_batch[b["label"]]:
@@ -718,7 +715,7 @@ def main(argv=None):
         "figures": figs, "tables": tables, "summary": summary, "versions": versions, "inputs": inputs,
         "min_pairs": args.min_clean_pairs, "meta_cols": meta_cols, "key_meta": key_meta,
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
-        "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": args.watchlist,
+        "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
         "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
         "karga": karga_ctx, "functional": func_ctx, "table_units": table_units, "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,

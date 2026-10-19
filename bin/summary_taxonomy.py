@@ -152,9 +152,9 @@ def prevalence_table(wide, samples, group_by, low=()):
 def mark_low_depth(wide, low, sample_cols):
     """Copy of a wide table with 0 -> NA_low_depth in the low-depth sample columns (absence there is unknown)."""
     out = wide.copy()
-    for s in sample_cols:
-        if s in low and s in out.columns:
-            out[s] = out[s].astype(object).where(out[s] != 0, NA_LOW_DEPTH)
+    cols = [s for s in sample_cols if s in low and s in out.columns]
+    if cols:  # all columns at once: one assignment per sample fragments a wide frame
+        out[cols] = out[cols].astype(object).where(out[cols] != 0, NA_LOW_DEPTH)
     return out
 
 

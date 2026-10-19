@@ -15,7 +15,7 @@ k-mers), so a group is represented by its deepest allele, never by the sum.
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die
+from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, fill_columns
 
 
 KARGA_NEEDED = {"sample", "nRead", "n16S", "nCell", "GeneIdx", "PercentGeneCovered", "AverageKMerDepth",
@@ -91,10 +91,7 @@ def karga_tables(karga, order, status):
     rep = karga[karga["group_representative"]]
 
     def fill(mat):
-        mat = mat.reindex(columns=order).astype(object)
-        for s in order:
-            mat[s] = mat[s].where(mat[s].notna(), 0 if status[s] == "ok" else status[s])
-        return mat
+        return fill_columns(mat.reindex(columns=order), {s: 0 if status[s] == "ok" else status[s] for s in order})
 
     out = {}
     if rep.empty:
@@ -104,11 +101,8 @@ def karga_tables(karga, order, status):
         g = rep.groupby(keys + ["sample"])["copies_per_cell"]
         mat = g.sum(min_count=1).unstack("sample")
         # a hit without copies per cell (ARGs-OAP nCell 0) is blank: neither 0 nor 'not detected'
-        blank = g.size().unstack("sample").notna() & mat.isna()
-        mat = fill(mat)
-        for s in blank.columns:
-            mat.loc[blank[s], s] = ""
-        return mat
+        blank = (g.size().unstack("sample").notna() & mat.isna()).reindex(columns=order, fill_value=False)
+        return fill(mat).mask(blank, "")
     out["arg_karga_group_cpc"] = wide(["megares_type", "megares_class", "megares_group"])
     out["arg_karga_class_cpc"] = wide(["megares_type", "megares_class"])
     return out

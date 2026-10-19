@@ -46,8 +46,6 @@ process RESULTS_SUMMARY {
     // (--summary_batch_label, or the output directory's name)
     def run_dir = "run/results"
     def batch_label = task.ext.batch_label ?: 'run'
-    // the README, LLM_GUIDE.md and the report name the run's output directory, not this staged copy
-    def results_path = task.ext.results_path ? file(task.ext.results_path).toAbsolutePath() : run_dir
     """
     mkdir -p ${run_dir}/01_quality_control/summary ${run_dir}/01_quality_control/fastp \\
         ${run_dir}/02_taxonomy/tables ${run_dir}/02_taxonomy/sylph \\
@@ -112,7 +110,6 @@ process RESULTS_SUMMARY {
     results_summary.py \\
         --results ${run_dir} \\
         --batch-labels '${batch_label}' \\
-        --results-paths '${results_path}' \\
         --outdir . \\
         --arg-priority ${arg_priority} \\
         --watchlist ${watchlist} \\

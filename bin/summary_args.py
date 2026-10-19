@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, norm_taxon, warn
+from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, fill_columns, norm_taxon, warn
 
 
 KMARVEL_COLUMNS = [
@@ -441,13 +441,10 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
     arg = arg[arg["gene_representative"]]
     cols = [s for s in order]
 
+    fills = {s: 0 if status[s] == "ok" else status[s] for s in cols}
+
     def fill_missing(mat):
-        mat = mat.reindex(columns=cols)
-        mat = mat.astype(object)
-        for s in cols:
-            fill = 0 if status[s] == "ok" else status[s]
-            mat[s] = mat[s].where(mat[s].notna(), fill)
-        return mat
+        return fill_columns(mat.reindex(columns=cols), fills)
 
     gene_meta = arg.groupby("gene").agg(tier=("tier", "min"), category=("category", "first"),
                                         gene_family=("gene_family", "first"))
@@ -463,10 +460,9 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
     out["arg_family_rpkm"] = fill_missing(fam)
 
     pres = (rpkm_numeric.reindex(columns=cols).notna() & (rpkm_numeric.reindex(columns=cols) > 0)).astype(int)
-    pres = pres.astype(object)
-    for s in cols:
-        if status[s] != "ok":
-            pres[s] = pres[s].where(pres[s] == 1, status[s])
+    # a 0 stays 0 in a sample of adequate depth; elsewhere it becomes the sample's status
+    ok = pd.DataFrame({s: [status[s] == "ok"] * len(pres) for s in cols}, index=pres.index, columns=cols)
+    pres = fill_columns(pres, fills, keep=(pres == 1) | ok)
     pres.insert(0, "tier", gene_meta.loc[pres.index, "tier"])
     out["arg_presence"] = pres.sort_values("tier", kind="stable")
 
