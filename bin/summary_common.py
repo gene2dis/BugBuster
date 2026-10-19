@@ -38,6 +38,12 @@ def parse_versions(text):
     return out
 
 
+def sample_status(order, ran, low):
+    """Per sample of a method: NA_not_run (no output for it), NA_low_depth (below --min-clean-pairs, so absence is
+    not informative) or ok."""
+    return {s: NA_NOT_RUN if s not in ran else (NA_LOW_DEPTH if s in low else "ok") for s in order}
+
+
 def fill_columns(mat, fills, keep=None):
     """mat as object, with each column's cells outside keep (default: the non-missing ones) set to
     fills[column], in one step: assigning a wide frame column by column leaves one block per sample (pandas

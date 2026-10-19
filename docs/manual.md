@@ -849,7 +849,7 @@ when its stage ran; the README and the guide list every pipeline stage and wheth
 | `--sample_metadata` | none | TSV/CSV with a `sample` column (or sample names in the first column) and any metadata columns; carried into every table |
 | `--summary_group_by` | none | Metadata column that groups samples (subject, site, ...) in the figures and the per-group ARG detection table |
 | `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...) in the figures and the per-group detection patterns |
-| `--summary_batch_label` | output directory name | Label in the `batch` column; set it when batches share an output directory name such as `results` |
+| `--summary_batch_label` | output directory name (its parent's when it is `results`) | Label in the `batch` column; set it when the default does not tell the batches apart |
 | `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
 | `--summary_top_n` | `40` | Maximum rows in the summary ARG heatmap |
 | `--summary_taxa_per_sample` | `5` | The taxonomy heatmaps show the union of each sample's N most abundant taxa (no row cap), grouped by phylum, A-Z within |
@@ -1022,7 +1022,8 @@ results/
 │   │   └── {sample}_sylph_{db}.sylphmpa        # Per-sample lineage profile (sylph-tax, every rank down to t__ genome)
 │   ├── tables/                                 # Taxonomy tables
 │   │   ├── *.tsv                               # Abundance tables (OTU = relative abundance for sylph)
-│   │   └── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
+│   │   ├── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
+│   │   └── Reads_report_taxonomy.csv           # Reads_report.csv plus the profiler's DB, Unclassified, Classified
 │   ├── phyloseq/                               # Phyloseq objects
 │   │   ├── *.h5                                # HDF5 format
 │   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
@@ -1371,7 +1372,7 @@ The following outputs are only generated when specific parameters are enabled:
 |------------------|-------------------|-------------|
 | `00_summary/` | `results_summary=true` (default) | Run-level summary: tables, Excel workbook, figures, HTML report |
 | `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
-| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`, extended with taxonomy when a profiler runs) |
+| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`; with a profiler, `02_taxonomy/tables/Reads_report_taxonomy.csv` adds the classified fraction) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
 | `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |
 | `03_assembly/` | `assembly_mode != 'none'` | Assembly results |

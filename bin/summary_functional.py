@@ -15,7 +15,7 @@ annotated reads: the tables are not compositional.
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_LOW_DEPTH, NA_NO_AGS, NA_NOT_RUN, die, fill_columns, warn
+from summary_common import NA_NO_AGS, die, fill_columns, warn
 
 
 ABUNDANCE_COLUMNS = ["sample_id", "source", "backend", "ontology", "accession", "description", "abundance_tpm",
@@ -93,10 +93,6 @@ def merge_read_functional(parts):
                        if any(p[key] is not None for p in parts) else None)
     return {"abundance": ab, "fraction": cat("fraction"), "summary": cat("summary"),
             "ran": set().union(*[p["ran"] for p in parts]), "backend": backends[0] if backends else ""}
-
-
-def function_status(order, ran, low):
-    return {s: NA_NOT_RUN if s not in ran else (NA_LOW_DEPTH if s in low else "ok") for s in order}
 
 
 def function_tables(func, order, status):

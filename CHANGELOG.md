@@ -449,15 +449,36 @@ next release is tagged.
 
 ### Fixed
 
-- **`Reads_report.csv` without the classified fraction**: with a taxonomic
-  profiler, READS_REPORT and TAXONOMY_REPORT both published
-  `Reads_report.csv` to `01_quality_control/summary/`, and the one published
-  last was kept, so a run could keep the copy without the profiler's DB,
-  Unclassified and Classified columns (a summary run on such a results
-  directory had no `classified_fraction`). READS_REPORT now publishes its
-  copy only when no profiler runs. On an existing results directory, delete
-  the file and `-resume` to republish TAXONOMY_REPORT's copy (resumed runs
-  do not overwrite published files)
+- **Two `Reads_report.csv` written to one path**: with a taxonomic profiler,
+  READS_REPORT and TAXONOMY_REPORT both published `Reads_report.csv` to
+  `01_quality_control/summary/`, and the one published last was kept, so a
+  run could keep the copy without the profiler's DB, Unclassified and
+  Classified columns. TAXONOMY_REPORT's copy is now
+  `02_taxonomy/tables/Reads_report_taxonomy.csv`; the QC path always holds
+  READS_REPORT's, also when the taxonomy step fails. The summary reads the
+  taxonomy copy first and falls back to the QC path (older results)
+- **Results summary review fixes**:
+  - a gene called without an RPKM (no `Reads_report.csv`, or no reference
+    length) is blank in `arg_gene_rpkm`, `arg_family_rpkm`,
+    `arg_drug_class_rpkm` and `arg_priority_panel`, and 1 in
+    `arg_presence`, instead of 0 (not detected)
+  - a tier rule outside 1-4 stops with a clear error instead of failing
+    while the report is written; the tier table keeps its categories when
+    the rule file has no `note` column
+  - `n_species` and `shannon` leave out the pooled `unassigned species`
+    row (taxa without a species name); Shannon is renormalised over the
+    named species
+  - the default batch label is the output directory's name, or its
+    parent's when it is called `results` (as `bin/results_summary.py`
+    labels a directory), reduced to the `--summary_batch_label` pattern so
+    it is safe on the command line
+  - the `--summary_group_by` / `--summary_order_by` check runs only with
+    `--results_summary true`
+  - a `--custom_rgi_card_db` is checked at launch for both k-mer files
+    RGI_KMER needs (`<k>mer_database.json` and `amr_<k>mer.txt`)
+  - tiers are assigned once per distinct ARO annotation, not once per row;
+    the status and metadata-merge code is shared; the unused
+    `rgi_gene_detected` column is gone
 
 - **MEGAHIT out of memory on a large host**: MEGAHIT was run without `-m`, so
   it sized its graph build to 90% of the host's RAM instead of the task's

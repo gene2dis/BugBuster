@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, fill_columns, norm_taxon, warn
+from summary_common import die, fill_columns, norm_taxon, warn
 
 
 KMARVEL_COLUMNS = [
@@ -156,6 +156,8 @@ def load_rules(path):
     for r in rules.itertuples(index=False):
         if r.match not in ("name", "family"):
             die(f"{path}: match must be 'name' or 'family', got '{r.match}'")
+        if str(r.tier).strip() not in ("1", "2", "3", "4"):
+            die(f"{path}: tier must be 1, 2, 3 or 4, got '{r.tier}' (rule {r.match} {r.pattern})")
         compiled.append((r.match, re.compile(r.pattern), int(r.tier), r.category, r.note))
     return compiled
 
@@ -242,6 +244,21 @@ def assign_tier(row, rules, snps):
     return 2, "acquired_unreviewed", "no tier rule matched; review and add a rule to the tier table"
 
 
+TIER_KEYS = ["aro_id", "aro_full_name", "gene_family", "model", "resistance_mechanism"]
+
+
+def tiers_for(arg, rules, snps):
+    """tier, category and tier_note of each row, from assign_tier run once per distinct ARO annotation (the
+    tier depends on nothing else): an RGI run lists thousands of ARO rows per sample, a few hundred distinct."""
+    keys = arg[TIER_KEYS].drop_duplicates()
+    tiers = [assign_tier(r, rules, snps) for r in keys.to_dict("records")]
+    keys = keys.assign(tier=[t[0] for t in tiers], category=[t[1] for t in tiers],
+                       tier_note=[t[2] for t in tiers])
+    out = arg[TIER_KEYS].merge(keys, on=TIER_KEYS, how="left")[["tier", "category", "tier_note"]]
+    out.index = arg.index
+    return out.astype({"tier": int})
+
+
 def annotate_args(arg, samples, rules, snps, prevalence, species_by_sample, families=None):
     if arg.empty:
         return arg
@@ -255,8 +272,7 @@ def annotate_args(arg, samples, rules, snps, prevalence, species_by_sample, fami
     clean = arg["sample"].map(samples["clean_pairs"]) if "clean_pairs" in samples else np.nan
     arg["rpm"] = arg["supporting_reads"] / clean * 1e6
     arg["rpkm"] = arg["rpm"] / (arg["gene_length_nt"] / 1000)
-    tiers = arg.apply(lambda r: assign_tier(r, rules, snps), axis=1, result_type="expand")
-    arg["tier"], arg["category"], arg["tier_note"] = tiers[0].astype(int), tiers[1], tiers[2]
+    arg[["tier", "category", "tier_note"]] = tiers_for(arg, rules, snps)
     arg["gene"] = [gene_name(a, f, families) for a, f in zip(arg["aro_full_name"], arg["gene_family"])]
     status = [
         snp_status(a, m, snps) if t == 4 else ("", "")
@@ -358,8 +374,7 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     arg["rpm"] = arg["supporting_reads"] / clean * 1e6
     arg["rpkm"] = arg["rpm"] / (arg["gene_length_nt"] / 1000)
     # the same tier input as K-MARVEL (CARD snps.txt when given), so a gene gets one tier from both methods
-    tiers = arg.apply(lambda r: assign_tier(r, rules, snps), axis=1, result_type="expand")
-    arg["tier"], arg["category"], arg["tier_note"] = tiers[0].astype(int), tiers[1], tiers[2]
+    arg[["tier", "category", "tier_note"]] = tiers_for(arg, rules, snps)
     arg["gene"] = [gene_name(n, f, families) for n, f in zip(arg["aro_full_name"], arg["gene_family"])]
     arg["resistance_snp_status"] = np.where(arg["tier"] == 4, "not_checked_rgi", "")
     arg["resistance_snps_found"] = ""
@@ -367,7 +382,6 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     arg["rgi_detected"] = arg["assembly_coverage"] >= min_coverage
     gene_cov = arg.groupby(["sample", "gene"])["assembly_coverage"].transform("max")
     arg["rgi_gene_coverage"] = gene_cov
-    arg["rgi_gene_detected"] = gene_cov >= min_coverage
     gene_rpkm = arg.groupby(["sample", "gene"])["rpkm"].transform("sum")
     gene_pairs = arg.groupby(["sample", "gene"])["supporting_reads"].transform("sum")
     # the representative ARO of a gene: detected first, then best covered, then most reads
@@ -429,37 +443,38 @@ def unify_gene_tiers(frames, order):
     return sorted(conflicts)
 
 
-def arg_status(samples, order, ran):
-    """Per sample: ok, NA_low_depth (absence not informative) or NA_not_run (no K-MARVEL output)."""
-    low = samples["low_depth"].fillna(False).astype(bool) if "low_depth" in samples else pd.Series(False, samples.index)
-    return {s: NA_NOT_RUN if s not in ran else (NA_LOW_DEPTH if low[s] else "ok") for s in order}
-
-
 def arg_tables(arg, samples, order, status, group_by, order_by):
-    """Wide ARG matrices; a cell for a gene not found is 0, NA_low_depth or NA_not_run."""
+    """Wide ARG matrices; a cell for a gene not found is 0, NA_low_depth or NA_not_run, and a gene found
+    without an RPKM (no Reads_report.csv, or no reference length) is blank, never 0 (= not detected)."""
     out = {}
     arg = arg[arg["gene_representative"]]
     cols = [s for s in order]
 
     fills = {s: 0 if status[s] == "ok" else status[s] for s in cols}
 
-    def fill_missing(mat):
-        return fill_columns(mat.reindex(columns=cols), fills)
+    def wide(frame, keys):
+        """-> (RPKM summed per keys x sample, keeping a missing RPKM missing; True where a call exists)."""
+        g = frame.groupby(keys + ["sample"])["gene_rpkm"]
+        mat = g.sum(min_count=1).unstack("sample")  # pivot_table's sum would turn a missing RPKM into 0
+        called = g.size().unstack("sample").notna().reindex(index=mat.index, columns=cols, fill_value=False)
+        return mat, called
+
+    def fill_missing(mat, called):
+        mat = mat.reindex(columns=cols)
+        return fill_columns(mat, fills).mask(called.loc[mat.index] & mat.isna(), "")
 
     gene_meta = arg.groupby("gene").agg(tier=("tier", "min"), category=("category", "first"),
                                         gene_family=("gene_family", "first"))
-    rpkm = arg.pivot_table(index="gene", columns="sample", values="gene_rpkm", aggfunc="sum")
-    rpkm_numeric = rpkm.reindex(columns=cols)
-    gene_rpkm = fill_missing(rpkm)
+    rpkm, gene_called = wide(arg, ["gene"])
+    gene_rpkm = fill_missing(rpkm, gene_called)
     gene_rpkm.insert(0, "category", gene_meta.loc[gene_rpkm.index, "category"])
     gene_rpkm.insert(0, "tier", gene_meta.loc[gene_rpkm.index, "tier"])
     gene_rpkm = gene_rpkm.sort_values(["tier"], kind="stable")
     out["arg_gene_rpkm"] = gene_rpkm
 
-    fam = arg.pivot_table(index="gene_family", columns="sample", values="gene_rpkm", aggfunc="sum")
-    out["arg_family_rpkm"] = fill_missing(fam)
+    out["arg_family_rpkm"] = fill_missing(*wide(arg, ["gene_family"]))
 
-    pres = (rpkm_numeric.reindex(columns=cols).notna() & (rpkm_numeric.reindex(columns=cols) > 0)).astype(int)
+    pres = gene_called.astype(int)  # a call, whether or not it has an RPKM
     # a 0 stays 0 in a sample of adequate depth; elsewhere it becomes the sample's status
     ok = pd.DataFrame({s: [status[s] == "ok"] * len(pres) for s in cols}, index=pres.index, columns=cols)
     pres = fill_columns(pres, fills, keep=(pres == 1) | ok)
@@ -474,11 +489,13 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
     counted = counted.explode("drug_class")
     counted["drug_class"] = counted["drug_class"].str.strip()
     counted = counted[counted["drug_class"] != ""]
-    dc = counted.pivot_table(index=["tier_group", "drug_class"], columns="sample", values="gene_rpkm", aggfunc="sum")
-    out["arg_drug_class_rpkm"] = fill_missing(dc) if not dc.empty else dc
+    if counted.empty:
+        out["arg_drug_class_rpkm"] = pd.DataFrame()
+    else:
+        out["arg_drug_class_rpkm"] = fill_missing(*wide(counted, ["tier_group", "drug_class"]))
 
-    t1 = rpkm_numeric.loc[gene_meta.loc[rpkm_numeric.index, "tier"] == 1]
-    panel = fill_missing(t1)
+    t1 = rpkm.loc[gene_meta.loc[rpkm.index, "tier"] == 1]
+    panel = fill_missing(t1, gene_called)
     panel.insert(0, "category", gene_meta.loc[panel.index, "category"])
     out["arg_priority_panel"] = panel
 

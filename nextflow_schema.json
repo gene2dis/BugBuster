@@ -1061,7 +1061,7 @@
                 "summary_batch_label": {
                     "type": "string",
                     "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$",
-                    "description": "Label in the 'batch' column of the summary tables (letters, digits, '.', '_', '-'). Defaults to the name of the --output directory; set it when the batches of a project share an output directory name such as 'results', so their summaries can be merged and told apart.",
+                    "description": "Label in the 'batch' column of the summary tables (letters, digits, '.', '_', '-'). Defaults to the name of the --output directory, or of its parent when it is called 'results' (as bin/results_summary.py labels a directory); set it when that does not tell the batches of a project apart, so their summaries can be merged.",
                     "fa_icon": "fas fa-tag"
                 },
                 "summary_min_clean_pairs": {

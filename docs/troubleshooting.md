@@ -802,7 +802,7 @@ directly contains `markers/`, `skani/`, `taxonomy/`, ...).
 ### Sylph: Classified is 1.0, or TAXONOMY_PHYLOSEQ fails with "No sylph genomes in any sample"
 
 **Symptom (a):** with `--taxonomic_profiler sylph`, the `Classified` column of
-`Reads_report.csv` is 1.0 (or close) for samples that surely hold organisms
+`02_taxonomy/tables/Reads_report_taxonomy.csv` is 1.0 (or close) for samples that surely hold organisms
 missing from the database, and the estimated read pairs in
 `sylph_<db>_read_counts.tsv` add up to every read pair.
 

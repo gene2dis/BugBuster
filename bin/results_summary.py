@@ -10,6 +10,7 @@ Usage:
 Reads only the files a BugBuster run publishes, so it runs on finished results without
 rerunning any tool, and merges any number of results directories (one per batch):
   01_quality_control/summary/Reads_report.csv     read counts per step (single reads)
+  02_taxonomy/tables/Reads_report_taxonomy.csv    the same with the classified fraction (when a profiler ran)
   01_quality_control/fastp/*/*.fastp.json         mean read length
   02_taxonomy/tables/<label>_{otu,tax}_table.tsv   any taxonomic profiler (+ _read_counts.tsv)
   02_taxonomy/sylph/*_sylph_<db>.tsv              sylph ANI / coverage (optional)
@@ -60,17 +61,17 @@ import pandas as pd
 # write no __pycache__ into the pipeline's bin/ (read-only in a container image)
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from summary_common import (NA_NOT_RUN, die, natural_key, norm_taxon, parse_versions, strip_gtdb,  # noqa: E402
-                            warn)
+from summary_common import (NA_NOT_RUN, die, natural_key, norm_taxon, parse_versions, sample_status,  # noqa: E402
+                            strip_gtdb, warn)
 from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mark_low_depth,  # noqa: E402
                               prevalence_table, species_rank, watchlist_table)
-from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_status, arg_tables,  # noqa: E402
+from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_tables,  # noqa: E402
                           card_families, compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules,
                           load_snps, unify_gene_tiers)
-from summary_megares import (karga_representatives, karga_sample_counts, karga_status,  # noqa: E402
-                             karga_tables, load_karga)
+from summary_megares import (karga_representatives, karga_sample_counts, karga_tables,  # noqa: E402
+                             load_karga)
 from summary_functional import (cog_matrix, function_long, function_sample_columns,  # noqa: E402
-                                function_status, function_tables, load_microbecensus, load_read_functional,
+                                function_tables, load_microbecensus, load_read_functional,
                                 merge_read_functional)
 from summary_catalog import stage_status  # noqa: E402
 from summary_figures import (FigureWriter, fig_args, fig_cog, fig_karga, fig_method_by_category,  # noqa: E402
@@ -88,8 +89,24 @@ def batch_label(path):
     return p.parent.name if p.name == "results" else p.name
 
 
+def with_meta(df, samples, meta_cols, order, sort_cols, ascending=None, lead=()):
+    """A long table joined to its samples' batch and metadata, sorted by sample order then sort_cols (ascending
+    unless given, one flag per column), with sample, batch, the metadata and lead first."""
+    df = df.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
+    df["_o"] = df["sample"].map({s: i for i, s in enumerate(order)})
+    asc = [True] + (list(ascending) if ascending is not None else [True] * len(sort_cols))
+    df = df.sort_values(["_o"] + list(sort_cols), ascending=asc, kind="stable").drop(columns="_o")
+    first = ["sample", "batch"] + meta_cols + list(lead)
+    return df[first + [c for c in df.columns if c not in first]]
+
+
 def load_reads_report(root):
-    path = root / "01_quality_control" / "summary" / "Reads_report.csv"
+    """Read counts per step; with a taxonomic profiler, TAXONOMY_REPORT's copy (02_taxonomy/tables/
+    Reads_report_taxonomy.csv) adds the classified fraction. Results from before it had its own name may hold
+    that copy at the QC path instead."""
+    path = root / "02_taxonomy" / "tables" / "Reads_report_taxonomy.csv"
+    if not path.exists():
+        path = root / "01_quality_control" / "summary" / "Reads_report.csv"
     if not path.exists():
         return None
     df = pd.read_csv(path, dtype={"Id": str})
@@ -448,7 +465,11 @@ def main(argv=None):
     if tx is not None:
         sp = species_rank(tx)
         spw = tx["wide"][sp].reindex(columns=order).fillna(0)
-        p = spw / 100
+        # taxa without a species name are pooled into one 'unassigned species' row: not a species, so it is
+        # counted in neither n_species nor the Shannon index (computed over the named species, renormalised)
+        named = ~spw.index.astype(str).str.startswith("unassigned ")
+        spw = spw[named]
+        p = spw / 100 if named.all() else spw / spw.sum(axis=0).replace(0, np.nan)  # columns sum to 100
         with np.errstate(divide="ignore", invalid="ignore"):
             shannon = -(p * np.log(p.where(p > 0))).sum(axis=0) + 0.0  # + 0.0: no "-0.0" for one species
         samples["taxonomy_db"] = tx["label"]
@@ -456,13 +477,8 @@ def main(argv=None):
         samples["shannon"] = shannon.reindex(order)
         no_tax = [s for s in order if s not in tx["rel"].columns]
         samples.loc[no_tax, ["n_species", "shannon"]] = np.nan
-        long = tx["long"]
-        meta_join = samples[["batch"] + meta_cols]
-        long = long.merge(meta_join, left_on="sample", right_index=True, how="left")
-        lead = ["sample", "batch"] + meta_cols + ["taxon_id"] + tx["ranks"]
-        long = long[lead + [c for c in long.columns if c not in lead]]
-        long["_o"] = long["sample"].map({s: i for i, s in enumerate(order)})
-        long = long.sort_values(["_o", "relative_abundance"], ascending=[True, False]).drop(columns="_o")
+        long = with_meta(tx["long"], samples, meta_cols, order, ["relative_abundance"], ascending=[False],
+                         lead=["taxon_id"] + tx["ranks"])
         tables["taxonomy_long"] = (long, False)
         tcols_all = list(tx["rel"].columns)
         for rank, wide in tx["wide"].items():
@@ -531,7 +547,7 @@ def main(argv=None):
             calls_by["rgi"] = rgi_all[rgi_all["rgi_detected"]].copy() if not rgi_all.empty else rgi_all
         summary["arg_primary"] = METHOD_LABELS[primary]
         summary["arg_methods"] = [METHOD_LABELS[m] for m in methods_ran]
-        status = arg_status(samples, order, methods_ran[primary])
+        status = sample_status(order, methods_ran[primary], low)
         samples["arg_status"] = [status[s] for s in order]
         not_run = [s for s in order if status[s] == NA_NOT_RUN]
         count_cols = [f"n_arg_calls_tier{t}" for t in (1, 2, 3, 4)] + ["acquired_genes", "acquired_rpkm"]
@@ -571,20 +587,13 @@ def main(argv=None):
             extra = [c for c in ("card_plasmid_associated", "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref",
                                  "rgi_gene_coverage", "rgi_gene_read_pairs", "rgi_kmer_hosts", "rgi_host_check")
                      if c in allc.columns]
-            allc = allc.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
-            allc["_o"] = allc["sample"].map({s: i for i, s in enumerate(order)})
-            allc["_m"] = (allc["method"] != primary).astype(int)
-            allc = allc.sort_values(["_o", "_m", "tier", "gene"], kind="stable").drop(columns=["_o", "_m"])
+            allc["_m"] = (allc["method"] != primary).astype(int)  # the primary method's calls first
+            allc = with_meta(allc, samples, meta_cols, order, ["_m", "tier", "gene"]).drop(columns="_m")
             tables["arg_long"] = (allc[lead + extra + ["tier_note", "mutation_data"]], False)
         if len(calls_by) > 1:
             comp, overlap, gene_sets = compare_methods(calls_by, rgi_all, methods_ran)
             if not comp.empty:
-                lead_c = ["sample", "batch"] + meta_cols
-                comp = comp.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
-                comp["_o"] = comp["sample"].map({s: i for i, s in enumerate(order)})
-                comp = comp.sort_values(["_o", "tier", "gene"], kind="stable").drop(columns="_o")
-                comp = comp[lead_c + [c for c in comp.columns if c not in lead_c]]
-                tables["arg_method_comparison"] = (comp, False)
+                tables["arg_method_comparison"] = (with_meta(comp, samples, meta_cols, order, ["tier", "gene"]), False)
                 tables["arg_method_overlap"] = (overlap, False)
                 common = set.intersection(*[set(v) for v in methods_ran.values()])
                 for m in calls_by:
@@ -605,15 +614,7 @@ def main(argv=None):
     karga_ctx = None
     karga_ran = set().union(*[b["karga_ran"] for b in batches])
     if karga_ran:
-        kstatus = karga_status(order, karga_ran, low)
-        meta_join = samples[["batch"] + meta_cols]
-
-        def with_meta(df, lead_cols):
-            df = df.merge(meta_join, left_on="sample", right_index=True, how="left")
-            df["_o"] = df["sample"].map({s: i for i, s in enumerate(order)})
-            df = df.sort_values(["_o"] + lead_cols, kind="stable").drop(columns="_o")
-            first = ["sample", "batch"] + meta_cols
-            return df[first + [c for c in df.columns if c not in first]]
+        kstatus = sample_status(order, karga_ran, low)
         kparts = [b["karga"] for b in batches if b["karga"] is not None]
         vparts = [b["kargva"] for b in batches if b["kargva"] is not None]
         karga = karga_representatives(pd.concat(kparts, ignore_index=True)) if kparts else None
@@ -626,13 +627,15 @@ def main(argv=None):
         for c in counts.columns:
             samples[c] = counts[c]
         if karga is not None:
-            tables["arg_karga_long"] = (with_meta(karga, ["megares_class", "megares_group", "kmer_depth"]), False)
+            tables["arg_karga_long"] = (with_meta(karga, samples, meta_cols, order,
+                                                  ["megares_class", "megares_group", "kmer_depth"]), False)
             for name, df in karga_tables(karga, order, kstatus).items():
                 tables[name] = (df, True)
             fig_karga(figs, tables.get("arg_karga_class_cpc", (None,))[0], order, groups, low,
                       {s for s in order if kstatus[s] != "ok"})
         if kargva is not None and not kargva.empty:
-            tables["arg_kargva_long"] = (with_meta(kargva, ["megares_class", "megares_group"]), False)
+            tables["arg_kargva_long"] = (with_meta(kargva, samples, meta_cols, order,
+                                                   ["megares_class", "megares_group"]), False)
         karga_ctx = {"n_samples": len(karga_ran & set(order)),
                      "n_groups": int(karga.loc[karga["group_representative"], "megares_group"].nunique())
                      if karga is not None else 0,
@@ -647,14 +650,10 @@ def main(argv=None):
     for c in fcols.columns:
         samples[c] = fcols[c]
     if func is not None:
-        fstatus = function_status(order, func["ran"], low)
+        fstatus = sample_status(order, func["ran"], low)
         ftables = function_tables(func, order, fstatus)
-        long_f = function_long(func)
-        long_f = long_f.merge(samples[["batch"] + meta_cols], left_on="sample", right_index=True, how="left")
-        long_f["_o"] = long_f["sample"].map({s: i for i, s in enumerate(order)})
-        long_f = long_f.sort_values(["_o", "ontology", "accession"], kind="stable").drop(columns="_o")
-        first = ["sample", "batch"] + meta_cols
-        tables["function_read_long"] = (long_f[first + [c for c in long_f.columns if c not in first]], False)
+        tables["function_read_long"] = (with_meta(function_long(func), samples, meta_cols, order,
+                                                  ["ontology", "accession"]), False)
         for ont, (mat, unit) in ftables.items():
             tables[f"function_read_{ont}"] = (mat, True)
             table_units[f"function_read_{ont}"] = unit

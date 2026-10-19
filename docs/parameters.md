@@ -530,7 +530,7 @@ Override automatic downloads by providing custom database paths:
 ### `--sylph_read_seq_id`
 - **Type**: Number (percent, > 0 and <= 100)
 - **Default**: unset (sylph's automatic estimate)
-- **Description**: Read sequence identity passed to `sylph profile --read-seq-id`. It drives sylph's unknown-fraction estimate (`-u`), i.e. the `Classified` column of `Reads_report.csv` and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified (on simulated reads with 1/3 unknown: automatic 100%, `100` gave 66.1% against a true 66.7%), so set it when `Classified` looks too high
+- **Description**: Read sequence identity passed to `sylph profile --read-seq-id`. It drives sylph's unknown-fraction estimate (`-u`), i.e. the `Classified` column of `02_taxonomy/tables/Reads_report_taxonomy.csv` and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified (on simulated reads with 1/3 unknown: automatic 100%, `100` gave 66.1% against a true 66.7%), so set it when `Classified` looks too high
 - **Example**: `--sylph_read_seq_id 99.5` (typical Illumina)
 
 ### Sylph outputs
@@ -546,7 +546,8 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
   `sequence_abundance / 100 × the read pairs given to sylph`. With `-u`,
   `sequence_abundance` is the genome's share of all input reads (unknown
   included), so the column sums to the classified pairs
-- The `Classified` column of `Reads_report.csv` is the sum of `sequence_abundance / 100`
+- The `Classified` column of `Reads_report_taxonomy.csv` (`Reads_report.csv` with the
+  profiler's columns added) is the sum of `sequence_abundance / 100`
   (capped at 1.0); see `--sylph_read_seq_id` when it looks too high
 
 ---
@@ -606,8 +607,8 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 
 ### `--summary_batch_label`
 - **Type**: String (letters, digits, `.`, `_`, `-`)
-- **Default**: the name of the `--output` directory
-- **Description**: Label written in the `batch` column of the summary tables. Set it when the batches of a project share an output directory name (e.g. every batch writes to `results/`), so that merged summaries tell the batches apart
+- **Default**: the name of the `--output` directory, or of its parent when it is called `results` (so `--output results` launched from `batch1/` gives `batch1`, as `bin/results_summary.py` labels a directory), with any character outside the pattern replaced by `_`
+- **Description**: Label written in the `batch` column of the summary tables. Set it when the default does not tell the batches of a project apart, so that merged summaries do
 - **Example**: `--summary_batch_label batch1`
 
 ### `--summary_min_clean_pairs`

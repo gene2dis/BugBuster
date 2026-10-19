@@ -263,7 +263,7 @@ workflow {
         error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
     }
     // The summary's grouping/ordering columns live in the metadata table
-    if ((params.summary_group_by || params.summary_order_by) && !params.sample_metadata) {
+    if (flagOn(params.results_summary) && (params.summary_group_by || params.summary_order_by) && !params.sample_metadata) {
         error("--summary_group_by and --summary_order_by name columns of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
     }
     // A sylph database and its sylph-tax metadata must come from the same
@@ -449,11 +449,17 @@ workflow {
         // give a pathogen of origin: skip the step with a warning instead of
         // running RGI_KMER on every sample (a database built here is checked
         // by RGI_KMER itself, which also warns and skips)
+        // The same two files RGI_KMER checks (modules/local/rgi_kmer/main.nf)
         def rgi_kmer_size = (params.rgi_kmer_size ?: 61) as Integer
-        def custom_kmers_missing = params.custom_rgi_card_db && !params.custom_rgi_wildcard &&
-            !file("${params.custom_rgi_card_db}/localDB/${rgi_kmer_size}mer_database.json").exists()
-        if ( custom_kmers_missing ) {
-            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: ${params.custom_rgi_card_db}/localDB has no ${rgi_kmer_size}mer_database.json (load the WildCARD k-mer database with rgi load --kmer_database, see docs/RGI_WILDCARD_USAGE.md)"
+        def kmer_files = ["${rgi_kmer_size}mer_database.json", "amr_${rgi_kmer_size}mer.txt"]
+        def missing_kmer_files = params.custom_rgi_card_db && !params.custom_rgi_wildcard
+            ? kmer_files.findAll { f ->
+                def kf = file("${params.custom_rgi_card_db}/localDB/${f}")
+                !(kf.exists() && kf.size() > 0)
+            }
+            : []
+        if ( missing_kmer_files ) {
+            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: ${params.custom_rgi_card_db}/localDB has no ${missing_kmer_files.join(' or ')} (load the WildCARD k-mer database with rgi load --kmer_database and --amr_kmers, see docs/RGI_WILDCARD_USAGE.md)"
         } else if ( params.custom_rgi_card_db || flagOn(params.rgi_include_wildcard) ) {
             ch_rgi_kmer = RGI_KMER(
                 ch_rgi_bwt.bam,

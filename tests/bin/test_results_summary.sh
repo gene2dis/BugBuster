@@ -554,6 +554,72 @@ check "KARGA in software_versions.yml without KARGA_norm.csv" \
 check "stage reported as 'ran, no table found'" \
     grep -q "| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran, no table found |" notab/README.md
 
+# with a profiler, TAXONOMY_REPORT publishes its copy (with the classified fraction) under its own name; the
+# summary reads it first, so the QC copy without those columns does not lose the classified fraction
+make_results taxrep/results sampleA sampleB
+cut -d, -f1-4 "${FIX}/Reads_report.csv" > taxrep/results/01_quality_control/summary/Reads_report.csv
+cp "${FIX}/Reads_report.csv" taxrep/results/02_taxonomy/tables/Reads_report_taxonomy.csv
+check "02_taxonomy/tables/Reads_report_taxonomy.csv next to a QC copy without Classified" \
+    py "${SUMMARY}" --results taxrep/results --outdir taxrep_out --min-clean-pairs 10000 --no-excel
+check "classified fraction read from the taxonomy copy" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("taxrep_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleA", "classified_fraction"] == 1.0 and qc.at["sampleB", "classified_fraction"] == 0.0
+PYEOF
+
+# no Reads_report.csv: no RPKM, so a gene that was called is blank in the matrices, never 0 (= not detected)
+make_results noreads/results sampleA sampleB
+rm noreads/results/01_quality_control/summary/Reads_report.csv
+check "results directory without Reads_report.csv" \
+    py "${SUMMARY}" --results noreads/results --outdir noreads_out --no-excel
+check "a call without RPKM is blank in arg_gene_rpkm and 1 in arg_presence" py - <<'PYEOF'
+import pandas as pd
+arg = pd.read_csv("noreads_out/tables/arg_long.tsv", sep="\t")
+called = arg[(arg["method"] == "kmarvel") & arg["gene_representative"]]
+rpkm = pd.read_csv("noreads_out/tables/arg_gene_rpkm.tsv", sep="\t", index_col=0, dtype=str, keep_default_na=False)
+pres = pd.read_csv("noreads_out/tables/arg_presence.tsv", sep="\t", index_col=0, dtype=str, keep_default_na=False)
+assert not called.empty
+for g, s in zip(called["gene"], called["sample"]):
+    assert rpkm.at[g, s] == "", (g, s, rpkm.at[g, s])
+    assert pres.at[g, s] == "1", (g, s, pres.at[g, s])
+PYEOF
+
+# tier rules: a tier outside 1-4 fails clearly; the note column is optional
+py - "${REPO_DIR}/assets/arg_priority_tiers.tsv" <<'PYEOF'
+import sys
+import pandas as pd
+rules = pd.read_csv(sys.argv[1], sep="\t", comment="#", dtype=str, keep_default_na=False)
+bad = pd.concat([rules, pd.DataFrame([{"match": "name", "pattern": "^TEM", "tier": "5", "category": "x", "note": ""}])])
+bad.to_csv("tiers_bad.tsv", sep="\t", index=False)
+rules.drop(columns="note").to_csv("tiers_nonote.tsv", sep="\t", index=False)
+PYEOF
+check "a tier 5 rule fails" \
+    fails py "${SUMMARY}" --results run1/results --outdir tier5 --arg-priority tiers_bad.tsv --no-excel
+py "${SUMMARY}" --results run1/results --outdir tier5 --arg-priority tiers_bad.tsv --no-excel > tier5.log 2>&1 || true
+check "the tier 5 error names the tier" grep -q "tier must be 1, 2, 3 or 4" tier5.log
+check "a rule table without a note column" \
+    py "${SUMMARY}" --results run1/results --outdir nonote --arg-priority tiers_nonote.tsv --no-excel
+check "its tier table still lists the rule categories" grep -q "intrinsic_glycopeptide" nonote/README.md
+
+# taxa without a species name are pooled as 'unassigned species': not counted as a species
+make_results unas/results sampleA
+awk -F'\t' 'BEGIN{OFS="\t"} $1=="GCF_000009045.1"{$NF=""} {print}' "${FIX}/sylph_gtdb_tax_table.tsv" \
+    > unas/results/02_taxonomy/tables/sylph_gtdb_tax_table.tsv
+check "a taxon without a species name" \
+    py "${SUMMARY}" --results unas/results --outdir unas_out --min-clean-pairs 10000 --no-excel
+check "n_species and Shannon leave 'unassigned species' out" py - <<'PYEOF'
+import numpy as np
+import pandas as pd
+full = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+qc = pd.read_csv("unas_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+wide = pd.read_csv("unas_out/tables/taxonomy_species_wide.tsv", sep="\t", index_col=0)
+assert "unassigned species" in wide.index
+assert qc.at["sampleA", "n_species"] == full.at["sampleA", "n_species"] - 1
+named = wide.loc[[i for i in wide.index if i != "unassigned species"], "sampleA"].astype(float)
+p = named[named > 0] / named.sum()
+assert abs(qc.at["sampleA", "shannon"] - float(-(p * np.log(p)).sum())) < 1e-9
+PYEOF
+
 echo
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "${FAIL}" -eq 0 ]

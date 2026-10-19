@@ -309,7 +309,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 |-----------|---------|-------------|
 | `--sample_metadata` | none | TSV/CSV with a `sample` column and any metadata columns, carried into every table |
 | `--summary_group_by` / `--summary_order_by` | none | Metadata columns that group and order the samples |
-| `--summary_batch_label` | output directory name | `batch` column of the summary tables |
+| `--summary_batch_label` | output directory name (its parent's when it is `results`) | `batch` column of the summary tables |
 | `--summary_min_clean_pairs` | `1000000` | Samples below this many clean read pairs are flagged low depth |
 | `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure |
 | `--summary_taxa_per_sample` | `5` | Taxonomy heatmaps: union of each sample's N most abundant taxa |

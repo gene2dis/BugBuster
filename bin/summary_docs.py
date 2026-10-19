@@ -47,7 +47,8 @@ TABLE_DOCS = {
             ("depth_class", "clean read pairs binned at --min-clean-pairs and --depth-marks (<1M, 1M-10M, ...)"),
             ("mean_read_length", "mean read length after fastp (mean of R1 and R2), bp"),
             ("taxonomy_db", "taxonomic profiler and database label of the taxonomy tables"),
-            ("n_species, shannon", "species detected and Shannon index (natural log) of species relative abundance"),
+            ("n_species, shannon", "named species detected and Shannon index (natural log) of their relative "
+                                    "abundance, renormalised over them; taxa without a species name are left out"),
             ("arg_status", "ok, NA_low_depth or NA_not_run (no output of the primary ARG method for the sample)"),
             ("n_arg_calls_tier1, n_arg_calls_tier2, n_arg_calls_tier3, n_arg_calls_tier4",
              "calls of the primary ARG method per tier (allele rows; tier 4 = mutation dependent, only "
@@ -411,8 +412,10 @@ def tier_categories(rules_path):
         rules = pd.read_csv(rules_path, sep="\t", comment="#", dtype=str, keep_default_na=False)
     except (OSError, ValueError):
         rules = pd.DataFrame(columns=["tier", "category", "note"])
+    if "note" not in rules.columns:  # optional, as in load_rules
+        rules["note"] = ""
     seen = set()
-    for tier, cat, note in zip(rules.get("tier", []), rules.get("category", []), rules.get("note", [])):
+    for tier, cat, note in zip(rules.get("tier", []), rules.get("category", []), rules["note"]):
         key = (int(tier), cat)
         if key in seen:
             continue
