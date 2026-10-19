@@ -449,6 +449,16 @@ next release is tagged.
 
 ### Fixed
 
+- **`Reads_report.csv` without the classified fraction**: with a taxonomic
+  profiler, READS_REPORT and TAXONOMY_REPORT both published
+  `Reads_report.csv` to `01_quality_control/summary/`, and the one published
+  last was kept, so a run could keep the copy without the profiler's DB,
+  Unclassified and Classified columns (a summary run on such a results
+  directory had no `classified_fraction`). READS_REPORT now publishes its
+  copy only when no profiler runs. On an existing results directory, delete
+  the file and `-resume` to republish TAXONOMY_REPORT's copy (resumed runs
+  do not overwrite published files)
+
 - **MEGAHIT out of memory on a large host**: MEGAHIT was run without `-m`, so
   it sized its graph build to 90% of the host's RAM instead of the task's
   memory, and the container killed it at the task limit (a 404M-read
