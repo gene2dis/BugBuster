@@ -220,6 +220,13 @@ Process exceeded time limit
    }
    ```
 
+With the local executor, a task killed at its time limit can instead fail with
+`process hasn't exited` (`java.lang.IllegalThreadStateException` in `.nextflow.log`), and its
+`.exitcode` is 143 (written after the kill). Nextflow then has no exit status for the task, so
+the error strategy stops the run instead of retrying it with more time. Compare the task's
+start and end times with its `time` setting; if they match, raise `time` for that process as
+above and `-resume`.
+
 ---
 
 ### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored

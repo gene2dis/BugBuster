@@ -449,6 +449,11 @@ next release is tagged.
 
 ### Fixed
 
+- **ARGS_OAP time limit**: stage one ran with `process_low` (4 CPUs, 8 h) and
+  took 6-8 h on 55-70 M read pairs; one sample hit the limit, and on the
+  local executor the kill surfaced as `process hasn't exited`, which stops
+  the run instead of retrying. ARGS_OAP now uses `process_medium` (8 CPUs,
+  36 GB, 24 h); `docs/troubleshooting.md` explains the message
 - **Two `Reads_report.csv` written to one path**: with a taxonomic profiler,
   READS_REPORT and TAXONOMY_REPORT both published `Reads_report.csv` to
   `01_quality_control/summary/`, and the one published last was kept, so a
