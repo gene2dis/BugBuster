@@ -67,8 +67,14 @@ def load_rgi(root):
         sample = path.name[: -len(suffix)]
         ran.add(sample)
         df = pd.read_csv(path, sep="\t", dtype=str, keep_default_na=False)
-        values = df.replace("NA", "").astype(str).apply(lambda col: col.str.strip())
-        if df.empty or not (values != "").any().any():
+        # a sample without hits: an empty table, a table without an ARO accession, or RGI's one-row placeholder
+        # (another header, every field NA); checked on one column or one row, not by stripping the whole table
+        if df.empty:
+            continue
+        if "ARO Accession" in df.columns:
+            if not df["ARO Accession"].str.strip().str.fullmatch(r"\d+").any():
+                continue
+        elif len(df) == 1 and df.iloc[0].str.strip().isin(["", "NA"]).all():
             continue
         missing = [c for c in RGI_ALLELE_COLUMNS if c not in df.columns]
         if missing:
@@ -413,9 +419,10 @@ def annotate_rgi(alleles, kmer, kmer_ran, samples, rules, prevalence, species_by
     return arg
 
 
-def unify_gene_tiers(frames, order):
+def unify_gene_tiers(frames, order, snps=None):
     """One tier per gene across the ARG methods, in place: a gene takes its tier, category and note from the
-    first method in `order` that has it (its lowest-tier row). Returns the genes whose tiers differed."""
+    first method in `order` that has it (its lowest-tier row). A K-MARVEL row raised to tier 4 gets its CARD
+    SNP check (snps) there. Returns the genes whose tiers differed."""
     ref = {}
     for m in order:
         d = frames.get(m)
@@ -440,6 +447,13 @@ def unify_gene_tiers(frames, order):
             d["resistance_snp_status"] = np.where(d["tier"] == 4, "not_checked_rgi", "")
         elif "resistance_snp_status" in d:
             d.loc[(d["tier"] != 4), ["resistance_snp_status", "resistance_snps_found"]] = ""
+            # rows that were not tier 4 had no SNP check (annotate_args checks tier 4 rows only)
+            new4 = (d["tier"] == 4) & (d["resistance_snp_status"] == "")
+            if new4.any():
+                checked = [snp_status(a, mu, snps) for a, mu in
+                           zip(d.loc[new4, "aro_id"], d.loc[new4, "mutation_data"].fillna(""))]
+                d.loc[new4, "resistance_snp_status"] = [c[0] for c in checked]
+                d.loc[new4, "resistance_snps_found"] = [c[1] for c in checked]
     return sorted(conflicts)
 
 

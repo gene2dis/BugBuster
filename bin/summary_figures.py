@@ -219,8 +219,9 @@ def fig_qc(fw, qc, cols, groups, low, min_pairs, depth_marks=()):
     colors = ["#c0392b" if s in low else "#2a7ab9" for s in cols]
     ax.barh(y, q["clean_pairs"], color=colors)
     ax.set_xscale("log")
-    ax.axvline(min_pairs, color="#c0392b", linestyle="--", linewidth=1)
-    ax.text(min_pairs, -0.9, f" min {short_count(min_pairs)}", color="#c0392b", fontsize=8, va="bottom")
+    if min_pairs > 0:  # --min-clean-pairs 0 flags nothing, and 0 is off a log axis (matplotlib blows the figure up)
+        ax.axvline(min_pairs, color="#c0392b", linestyle="--", linewidth=1)
+        ax.text(min_pairs, -0.9, f" min {short_count(min_pairs)}", color="#c0392b", fontsize=8, va="bottom")
     for mark in depth_marks:
         ax.axvline(mark, color="#555555", linestyle=":", linewidth=1)
         ax.text(mark, -0.9, f" {short_count(mark)}", color="#555555", fontsize=8, va="bottom")

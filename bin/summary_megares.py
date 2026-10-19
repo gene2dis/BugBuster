@@ -18,8 +18,14 @@ import pandas as pd
 from summary_common import NA_NOT_RUN, die, fill_columns
 
 
-KARGA_NEEDED = {"sample", "nRead", "n16S", "nCell", "GeneIdx", "PercentGeneCovered", "AverageKMerDepth",
-                "CPM_ARGs", "copies_per_cell"}
+KARGA_NEEDED = {"sample", "nRead", "n16S", "nCell", "GeneIdx"}
+# hit columns: older ARG_NORM_REPORT runs left CPM_ARGs and copies_per_cell out of a file where no gene or
+# variant passed, so a file without hits may lack them (they are blank there anyway)
+KARGA_VALUES = ["PercentGeneCovered", "AverageKMerDepth", "CPM_ARGs", "copies_per_cell"]
+KARGA_FIELDS = ["megares_id", "megares_type", "megares_class", "megares_mechanism", "megares_group",
+                "snp_confirmation_required"]
+KARGVA_FIELDS = ["kargva_id", "kargva_mutation", "aro_id", "kargva_description", "megares_id", "megares_type",
+                 "megares_class", "megares_mechanism", "megares_group"]
 
 
 def _read_norm(path):
@@ -27,6 +33,12 @@ def _read_norm(path):
     missing = KARGA_NEEDED - set(df.columns)
     if missing:
         die(f"{path} lacks columns: {', '.join(sorted(missing))}")
+    hits = df["GeneIdx"].fillna("").str.strip() != ""
+    absent = [c for c in KARGA_VALUES if c not in df.columns]
+    if absent and hits.any():
+        die(f"{path} lacks columns: {', '.join(absent)}")
+    for c in absent:  # a file with no hit
+        df[c] = np.nan
     df["sample"] = df["sample"].astype(str)
     return df
 
@@ -60,7 +72,9 @@ def load_karga(root):
         df = _read_norm(path)
         cells.append(df[["sample", "nRead", "n16S", "nCell"]])
         hits = df[df["GeneIdx"].fillna("").str.strip() != ""].copy()
-        fields = pd.DataFrame([_megares(h, key == "kargva") for h in hits["GeneIdx"]], index=hits.index)
+        # columns given, so a file with no hit still has every field (an empty table, not a missing column)
+        fields = pd.DataFrame([_megares(h, key == "kargva") for h in hits["GeneIdx"]], index=hits.index,
+                              columns=KARGVA_FIELDS if key == "kargva" else KARGA_FIELDS)
         out = pd.concat([hits[["sample"]], fields], axis=1)
         if key == "kargva":
             out["gene"] = hits.get("Gen", "")

@@ -1032,7 +1032,7 @@
             "title": "Results summary options",
             "type": "object",
             "fa_icon": "fas fa-clipboard-list",
-            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures and a self-contained HTML report of the QC, taxonomy and K-MARVEL results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
+            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md of the QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
             "properties": {
                 "results_summary": {
                     "type": "boolean",

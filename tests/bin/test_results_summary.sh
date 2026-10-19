@@ -544,6 +544,13 @@ k = pd.DataFrame({"gene": ["g1"], "tier": [2], "category": ["a"], "tier_note": [
 r = pd.DataFrame({"gene": ["g1"], "tier": [3], "category": ["b"], "tier_note": [""], "resistance_snp_status": [""]})
 assert rs.unify_gene_tiers({"kmarvel": k, "rgi": r}, ["kmarvel", "rgi"]) == ["g1"]
 assert r.at[0, "tier"] == 2 and r.at[0, "category"] == "a"
+# a K-MARVEL row raised to tier 4 by the reference method gets its CARD SNP check
+k4 = pd.DataFrame({"gene": ["g2"], "tier": [2], "category": ["a"], "tier_note": [""], "aro_id": ["ARO:3000001"],
+                   "mutation_data": ["S83L"], "resistance_snp_status": [""], "resistance_snps_found": [""]})
+r4 = pd.DataFrame({"gene": ["g2"], "tier": [4], "category": ["mutation_dependent"], "tier_note": [""],
+                   "resistance_snp_status": ["not_checked_rgi"]})
+rs.unify_gene_tiers({"rgi": r4, "kmarvel": k4}, ["rgi", "kmarvel"], {"3000001": [{"S83L"}]})
+assert k4.at[0, "tier"] == 4 and k4.at[0, "resistance_snp_status"] == "card_snp_present", k4.iloc[0].to_dict()
 PYEOF
 
 # a stage that ran (software_versions.yml) without its table in the results directory is reported
@@ -618,6 +625,50 @@ assert qc.at["sampleA", "n_species"] == full.at["sampleA", "n_species"] - 1
 named = wide.loc[[i for i in wide.index if i != "unassigned species"], "sampleA"].astype(float)
 p = named[named > 0] / named.sum()
 assert abs(qc.at["sampleA", "shannon"] - float(-(p * np.log(p)).sum())) < 1e-9
+PYEOF
+
+# KARGA / KARGVA files with no hit (one blank row per sample), with and without the normalisation columns
+# (older ARG_NORM_REPORT runs left them out): the summary runs and reports no MEGARes gene
+make_results nokarga/results sampleA sampleB
+norm=nokarga/results/05_arg_prediction/read_level/summary
+printf 'sample,nRead,n16S,nCell,GeneIdx,PercentGeneCovered,AverageKMerDepth\nsampleA,1000,1.0,2.0,,,\nsampleB,800,1.0,1.0,,,\n' \
+    > "${norm}/KARGVA_norm.csv"
+printf 'sample,nRead,n16S,nCell,GeneIdx,PercentGeneCovered,AverageKMerDepth,CPM_ARGs,copies_per_cell\nsampleA,1000,1.0,2.0,,,,,\nsampleB,800,1.0,1.0,,,,,\n' \
+    > "${norm}/KARGA_norm.csv"
+check "KARGA and KARGVA without any hit" \
+    py "${SUMMARY}" --results nokarga/results --outdir nokarga_out --min-clean-pairs 10000 --no-excel
+check "no MEGARes gene: zero counts, empty long table, cell estimates kept" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("nokarga_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert (qc["karga_n_groups"] == 0).all() and (qc["kargva_n_variants"] == 0).all()
+assert qc.at["sampleA", "args_oap_ncell"] == 2.0
+long = pd.read_csv("nokarga_out/tables/arg_karga_long.tsv", sep="\t")
+assert long.empty and "megares_group" in long.columns
+PYEOF
+
+# a 0 cutoff is recorded in the README's inputs, not dropped as if it were unset
+check "--rgi-min-coverage 0 --min-clean-pairs 0" \
+    py "${SUMMARY}" --results run1/results --outdir zero_out --rgi-min-coverage 0 --min-clean-pairs 0 --no-excel
+check "zero settings listed in the README inputs" \
+    sh -c 'grep -q "^--rgi-min-coverage 0" zero_out/README.md && grep -q "^--min-clean-pairs 0" zero_out/README.md'
+
+# merged batches where RGI ran on one only: a tier 1 call in the K-MARVEL-only batch is in the header list
+make_results kmonly/results sampleB
+rm -r kmonly/results/05_arg_prediction/read_level/rgi kmonly/results/05_arg_prediction/read_level/rgi_kmer 2>/dev/null || true
+# sampleB's K-MARVEL calls: sampleA's with TEM-117 replaced by KPC-2 (tier 1)
+sed 's/^TEM-117\tARO:3000980\tTEM beta-lactamase/KPC-2\tARO:3002312\tKPC beta-lactamase/' "${KM}/sampleA_kmarvel.tsv" \
+    > kmonly/results/05_arg_prediction/read_level/kmarvel/sampleB/sampleB_kmarvel.tsv
+make_results withrgi/results sampleA
+check "merge of a K-MARVEL + RGI batch and a K-MARVEL-only batch" \
+    py "${SUMMARY}" --results withrgi/results kmonly/results --outdir mixed_out --min-clean-pairs 10000 --no-excel
+check "header lists tier 1 calls of samples outside the method comparison" py - <<'PYEOF'
+import pandas as pd
+arg = pd.read_csv("mixed_out/tables/arg_long.tsv", sep="\t")
+t1 = arg[(arg["tier"] == 1) & (arg["sample"] == "sampleB") & arg["gene_representative"]]
+html = open("mixed_out/results_summary.html").read()
+assert set(t1["gene"]) == {"KPC"}, set(t1["gene"])
+# KPC: RGI only in sampleA (both methods ran), K-MARVEL in sampleB (RGI did not run there)
+assert "KPC: 2 samples (sampleA, sampleB)" in html and "K-MARVEL (not every method ran) / RGI only" in html
 PYEOF
 
 echo

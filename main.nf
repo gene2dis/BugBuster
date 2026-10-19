@@ -75,7 +75,7 @@ def printHelp() {
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
 
     \u001B[1;33mResults summary (00_summary/):\u001B[0m
-      --results_summary             Tables, Excel workbook, figures and HTML report of QC, taxonomy and K-MARVEL results (default: ${params.results_summary})
+      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results (default: ${params.results_summary})
       --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
       --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)

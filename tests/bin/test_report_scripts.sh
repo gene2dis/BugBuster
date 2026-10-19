@@ -353,6 +353,22 @@ for f in KARGA_norm.csv KARGVA_norm.csv; do
     fi
 done
 
+# no gene or variant passes (KARGA at 50% coverage, KARGVA with 1 SNP k-mer): the CSVs keep the
+# normalisation columns, blank, so every KARGA_norm.csv / KARGVA_norm.csv has the same columns
+AN0="${WORK}/arg_norm_no_hits"
+mkdir -p "${AN0}/s1_args_oap_s1_out"
+printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n%s,50%%,10.0\n' "${KARGA_GENE}" \
+    > "${AN0}/s1_all_reads_KARGA_mappedGenes.csv"
+printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n%s,1/10,85%%,10.0\n' "${KARGVA_GENE}" \
+    > "${AN0}/s1_all_reads_KARGVA_mappedGenes.csv"
+printf 'sample\tnRead\tn16S\tnCell\ns1\t1000000\t50\t100\n' > "${AN0}/s1_args_oap_s1_out/metadata.txt"
+NEXT_WORKDIR="${AN0}"
+expect_pass "arg_norm: no gene or variant passes" arg_norm_report.py
+check_grep "arg_norm: KARGA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGA_norm.csv" \
+    "^sample,.*,CPM_ARGs,copies_per_cell$"
+check_grep "arg_norm: KARGVA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGVA_norm.csv" \
+    "^sample,.*,CPM_ARGs,copies_per_cell$"
+
 #
 # kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
 # two ARGs, sampleB header-only); the zero-ARG sample must stay as an

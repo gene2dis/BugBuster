@@ -242,17 +242,32 @@ def tier1_table(calls, comparison, primary):
     return t1
 
 
-def attention_flags(tier1, comparison, low_samples):
+def attention_flags(tier1, comparison, low_samples, calls_by=None):
     """Short findings for the report header: [(kind, text, anchor)].
 
     Tier 1 genes come from the method comparison when several ARG methods ran (so a gene only one method found
-    is listed too), else from the primary method's tier 1 calls.
+    is listed too), plus the tier 1 calls (calls_by) in samples outside it, where not every method ran; else
+    from the primary method's tier 1 calls.
     """
     flags = []
     rows = None
     if comparison is not None:
         rows = comparison["comp"]
         rows = rows[rows["tier"] == 1]
+        parts = [d[(d["tier"] == 1) & d["gene_representative"] & ~d["sample"].isin(comparison["common"])]
+                 .assign(_m=m) for m, d in (calls_by or {}).items() if not d.empty]
+        outside = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+        if not outside.empty:
+            extra = []
+            for (s, g), sub in outside.groupby(["sample", "gene"], sort=False):
+                found = " + ".join(METHOD_LABELS.get(m, m) for m in comparison["methods"] if m in set(sub["_m"]))
+                rec = {"sample": s, "gene": g, "tier": 1, "detected_by": f"{found} (not every method ran)"}
+                for c in ("rgi_kmer_hosts", "rgi_host_check"):
+                    if c in sub:
+                        vals = sub[c].dropna()
+                        rec[c] = vals.iloc[0] if not vals.empty else ""
+                extra.append(rec)
+            rows = pd.concat([rows, pd.DataFrame(extra)], ignore_index=True).sort_values("sample", kind="stable")
     elif tier1 is not None:
         rows = tier1.drop_duplicates(["sample", "gene"])
     if rows is not None and not rows.empty:
@@ -539,7 +554,7 @@ def main(argv=None):
         frames = dict(calls_by)
         if rgi_all is not None:
             frames["rgi"] = rgi_all
-        conflicts = unify_gene_tiers(frames, [primary] + [m for m in frames if m != primary])
+        conflicts = unify_gene_tiers(frames, [primary] + [m for m in frames if m != primary], snps)
         if conflicts:
             warn(f"{len(conflicts)} genes had different tiers in different ARG methods; each takes the "
                  f"{METHOD_LABELS[primary]} tier: {', '.join(conflicts[:10])}")
@@ -604,7 +619,7 @@ def main(argv=None):
                 outside = [s for s in order if s not in common]
                 samples.loc[outside, [f"n_genes_{m}" for m in calls_by] + ["n_genes_all_methods"]] = np.nan
                 summary["n_tier1_genes_all_methods"] = int(both.loc[both["tier"] == 1, "gene"].nunique())
-                comparison = {"comp": comp, "overlap": overlap, "gene_sets": gene_sets,
+                comparison = {"comp": comp, "overlap": overlap, "gene_sets": gene_sets, "common": common,
                               "methods": [m for m in ("kmarvel", "rgi") if m in calls_by]}
                 fig_method_upset(figs, comp, gene_sets, comparison["methods"])
                 fig_method_by_category(figs, comp, comparison["methods"])
@@ -671,7 +686,7 @@ def main(argv=None):
     tier1_view = None
     if prim_arg is not None and not prim_arg.empty:
         tier1_view = tier1_table(calls_by[primary], comparison, primary)
-    summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"])
+    summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"], calls_by)
 
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]
@@ -696,7 +711,7 @@ def main(argv=None):
                       ("min-clean-pairs", args.min_clean_pairs), ("rgi-min-coverage", args.rgi_min_coverage),
                       ("arg-primary", args.arg_primary), ("depth-marks", args.depth_marks),
                       ("taxa-per-sample", args.taxa_per_sample)):
-        if val:
+        if val is not None and val != "":  # a 0 cutoff is a setting too
             inputs.append(f"--{flag} {Path(val).resolve().name if flag in file_flags else val}")
     stage_by_batch = {b["label"]: stage_status(b["processes"], b["found"]) for b in batches}
     for b in batches:

@@ -479,6 +479,22 @@ next release is tagged.
   - tiers are assigned once per distinct ARO annotation, not once per row;
     the status and metadata-merge code is shared; the unused
     `rgi_gene_detected` column is gone
+  - the summary no longer fails when KARGA or KARGVA has no passing hit:
+    ARG_NORM_REPORT now always writes `CPM_ARGs` and `copies_per_cell`
+    (they were left out of a file without hits), and the summary reads a
+    file without hits, with or without those columns, as no MEGARes gene
+  - `--summary_min_clean_pairs 0` no longer crashes the QC figure (the
+    threshold line at 0 on a log axis)
+  - when merged batches ran different ARG methods, the report header's
+    tier 1 list also covers the samples outside the method comparison
+  - a K-MARVEL row raised to tier 4 to match the reference method gets
+    its CARD SNP check (`resistance_snp_status`) instead of a blank
+  - a 0 setting (e.g. `--rgi-min-coverage 0`) is listed in the README's
+    inputs instead of being dropped as unset
+  - the RGI placeholder table of a sample without hits is recognised from
+    one column or row, not by stripping the whole table
+  - the `--results_summary` help and schema text list every result the
+    summary covers
 
 - **MEGAHIT out of memory on a large host**: MEGAHIT was run without `-m`, so
   it sized its graph build to 90% of the host's RAM instead of the task's
