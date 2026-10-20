@@ -372,6 +372,13 @@ next release is tagged.
 
 ### Changed
 
+- **`--publish_dir_mode link` documented** (manual section 6.1, parameters,
+  `DISK_OPTIMIZATION.md`): hard links take no extra space and survive
+  deleting the work directory, but need the work directory and `--output` on
+  one filesystem; across filesystems Nextflow 25.10.7 and 26.04.4 fail the
+  run at the first publish (`Invalid cross-device link`) instead of copying,
+  so the default stays `copy`
+
 - **`software_versions.yml` also collects the `versions` topic**: current
   nf-core modules report `[process, tool, version]` tuples on the `versions`
   topic instead of a `versions.yml` file. A new `SOFTWARE_VERSIONS`

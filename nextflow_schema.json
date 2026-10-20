@@ -895,7 +895,7 @@
                     "type": "string",
                     "default": "copy",
                     "description": "Method used to save pipeline results to output directory.",
-                    "help_text": "The Nextflow `publishDir` option specifies which intermediate files should be saved to the output directory. This option tells the pipeline what method should be used to move these files. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
+                    "help_text": "How results are saved from the work directory to `--output`. `link` makes hard links: no extra space, results survive deleting the work directory, and copying the results folder elsewhere copies full files; it needs the work directory and `--output` on the same filesystem, otherwise the first publish fails (Invalid cross-device link) and the run stops, since Nextflow does not fall back to copying. `symlink` and `rellink` point into the work directory and break when it is deleted. Don't use `move`. See [Nextflow docs](https://www.nextflow.io/docs/latest/process.html#publishdir) for details.",
                     "fa_icon": "fas fa-copy",
                     "enum": [
                         "symlink",

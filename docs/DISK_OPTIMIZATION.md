@@ -22,8 +22,11 @@ BugBuster reduces disk use in two ways:
    `low_disk` profile. It runs **once, when the run completes successfully**. It does not
    free space while the run is in progress, so it does **not** lower peak disk use.
 
-All publishing uses standard `publishDir` with `mode: 'copy'` (`publish_dir_mode`).
-Publishing never removes files from the work directory.
+All publishing uses standard `publishDir` with `mode: 'copy'` by default
+(`--publish_dir_mode`). Publishing never removes files from the work directory. When the
+work directory and `--output` are on the same filesystem, `--publish_dir_mode link`
+publishes hard links instead of copies: no second copy of large outputs, and the results
+survive the work-dir deletion below (see the table at the end).
 
 ## In-Task Cleanup (all runs)
 
@@ -292,9 +295,10 @@ before an interruption may not be recorded in any run.
 | Mode | Behavior | Disk Impact | Use Case |
 |------|----------|-------------|----------|
 | **copy** | Copy files to output | No space freed | Default; what BugBuster uses (`publish_dir_mode`) |
+| **link** | Hard link to the work-dir file | No extra space | Same filesystem only (otherwise the run fails at the first publish, no fallback to copy); results are full files that survive deleting the work dir |
 | **move** | Move files to output | Immediate space freed | NOT used: it removes outputs downstream tasks still stage from the work dir and breaks `-resume` |
-| **symlink** | Create symbolic links | Minimal space | Read-only access |
-| **rellink** | Create relative links | Minimal space | Portable links |
+| **symlink** | Create symbolic links | Minimal space | Break when the work dir is deleted (`low_disk`, `nextflow clean`) |
+| **rellink** | Create relative links | Minimal space | Same as symlink, relative paths |
 
 ### Cache Strategies
 

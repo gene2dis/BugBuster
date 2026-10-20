@@ -434,7 +434,31 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|-------------|
 | `--input` | *required* | Path to samplesheet CSV file |
 | `--output` | *required* | Output directory for results |
-| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` |
+| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` (see below) |
+
+**Saving space with `--publish_dir_mode link`.** By default every result is copied
+from the work directory into `--output`, so large outputs (clean reads with
+`--store_clean_reads`, RGI BAMs, bins) take their space twice. With `link`, each
+result is a hard link to the file in the work directory: publishing is instant and
+takes no extra space. A hard link is a full file, not a pointer:
+
+- copying the results folder elsewhere (`cp -r`, `rsync`, `scp`) copies full files;
+- deleting the work directory (by hand, `nextflow clean` or the `low_disk` profile)
+  keeps the results; the space is freed when the last of the two names is gone;
+- do not edit a published file in place: it is the same file as the one in the work
+  directory, which `-resume` reuses.
+
+Hard links only work within one filesystem. If the work directory and `--output` are
+on different filesystems (`df <work dir> <output dir>` shows two devices), the first
+task that publishes fails with `Failed to publish file ... [link]` (`Invalid
+cross-device link` in `.nextflow.log`) and the run stops: Nextflow does not fall back
+to copying (tested with Nextflow 25.10.7 and 26.04.4). Use `copy` there, or move the
+work directory with `-work-dir`; an interrupted run continues with `-resume`. This is
+why `copy` stays the default. `symlink` and `rellink` are different: they publish
+links that point into the work directory, which break when it is deleted, and a copy
+of the results folder copies only the links unless the copy follows them. Don't use
+`move`: it removes outputs that later tasks still read from the work directory and
+breaks `-resume`.
 
 ### 6.2 Pipeline Execution Options
 
