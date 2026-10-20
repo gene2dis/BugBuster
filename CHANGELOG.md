@@ -384,7 +384,8 @@ next release is tagged.
   topic instead of a `versions.yml` file. A new `SOFTWARE_VERSIONS`
   subworkflow writes them in the same format as the local modules' files
   (one block per process), so the file and `RESULTS_SUMMARY` are unchanged.
-  No module emits the topic yet; the nf-core updates (issue #35) will
+  No module emits the topic yet; the nf-core module updates (issue #35)
+  will be the first to use it
 
 - **MetaWRAP requests 80 GB on the first attempt** (was 72 GB from
   `process_high`): its peak RSS was 67-69 GB in every binning run, within 5 %
@@ -402,7 +403,9 @@ next release is tagged.
   requests can be compared with what each task used
 
 - **`SOURMASH` no longer caps itself at 24 parallel tasks** (`maxForks 24`
-  removed): the executor's CPU and memory pool already limits concurrency
+  removed): the local executor's CPU and memory pool already limits
+  concurrency; on a cluster or cloud profile the executor's `queueSize`
+  does (set it in a `-c` config to bound parallel jobs)
 
 - **`RGI_REPORT` adds coverage-filtered counts**: `rgi bwt` lists every gene
   with at least one mapped read (38-548 per sample in a 32-sample run), so

@@ -16,16 +16,23 @@ nextflow_workflow {
     script "../../subworkflows/local/software_versions.nf"
     workflow "SOFTWARE_VERSIONS"
 
-    test("one topic tuple joins a versions.yml file in the same format") {
+    test("topic tuples join a versions.yml file in the same format") {
         when {
             params {
                 output = "${outputDir}"
             }
             workflow {
                 """
-                input[0] = channel.of( file("${projectDir}/tests/data/versions/versions.yml", checkIfExists: true) )
-                // eval() output can end in a newline
-                input[1] = channel.of( [ 'QC:FASTP', 'fastp', '1.4.0\\n' ] )
+                // a versions.yml file, plus a topic tuple mixed in by mistake
+                input[0] = channel.of(
+                    file("${projectDir}/tests/data/versions/versions.yml", checkIfExists: true),
+                    [ 'QC:FASTP', 'fastp', '1.4.0' ]
+                )
+                // eval() output can end in a newline or span lines
+                input[1] = channel.of(
+                    [ 'QC:FASTP', 'fastp', '1.4.0\\n' ],
+                    [ 'QC:FASTP', 'pigz', '2.8\\nCopyright' ]
+                )
                 """
             }
         }
@@ -34,7 +41,10 @@ nextflow_workflow {
             assert workflow.success
             def text = path(workflow.out.yml.get(0)).text
             assert text == path("${outputDir}/pipeline_info/software_versions.yml").text
-            assert text.contains('"QC:FASTP":\n    fastp: 1.4.0\n')
+            // one block for the process: tools sorted, the stray tuple not repeated,
+            // a multi-line version on one line
+            assert text.contains('"QC:FASTP":\n    fastp: 1.4.0\n    pigz: 2.8 Copyright\n')
+            assert text.count('"QC:FASTP":') == 1
             // a versions.yml file keeps its block
             assert text.contains('"QC:QFILTER":\n    bash: 5.1.16(1)-release\n')
             assert text.contains('"gene2dis/BugBuster":\n    pipeline: ')

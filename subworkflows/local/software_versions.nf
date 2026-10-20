@@ -14,27 +14,43 @@
     Per-sample tasks of one process write byte-identical versions.yml files
     (and emit identical tuples), so content-level unique() collapses them to
     one block per process. Nextflow already strips the script's indentation,
-    so the files are not indented; stripIndent() is Java's (JDK 15+), which
-    counts the empty line after the final newline, so it changes nothing in
-    a file ending in a newline (a broken heredoc, e.g. KARGVA's, stays as it
-    is; parse_versions in bin/summary_common.py copes with it).
+    so the files are not indented. stripIndent() is Java's (JDK 15+): it
+    trims trailing whitespace on each line, but it counts the empty line
+    after the final newline, so it removes no indentation from a file ending
+    in a newline (a broken heredoc, e.g. KARGVA's, stays indented;
+    parse_versions in bin/summary_common.py copes with it).
+
+    A topic tuple mixed into ch_versions by mistake (a module's
+    `.out.versions_<tool>` after an nf-core update) is handled as a tuple, not
+    read as a file; the topic reports it too, and unique() drops the copy. A
+    multi-line version string is joined into one line to keep the file
+    line-based.
 ----------------------------------------------------------------------------------------
 */
 
 workflow SOFTWARE_VERSIONS {
 
     take:
-    ch_versions_yml     // channel: versions.yml files
+    ch_versions_yml     // channel: versions.yml files (a stray [ process, tool, version ] tuple is accepted)
     ch_topic_versions   // channel: [ process, tool, version ], e.g. channel.topic('versions')
 
     main:
+    ch_versions_in = ch_versions_yml
+        .branch { v ->
+            tuple: v instanceof List
+            file: true
+        }
+
     ch_topic_yml = ch_topic_versions
-        .map { name, tool, version -> [ name.toString(), "    ${tool}: ${version.toString().trim()}".toString() ] }
+        .mix( ch_versions_in.tuple )
+        .map { name, tool, version ->
+            [ name.toString(), "    ${tool}: ${version.toString().trim().replaceAll(/\s*\n\s*/, ' ')}".toString() ]
+        }
         .unique()
         .groupTuple()
         .map { name, tools -> ( "\"${name}\":\n" + tools.sort().join('\n') + '\n' ).toString() }
 
-    ch_yml = ch_versions_yml
+    ch_yml = ch_versions_in.file
         .map { yml -> yml.text.stripIndent() }
         .mix( ch_topic_yml )
         .mix( channel.of(
