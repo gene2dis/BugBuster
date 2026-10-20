@@ -678,14 +678,15 @@ workflow {
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
         //   input:  tuple val(meta), path(input)
-        //   output: tuple val(meta), path("*.bai"), emit: bai
+        //   output: tuple val(meta), path("*.{bai,csi,crai}"), emit: index
+        //   (version on the versions topic)
         //
         NFCORE_SAMTOOLS_INDEX(ch_bam_meta)
         
         // Join BAM with its index for BLOBTOOLS compatibility
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
-            .join(NFCORE_SAMTOOLS_INDEX.out.bai)
+            .join(NFCORE_SAMTOOLS_INDEX.out.index)
         // Wrap the collected taxdump files in a list so they arrive as ONE
         // tuple element (path(tax_files)) instead of being flattened into the
         // tuple — flattened, only the first file was staged into BLOBTOOLS
@@ -708,7 +709,6 @@ workflow {
 
         ch_versions = ch_versions.mix(
             NT_BLASTN.out.versions.first(),
-            NFCORE_SAMTOOLS_INDEX.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
             DEEPARG_CONTIGS.out.versions.first(),
