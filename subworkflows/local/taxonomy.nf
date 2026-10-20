@@ -63,7 +63,6 @@ workflow TAXONOMY {
             KRAKEN2.out.report,
             kraken_db.first()
         )
-        ch_versions = ch_versions.mix(BRACKEN.out.versions.first())
         
         // Generate unified taxonomy report
         TAXONOMY_REPORT(
