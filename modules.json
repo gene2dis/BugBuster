@@ -22,7 +22,7 @@
                     },
                     "fastp": {
                         "branch": "master",
-                        "git_sha": "b8f1de0ac853ae5b56c63450d47438f899c553d0",
+                        "git_sha": "1e31555fd8e5f4e959283d6db859a1f3a17fe25f",
                         "installed_by": [
                             "modules"
                         ]
