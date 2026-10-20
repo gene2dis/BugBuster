@@ -980,7 +980,7 @@ results/
 ├── pipeline_info/                              # Execution reports
 │   ├── execution_report_*.html                 # Resource usage report
 │   ├── execution_timeline_*.html               # Timeline visualization
-│   ├── execution_trace_*.txt                   # Task trace log
+│   ├── execution_trace_*.txt                   # Task trace: timing, %CPU, peak RSS, I/O, requested cpus/memory/time, attempt, work dir
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')

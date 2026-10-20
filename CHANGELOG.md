@@ -372,6 +372,11 @@ next release is tagged.
 
 ### Changed
 
+- **The execution trace records requested resources**:
+  `pipeline_info/execution_trace_*.txt` adds the `start`, `complete`, `%mem`,
+  `cpus`, `memory`, `time`, `attempt` and `workdir` columns, so CPU and memory
+  requests can be compared with what each task used
+
 - **`SOURMASH` no longer caps itself at 24 parallel tasks** (`maxForks 24`
   removed): the executor's CPU and memory pool already limits concurrency
 
