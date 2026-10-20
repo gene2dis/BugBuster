@@ -89,7 +89,8 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   samples with 404M clean reads in total needed ~86 GB at k=21, so MEGAHIT ran
   out of memory and is retried with 144 GB. To skip the failed attempt on
   deep co-assemblies, raise the request in a `-c` config file (see
-  [Out of memory](troubleshooting.md#out-of-memory)).
+  [Out of memory](troubleshooting.md#out-of-memory)). MetaWRAP bin refinement
+  requests 80 GB on the first attempt (peaks of 67-69 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
   every fresh run unless you pass the published index
@@ -433,7 +434,31 @@ Parameters are validated against `nextflow_schema.json` at startup (nf-schema). 
 |-----------|---------|-------------|
 | `--input` | *required* | Path to samplesheet CSV file |
 | `--output` | *required* | Output directory for results |
-| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` |
+| `--publish_dir_mode` | `copy` | How to save results: `copy`, `copyNoFollow`, `symlink`, `rellink`, `link`, `move` (see below) |
+
+**Saving space with `--publish_dir_mode link`.** By default every result is copied
+from the work directory into `--output`, so large outputs (clean reads with
+`--store_clean_reads`, RGI BAMs, bins) take their space twice. With `link`, each
+result is a hard link to the file in the work directory: publishing is instant and
+takes no extra space. A hard link is a full file, not a pointer:
+
+- copying the results folder elsewhere (`cp -r`, `rsync`, `scp`) copies full files;
+- deleting the work directory (by hand, `nextflow clean` or the `low_disk` profile)
+  keeps the results; the space is freed when the last of the two names is gone;
+- do not edit a published file in place: it is the same file as the one in the work
+  directory, which `-resume` reuses.
+
+Hard links only work within one filesystem. If the work directory and `--output` are
+on different filesystems (`df <work dir> <output dir>` shows two devices), the first
+task that publishes fails with `Failed to publish file ... [link]` (`Invalid
+cross-device link` in `.nextflow.log`) and the run stops: Nextflow does not fall back
+to copying (tested with Nextflow 25.10.7 and 26.04.4). Use `copy` there, or move the
+work directory with `-work-dir`; an interrupted run continues with `-resume`. This is
+why `copy` stays the default. `symlink` and `rellink` are different: they publish
+links that point into the work directory, which break when it is deleted, and a copy
+of the results folder copies only the links unless the copy follows them. Don't use
+`move`: it removes outputs that later tasks still read from the work directory and
+breaks `-resume`.
 
 ### 6.2 Pipeline Execution Options
 
@@ -980,7 +1005,7 @@ results/
 ├── pipeline_info/                              # Execution reports
 │   ├── execution_report_*.html                 # Resource usage report
 │   ├── execution_timeline_*.html               # Timeline visualization
-│   ├── execution_trace_*.txt                   # Task trace log
+│   ├── execution_trace_*.txt                   # Task trace: timing, %CPU, peak RSS, I/O, requested cpus/memory/time, attempt, work dir
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')

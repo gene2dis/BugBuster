@@ -44,8 +44,16 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String
 - **Default**: `copy`
 - **Options**: `copy`, `symlink`, `link`, `move`, `copyNoFollow`, `rellink`
-- **Description**: Method used to save pipeline results to output directory
-- **Example**: `--publish_dir_mode symlink`
+- **Description**: Method used to save pipeline results to output directory.
+  `link` makes hard links: no extra space, results survive deleting the work directory,
+  and copying the results folder elsewhere copies full files. It needs the work directory
+  and `--output` on the same filesystem; otherwise the first publish fails with an
+  "Invalid cross-device link" error and the run stops (Nextflow does not fall back to
+  copying), hence the `copy` default. `symlink` and `rellink` point into the work
+  directory and break when it is deleted (`low_disk`, `nextflow clean`). Don't use `move`
+  (later tasks still read the published outputs from the work directory). See the
+  [manual](manual.md#61-inputoutput-options)
+- **Example**: `--publish_dir_mode link`
 
 ---
 

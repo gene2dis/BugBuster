@@ -1,0 +1,42 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SOFTWARE_VERSIONS Subworkflow Test, through a real topic
+
+    Roadmap U0: a process emitting [process, tool, version] tuples on the
+    'versions' topic, the way current nf-core modules do, read with
+    channel.topic('versions') as main.nf does (harness:
+    software_versions_topic.nf). Tasks of one process emit identical tuples;
+    the file must hold one block per process with every tool
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_workflow {
+
+    name "Test SOFTWARE_VERSIONS with channel.topic('versions')"
+    script "./software_versions_topic.nf"
+    workflow "TOPIC_VERSIONS_TEST"
+
+    test("tuples from channel.topic('versions') give one block per process") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            workflow {
+                """
+                // two tasks of one process emit identical tuples, two tools each
+                input[0] = channel.of( 'sample1', 'sample2' )
+                input[1] = channel.empty()
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            def text = path(workflow.out.yml.get(0)).text
+            def block = '"TOPIC_VERSIONS_TEST:TOPIC_VERSIONS_EMITTER":\n    fastp: 1.4.0\n    pigz: 2.8\n'
+            assert text.contains(block)
+            assert text.count('"TOPIC_VERSIONS_TEST:TOPIC_VERSIONS_EMITTER":') == 1
+            assert text.contains('"gene2dis/BugBuster":\n    pipeline: ')
+        }
+    }
+}

@@ -372,6 +372,41 @@ next release is tagged.
 
 ### Changed
 
+- **`--publish_dir_mode link` documented** (manual section 6.1, parameters,
+  `DISK_OPTIMIZATION.md`): hard links take no extra space and survive
+  deleting the work directory, but need the work directory and `--output` on
+  one filesystem; across filesystems Nextflow 25.10.7 and 26.04.4 fail the
+  run at the first publish (`Invalid cross-device link`) instead of copying,
+  so the default stays `copy`
+
+- **`software_versions.yml` also collects the `versions` topic**: current
+  nf-core modules report `[process, tool, version]` tuples on the `versions`
+  topic instead of a `versions.yml` file. A new `SOFTWARE_VERSIONS`
+  subworkflow writes them in the same format as the local modules' files
+  (one block per process), so the file and `RESULTS_SUMMARY` are unchanged.
+  No module emits the topic yet; the nf-core module updates (issue #35)
+  will be the first to use it
+
+- **MetaWRAP requests 80 GB on the first attempt** (was 72 GB from
+  `process_high`): its peak RSS was 67-69 GB in every binning run, within 5 %
+  of the old request. Still doubled on retry and capped by `--max_memory`
+
+- **CPU requests sized to measured use** (`config/modules.config`):
+  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2, `WOLTKA_CLASSIFY` 8 → 2,
+  `TAXONOMY_PHYLOSEQ` 4 → 2 (each used well under its request in real runs),
+  and `CHECKM2_BATCH` 8 → 16 (one task over every bin at the end of a binning
+  run, 585-673 % CPU of 8). Outputs are unchanged; more tasks fit at once
+
+- **The execution trace records requested resources**:
+  `pipeline_info/execution_trace_*.txt` adds the `start`, `complete`, `%mem`,
+  `cpus`, `memory`, `time`, `attempt` and `workdir` columns, so CPU and memory
+  requests can be compared with what each task used
+
+- **`SOURMASH` no longer caps itself at 24 parallel tasks** (`maxForks 24`
+  removed): the local executor's CPU and memory pool already limits
+  concurrency; on a cluster or cloud profile the executor's `queueSize`
+  does (set it in a `-c` config to bound parallel jobs)
+
 - **`RGI_REPORT` adds coverage-filtered counts**: `rgi bwt` lists every gene
   with at least one mapped read (38-548 per sample in a 32-sample run), so
   `RGI_summary_report.csv` gains `AMR_Genes_cov<N>`, `Mapped_Reads_cov<N>`,
