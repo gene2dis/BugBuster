@@ -89,7 +89,8 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   samples with 404M clean reads in total needed ~86 GB at k=21, so MEGAHIT ran
   out of memory and is retried with 144 GB. To skip the failed attempt on
   deep co-assemblies, raise the request in a `-c` config file (see
-  [Out of memory](troubleshooting.md#out-of-memory)).
+  [Out of memory](troubleshooting.md#out-of-memory)). MetaWRAP bin refinement
+  requests 80 GB on the first attempt (peaks of 67-69 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
   every fresh run unless you pass the published index
