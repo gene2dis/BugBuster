@@ -372,6 +372,9 @@ next release is tagged.
 
 ### Changed
 
+- **`SOURMASH` no longer caps itself at 24 parallel tasks** (`maxForks 24`
+  removed): the executor's CPU and memory pool already limits concurrency
+
 - **`RGI_REPORT` adds coverage-filtered counts**: `rgi bwt` lists every gene
   with at least one mapped read (38-548 per sample in a 32-sample run), so
   `RGI_summary_report.csv` gains `AMR_Genes_cov<N>`, `Mapped_Reads_cov<N>`,
