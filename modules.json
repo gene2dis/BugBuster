@@ -29,7 +29,7 @@
                     },
                     "kraken2/kraken2": {
                         "branch": "master",
-                        "git_sha": "1a9dc0fd9f8f61099b3c912df1ab97fac72a1f86",
+                        "git_sha": "d67d33d5925fcec4691b499670fa2bd926fd2be5",
                         "installed_by": [
                             "modules"
                         ]
