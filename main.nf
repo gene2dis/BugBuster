@@ -124,6 +124,7 @@ include { ASSEMBLY           } from './subworkflows/local/assembly'
 include { BINNING            } from './subworkflows/local/binning'
 include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotation'
 include { READ_FUNCTIONAL    } from './subworkflows/local/read_functional'
+include { SOFTWARE_VERSIONS  } from './subworkflows/local/software_versions'
 
 // Modules for functionality not covered by subworkflows
 
@@ -738,25 +739,13 @@ workflow {
     }
 
     //
-    // Aggregate software versions -> pipeline_info/software_versions.yml
-    // Per-sample tasks of one process write byte-identical versions.yml files,
-    // so content-level unique() collapses them to one block per process.
-    // stripIndent() normalizes the varying heredoc indentation across modules.
+    // Aggregate software versions -> pipeline_info/software_versions.yml:
+    // the versions.yml files mixed into ch_versions plus the [process, tool,
+    // version] tuples nf-core modules emit on the 'versions' topic (a module
+    // that emits the topic is not also mixed into ch_versions)
     //
-    ch_software_versions = ch_versions
-        .map { yml -> yml.text.stripIndent() }
-        .mix( channel.of(
-            ( "\"${workflow.manifest.name}\":\n" +
-              "    pipeline: ${workflow.manifest.version}\n" +
-              "    nextflow: ${nextflow.version}\n" ).toString()
-        ) )
-        .unique()
-        .collectFile(
-            name: 'software_versions.yml',
-            storeDir: "${params.output}/pipeline_info",
-            sort: true,
-            newLine: false
-        )
+    SOFTWARE_VERSIONS( ch_versions, channel.topic('versions') )
+    ch_software_versions = SOFTWARE_VERSIONS.out.yml
 
     //
     // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG

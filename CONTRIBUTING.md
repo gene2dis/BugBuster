@@ -167,6 +167,27 @@ feat(modules): add DIAMOND module for protein alignment
   surfaces as an error instead of a silent double fix. Each one names its removal
   condition (a fixed upstream release); remove it with the re-pin
 
+### Software versions
+
+`pipeline_info/software_versions.yml` (read by `RESULTS_SUMMARY`) is built by
+`subworkflows/local/software_versions.nf` from two sources, written in one format,
+`"PROCESS":` followed by indented `tool: version` lines:
+
+- **Local modules** write a `versions.yml` file (template below) and emit it as
+  `versions`; `main.nf` (or the stage's subworkflow) mixes `.out.versions` into
+  `ch_versions`. Use `.first()` for per-sample processes.
+- **nf-core modules** at current upstream emit one tuple per tool on the `versions`
+  topic, `tuple val("${task.process}"), val('tool'), eval('tool --version'), topic: versions`,
+  and have no `versions.yml`. `main.nf` reads them with `channel.topic('versions')`;
+  do not mix such a module's `.out` into `ch_versions` (it has no file to read). When
+  `nf-core modules update` moves a module to the topic, drop its `.out.versions` mixes.
+  A module kept on `versions.yml` by a local `.diff` patch (`pyrodigal`, `bakta`) stays
+  in `ch_versions`.
+
+The tuples of one process become one block with its tools sorted, identical blocks
+from per-sample tasks collapse to one, and the file keeps its format.
+`tests/subworkflows/software_versions*.nf.test` cover both sources.
+
 ### Process Structure
 
 ```groovy

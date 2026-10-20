@@ -372,6 +372,13 @@ next release is tagged.
 
 ### Changed
 
+- **`software_versions.yml` also collects the `versions` topic**: current
+  nf-core modules report `[process, tool, version]` tuples on the `versions`
+  topic instead of a `versions.yml` file. A new `SOFTWARE_VERSIONS`
+  subworkflow writes them in the same format as the local modules' files
+  (one block per process), so the file and `RESULTS_SUMMARY` are unchanged.
+  No module emits the topic yet; the nf-core updates (issue #35) will
+
 - **MetaWRAP requests 80 GB on the first attempt** (was 72 GB from
   `process_high`): its peak RSS was 67-69 GB in every binning run, within 5 %
   of the old request. Still doubled on retry and capped by `--max_memory`

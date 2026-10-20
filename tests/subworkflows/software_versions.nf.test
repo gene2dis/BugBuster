@@ -1,0 +1,45 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SOFTWARE_VERSIONS Subworkflow Test
+
+    Roadmap U0: nf-core modules report versions as [process, tool, version]
+    tuples on the 'versions' topic instead of a versions.yml file. Both must
+    end up in pipeline_info/software_versions.yml in the format local modules
+    write ("PROCESS":\n    tool: version), one block per process, which
+    RESULTS_SUMMARY parses (bin/summary_common.py parse_versions)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_workflow {
+
+    name "Test SOFTWARE_VERSIONS Subworkflow"
+    script "../../subworkflows/local/software_versions.nf"
+    workflow "SOFTWARE_VERSIONS"
+
+    test("one topic tuple joins a versions.yml file in the same format") {
+        when {
+            params {
+                output = "${outputDir}"
+            }
+            workflow {
+                """
+                input[0] = channel.of( file("${projectDir}/tests/data/versions/versions.yml", checkIfExists: true) )
+                // eval() output can end in a newline
+                input[1] = channel.of( [ 'QC:FASTP', 'fastp', '1.4.0\\n' ] )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            def text = path(workflow.out.yml.get(0)).text
+            assert text == path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert text.contains('"QC:FASTP":\n    fastp: 1.4.0\n')
+            // a versions.yml file keeps its block
+            assert text.contains('"QC:QFILTER":\n    bash: 5.1.16(1)-release\n')
+            assert text.contains('"gene2dis/BugBuster":\n    pipeline: ')
+            // nothing but quoted process keys and 4-space tool lines
+            assert text.readLines().every { line -> line ==~ /"[^"]+":/ || line ==~ /    [A-Za-z0-9_.+\-]+: \S.*/ }
+        }
+    }
+}
