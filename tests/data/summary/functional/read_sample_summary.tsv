@@ -1,0 +1,3 @@
+sample_id	backend	tool_version	db_version	reads_assigned	reads_unassigned_ambiguous	average_genome_size_bp	genome_equivalents	cpge_status
+sampleA	woltka	0.1.7	WoLr2 test fixture (tests/bin/make_woltka_fixtures.py)	20.000000	0.000000	3000000	2.0	ok
+sampleB	woltka	0.1.7	WoLr2 test fixture (tests/bin/make_woltka_fixtures.py)	10.000000	0.000000			unavailable

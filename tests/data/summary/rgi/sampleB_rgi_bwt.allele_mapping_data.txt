@@ -1,0 +1,2 @@
+ORF_ID	Contig	Start	Stop	Orientation	Cut_Off	Pass_Bitscore	Best_Hit_ARO	Best_Identities	AROMatch	SNPs_In_Best_Hit_ORTH	Other_Hits	Unique_Identifier	Best_Hit_ARO_category	Best_Resistomes	AROs	ARO_category	Resistomes	Predicted_DNA	Predicted_Protein	CARD_Protein_Sequence	Percentage_Length_of_CARD_Protein	ID	Model_ID	Nudged	Note	Other_Hit_Accession
+NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA

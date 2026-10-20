@@ -27,6 +27,13 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib import rcParams
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import re
+
+# natural_key is shared with bin/results_summary.py (bin/summary_common.py)
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.dont_write_bytecode = True
+from summary_common import natural_key  # noqa: E402
+
 
 # Set matplotlib parameters
 rcParams['font.size'] = 20
@@ -539,22 +546,23 @@ class PhyloseqTableGenerator:
             # Calculate relative abundance
             rel_abundance = agg_table.div(agg_table.sum(axis=0), axis=1) * 100
             
-            # Select top N taxa
-            mean_abundance = rel_abundance.mean(axis=1).sort_values(ascending=False)
-            top_taxa = mean_abundance.head(self.top_n).index
+            top_taxa = self.select_plot_taxa(rel_abundance)
             
-            plot_data = rel_abundance.loc[top_taxa]
+            # Samples top to bottom in natural order (V2 before V10)
+            samples = sorted(rel_abundance.columns, key=natural_key, reverse=True)
+            plot_data = rel_abundance.loc[top_taxa, samples]
             
             # Add "Other" category
-            other = rel_abundance.loc[~rel_abundance.index.isin(top_taxa)].sum(axis=0)
+            other = rel_abundance.loc[~rel_abundance.index.isin(top_taxa), samples].sum(axis=0)
             plot_data.loc['Other'] = other
             
-            # Create plot
-            fig, ax = plt.subplots(figsize=(16, 8))
+            # Create plot; height and label size follow the number of samples
+            n_samples = len(samples)
+            fig, ax = plt.subplots(figsize=(16, max(6, 0.3 * n_samples + 2)))
             
-            # Generate color palette
-            n_colors = len(plot_data)
-            colors = sns.color_palette("tab20", n_colors)
+            # Generate color palette; "Other" is grey
+            palette = "tab10" if len(top_taxa) <= 10 else "tab20"
+            colors = sns.color_palette(palette, len(top_taxa)) + [(0.8, 0.8, 0.8)]
             
             # Create stacked bar plot
             plot_data.T.plot(
@@ -578,7 +586,8 @@ class PhyloseqTableGenerator:
             
             # Format x-axis
             ax.set_xlim(0, 100)
-            ax.tick_params(axis='both', labelsize=18)
+            ax.tick_params(axis='x', labelsize=18)
+            ax.tick_params(axis='y', labelsize=max(6, min(18, 500 / max(n_samples, 1))))
             
             # Legend
             ax.legend(
@@ -607,6 +616,37 @@ class PhyloseqTableGenerator:
             print(f"Warning: Failed to create {tax_level} plot: {e}", file=sys.stderr)
             return None
     
+    def select_plot_taxa(self, rel_abundance: pd.DataFrame) -> List[str]:
+        """
+        Choose at most top_n taxa so that every sample's dominant taxa are shown.
+
+        Ranking by mean abundance alone hides taxa that dominate a few samples
+        (they end up in 'Other'). Take the union of each sample's k most
+        abundant taxa for the largest k that fits in top_n, then fill the
+        remaining slots by mean abundance.
+        """
+        mean_abundance = rel_abundance.mean(axis=1).sort_values(ascending=False)
+        chosen: List[str] = []
+        for k in range(1, self.top_n + 1):
+            union = set()
+            for sample in rel_abundance.columns:
+                col = rel_abundance[sample]
+                union.update(col[col > 0].nlargest(k).index)
+            if len(union) > self.top_n:
+                if k == 1:
+                    # more samples with distinct dominant taxa than slots:
+                    # keep the dominant taxa that reach the highest abundance
+                    peak = rel_abundance.loc[list(union)].max(axis=1)
+                    chosen = list(peak.sort_values(ascending=False).index[:self.top_n])
+                break
+            chosen = [t for t in mean_abundance.index if t in union]
+        for taxon in mean_abundance.index:
+            if len(chosen) >= self.top_n:
+                break
+            if taxon not in chosen and mean_abundance[taxon] > 0:
+                chosen.append(taxon)
+        return chosen
+
     def generate_all_plots(
         self,
         otu_table: pd.DataFrame,
@@ -759,7 +799,7 @@ Examples:
         '--top-n',
         type=int,
         default=10,
-        help='Number of top taxa to show in plots (default: 10)'
+        help='Maximum taxa shown in plots; every sample\'s most abundant taxa are included first (default: 10)'
     )
     
     return parser.parse_args()

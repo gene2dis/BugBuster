@@ -35,6 +35,10 @@ workflow TAXONOMY {
 
     main:
     ch_versions = channel.empty()
+    // For the results summary
+    ch_tax_reads_report = channel.empty()
+    ch_tax_tables       = channel.empty()
+    ch_sylph_profiles   = channel.empty()
 
     //
     // Kraken2 taxonomic profiling
@@ -195,6 +199,20 @@ workflow TAXONOMY {
         }
     }
 
+    // TAXONOMY_REPORT runs in exactly one branch above, so its outputs are
+    // read once here rather than in every branch
+    if ( params.taxonomic_profiler in ['kraken2', 'sourmash', 'sylph'] ) {
+        ch_tax_reads_report = TAXONOMY_REPORT.out.report
+        ch_tax_tables = TAXONOMY_PHYLOSEQ.out.otu_table
+            .mix(TAXONOMY_PHYLOSEQ.out.tax_table, TAXONOMY_PHYLOSEQ.out.read_counts)
+    }
+    if ( params.taxonomic_profiler == "sylph" ) {
+        ch_sylph_profiles = SYLPH_PROFILE.out.profile.map { _meta, profile -> profile }
+    }
+
     emit:
-    versions = ch_versions // channel: path(versions.yml)
+    reads_report   = ch_tax_reads_report // channel: path(Reads_report.csv) with the classified fraction
+    tables         = ch_tax_tables       // channel: path(<label>_{otu_table,tax_table,read_counts}.tsv)
+    sylph_profiles = ch_sylph_profiles   // channel: path(<sample>_sylph_<db>.tsv)
+    versions       = ch_versions         // channel: path(versions.yml)
 }

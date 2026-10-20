@@ -125,6 +125,10 @@ jobs:
         run: |
           tests/bin/test_report_scripts.sh
 
+      - name: Run results summary regression tests
+        run: |
+          tests/bin/test_results_summary.sh
+
       - name: Run GFF-to-SAF converter tests (design doc T3)
         run: |
           tests/bin/test_gff2saf.sh
@@ -136,6 +140,10 @@ jobs:
       - name: Run co-assembly read-role tests
         run: |
           tests/bin/test_read_role.sh
+
+      - name: Run MEGAHIT memory wrapper tests
+        run: |
+          tests/bin/test_megahit_run.sh
 
       - name: Run functional aggregation script tests (design doc T4)
         run: |
@@ -170,9 +178,17 @@ jobs:
         run: |
           tests/bin/test_rgi_bwt_fallback.sh
 
+      - name: Run RGI k-mer database load tests (pathogen of origin)
+        run: |
+          tests/bin/test_rgi_load_kmers.sh
+
       - name: Run RGI kmer_query patch tests (KMA BAMs, dead workers, time limit)
         run: |
           tests/bin/test_rgi_kmer_kma_fix.sh
+
+      - name: Run RGI bwt patch tests (mapped reads only, KMA failures)
+        run: |
+          tests/bin/test_rgi_bwt_kma_fix.sh
 
       - name: Run K-MARVEL output check tests (zero ARGs, BLAST failure)
         run: |

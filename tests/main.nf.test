@@ -795,6 +795,38 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run skips RGI pathogen of origin without WildCARD") {
+        // The k-mer database rgi kmer_query needs comes with WildCARD, so the
+        // downloaded CARD-only database (--rgi_include_wildcard false) has
+        // none: RGI_KMER is skipped and RGI_REPORT still runs on the bwt tables
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control      = true
+                assembly_mode        = "none"
+                taxonomic_profiler   = "none"
+                rgi_prediction       = true
+                rgi_include_wildcard = false
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_BWT") }
+            assert !workflow.trace.tasks().any { task -> task.name.contains("RGI_KMER") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_REPORT") }
+            // log.warn reaches only the Nextflow log, not the captured console
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("RGI pathogen of origin (rgi kmer_query) is skipped")
+        }
+    }
+
     test("Stub run wires the read-level K-MARVEL path") {
         // K-MARVEL runs on the clean reads with --assembly_mode none. No
         // --custom_kmarvel_db: pins the FORMAT_KMARVEL_DB provisioning path,

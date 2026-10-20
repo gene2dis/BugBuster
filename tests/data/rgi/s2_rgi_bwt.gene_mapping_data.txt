@@ -1,0 +1,2 @@
+ORF_ID	ARO Term	ARO Accession	Reference Model Type	Reference DB	Alleles with Mapped Reads	Reference Allele	%Coverage of Reference Allele	Minimum Bidirectional Coverage	Average Bidirectional Coverage	%Identity to Reference Allele	Antibiotic	Class	Resistance Mechanism	AMR Gene Family	Drug Class
+NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA	NA

@@ -1,3 +1,3 @@
-ARO Term	AMR Gene Family	Drug Class	Resistance Mechanism	All Mapped Reads
-tet(Q)	tetracycline-resistant ribosomal protection protein	tetracycline antibiotic	antibiotic target protection	12
-ErmF	Erm 23S ribosomal RNA methyltransferase	macrolide antibiotic;lincosamide antibiotic	antibiotic target alteration	5
+ARO Term	ARO Accession	AMR Gene Family	Drug Class	Resistance Mechanism	All Mapped Reads
+tet(Q)	3000191	tetracycline-resistant ribosomal protection protein	tetracycline antibiotic	antibiotic target protection	12
+ErmF	3000498	Erm 23S ribosomal RNA methyltransferase	macrolide antibiotic;lincosamide antibiotic	antibiotic target alteration	5

@@ -151,6 +151,16 @@ def process_kargva_data(kargva_df):
     return kargva_df
 
 
+def normalise(df):
+    """CPM_ARGs (k-mer depth per million single reads) and copies_per_cell (k-mer depth / ARGs-OAP nCell);
+    blank where there is no hit or the sample's count is 0."""
+    df = df.copy()
+    depth = df['AverageKMerDepth'] if 'AverageKMerDepth' in df else pd.Series(float('nan'), index=df.index)
+    df['CPM_ARGs'] = depth * (1 / (df['nRead'].replace(0, float('nan')) / 1e6))
+    df['copies_per_cell'] = depth / df['nCell'].replace(0, float('nan'))
+    return df
+
+
 def main():
     """Main function to generate ARG normalization report."""
     
@@ -222,21 +232,10 @@ def main():
     # Zero read/cell counts (e.g. ARGs-OAP finds no 16S -> nCell=0) must yield
     # empty cells, not inf, in the published CSVs
 
-    # Normalize KARGA
-    if not karga_filtered.empty and not karga_filtered['GeneIdx'].isna().all():
-        karga_norm = karga_with_reads.copy()
-        karga_norm['CPM_ARGs'] = karga_norm['AverageKMerDepth'] * (1 / (karga_norm['nRead'].replace(0, float('nan')) / 1e6))
-        karga_norm['copies_per_cell'] = karga_norm['AverageKMerDepth'] / karga_norm['nCell'].replace(0, float('nan'))
-    else:
-        karga_norm = karga_with_reads
-
-    # Normalize KARGVA
-    if not kargva_filtered.empty and not kargva_filtered['GeneIdx'].isna().all():
-        kargva_norm = kargva_with_reads.copy()
-        kargva_norm['CPM_ARGs'] = kargva_norm['AverageKMerDepth'] * (1 / (kargva_norm['nRead'].replace(0, float('nan')) / 1e6))
-        kargva_norm['copies_per_cell'] = kargva_norm['AverageKMerDepth'] / kargva_norm['nCell'].replace(0, float('nan'))
-    else:
-        kargva_norm = kargva_with_reads
+    # Normalize KARGA and KARGVA. The two columns are written also when no gene or variant passes (one row
+    # per sample with blank ARG fields), so every KARGA_norm.csv / KARGVA_norm.csv has the same columns
+    karga_norm = normalise(karga_with_reads)
+    kargva_norm = normalise(kargva_with_reads)
     
     # Write outputs
     karga_norm.to_csv('KARGA_norm.csv', index=False)

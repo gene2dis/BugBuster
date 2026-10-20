@@ -16,10 +16,14 @@ process RGI_LOAD_WILDCARD {
         task.ext.when == null || task.ext.when
 
     script:
+        def kmer_size = params.rgi_kmer_size ?: 61
         """
         set +u
         if [ -f /usr/local/env-execute ]; then
+            # env-execute resets PATH; keep the pipeline's bin/ on it
+            pipeline_path="\$PATH"
             source /usr/local/env-execute
+            export PATH="\$PATH:\$pipeline_path"
         fi
         set -u
 
@@ -97,6 +101,10 @@ process RGI_LOAD_WILDCARD {
             --wildcard_index wildcard_data/index-for-model-sequences.txt \\
             --card_annotation \$CARD_FASTA \\
             --local
+
+        # Load the WildCARD k-mer database: RGI_KMER (rgi kmer_query, pathogen
+        # of origin) reads it from localDB/
+        rgi_load_kmers.sh card.json wildcard_data ${kmer_size}
 
         # Verify database is loaded
         rgi database --version --local > database_version.txt

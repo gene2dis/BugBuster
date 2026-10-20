@@ -51,7 +51,8 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 22. Bin reports.
 23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only MetaWRAP quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
 24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-25. Assembly modes: "coassembly", "assembly", "none"
+25. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
+26. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -217,7 +218,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA, KARGVA and ARGs-OAP, which run together) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
@@ -227,6 +228,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |
 | `--functional_cazy` | `true` | run_dbcan CAZy annotation in the contig functional branch |
 | `--arg_bin_clustering` | `false` | Bin-level ARG prediction and clustering |
+| `--results_summary` | `true` | Run-level summary in `00_summary/` (tables, Excel, figures, HTML report) |
 
 ### Database Selection
 
@@ -299,6 +301,22 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--kmarvel_min_coverage` | `90` | K-MARVEL minimum gene coverage (%) |
 | `--kmarvel_min_identity` | `90` | K-MARVEL minimum gene identity (%) |
 | `--kmarvel_min_read_length` | `100` | K-MARVEL minimum read length (bp, below 200) |
+| `--rgi_summary_min_coverage` | `80` | Summaries only: an RGI gene counts when reads cover >= N% of its best reference sequence |
+
+### Results Summary Options
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--sample_metadata` | none | TSV/CSV with a `sample` column and any metadata columns, carried into every table |
+| `--summary_group_by` / `--summary_order_by` | none | Metadata columns that group and order the samples |
+| `--summary_batch_label` | output directory name (its parent's when it is `results`) | `batch` column of the summary tables |
+| `--summary_min_clean_pairs` | `1000000` | Samples below this many clean read pairs are flagged low depth |
+| `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure |
+| `--summary_taxa_per_sample` | `5` | Taxonomy heatmaps: union of each sample's N most abundant taxa |
+| `--summary_top_n` | `40` | Maximum rows in the ARG heatmap |
+| `--card_prevalence` | none | WildCARD `card_prevalence.txt`: candidate ARG hosts (co-occurrence) |
+| `--arg_priority_table` | `assets/arg_priority_tiers.tsv` | ARG reporting tier rules |
+| `--summary_watchlist` | `assets/summary_watchlist.tsv` | Watchlist taxa (ESKAPE, WHO 2024, CDC 2019) |
 
 ### Resource Limits
 
@@ -321,6 +339,7 @@ The pipeline generates organized output with numbered prefixes:
 ```
 results/
 ├── pipeline_info/              # Execution reports, logs, contig filtering summary
+├── 00_summary/                 # Run-level summary (if results_summary=true): results_summary.html, results_summary.xlsx, README.md/.docx, LLM_GUIDE.md, tables/, figures/
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
 ├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports

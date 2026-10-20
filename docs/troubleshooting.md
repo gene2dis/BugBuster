@@ -159,6 +159,14 @@ exitCode: 137
 
 3. Use a larger instance type (cloud) or node (HPC)
 
+A process that runs out of memory is retried twice with more memory each time
+(exit statuses 130-145 and 104). MEGAHIT reports running out of memory as 137
+too (`bin/megahit_run.sh`), and its graph build is held to 90% of the task
+memory. MEGAHIT takes the minimum a step needs even above that budget, so a
+deep co-assembly can still need a larger request: its log
+(`<work dir>/coassembly_assembly/log`) gives each step's "Minimum memory
+required" in bytes.
+
 The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
 on a real co-assembly; it requests 96 GB on the first attempt), `WOLTKA_ALIGN` (≥ 68 GB,
 see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step are
@@ -211,6 +219,13 @@ Process exceeded time limit
        }
    }
    ```
+
+With the local executor, a task killed at its time limit can instead fail with
+`process hasn't exited` (`java.lang.IllegalThreadStateException` in `.nextflow.log`), and its
+`.exitcode` is 143 (written after the kill). Nextflow then has no exit status for the task, so
+the error strategy stops the run instead of retrying it with more time. Compare the task's
+start and end times with its `time` setting; if they match, raise `time` for that process as
+above and `-resume`.
 
 ---
 
@@ -339,6 +354,20 @@ was changed to a different version.
 eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
 check whether issue #620 is fixed in the new version and update or remove
 `bin/emapper_ogs_fix.py` accordingly.
+
+### RGI_BWT fails: "KMA failed" or "not the 6.0.3 method"
+
+`RGI_BWT` runs `rgi bwt` through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads KMA placed on a
+reference (RGI 6.0.3 kept every read, which made the task take hours and tens of GB of disk) and checks that
+KMA succeeded. Its messages:
+
+- **"KMA failed (exit status N)":** the alignment failed (status 2: a missing or incomplete KMA index in
+  `localDB/`; 137: killed, usually out of memory, retried with more memory). RGI itself ignored this and
+  reported the sample as having no hits. KMA 1.4.9 can exit 95 after a successful run, so 95 is accepted
+  when KMA has written its result table.
+- **"the installed RGI BWT.<method> is not the 6.0.3 method this patch targets":** the RGI container was
+  changed. Use the pinned image, or, when updating RGI, check whether the new version still writes every read
+  to the KMA SAM, then update or remove `bin/rgi_bwt_kma_fix.py`.
 
 ### RGI_KMER fails: "worker was killed", "did not finish within", or "not the 6.0.3 method"
 
@@ -780,7 +809,7 @@ directly contains `markers/`, `skani/`, `taxonomy/`, ...).
 ### Sylph: Classified is 1.0, or TAXONOMY_PHYLOSEQ fails with "No sylph genomes in any sample"
 
 **Symptom (a):** with `--taxonomic_profiler sylph`, the `Classified` column of
-`Reads_report.csv` is 1.0 (or close) for samples that surely hold organisms
+`02_taxonomy/tables/Reads_report_taxonomy.csv` is 1.0 (or close) for samples that surely hold organisms
 missing from the database, and the estimated read pairs in
 `sylph_<db>_read_counts.tsv` add up to every read pair.
 

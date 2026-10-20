@@ -1,0 +1,47 @@
+# ARG reporting tiers for bin/results_summary.py (CARD 4.x names; edit freely and pass with --arg-priority).
+# Columns: match (name = regex searched in the ARO name, family = regex searched in the CARD AMR gene family),
+#          pattern, tier, category, note.
+# Rules are tried top to bottom and the first match wins, so put name rules before the family rule they refine.
+# A name rule also wins over every family rule below it: keep genes of a tier 1 family out of the name lists
+# (cfr genes match the tier 1 Cfr family rule, not the tier 2 'acquired_other' names).
+# Applied before this table: any ARO with CARD SNP definitions (snps.txt), any "protein variant model" and any ARO
+# whose name says "mutant" / "mutation" is tier 4 (mutation_dependent); its resistance_snp_status column says
+# whether a known resistance mutation was seen.
+# Applied after this table: efflux / reduced-permeability mechanisms and overexpression models are tier 3; anything
+# else is tier 2 with category "acquired_unreviewed".
+# Tiers: 1 = clinical priority (last-line resistance, usually mobile), 2 = other acquired, 3 = intrinsic,
+# housekeeping, efflux or regulator, 4 = mutation dependent.
+match	pattern	tier	category	note
+name	^vanC|in vanC cluster|^vanG$|^vanT gene in vanG|in vanG cluster|^vanO$|in vanO cluster	3	intrinsic_glycopeptide	vanC/vanG/vanO clusters: low-level glycopeptide resistance, intrinsic in E. gallinarum/casseliflavus; the vanG ligase is common on the chromosome of gut Clostridia, the vanO cluster on the chromosome of Rhodococcus (Actinomycetota)
+name	^RbpA$	3	intrinsic_rifamycin	RNA polymerase-binding protein of Actinomycetota (Streptomyces, Mycobacterium): chromosomal, low-level rifampin tolerance
+name	^van[ABDELMN]$	1	glycopeptide_VRE	Van ligase; vanB-type ligases also occur in gut anaerobes (Clostridia), so check the candidate hosts
+name	gene in van[A-Z] cluster	2	glycopeptide_cluster_accessory	accessory gene of a van operon; resistance needs the ligase
+name	^mec[IR]	3	regulator	mec regulator; resistance needs mecA/mecC
+name	^tet\(X([3-9]|[1-9][0-9])\)	1	tigecycline	tet(X3) and later: high-level tigecycline resistance
+name	^(optrA|poxtA)	1	oxazolidinone	transferable linezolid resistance
+name	^tet[A-Z]?\(	2	tetracycline	acquired tetracycline gene (efflux or protection)
+name	^mup[AB]|mupA conferring|mupB conferring	2	mupirocin	acquired high-level mupirocin resistance
+name	^(qac|mef|msr|mel|lsa|vga|sal|lnu|vat|mph|ere|fexA|floR|cml)	2	acquired_other	acquired gene matched by name
+family	KPC beta-lactamase|NDM beta-lactamase|VIM beta-lactamase|IMP beta-lactamase|GIM beta-lactamase|SIM beta-lactamase|SPM beta-lactamase|DIM beta-lactamase|AIM beta-lactamase|KHM beta-lactamase|IMI beta-lactamase|SME beta-lactamase|FRI beta-lactamase|BKC Beta-lactamase	1	carbapenemase	acquired carbapenemase family
+family	OXA-48-like|OXA-23-like|OXA-24-like|OXA-58-like|OXA-143-like|OXA-235-like	1	carbapenemase	carbapenem-hydrolysing class D (OXA) family
+family	MCR phosphoethanolamine transferase	1	colistin_mcr	mobile colistin resistance
+family	methicillin resistant PBP2	1	methicillin_mec	mecA/mecC (MRSA/MRCoNS)
+family	16S rRNA methyltransferase	1	aminoglycoside_16S_RMTase	pan-aminoglycoside resistance
+family	Cfr 23S ribosomal RNA methyltransferase	1	oxazolidinone	cfr family (phenicols, lincosamides, oxazolidinones, pleuromutilins, streptogramin A)
+family	CTX-M beta-lactamase|PER beta-lactamase|VEB beta-lactamase|GES beta-lactamase|BEL beta-lactamase|SFO beta-lactamase|TLA beta-lactamase	2	ESBL	extended-spectrum beta-lactamase family (GES: some alleles are carbapenemases)
+family	TEM beta-lactamase|SHV beta-lactamase	2	broad_spectrum_bla	ESBL status depends on the allele, and allele calls from reads are unstable
+family	CMY beta-lactamase|DHA beta-lactamase|FOX beta-lactamase|MOX beta-lactamase|ACC beta-lactamase|LAT beta-lactamase|ACT beta-lactamase|MIR beta-lactamase	2	AmpC	AmpC family; CMY/DHA/FOX/MOX/ACC are usually plasmid-borne, ACT/MIR are chromosomal in Enterobacter
+family	OXA-1-like|OXA-2-like|OXA-10-like|OXA beta-lactamase	2	OXA_other	class D beta-lactamase without a carbapenemase subgroup; check the allele
+family	EC beta-lactamase|ampC-type beta-lactamase|PDC beta-lactamase|ADC beta-lactamase|OXY beta-lactamase|OKP beta-lactamase|LEN beta-lactamase|OXA-51-like|OXA-50-like|OXA-213-like|OXA-134-like|CepA beta-lactamase|CblA beta-lactamase|ACI beta-lactamase|MUN beta-lactamase|crx beta-lactamase|L1 family|CphA beta-lactamase|BlaB beta-lactamase|GOB beta-lactamase	3	intrinsic_bla	chromosomal (intrinsic) beta-lactamase of its species
+family	CfiA beta-lactamase	2	carbapenemase_Bacteroides	cfiA: B. fragilis division II metallo-carbapenemase
+family	CfxA beta-lactamase|BlaZ beta-lactamase|CARB beta-lactamase	2	bla_other	acquired beta-lactamase
+family	quinolone resistance protein \(qnr\)|AAC\(6'\)-Ib-cr	2	quinolone_PMQR	plasmid-mediated quinolone resistance
+family	AAC\(|APH\(|ANT\(|aminoglycoside bifunctional	2	aminoglycoside	aminoglycoside-modifying enzyme
+family	Erm 23S ribosomal RNA methyltransferase	2	MLSB	erm methyltransferase
+family	tetracycline-resistant ribosomal protection protein|tetracycline inactivation enzyme	2	tetracycline	tetracycline resistance
+family	sulfonamide resistant sul|trimethoprim resistant dihydrofolate reductase dfr	2	folate_pathway	sul / dfr
+family	chloramphenicol acetyltransferase|chloramphenicol phosphotransferase	2	phenicol	cat
+family	lincosamide nucleotidyltransferase|macrolide phosphotransferase|macrolide esterase|streptogramin|ABC-F	2	MLS_other	acquired macrolide/lincosamide/streptogramin gene
+family	fosfomycin thiol transferase	2	fosfomycin	fos
+family	streptothricin acetyltransferase|rifampin ADP-ribosyltransferase|Bleomycin resistant protein|FusB-type	2	acquired_other	acquired gene
+family	pmr phosphoethanolamine transferase|undecaprenyl pyrophosphate|kdpDE|Serine/threonine kinases|isoleucyl-tRNA synthetase|daptomycin resistant|Penicillin-binding protein mutations|non-erm 23S ribosomal RNA methyltransferase	3	intrinsic_other	chromosomal/housekeeping gene that confers intrinsic or low-level resistance

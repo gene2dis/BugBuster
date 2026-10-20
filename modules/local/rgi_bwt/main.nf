@@ -55,14 +55,22 @@ process RGI_BWT {
         mkdir localDB
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
-        # Run RGI bwt (stderr redirected to log file to avoid flooding with low-coverage warnings)
-        rgi bwt \\
+        # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI 6.0.3 writes every
+        # read KMA reports, unplaced ones included (over 99% of a metagenome),
+        # to the SAM and then scans that read table once per reference with
+        # reads (hours on a deep sample, ~390 bytes per clean read on disk);
+        # the wrapper keeps the reads placed on a reference. Remove it at the
+        # RGI re-pin. --clean deletes the *.temp.* files when rgi finishes;
+        # the files RGI_KMER and RGI_REPORT read have no .temp in their names
+        # and are kept.
+        rgi_bwt_kma_fix.py bwt \\
             --read_one ${read_one} \\
             ${read_two ? "--read_two ${read_two}" : ""} \\
             --aligner ${aligner} \\
             --threads ${task.cpus} \\
             --output_file ${prefix}_rgi_bwt \\
             --local \\
+            --clean \\
             ${wildcard} \\
             ${args} \\
             2>${prefix}_rgi_bwt.log

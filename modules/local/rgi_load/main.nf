@@ -16,10 +16,14 @@ process RGI_LOAD {
         task.ext.when == null || task.ext.when
 
     script:
+        def kmer_size = params.rgi_kmer_size ?: 61
         """
         set +u
         if [ -f /usr/local/env-execute ]; then
+            # env-execute resets PATH; keep the pipeline's bin/ on it
+            pipeline_path="\$PATH"
             source /usr/local/env-execute
+            export PATH="\$PATH:\$pipeline_path"
         fi
         set -u
 
@@ -72,7 +76,8 @@ process RGI_LOAD {
             gunzip wildcard/*.gz || true
             
             # Get CARD version from JSON
-            CARD_VERSION=\$(grep '"version"' card.json | head -1 | sed 's/.*: "\\(.*\\)".*/\\1/')
+            # card.json keeps its version under "_version" (one-line JSON)
+            CARD_VERSION=\$(python3 -c "import json; print(json.load(open('card.json'))['_version'])")
             
             # Run wildcard annotation
             echo "Processing WildCARD annotations (this may take 30-60 minutes)..."
@@ -97,6 +102,10 @@ process RGI_LOAD {
                 --wildcard_index wildcard/index-for-model-sequences.txt \\
                 --card_annotation \$CARD_FASTA \\
                 --local
+
+            # Load the k-mer database shipped with WildCARD: RGI_KMER (rgi
+            # kmer_query, pathogen of origin) reads it from localDB/
+            rgi_load_kmers.sh card.json wildcard ${kmer_size}
         fi
 
         # Verify database is loaded
@@ -106,7 +115,7 @@ process RGI_LOAD {
         cat <<-END_VERSIONS > ../versions.yml
         "${task.process}":
             rgi: \$(rgi --version 2>&1 | grep -oP 'rgi \\K[0-9.]+' || echo "unknown")
-            card: \$(grep '"version"' card.json | head -1 | sed 's/.*: "\\(.*\\)".*/\\1/')
+            card: \$(python3 -c "import json; print(json.load(open('card.json')).get('_version', 'unknown'))" 2>/dev/null || echo "unknown")
         END_VERSIONS
 
         cd ..

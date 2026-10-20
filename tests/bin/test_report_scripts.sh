@@ -10,6 +10,8 @@
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
 #   - and the happy paths still produce their real outputs,
+#   - bin/arg_contig_level_report.py writes a real TSV, and bin/arg_blobplot.py
+#     plots only the ARG-carrying contigs (contigs without an ARG were "Other"),
 #   - bin/blobplot.py and bin/arg_blobplot.py pickle their figure without
 #     error (design doc T9 finding: lambda tick formatters broke pickle.dump).
 #
@@ -351,6 +353,22 @@ for f in KARGA_norm.csv KARGVA_norm.csv; do
     fi
 done
 
+# no gene or variant passes (KARGA at 50% coverage, KARGVA with 1 SNP k-mer): the CSVs keep the
+# normalisation columns, blank, so every KARGA_norm.csv / KARGVA_norm.csv has the same columns
+AN0="${WORK}/arg_norm_no_hits"
+mkdir -p "${AN0}/s1_args_oap_s1_out"
+printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n%s,50%%,10.0\n' "${KARGA_GENE}" \
+    > "${AN0}/s1_all_reads_KARGA_mappedGenes.csv"
+printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n%s,1/10,85%%,10.0\n' "${KARGVA_GENE}" \
+    > "${AN0}/s1_all_reads_KARGVA_mappedGenes.csv"
+printf 'sample\tnRead\tn16S\tnCell\ns1\t1000000\t50\t100\n' > "${AN0}/s1_args_oap_s1_out/metadata.txt"
+NEXT_WORKDIR="${AN0}"
+expect_pass "arg_norm: no gene or variant passes" arg_norm_report.py
+check_grep "arg_norm: KARGA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGA_norm.csv" \
+    "^sample,.*,CPM_ARGs,copies_per_cell$"
+check_grep "arg_norm: KARGVA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGVA_norm.csv" \
+    "^sample,.*,CPM_ARGs,copies_per_cell$"
+
 #
 # kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
 # two ARGs, sampleB header-only); the zero-ARG sample must stay as an
@@ -423,6 +441,31 @@ NEXT_WORKDIR="${ABP_WORK}"
 expect_pass "arg_blobplot: contig ARG table plotted and pickled" arg_blobplot.py
 check_file "arg_blobplot: PNG created" "ARG_blob_plot.png"
 check_pickle "arg_blobplot: pickled figure loads back" arg_blobplot "ARG_final_blobplot.pkl"
+# The fixture has 7 ARG-carrying contigs out of 40 in 5 classes; the 33
+# contigs without an ARG used to be plotted as "Other"
+check_grep "arg_blobplot: only the ARG-carrying contigs are plotted" "../arg_blobplot.log" "Total contigs: 7$"
+check_grep "arg_blobplot: five ARG classes and no 'Other'" "../arg_blobplot.log" \
+    "Class distribution: {'Aminoglycoside': 14.29, 'Beta-Lactam': 28.57, 'Fosmidomycin': 14.29, 'Multidrug': 28.57, 'Tetracycline': 14.29}$"
+
+#
+# arg_contig_level_report.py: the contig table is written tab-separated, as
+# its .tsv name says (it was comma-separated). Inputs: the real BlobTools
+# table above and a synthetic DeepARG mapping file (DeepARG 1.0.4 header,
+# one acrA hit on contig k141_0, values taken from a real test_sample1 hit).
+#
+echo "--- arg_contig_level_report.py ---"
+ACR_WORK="${WORK}/arg_contig_level_report"
+mkdir -p "${ACR_WORK}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_WORK}/"
+NEXT_WORKDIR="${ACR_WORK}"
+expect_pass "arg_contig_level_report: BlobTools and DeepARG tables joined" arg_contig_level_report.py
+check_grep "arg_contig_level_report: tab-separated header" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	.*	counts$"
+check_grep "arg_contig_level_report: ARG joined to its contig" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	.*	ACRA	multidrug	"
+check_grep "arg_contig_level_report: contig without an ARG kept with empty ARG columns" \
+    "Contig_tax_and_arg_prediction.tsv" "^test_sample2	k141_820	.*						$"
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

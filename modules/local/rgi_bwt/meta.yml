@@ -1,5 +1,5 @@
 name: rgi_bwt
-description: Read-level AMR gene detection with rgi bwt, aligning the paired host-removed reads of one sample to the CARD (and WildCARD, if loaded) reference alleles; singleton reads are excluded, and a sample without mapping results gets NA placeholder tables and no BAM
+description: Read-level AMR gene detection with rgi bwt, aligning the paired host-removed reads of one sample to the CARD (and WildCARD, if loaded) reference alleles; singleton reads are excluded, and a sample without mapping results gets NA placeholder tables and no BAM. Runs through bin/rgi_bwt_kma_fix.py, which keeps only the reads KMA placed on a reference (RGI 6.0.3 kept every read, taking hours per sample and tens of GB of disk) and fails when KMA fails, and with --clean, which removes the temporary files
 keywords:
   - antimicrobial resistance
   - card

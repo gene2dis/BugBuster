@@ -1,5 +1,5 @@
 name: rgi_report
-description: Study-level RGI summary from the rgi bwt gene-mapping tables of all samples (per-sample AMR gene count, mapped reads, unique drug classes and AMR gene families) plus bar plots of the top gene families, drug classes, resistance mechanisms and per-sample gene counts; written as an inline Python script
+description: Study-level RGI summary from the rgi bwt gene-mapping tables of all samples (per-sample AMR gene count, mapped reads, unique drug classes and AMR gene families; rgi bwt lists every gene with a mapped read, so the *_cov<N> columns repeat the counts for the genes whose best-covered reference sequence reads cover at least --rgi_summary_min_coverage %, default 80, from the allele tables) plus bar plots, of those genes, of the top gene families, drug classes, resistance mechanisms and per-sample gene counts; written as an inline Python script
 keywords:
   - antimicrobial resistance
   - rgi

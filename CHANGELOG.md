@@ -12,6 +12,104 @@ next release is tagged.
 
 ### Added
 
+- **Run-level results summary (`00_summary/`, `--results_summary`, on by default)**
+  - `RESULTS_SUMMARY` (`bin/results_summary.py` and its `summary_*.py`
+    modules) consolidates the QC, taxonomy and read-level ARG (K-MARVEL, RGI)
+    results into tidy and wide TSV tables, an Excel workbook
+    (README sheet with column definitions), PDF/PNG/SVG figures and a
+    self-contained HTML report (inline SVG, sortable tables, no network)
+  - Counts in read pairs (`Reads_report.csv` counts single reads); a
+    low-depth flag (`--summary_min_clean_pairs`, default 1,000,000 clean
+    pairs) turns "not detected" into `NA_low_depth` instead of absent
+  - K-MARVEL abundance as RPM and RPKM of clean read pairs (the
+    `kmarvel_summary/` matrices are raw counts); each gene is represented by
+    its best-supported allele, as alleles of one gene share their reads
+  - ARG reporting tiers from an editable rule table
+    (`assets/arg_priority_tiers.tsv`, `--arg_priority_table`): 1 clinical
+    priority, 2 other acquired, 3 intrinsic/efflux/regulator, 4 mutation
+    dependent; tier 4 hits are checked against the K-MARVEL database's CARD
+    `snps.txt` (`resistance_snp_status`), since K-MARVEL lists every
+    difference from the reference, not resistance mutations
+  - Taxonomy tables named by taxon per rank, a long table with sylph ANI,
+    ANI interval and coverage (`species_call_uncertain`), species prevalence,
+    and a watchlist of priority pathogens (`assets/summary_watchlist.tsv`,
+    `--summary_watchlist`)
+  - Optional `--sample_metadata` with `--summary_group_by` /
+    `--summary_order_by`: grouped and ordered figures, per-group ARG
+    detection patterns
+  - RGI in the summary: `rgi bwt` genes count at `--rgi_summary_min_coverage`
+    (default 80) % coverage of their best reference sequence (RGI lists
+    every gene with a mapped read), with RGI's k-mer pathogen of origin
+    (`rgi_kmer_hosts`) and whether the top host is a watchlist pathogen
+    (`rgi_host_check`: WildCARD holds resistance-gene sequences of gut
+    commensals, e.g. poxtA from *Blautia*); RGI is the primary ARG method
+    when K-MARVEL did not run
+  - K-MARVEL vs RGI comparison when both ran: gene-level overlap tables
+    (`arg_method_comparison`, `arg_method_overlap`, with RGI calls below the
+    cutoff marked), an UpSet plot and agreement by tier and category
+  - QC figure marks 10M and 20M clean read pairs (`--summary_depth_marks`)
+    next to the low-depth line, and writes the % classified on each bar; the
+    report header counts the samples at each mark (`depth_class` column)
+  - Taxonomy heatmaps show each sample's 5 most abundant taxa
+    (`--summary_taxa_per_sample`, no row cap; `--summary_top_n` now caps the
+    ARG heatmap only), grouped by phylum and alphabetical within each; group
+    names sit in their own strip, so they no longer overlap the title or each
+    other
+  - An "Attention" list at the top of the HTML report (tier 1 genes found by
+    every method, by one only or with a commensal RGI host, and low-depth
+    samples), and a first "Reading this report" section explaining the units,
+    the ARG tiers (from the tier rule file in use) and the ARG methods
+  - The watchlist notes name each taxon's source (ESKAPE, WHO Bacterial
+    Priority Pathogens List 2024, CDC AR Threats Report 2019), and the
+    report's Methods section shows the list
+  - Optional `--card_prevalence` (WildCARD): candidate ARG hosts among the
+    species of the same sample (co-occurrence, not linkage) and CARD plasmid
+    association
+  - `batch` column: the output directory's name, or `--summary_batch_label`
+    (script: `--batch-labels`) when batches share an output directory name
+  - The script also runs on finished results directories, merging several
+    batches without rerunning any tool (manual, Example 13); pinned Seqera
+    image with pandas, matplotlib and openpyxl
+  - `docs/REPORTING_ROADMAP.md`: reporting improvements planned for the
+    modules without example results yet
+  - KARGA / KARGVA in the summary (ARG_NORM_REPORT's tables): long tables,
+    copies per cell per MEGARes group and class (each group's deepest allele,
+    as alleles share k-mers), the KARGVA variants, a class heatmap, and the
+    ARGs-OAP 16S and cell estimates in `samples_qc`; reported apart from the
+    CARD methods (MEGARes names differ) and in their own unit
+  - Read functional profile (Woltka, SUPER-FOCUS or HUMAnN) and MicrobeCensus
+    in the summary: `function_read_long`, one wide table per ontology in CPGE
+    (`NA_no_ags` without a MicrobeCensus estimate), a COG-category heatmap,
+    and reads assigned, annotated fraction, average genome size and genome
+    equivalents in `samples_qc`
+  - `README.md` and `README.docx` (standard-library writer, no new
+    dependency) and `LLM_GUIDE.md` in `00_summary/`: the stages that ran per
+    results directory (from `software_versions.yml`, read line by line as it
+    is not always valid YAML), every table and figure, units, tiers, caveats,
+    versions; the guide covers the stages that ran, methods, every table
+    column and figure, pitfalls and recipes. Both describe the summary
+    folder only (the part that is shared): paths are relative to it, batches
+    appear by label and input files by name, never as local paths
+  - One generic input (`stage_reports`) lays out other stages' run-level
+    tables by file name, so a stage is added with one case in the module and
+    one `mix()` in `main.nf`
+  - Every emitted column is documented (`bin/summary_docs.py`); the test
+    suite fails on an undocumented one, and the Excel README sheet lists only
+    the tables written
+  - Table audit on a real run: RbpA and the vanO cluster (chromosomal in
+    Actinomycetota, 74-82% of acquired RPKM in one batch) move to tier 3;
+    a gene gets one tier across ARG methods (RGI tiers also use CARD
+    `snps.txt`); an allele name that collapses onto another CARD gene keeps
+    its own name (CRP-1, a CRP beta-lactamase, is not CRP, an efflux
+    regulator); `rgi_gene_read_pairs` is written, so RGI gene RPKM can be
+    rebuilt from the tables; taxonomy wide and watchlist tables mark taxa
+    not found in a low-depth sample `NA_low_depth`, and species prevalence
+    counts the samples with taxonomy output and leaves low-depth absences
+    out of its denominator; gene family and drug class
+    lists use one separator; the report says where tier 1 genes found only
+    by another method are; wide tables are filled in one step, not one
+    column per sample (pandas PerformanceWarning on 100+ samples)
+
 - **Sylph read-level taxonomic profiler (`--taxonomic_profiler sylph`)**
   - `SYLPH_PROFILE` (sylph 1.0.0) profiles the paired host-removed reads by
     containment ANI against a sylph database with `-u` (unknown-fraction
@@ -274,6 +372,15 @@ next release is tagged.
 
 ### Changed
 
+- **`RGI_REPORT` adds coverage-filtered counts**: `rgi bwt` lists every gene
+  with at least one mapped read (38-548 per sample in a 32-sample run), so
+  `RGI_summary_report.csv` gains `AMR_Genes_cov<N>`, `Mapped_Reads_cov<N>`,
+  `Unique_Drug_Classes_cov<N>` and `Unique_AMR_Families_cov<N>`, counting the
+  genes whose best-covered reference sequence reads cover at least
+  `--rgi_summary_min_coverage` % (default 80). The existing columns are
+  unchanged; the four plots now use the filtered genes and say so in their
+  titles
+
 - **Breaking (default aligner)**: `--read_aligner` defaults to `bwamem3` instead of
   `bowtie2`, after a benchmark on five real metagenomes and a spiked mock community
   (`docs/benchmarks/bwamem3_vs_bowtie2.md`): host removal 4.1x faster, reads-to-contigs
@@ -341,6 +448,132 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **ARGS_OAP time limit**: stage one ran with `process_low` (4 CPUs, 8 h) and
+  took 6-8 h on 55-70 M read pairs; one sample hit the limit, and on the
+  local executor the kill surfaced as `process hasn't exited`, which stops
+  the run instead of retrying. ARGS_OAP now uses `process_medium` (8 CPUs,
+  36 GB, 24 h); `docs/troubleshooting.md` explains the message
+- **Two `Reads_report.csv` written to one path**: with a taxonomic profiler,
+  READS_REPORT and TAXONOMY_REPORT both published `Reads_report.csv` to
+  `01_quality_control/summary/`, and the one published last was kept, so a
+  run could keep the copy without the profiler's DB, Unclassified and
+  Classified columns. TAXONOMY_REPORT's copy is now
+  `02_taxonomy/tables/Reads_report_taxonomy.csv`; the QC path always holds
+  READS_REPORT's, also when the taxonomy step fails. The summary reads the
+  taxonomy copy first and falls back to the QC path (older results)
+- **Results summary review fixes**:
+  - a gene called without an RPKM (no `Reads_report.csv`, or no reference
+    length) is blank in `arg_gene_rpkm`, `arg_family_rpkm`,
+    `arg_drug_class_rpkm` and `arg_priority_panel`, and 1 in
+    `arg_presence`, instead of 0 (not detected)
+  - a tier rule outside 1-4 stops with a clear error instead of failing
+    while the report is written; the tier table keeps its categories when
+    the rule file has no `note` column
+  - `n_species` and `shannon` leave out the pooled `unassigned species`
+    row (taxa without a species name); Shannon is renormalised over the
+    named species
+  - the default batch label is the output directory's name, or its
+    parent's when it is called `results` (as `bin/results_summary.py`
+    labels a directory), reduced to the `--summary_batch_label` pattern so
+    it is safe on the command line
+  - the `--summary_group_by` / `--summary_order_by` check runs only with
+    `--results_summary true`
+  - a `--custom_rgi_card_db` is checked at launch for both k-mer files
+    RGI_KMER needs (`<k>mer_database.json` and `amr_<k>mer.txt`)
+  - tiers are assigned once per distinct ARO annotation, not once per row;
+    the status and metadata-merge code is shared; the unused
+    `rgi_gene_detected` column is gone
+  - the summary no longer fails when KARGA or KARGVA has no passing hit:
+    ARG_NORM_REPORT now always writes `CPM_ARGs` and `copies_per_cell`
+    (they were left out of a file without hits), and the summary reads a
+    file without hits, with or without those columns, as no MEGARes gene
+  - `--summary_min_clean_pairs 0` no longer crashes the QC figure (the
+    threshold line at 0 on a log axis)
+  - when merged batches ran different ARG methods, the report header's
+    tier 1 list also covers the samples outside the method comparison
+  - a K-MARVEL row raised to tier 4 to match the reference method gets
+    its CARD SNP check (`resistance_snp_status`) instead of a blank
+  - a 0 setting (e.g. `--rgi-min-coverage 0`) is listed in the README's
+    inputs instead of being dropped as unset
+  - the RGI placeholder table of a sample without hits is recognised from
+    one column or row, not by stripping the whole table
+  - the `--results_summary` help and schema text list every result the
+    summary covers
+
+- **MEGAHIT out of memory on a large host**: MEGAHIT was run without `-m`, so
+  it sized its graph build to 90% of the host's RAM instead of the task's
+  memory, and the container killed it at the task limit (a 404M-read
+  co-assembly needed ~86 GB at k=21 against the 72 GB first attempt). Its
+  exit status, 247, was not in the retry list, so the run stopped instead of
+  retrying with more memory. MEGAHIT now runs through `bin/megahit_run.sh`:
+  `-m` is 90% of the task memory (a `-m` in `ext.args` still wins), and
+  running out of memory exits 137, so the task is retried with twice the
+  memory
+
+- **kraken2 classified-reads plot at low classification**: `taxonomy_report.py`
+  guessed percent vs fraction from the values, so a kraken2 run where every
+  sample was at most 1% classified was drawn as up to 100%; it now goes by
+  the profiler (kraken2 reports percent)
+
+- **Report plots readable on large runs**
+  - `Box_plot_reads.png`: the y axis had a tick every 5M reads (57
+    overlapping labels at 285M); ticks are now chosen automatically
+  - Taxonomy bar plots: `--taxonomy_top_n_taxa` taxa are chosen so that each
+    sample's most abundant taxa are shown (the global top-N by mean abundance
+    put whole samples in "Other"); samples in natural order (`V2` before
+    `V10`), figure height and label size follow the sample count
+  - Classified-reads plot: samples sorted, legend outside the bars
+
+- **RGI summary counted a zero-hit sample as one gene**: when `rgi bwt` maps too
+  few reads, `RGI_BWT` writes placeholder tables with one all-NA row, and
+  `RGI_REPORT` counted that row (`Total_AMR_Genes` 1). The row is now dropped:
+  the sample is reported with 0 genes and 0 reads, and shown as 0 in
+  `RGI_sample_amr_counts.png`. `Total_Mapped_Reads` is written as an integer
+  (a mixed run turned it into `17.0`), and samples are sorted
+
+- **ARG blob plot showed every contig without an ARG as "Other"**
+  (`ARG_blob_plot.png`): their class is empty, and the top-nine relabel turned
+  it into "Other" (82.5% of the contigs in the test data). The plot now shows
+  the ARG-carrying contigs only, as the original R script did, so "Other"
+  holds only the ARG classes beyond the top nine; the bar panel gives
+  percentages of the ARG-carrying contigs
+
+- **`Contig_tax_and_arg_prediction.tsv` is tab-separated**: it was written
+  comma-separated despite its name. Scripts that read it as CSV must switch
+  to tab-separated
+
+- **RGI pathogen of origin was always empty**: neither database step
+  (`RGI_LOAD`, `RGI_LOAD_WILDCARD`) loaded the WildCARD k-mer database, and
+  `rgi kmer_query` exits 0 without output when it is missing, so `RGI_KMER`
+  wrote `{}` for every sample. Both steps now load it
+  (`bin/rgi_load_kmers.sh`, for `--rgi_kmer_size`). A missing k-mer database
+  is never fatal, so `rgi bwt` and its reports always run: the load step warns
+  when the WildCARD files lack it, `RGI_KMER` warns and writes an empty result
+  when the database has none, and the step is skipped with a warning at launch
+  for a `--custom_rgi_card_db` without it and for the downloaded CARD-only
+  database (`--rgi_include_wildcard false`). Databases prepared by earlier
+  runs lack the k-mers: load them as in `docs/RGI_WILDCARD_USAGE.md` (Step 4)
+  or prepare again
+- **RGI CARD version read as empty on the download path**: `RGI_LOAD` looked for
+  `"version"` in `card.json`, which stores it as `"_version"`, so
+  `rgi wildcard_annotation` got no version and `software_versions.yml` a blank
+  `card:`
+- **`RGI_BWT` took hours per sample and kept tens of GB of temporary files**:
+  RGI 6.0.3 writes every read KMA reports, unplaced ones included (over 99%
+  of a metagenome), to the SAM, two BAM copies and a read table, and then
+  scans that table once per reference sequence with reads (81M rows times
+  7,859 references for an 81M-read sample). It also removes its temporary
+  files only with `--clean`, which the pipeline did not pass: a task kept
+  about 390 bytes per clean read (1.2 TB for a 32-sample batch). `RGI_BWT` now
+  runs rgi through `bin/rgi_bwt_kma_fix.py`, which runs RGI's own KMA command
+  but keeps only the SAM records placed on a reference, and stops when KMA
+  fails (RGI ignored it, so a failed alignment looked like a sample without
+  hits), and passes `--clean`. The placed reads, and so the gene and allele
+  tables, are unchanged; `overall_mapping_stats.txt` and
+  `artifacts_mapping_stats.txt` now count the placed reads only. The log no
+  longer holds one samtools warning per unplaced KMA read (3.5 GB for an
+  81M-read sample). Tests: `tests/bin/test_rgi_bwt_kma_fix.sh`
 
 - **Co-assembly read pairing for sample ids such as `S_1.2`**: MEGAHIT, BOWTIE2_SAMTOOLS
   and BWAMEM3_SAMTOOLS sorted the pooled reads into R1/R2 lists by a substring match on

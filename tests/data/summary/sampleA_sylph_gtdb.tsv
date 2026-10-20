@@ -1,0 +1,4 @@
+Sample_file	Genome_file	Taxonomic_abundance	Sequence_abundance	Adjusted_ANI	True_cov	ANI_5-95_percentile	Eff_lambda	Lambda_5-95_percentile	Median_cov	Mean_cov_geq1	Containment_ind	Naive_ANI	kmers_reassigned	Contig_name
+sampleA_R1_clean.fastq.gz	gtdb_genomes_reps/database/GCA/047/199/115/GCA_047199115.1_genomic.fna.gz	39.8005	40.7752	98.31	2.234	NA-NA	HIGH	NA-NA	2	2.4	900/1000	98.31	0	contig_1
+sampleA_R1_clean.fastq.gz	gtdb_genomes_reps/database/GCA/047/199/095/GCA_047199095.1_genomic.fna.gz	37.8619	38.3799	95.13	2.125	93.80-96.40	1.05	0.90-1.20	2	2.2	700/1000	95.13	0	contig_1
+sampleA_R1_clean.fastq.gz	gtdb_genomes_reps/database/GCF/000/009/045/GCF_000009045.1_genomic.fna.gz	22.3376	20.8449	99.94	1.254	NA-NA	HIGH	NA-NA	1	1.3	990/1000	99.94	0	contig_1

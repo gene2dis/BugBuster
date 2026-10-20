@@ -1,0 +1,35 @@
+# Taxa reported in the watchlist table/figure of bin/results_summary.py (edit freely and pass with --watchlist).
+# Columns: taxon, rank (species or genus), note (why the taxon is listed).
+# Default list: the ESKAPE pathogens, the bacteria of the WHO Bacterial Priority Pathogens List 2024
+# (BPPL 2024; https://www.who.int/publications/i/item/9789240093461) and of the CDC Antibiotic Resistance
+# Threats Report 2019 (https://www.cdc.gov/antimicrobial-resistance/data-research/threats/), and a few other
+# species of clinical interest. Enterobacterales are listed by species or genus because the WHO and CDC entries
+# name the order. Each note gives the source lists and, in brackets, the resistance they name.
+# Names are matched after removing GTDB suffixes on both sides ("Enterococcus_B faecium" matches
+# "Enterococcus faecium", "Enterobacter hormaechei_C" matches "Enterobacter hormaechei"), so NCBI-style names work
+# for GTDB, Kraken2 and sourmash outputs alike. A genus row reports the summed abundance of the genus.
+taxon	rank	note
+Enterococcus faecium	species	ESKAPE; WHO BPPL 2024 high (vancomycin-R); CDC 2019 serious (VRE)
+Enterococcus faecalis	species	CDC 2019 serious (VRE); not on WHO BPPL 2024, which lists E. faecium only
+Staphylococcus aureus	species	ESKAPE; WHO BPPL 2024 high (methicillin-R); CDC 2019 serious (MRSA)
+Klebsiella pneumoniae	species	ESKAPE; Enterobacterales: WHO BPPL 2024 critical (carbapenem-R, 3rd-gen cephalosporin-R); CDC 2019 urgent (CRE), serious (ESBL)
+Klebsiella variicola	species	K. pneumoniae species complex; Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Klebsiella oxytoca	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Klebsiella michiganensis	species	K. oxytoca species complex; Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Acinetobacter baumannii	species	ESKAPE; WHO BPPL 2024 critical (carbapenem-R); CDC 2019 urgent (carbapenem-R Acinetobacter)
+Pseudomonas aeruginosa	species	ESKAPE; WHO BPPL 2024 high (carbapenem-R); CDC 2019 serious (multidrug-R)
+Enterobacter	genus	ESKAPE; E. cloacae complex; Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Escherichia coli	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL); GTDB includes Shigella (WHO BPPL 2024 high, fluoroquinolone-R; CDC 2019 serious)
+Citrobacter freundii	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Serratia marcescens	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Proteus mirabilis	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Morganella morganii	species	Enterobacterales (WHO BPPL 2024 critical; CDC 2019 CRE, ESBL)
+Salmonella enterica	species	WHO BPPL 2024 high (Typhi and non-typhoidal, fluoroquinolone-R); CDC 2019 serious
+Clostridioides difficile	species	CDC 2019 urgent (C. difficile infection; not a resistance listing); not on WHO BPPL 2024
+Streptococcus pneumoniae	species	WHO BPPL 2024 medium (macrolide-R); CDC 2019 serious (drug-R)
+Streptococcus agalactiae	species	Group B Streptococcus: WHO BPPL 2024 medium (penicillin-R); CDC 2019 concerning (clindamycin-R)
+Haemophilus influenzae	species	WHO BPPL 2024 medium (ampicillin-R)
+Campylobacter jejuni	species	CDC 2019 serious (drug-R Campylobacter); WHO BPPL 2017 high, not on the 2024 list
+Helicobacter pylori	species	WHO BPPL 2017 high (clarithromycin-R), not on the 2024 list
+Neisseria gonorrhoeae	species	WHO BPPL 2024 high (3rd-gen cephalosporin-R and/or fluoroquinolone-R); CDC 2019 urgent
+Stenotrophomonas maltophilia	species	intrinsically multidrug-resistant opportunist; not on the WHO or CDC lists

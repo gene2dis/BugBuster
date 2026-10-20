@@ -1,0 +1,2 @@
+#ARG	query-start	query-end	read_id	predicted_ARG-class	best-hit	probability	identity	alignment-length	alignment-bitscore	alignment-evalue	counts
+ACRA	1	397	k141_0_1	multidrug	YP_002269113|FEATURES|acrA|multidrug|acrA	0.999998229145703	100.0	397	780.0	3.75e-275	1

@@ -49,6 +49,11 @@ nextflow run main.nf \
   checks only for its `localDB/` directory
 - KMA indices are optional: RGI builds missing ones in each task
 - WildCARD must already be integrated
+- The k-mer database must be loaded for the pathogen-of-origin step (RGI_KMER):
+  `localDB/<k>mer_database.json` and `localDB/amr_<k>mer.txt`, for the
+  `--rgi_kmer_size` in use (61 by default). Without them the pipeline warns at
+  launch and skips the pathogen-of-origin step; `rgi bwt` and its reports still
+  run. See Step 4 of the manual preparation below
 
 **Database structure:**
 ```
@@ -83,7 +88,13 @@ nextflow run main.nf \
 **What happens:**
 - Uses your existing CARD database
 - Processes WildCARD annotations from your directory
+- Loads the WildCARD k-mer database for the pathogen-of-origin step
 - Combines them into a new database, published to `<databases_dir>/rgi/card_db_with_wildcard`
+
+This copies both directories into the task's work directory, and the published
+copy is a full one: with a large WildCARD directory that is tens of GB twice. A
+database loaded once by hand (manual preparation below) and passed with
+`--custom_rgi_card_db` alone is linked, not copied.
 
 ### CARD Database Requirements
 
@@ -105,8 +116,13 @@ wildcard_directory/
 ├── nucleotide_fasta_protein_overexpression_model_variants.fasta
 ├── nucleotide_fasta_protein_variant_model_variants.fasta
 ├── nucleotide_fasta_rRNA_gene_variant_model_variants.fasta
+├── 61_kmer_db.json          (k-mer database, pathogen of origin)
+├── all_amr_61mers.txt       (k-mer database, pathogen of origin)
 └── ... (other variant files)
 ```
+
+The k-mer files must match `--rgi_kmer_size` (61 by default); the database step
+fails when they are missing.
 
 **Note:** The files must be decompressed (`gunzip *.gz` first): this path passes the directory to `rgi wildcard_annotation` as is. Only the automatic download decompresses WildCARD.
 
@@ -238,7 +254,7 @@ nextflow run main.nf \
 **Solution:**
 ```bash
 # Check CARD version
-grep '"version"' /path/to/card_database/card.json
+python3 -c "import json; print(json.load(open('/path/to/card_database/card.json'))['_version'])"
 
 # Check WildCARD version
 grep "version" /path/to/wildcard/index-for-model-sequences.txt
@@ -254,6 +270,15 @@ grep "version" /path/to/wildcard/index-for-model-sequences.txt
 - Ensure at least 100 GB free space in work directory
 - Use `--databases_dir` to specify location with sufficient space
 - Consider using CARD-only mode if space is limited
+
+**Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`, or a task takes hours
+
+RGI 6.0.3 writes every read KMA reports, placed on a reference or not, to its SAM and then scans that read
+table once per reference sequence with reads. `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which
+keeps only the reads placed on a reference (well under 1% of a metagenome; the gene and allele tables are
+unchanged), and with `--clean`, which removes the temporary files when the task ends. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
+read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
+`RGI_BWT` task directories, or the whole `work/` once the run is done.
 
 ## Best Practices
 
@@ -299,7 +324,7 @@ tar -xvf data ./card.json
 wget https://card.mcmaster.ca/download/0/broadstreet-v3.2.9.tar.bz2
 tar -xjf broadstreet-v3.2.9.tar.bz2
 
-grep '"version"' card.json | head -1
+python3 -c "import json; print(json.load(open('card.json'))['_version'])"
 ```
 
 ### Step 3: Load CARD (protein homolog models)
@@ -327,7 +352,7 @@ mkdir -p wildcard
 tar -xjf wildcard_data.tar.bz2 -C wildcard
 gunzip wildcard/*.gz
 
-CARD_VERSION=$(grep '"version"' card.json | head -1 | sed 's/.*: "\(.*\)".*/\1/')
+CARD_VERSION=$(python3 -c "import json; print(json.load(open('card.json'))['_version'])")
 
 # CPU-intensive; may take 30-60 minutes
 rgi wildcard_annotation -i wildcard --card_json card.json -v ${CARD_VERSION} \
@@ -340,8 +365,20 @@ rgi load \
     --card_annotation card_database_v<version>.fasta \
     --local
 
+# k-mer database for the pathogen-of-origin step (rgi kmer_query). rgi load
+# needs --card_json on every call; this call adds to the load above
+rgi load --card_json card.json \
+    --kmer_database wildcard/61_kmer_db.json \
+    --amr_kmers wildcard/all_amr_61mers.txt \
+    --kmer_size 61 \
+    --local
+
 rgi database --version --local   # verify both are loaded
+cat localDB/loaded_databases.json   # "card_kmers": {"kmer_sizes": ["61"]}
 ```
+
+Without the k-mer load, `rgi kmer_query` writes nothing and RGI_KMER stops
+with an error.
 
 ### Step 5: Use the prepared database
 
@@ -356,7 +393,20 @@ nextflow run main.nf \
 
 Aligner indices (KMA by default) are built by RGI when missing, inside each
 RGI_BWT task's own `localDB/`; they are not written back to the prepared
-database.
+database. With WildCARD the KMA index takes about 10 minutes (and 1 GB) per
+sample, so build it once in the database instead; `rgi bwt` reuses it when its
+four files are present:
+
+```bash
+# inside the database directory, in the RGI image
+mkdir -p localDB/bwt/card_wildcard_reference/kma
+kma index -i localDB/card_wildcard_reference.fasta \
+    -o localDB/bwt/card_wildcard_reference/kma
+ls localDB/bwt/card_wildcard_reference/   # kma.comp.b kma.length.b kma.name kma.seq.b
+```
+
+(`card_reference` instead of `card_wildcard_reference` for a CARD-only
+database.)
 
 ### Sizing
 

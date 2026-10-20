@@ -13,13 +13,14 @@ Complete reference for all BugBuster pipeline parameters.
 5. [Quality Control Parameters](#quality-control-parameters)
 6. [Taxonomy Profiling Parameters](#taxonomy-profiling-parameters)
 7. [Taxonomy Visualization Parameters](#taxonomy-visualization-parameters)
-8. [Assembly Parameters](#assembly-parameters)
-9. [Binning Parameters](#binning-parameters)
-10. [ARG Prediction Parameters](#arg-prediction-parameters)
-11. [Functional Annotation Parameters](#functional-annotation-parameters)
-12. [Alignment Parameters](#alignment-parameters)
-13. [Resource Limit Parameters](#resource-limit-parameters)
-14. [Advanced Parameters](#advanced-parameters)
+8. [Results Summary Parameters](#results-summary-parameters)
+9. [Assembly Parameters](#assembly-parameters)
+10. [Binning Parameters](#binning-parameters)
+11. [ARG Prediction Parameters](#arg-prediction-parameters)
+12. [Functional Annotation Parameters](#functional-annotation-parameters)
+13. [Alignment Parameters](#alignment-parameters)
+14. [Resource Limit Parameters](#resource-limit-parameters)
+15. [Advanced Parameters](#advanced-parameters)
 
 ---
 
@@ -396,7 +397,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)
-- **Description**: Path to pre-prepared CARD database directory for RGI (must contain RGI-loaded data and KMA indices)
+- **Description**: Path to pre-prepared CARD database directory for RGI: its `localDB/` (created by `rgi load --local`) must include WildCARD and the k-mer database for `--rgi_kmer_size` (`localDB/61mer_database.json`, `localDB/amr_61mer.txt`), which the pathogen-of-origin step needs; without them that step is skipped with a warning (rgi bwt still runs). KMA indices are built by RGI when absent. Used alone, the directory is linked, not copied
 - **Example**: `--custom_rgi_card_db /path/to/card_database`
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for database preparation instructions
 
@@ -404,7 +405,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to WildCARD directory containing variant files. Use together with `--custom_rgi_card_db` to combine separate databases
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
-- **Requirements**: Directory must contain `index-for-model-sequences.txt` and variant FASTA files
+- **Requirements**: Directory must contain `index-for-model-sequences.txt`, the variant FASTA files and the k-mer database for `--rgi_kmer_size` (`61_kmer_db.json`, `all_amr_61mers.txt`; without them the pathogen-of-origin step is skipped with a warning), all decompressed. Both directories are copied into the preparation task and the combined database is published as a full copy, so loading the database once by hand and passing `--custom_rgi_card_db` alone saves that space
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
 
 ### `--custom_kmarvel_db`
@@ -529,7 +530,7 @@ Override automatic downloads by providing custom database paths:
 ### `--sylph_read_seq_id`
 - **Type**: Number (percent, > 0 and <= 100)
 - **Default**: unset (sylph's automatic estimate)
-- **Description**: Read sequence identity passed to `sylph profile --read-seq-id`. It drives sylph's unknown-fraction estimate (`-u`), i.e. the `Classified` column of `Reads_report.csv` and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified (on simulated reads with 1/3 unknown: automatic 100%, `100` gave 66.1% against a true 66.7%), so set it when `Classified` looks too high
+- **Description**: Read sequence identity passed to `sylph profile --read-seq-id`. It drives sylph's unknown-fraction estimate (`-u`), i.e. the `Classified` column of `02_taxonomy/tables/Reads_report_taxonomy.csv` and the estimated read pairs per genome; relative abundance is not affected. Reads from genomes absent from the database can skew the automatic estimate towards 100% classified (on simulated reads with 1/3 unknown: automatic 100%, `100` gave 66.1% against a true 66.7%), so set it when `Classified` looks too high
 - **Example**: `--sylph_read_seq_id 99.5` (typical Illumina)
 
 ### Sylph outputs
@@ -545,7 +546,8 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
   `sequence_abundance / 100 × the read pairs given to sylph`. With `-u`,
   `sequence_abundance` is the genome's share of all input reads (unknown
   included), so the column sums to the classified pairs
-- The `Classified` column of `Reads_report.csv` is the sum of `sequence_abundance / 100`
+- The `Classified` column of `Reads_report_taxonomy.csv` (`Reads_report.csv` with the
+  profiler's columns added) is the sum of `sequence_abundance / 100`
   (capped at 1.0); see `--sylph_read_seq_id` when it looks too high
 
 ---
@@ -562,7 +564,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Type**: Integer
 - **Default**: `10`
 - **Minimum**: `1`
-- **Description**: Number of top taxa to display in plots
+- **Description**: Maximum taxa per plot. Each sample's most abundant taxa are included first, then the most abundant overall, so a taxon that dominates a few samples is not hidden in "Other"
 - **Example**: `--taxonomy_top_n_taxa 20`
 
 ### `--create_phyloseq_rds`
@@ -570,6 +572,90 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Default**: `false`
 - **Description**: Generate R phyloseq RDS files for downstream analysis
 - **Example**: `--create_phyloseq_rds true`
+
+---
+
+## Results Summary Parameters
+
+The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI,
+KARGA/KARGVA), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
+self-contained HTML report, a README (`README.md`, `README.docx`) and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.16, for how the results are reported.
+
+### `--results_summary`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Write the run-level summary to `00_summary/`
+- **Example**: `--results_summary false`
+
+### `--sample_metadata`
+- **Type**: String (path to a `.tsv`, `.csv` or `.txt` file)
+- **Default**: none
+- **Description**: Table with a `sample` column (or sample names in the first column) and any metadata columns; the columns are carried into every summary table
+- **Example**: `--sample_metadata samples.tsv`
+
+### `--summary_group_by`
+- **Type**: String
+- **Default**: none
+- **Description**: Metadata column that groups samples (e.g. subject, site) in the summary figures and in `group_arg_detection.tsv`. Needs `--sample_metadata`
+- **Example**: `--summary_group_by subject`
+
+### `--summary_order_by`
+- **Type**: String
+- **Default**: none
+- **Description**: Metadata column that orders samples within a group (e.g. visit, day; `V2` sorts before `V10`). With `--summary_group_by` it orders the samples of each group and the per-group detection patterns of tier 1 and 2 genes (`group_arg_detection`). Needs `--sample_metadata`
+- **Example**: `--summary_order_by visit`
+
+### `--summary_batch_label`
+- **Type**: String (letters, digits, `.`, `_`, `-`)
+- **Default**: the name of the `--output` directory, or of its parent when it is called `results` (so `--output results` launched from `batch1/` gives `batch1`, as `bin/results_summary.py` labels a directory), with any character outside the pattern replaced by `_`
+- **Description**: Label written in the `batch` column of the summary tables. Set it when the default does not tell the batches of a project apart, so that merged summaries do
+- **Example**: `--summary_batch_label batch1`
+
+### `--summary_min_clean_pairs`
+- **Type**: Integer
+- **Default**: `1000000`
+- **Minimum**: `0`
+- **Description**: Samples with fewer clean read pairs are flagged as low depth. A gene or taxon not found in such a sample is reported as `NA_low_depth`, not as absent. Samples are never dropped
+- **Example**: `--summary_min_clean_pairs 5000000`
+
+### `--summary_top_n`
+- **Type**: Integer
+- **Default**: `40`
+- **Minimum**: `1`
+- **Description**: Maximum rows in the summary ARG heatmap (the taxonomy heatmaps use `--summary_taxa_per_sample`)
+- **Example**: `--summary_top_n 60`
+
+### `--summary_taxa_per_sample`
+- **Type**: Integer
+- **Default**: `5`
+- **Minimum**: `1`
+- **Description**: The summary species and genus heatmaps show the union of each sample's N most abundant taxa, with no row cap, grouped by phylum and alphabetical within each phylum
+- **Example**: `--summary_taxa_per_sample 10`
+
+### `--summary_depth_marks`
+- **Type**: String (comma-separated read-pair counts)
+- **Default**: `10000000,20000000`
+- **Description**: Clean read-pair depths drawn as dotted reference lines in the summary QC figure, counted in the report header ("samples with >=10M clean pairs") and used for the `depth_class` column. `''` for none. The low-depth threshold (`--summary_min_clean_pairs`) is always drawn
+- **Example**: `--summary_depth_marks 5000000,10000000,20000000`
+
+### `--card_prevalence`
+- **Type**: String (path)
+- **Default**: none
+- **Description**: WildCARD `card_prevalence.txt` (in an RGI WildCARD database: `wildcard/card_prevalence.txt`). Adds to each ARG call the species of the same sample that CARD finds carrying that ARO, with their abundance, and whether CARD finds the ARO on plasmids. This is co-occurrence, not linkage
+- **Example**: `--card_prevalence /dbs/rgi/wildcard/card_prevalence.txt`
+
+### `--arg_priority_table`
+- **Type**: String (path)
+- **Default**: `assets/arg_priority_tiers.tsv`
+- **Description**: ARG reporting tier rules: regular expressions on CARD ARO names or gene families, first match wins. Copy and edit the default to change the tiers
+- **Example**: `--arg_priority_table my_tiers.tsv`
+
+### `--summary_watchlist`
+- **Type**: String (path)
+- **Default**: `assets/summary_watchlist.tsv`
+- **Description**: Taxa (species or genus) reported in the summary watchlist table and figure; GTDB suffixes are ignored when matching
+- **Example**: `--summary_watchlist my_taxa.tsv`
 
 ---
 
@@ -730,7 +816,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 ### `--rgi_include_wildcard`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Include WildCARD variants for extended allelic diversity (recommended for environmental samples)
+- **Description**: Include WildCARD variants for extended allelic diversity (recommended for environmental samples). The k-mer database of the pathogen-of-origin step (`rgi kmer_query`) comes with WildCARD, so with the downloaded database and `false` that step is skipped (a warning says so)
 - **Example**: `--rgi_include_wildcard true`
 
 ### `--rgi_aligner`
@@ -751,6 +837,13 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 - **Default**: `10`
 - **Description**: Minimum k-mer coverage threshold for pathogen prediction
 - **Example**: `--rgi_min_kmer_coverage 10`
+
+### `--rgi_summary_min_coverage`
+- **Type**: Number
+- **Default**: `80`
+- **Range**: 0-100
+- **Description**: `rgi bwt` lists every gene with at least one mapped read; it has no detection rule. In the summaries an RGI gene counts when reads cover at least this % of its best-covered reference sequence (`Percent Coverage` in the allele table): the `*_cov<N>` columns and the plots of `RGI_REPORT`, and the RGI calls in `00_summary/`. The raw RGI tables and the existing `RGI_summary_report.csv` columns are not filtered
+- **Example**: `--rgi_summary_min_coverage 60`
 
 ### `--kmarvel_min_coverage`
 - **Type**: Integer

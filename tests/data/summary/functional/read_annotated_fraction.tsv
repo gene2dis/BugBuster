@@ -1,0 +1,13 @@
+sample_id	backend	ontology	reads_assigned	reads_annotated	fraction_annotated
+sampleA	woltka	any	20.000000	18.000000	0.9000
+sampleA	woltka	ko	20.000000	14.000000	0.7000
+sampleA	woltka	ec	20.000000	14.000000	0.7000
+sampleA	woltka	cog	20.000000	14.000000	0.7000
+sampleA	woltka	pfam	20.000000	15.000000	0.7500
+sampleA	woltka	metacyc	20.000000	7.000000	0.3500
+sampleB	woltka	any	10.000000	9.000000	0.9000
+sampleB	woltka	ko	10.000000	7.000000	0.7000
+sampleB	woltka	ec	10.000000	7.000000	0.7000
+sampleB	woltka	cog	10.000000	7.000000	0.7000
+sampleB	woltka	pfam	10.000000	7.500000	0.7500
+sampleB	woltka	metacyc	10.000000	3.500000	0.3500

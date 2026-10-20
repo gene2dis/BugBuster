@@ -3,7 +3,9 @@ process ARGS_OAP {
     container 'quay.io/ffuentessantander/args_oap:3.2.4'
 
     tag "${meta.id}"
-    label 'process_low'
+    // process_medium (8 CPUs, 24 h): stage one on 55-70 M read pairs took 6-8 h with process_low's 4 CPUs,
+    // and one sample hit its 8 h limit
+    label 'process_medium'
 
     input:
         tuple val(meta), path(reads)

@@ -1,0 +1,161 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RESULTS_SUMMARY Module Test
+
+    Fixtures: tests/data/summary/ (tests/bin/make_summary_fixtures.sh) and the
+    K-MARVEL tables in tests/data/kmarvel/ (sampleA: TEM + CTX-M, sampleB: no
+    ARGs), with the RGI bwt and k-mer tables in tests/data/summary/rgi/ and the
+    KARGA/KARGVA, read functional and MicrobeCensus tables in
+    tests/data/summary/{arg_norm,functional}/ (the stage_reports input). The
+    module lays the staged files out as a results directory for
+    bin/results_summary.py; this checks that layout, the ext.args built from
+    the summary params (grouping, ordering, low-depth threshold, batch label,
+    RGI coverage cutoff) and the published outputs. Numeric checks of the script are in
+    tests/bin/test_results_summary.sh.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RESULTS_SUMMARY Process"
+    script "../../modules/local/results_summary/main.nf"
+    process "RESULTS_SUMMARY"
+
+    test("summarises QC, sylph and K-MARVEL results with grouping metadata") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                summary_min_clean_pairs = 10000
+                summary_group_by        = "subject"
+                summary_order_by        = "visit"
+                summary_batch_label     = "batch1"
+                rgi_summary_min_coverage = 80
+            }
+            process {
+                """
+                def fix = "${projectDir}/tests/data/summary"
+                input[0]  = file("\${fix}/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = [
+                    file("\${fix}/sylph_gtdb_otu_table.tsv", checkIfExists: true),
+                    file("\${fix}/sylph_gtdb_tax_table.tsv", checkIfExists: true),
+                    file("\${fix}/sylph_gtdb_read_counts.tsv", checkIfExists: true)
+                ]
+                input[3]  = [ file("\${fix}/sampleA_sylph_gtdb.tsv", checkIfExists: true) ]
+                input[4]  = [
+                    file("${projectDir}/tests/data/kmarvel/sampleA_kmarvel.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/kmarvel/sampleB_kmarvel.tsv", checkIfExists: true)
+                ]
+                input[5]  = []
+                input[6]  = [
+                    file("\${fix}/rgi/sampleA_rgi_bwt.allele_mapping_data.txt", checkIfExists: true),
+                    file("\${fix}/rgi/sampleB_rgi_bwt.allele_mapping_data.txt", checkIfExists: true)
+                ]
+                input[7]  = [ file("\${fix}/rgi/sampleA_rgi_kmer_61mer_analysis.gene.txt", checkIfExists: true) ]
+                input[8]  = []
+                input[9]  = file("\${fix}/metadata.tsv", checkIfExists: true)
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = [
+                    file("\${fix}/arg_norm/KARGA_norm.csv", checkIfExists: true),
+                    file("\${fix}/arg_norm/KARGVA_norm.csv", checkIfExists: true),
+                    file("\${fix}/functional/read_function_abundance.tsv", checkIfExists: true),
+                    file("\${fix}/functional/read_annotated_fraction.tsv", checkIfExists: true),
+                    file("\${fix}/functional/read_sample_summary.tsv", checkIfExists: true),
+                    file("\${fix}/functional/sampleA.ags.tsv", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+
+            def tables = process.out.tables.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert tables.keySet().containsAll([
+                "samples_qc.tsv", "taxonomy_long.tsv", "taxonomy_species_wide.tsv", "arg_long.tsv",
+                "arg_gene_rpkm.tsv", "arg_presence.tsv", "arg_priority_panel.tsv", "group_arg_detection.tsv"
+            ])
+
+            // read pairs = Reads_report reads / 2; sampleB is under the 10,000-pair threshold
+            def qc = tables["samples_qc.tsv"]
+            def header = qc[0].split("\t") as List
+            def rows = qc.drop(1).collectEntries { line -> def c = line.split("\t", -1); [ (c[0]): c ] }
+            assert rows["sampleA"][header.indexOf("clean_pairs")] == "60000"
+            assert rows["sampleA"][header.indexOf("subject")] == "S1"
+            assert rows["sampleB"][header.indexOf("low_depth")] == "True"
+            assert rows["sampleB"][header.indexOf("arg_status")] == "NA_low_depth"
+            // the batch column is --summary_batch_label (ext.batch_label)
+            assert rows["sampleA"][header.indexOf("batch")] == "batch1"
+
+            def presence = tables["arg_presence.tsv"]
+            assert presence.any { line -> line.startsWith("CTX-M\t2\t1\tNA_low_depth") }
+            assert tables["group_arg_detection.tsv"].any { line -> line.contains("V1:+ V2:NA") }
+
+            assert path(process.out.html.get(0)).text.contains("BugBuster results summary")
+            assert process.out.xlsx.size() == 1
+            assert process.out.figures.get(0).any { f -> file(f).name == "qc_read_fate.svg" }
+
+            // RGI tables laid out by the module: genes at >= 80% coverage, compared with K-MARVEL
+            assert tables.keySet().containsAll(["arg_method_comparison.tsv", "arg_method_overlap.tsv"])
+            def comp = tables["arg_method_comparison.tsv"]
+            def ch = comp[0].split("\t") as List
+            def byGene = comp.drop(1).collectEntries { line -> def c = line.split("\t", -1); [ (c[ch.indexOf("gene")]): c ] }
+            assert byGene["TEM"][ch.indexOf("detected_by")] == "K-MARVEL + RGI"
+            assert byGene["KPC"][ch.indexOf("detected_by")] == "RGI only"
+            // the k-mer table was laid out too: KPC's top host is a watchlist pathogen
+            assert byGene["KPC"][ch.indexOf("rgi_host_check")] == "watchlist_host"
+            assert process.out.figures.get(0).any { f -> file(f).name == "arg_method_upset.svg" }
+
+            // the stage reports laid out by file name: KARGA/KARGVA, read functional, MicrobeCensus
+            assert tables.keySet().containsAll(["arg_karga_long.tsv", "arg_karga_class_cpc.tsv", "arg_kargva_long.tsv",
+                                                "function_read_long.tsv", "function_read_ko.tsv"])
+            assert rows["sampleA"][header.indexOf("mc_genome_equivalents")] == "2.0"
+            assert rows["sampleA"][header.indexOf("args_oap_ncell")] == "20.0"
+            def readme = path(process.out.readme.get(0)).text
+            assert readme.contains("| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran |")
+            assert readme.contains("`tables/function_read_ko.tsv`")
+            def guide = path(process.out.llm_guide.get(0)).text
+            assert guide.contains("### arg_karga_long.tsv")
+            // the summary folder is shared: no local path (task dir, staged run/results copy, an input's path)
+            def taskDir = file(process.out.readme.get(0)).parent.toString()
+            assert !guide.contains(taskDir) && !readme.contains(taskDir)
+            assert !guide.contains("run/results") && !readme.contains("run/results")
+            assert !(readme =~ /--[a-z-]+ \/\w/) && readme.contains("--arg-priority arg_priority_tiers.tsv")
+            assert guide.contains("`tables/samples_qc.tsv`")
+            assert process.out.readme_docx.size() == 1
+        }
+    }
+
+    test("stub") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0]  = file("${projectDir}/tests/data/summary/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = []
+                input[3]  = []
+                input[4]  = []
+                input[5]  = []
+                input[6]  = []
+                input[7]  = []
+                input[8]  = []
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = []
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.html.size() == 1
+            assert process.out.llm_guide.size() == 1
+            assert process.out.versions.size() == 1
+        }
+    }
+}

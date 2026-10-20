@@ -85,7 +85,11 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   capped by it, and on a local machine it is also the memory pool Nextflow
   schedules from, so it decides what runs, not the table above. Decontamination
   and MEGAHIT request 72 GB each on the first attempt (`process_high`), although
-  decontamination peaked at ~16 GB.
+  decontamination peaked at ~16 GB. A deep co-assembly needs more: three
+  samples with 404M clean reads in total needed ~86 GB at k=21, so MEGAHIT ran
+  out of memory and is retried with 144 GB. To skip the failed attempt on
+  deep co-assemblies, raise the request in a `-c` config file (see
+  [Out of memory](troubleshooting.md#out-of-memory)).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
   every fresh run unless you pass the published index
@@ -810,7 +814,7 @@ Control taxonomic output visualization and formatting:
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--taxonomy_plot_levels` | `Phylum,Family,Genus,Species` | Comma-separated taxonomic levels to plot |
-| `--taxonomy_top_n_taxa` | `10` | Number of top taxa to display in plots |
+| `--taxonomy_top_n_taxa` | `10` | Maximum taxa per plot; each sample's most abundant taxa are included first, then the most abundant overall |
 | `--create_phyloseq_rds` | `false` | Generate R phyloseq RDS files for downstream analysis |
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
@@ -830,6 +834,50 @@ By default, databases are published to a `databases/` directory at the same leve
 | `--max_cpus` | `16` | Maximum CPUs per process |
 | `--max_memory` | `128.GB` | Maximum memory per process |
 | `--max_time` | `240.h` | Maximum time per process |
+
+### 6.16 Results Summary Options
+
+The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA),
+read functional and MicrobeCensus results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
+README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
+network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only
+when its stage ran; the README and the guide list every pipeline stage and whether it ran in each results directory.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--results_summary` | `true` | Write `00_summary/` |
+| `--sample_metadata` | none | TSV/CSV with a `sample` column (or sample names in the first column) and any metadata columns; carried into every table |
+| `--summary_group_by` | none | Metadata column that groups samples (subject, site, ...) in the figures and the per-group ARG detection table |
+| `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...) in the figures and the per-group detection patterns |
+| `--summary_batch_label` | output directory name (its parent's when it is `results`) | Label in the `batch` column; set it when the default does not tell the batches apart |
+| `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
+| `--summary_top_n` | `40` | Maximum rows in the summary ARG heatmap |
+| `--summary_taxa_per_sample` | `5` | The taxonomy heatmaps show the union of each sample's N most abundant taxa (no row cap), grouped by phylum, A-Z within |
+| `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure and counted in the report header |
+| `--rgi_summary_min_coverage` | `80` | An RGI gene counts when reads cover at least this % of its best reference sequence (summaries only) |
+| `--card_prevalence` | none | WildCARD `card_prevalence.txt` (an RGI WildCARD database has it in `wildcard/`); adds candidate hosts and CARD plasmid association to each ARG call |
+| `--arg_priority_table` | `assets/arg_priority_tiers.tsv` | ARG reporting tier rules |
+| `--summary_watchlist` | `assets/summary_watchlist.tsv` | Taxa reported in the watchlist table and figure |
+
+How the summary reports the results:
+
+- **Read pairs throughout.** `Reads_report.csv` counts single reads (both mates); the summary divides by two, the unit K-MARVEL and sylph use.
+- **ARG abundance is normalised.** K-MARVEL's supporting read pairs become RPM (per million clean read pairs) and RPKM (RPM per kb of the CARD reference gene). The raw matrices in `kmarvel_summary/` are not comparable between samples of different depth.
+- **ARG tiers.** Each call is assigned a tier by `--arg_priority_table`: 1 clinical priority (carbapenemases, mcr, vanA/B/D/M, mecA/C, 16S rRNA methyltransferases, cfr/optrA/poxtA, tet(X3+)), 2 other acquired, 3 intrinsic, efflux or regulator, 4 mutation dependent. The rules are regular expressions on CARD gene families and names; copy the file to change them.
+- **Mutation-dependent hits are checked.** For variant-model hits (gyrA, parC, rpoB, ...), K-MARVEL lists every difference from the reference. The summary checks them against the CARD `snps.txt` of the K-MARVEL database. Only rows with `resistance_snp_status = card_snp_present` carry a mutation CARD lists for resistance; the others are detections of the gene, not of resistance.
+- **Genes, not alleles.** Read-level allele calls among close variants are unstable and share their reads (TEM-1 and TEM-256 with 16,032 and 16,029 pairs), so each gene is represented by its best-supported allele, never by the sum.
+- **Candidate hosts are co-occurrence.** With `--card_prevalence`, each ARG call lists the species of the same sample that CARD finds carrying that ARO. Reads are not linked to a host; confirming one needs assembly or long reads.
+- **Sylph confidence.** `taxonomy_long.tsv` adds sylph's ANI, ANI interval and coverage per genome; `species_call_uncertain` marks genomes whose ANI interval reaches below 95%.
+- **RGI genes need a coverage cutoff.** `rgi bwt` lists every gene with at least one mapped read, fragments of related genes included (548 genes in one batch1 sample). The summary counts an RGI gene when reads cover at least `--rgi_summary_min_coverage` % (80) of its best-covered reference sequence; the raw RGI tables are unchanged. RGI counts mates separately, so its read pairs are mapped reads / 2.
+- **RGI pathogen of origin.** RGI's k-mer step assigns the gene's reads to species. `rgi_kmer_hosts` lists the top ones and `rgi_host_check` says whether the top host is a watchlist pathogen. WildCARD holds resistance-gene sequences from many species, gut commensals among them, so a tier 1 gene whose reads point to a commensal (poxtA from *Blautia*, vanD-type genes from *Enterocloster*) is flagged as a possible related gene rather than reported as a pathogen's resistance.
+- **Method comparison.** When K-MARVEL and RGI both ran, `arg_method_comparison.tsv`, `arg_method_overlap.tsv`, an UpSet plot and a per-category bar chart show, gene by gene (alleles collapsed), what each method found. A K-MARVEL gene RGI saw below its cutoff is marked `rgi_below_cutoff`, which is partial coverage, not absence. The ARG matrices and figures use one method (`--arg-primary` in the script; K-MARVEL when present); `arg_long.tsv` holds every method's calls.
+- **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
+- **KARGA / KARGVA (MEGARes).** With `--read_arg_prediction`, the summary reads ARG_NORM_REPORT's `KARGA_norm.csv` and `KARGVA_norm.csv` (KARGA genes with at least 90% k-mer coverage; KARGVA variants with at least 2 SNP k-mers and 80% coverage) into `arg_karga_long`, `arg_karga_group_cpc`, `arg_karga_class_cpc` and `arg_kargva_long`. Abundance is copies per cell: k-mer depth over the ARGs-OAP cell estimate (`args_oap_ncell` in `samples_qc`). Alleles of one MEGARes group share their k-mers, so each group is represented by its deepest allele. MEGARes names its genes differently from CARD, so KARGA is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only.
+- **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
+- **README and LLM guide.** `README.md` / `README.docx` (written with the Python standard library) list the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the summary folder for a language model or a script: run facts as YAML, the stages that ran, methods, every table column and figure, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. The summary folder is the part meant to be shared, so neither file names a local path: paths are relative to the folder, batches appear by label and input files by name. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
+- **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
+
+The same script summarises several finished results directories (batches) without rerunning any tool; see [Example 13](#example-13-summarise-several-batches).
 
 ---
 
@@ -936,6 +984,20 @@ results/
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
+├── 00_summary/                                 # Run-level summary (if results_summary=true)
+│   ├── results_summary.html                    # Self-contained report: figures, sortable tables, methods
+│   ├── results_summary.xlsx                    # Every table, plus a README sheet defining the columns
+│   ├── README.md, README.docx                  # What the summary holds: stages run, tables, figures, units, caveats
+│   ├── LLM_GUIDE.md                            # The summary folder (tables, figures, methods), for a language model or a script
+│   ├── tables/                                 # samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence,
+│   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
+│   │                                           # arg_presence, arg_drug_class_rpkm, arg_priority_panel, group_arg_detection,
+│   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran),
+│   │                                           # arg_karga_long, arg_karga_group_cpc, arg_karga_class_cpc, arg_kargva_long
+│   │                                           # (KARGA/KARGVA), function_read_long, function_read_<ontology> (read functional)
+│   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
+│                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
+│                                               # arg_karga_class_heatmap, function_cog_heatmap (.png/.pdf/.svg)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control
@@ -960,7 +1022,8 @@ results/
 │   │   └── {sample}_sylph_{db}.sylphmpa        # Per-sample lineage profile (sylph-tax, every rank down to t__ genome)
 │   ├── tables/                                 # Taxonomy tables
 │   │   ├── *.tsv                               # Abundance tables (OTU = relative abundance for sylph)
-│   │   └── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
+│   │   ├── sylph_{db}_read_counts.tsv          # Sylph: estimated read pairs per genome
+│   │   └── Reads_report_taxonomy.csv           # Reads_report.csv plus the profiler's DB, Unclassified, Classified
 │   ├── phyloseq/                               # Phyloseq objects
 │   │   ├── *.h5                                # HDF5 format
 │   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
@@ -1307,8 +1370,9 @@ The following outputs are only generated when specific parameters are enabled:
 
 | Output Directory | Required Parameter | Description |
 |------------------|-------------------|-------------|
+| `00_summary/` | `results_summary=true` (default) | Run-level summary: tables, Excel workbook, figures, HTML report |
 | `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
-| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`, extended with taxonomy when a profiler runs) |
+| `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`; with a profiler, `02_taxonomy/tables/Reads_report_taxonomy.csv` adds the classified fraction) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
 | `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |
 | `03_assembly/` | `assembly_mode != 'none'` | Assembly results |
@@ -1560,6 +1624,54 @@ nextflow run main.nf \
     --include_binning true \
     -profile singularity
 ```
+
+### Example 13: Summarise several batches
+
+Large studies are often run in batches (one results directory each). `bin/results_summary.py` reads the
+published results only, so it merges finished batches without rerunning any tool. Sample names must be unique
+across batches; taxa are matched by genome/taxon ID, and all batches must use the same taxonomy database.
+
+The script needs Python 3 with pandas, numpy and matplotlib 3.7 or newer (its figure legends use a placement
+older versions lack); openpyxl or xlsxwriter adds the Excel workbook, which is skipped with a warning without
+them. The pipeline runs it with Python 3.12, pandas 2.2.3, numpy 1.26.4, matplotlib 3.9.2 and openpyxl 3.1.5
+(`modules/local/results_summary/main.nf`). Run it from a BugBuster checkout: it imports the `summary_*.py`
+modules next to it in `bin/` and reads its default tier rules and watchlist from `assets/`. Either way works:
+
+**With the pipeline's container image**, which has everything installed:
+
+```bash
+IMG=community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_openpyxl:26abe1de4b35cb08
+docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -v /dbs:/dbs:ro -w $PWD $IMG \
+    python /bb/bin/results_summary.py \
+        --results batch1/results batch2/results batch3/results \
+        --outdir project_summary \
+        --metadata samples.tsv --group-by subject --order-by visit \
+        --kmarvel-db /dbs/kmarvel/card_v4.0.1 \
+        --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
+```
+
+Under Singularity/Apptainer, use `singularity exec -B /path/to/BugBuster:/bb oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_openpyxl:9bdbbc7916528cdc python /bb/bin/results_summary.py ...`.
+
+**With a local Python** that has the packages above (for example
+`conda install -c conda-forge pandas numpy "matplotlib-base>=3.7" openpyxl`):
+
+```bash
+python /path/to/BugBuster/bin/results_summary.py \
+    --results batch1/results batch2/results batch3/results \
+    --outdir project_summary \
+    --metadata samples.tsv --group-by subject --order-by visit \
+    --kmarvel-db /dbs/kmarvel/card_v4.0.1 \
+    --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
+```
+
+`--metadata`, `--group-by` and `--order-by` are optional. The `batch` column is each directory's name, or its
+parent's when it is called `results` (`batch1` above); `--batch-labels` sets the labels instead, one per
+`--results` directory in the same order. Without `--kmarvel-db`, mutation-dependent ARG hits
+are reported as `not_checked`. RGI results (`05_arg_prediction/read_level/rgi/` and `rgi_kmer/`) are read when
+present; `--rgi-min-coverage` sets their cutoff (default 80). KARGA/KARGVA (`05_arg_prediction/read_level/summary/`),
+the read functional profile (`07_functional_annotation/summary/read_*.tsv`) and MicrobeCensus
+(`07_functional_annotation/microbecensus/`) are read when present; batches without them get `NA_not_run`. The
+README and `LLM_GUIDE.md` say which stages ran in each batch. `results_summary.py --help` lists every option.
 
 ---
 

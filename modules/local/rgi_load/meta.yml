@@ -18,7 +18,7 @@ input:
       description: CARD release to download, 'latest' or a version number (broadstreet-v<version>.tar.bz2), from --rgi_card_version
   - include_wildcard:
       type: value
-      description: Boolean; when true the latest WildCARD variants are downloaded, annotated with rgi wildcard_annotation and loaded (can take 30-60 minutes)
+      description: Boolean; when true the latest WildCARD variants are downloaded, annotated with rgi wildcard_annotation and loaded with their k-mer database for --rgi_kmer_size (can take 30-60 minutes); without them there is no k-mer database and RGI_KMER is skipped
 
 output:
   - card_db:

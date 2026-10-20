@@ -1,0 +1,3 @@
+Id,Raw reads,Fastp,Clean reads (contaminants removed),Sylph DB,Unclassified,Classified
+sampleA,130000,124000,120000,gtdb,0.0,1.0
+sampleB,5000,4400,4000,gtdb,1.0,0.0
