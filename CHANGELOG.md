@@ -372,6 +372,12 @@ next release is tagged.
 
 ### Changed
 
+- **CPU requests sized to measured use** (`config/modules.config`):
+  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2, `WOLTKA_CLASSIFY` 8 → 2,
+  `TAXONOMY_PHYLOSEQ` 4 → 2 (each used well under its request in real runs),
+  and `CHECKM2_BATCH` 8 → 16 (one task over every bin at the end of a binning
+  run, 585-673 % CPU of 8). Outputs are unchanged; more tasks fit at once
+
 - **The execution trace records requested resources**:
   `pipeline_info/execution_trace_*.txt` adds the `start`, `complete`, `%mem`,
   `cpus`, `memory`, `time`, `attempt` and `workdir` columns, so CPU and memory
