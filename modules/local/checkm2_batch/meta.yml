@@ -1,5 +1,5 @@
 name: checkm2_batch
-description: Batched CheckM2 bin quality assessment - pools every sample's bins per binner into one CheckM2 run (the database is loaded once per binner, not per sample) and splits the result back into per-sample, per-binner reports
+description: Batched CheckM2 bin quality assessment - one CheckM2 run over every sample's and every binner's bins (renamed <sample>__<binner>__<bin>; the database is searched once per run) and splits the result back into per-sample, per-binner reports
 keywords:
   - binning
   - bin quality

@@ -4,11 +4,13 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Batched bin quality assessment using CheckM2
     
-    Processes all bins from all samples in a single CheckM2 run for improved performance.
-    Database is loaded once instead of N times (N = number of samples).
-    
+    One checkm2 predict over every bin of every sample and binner (bins renamed
+    <sample>__<binner>__<bin>), so the DIAMOND database is searched and the
+    models are loaded once per run instead of once per binner (performance
+    review E5); the report is split back into one file per sample and binner.
+
     Input:
-        tuple val(meta_list), path(all_bins, stageAs: 'input_bins/*'), path(checkm_db)
+        tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(checkm_db)
     
     Output:
         all_reports: tuple val(meta), path(quality_reports) - per sample
@@ -42,8 +44,13 @@ process CHECKM2_BATCH {
     """
     set -euo pipefail
 
-    # Create organized directory structure
-    mkdir -p batch_bins
+    # Every bin of every sample and binner goes into one directory as
+    # <sample>__<binner>__<bin file>, so one checkm2 run (one DIAMOND search,
+    # one model load) covers them all. bin_map.tsv maps each CheckM2 name
+    # (the file name without .fa) back to its sample, binner and bin name.
+    mkdir -p all_bins
+    printf 'name\\tsample_id\\tbinner\\tbin\\n' > bin_map.tsv
+    : > binners.txt
 
     # Process ALL staged bin directories - parse sample_id and binner from directory names
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. Every staged dir is a
@@ -61,109 +68,82 @@ process CHECKM2_BATCH {
         binner=\${id_line##*\$'\\t'}
 
         echo "Processing \$bin_dir -> sample_id=\$sample_id, binner=\$binner"
-        
-        mkdir -p "batch_bins/\${sample_id}_\${binner}"
-        
-        # Find and copy bins with prefixed names
+        echo "\$binner" >> binners.txt
+
+        # Only the samples of this batch get reports
+        case " ${meta_ids} " in
+            *" \$sample_id "*) ;;
+            *) continue ;;
+        esac
+
         bin_count=\$(find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
-        
         if [ "\$bin_count" -gt 0 ]; then
             echo "Found \$bin_count bins for \${sample_id} \${binner}"
             find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
                 bin_name=\$(basename "\$bin_file")
-                cp "\$bin_file" "batch_bins/\${sample_id}_\${binner}/\${sample_id}__\${bin_name}"
+                cp "\$bin_file" "all_bins/\${sample_id}__\${binner}__\${bin_name}"
+                printf '%s\\t%s\\t%s\\t%s\\n' "\${sample_id}__\${binner}__\${bin_name%.fa}" "\$sample_id" "\$binner" "\${bin_name%.fa}" >> bin_map.tsv
             done
         fi
     done
-    
-    # Run CheckM2 on each binner's combined bins across all samples.
-    # The binner list is derived from the staged directories (batch_bins/<sample>_<binner>)
-    # instead of a fixed set, so no header-only reports are fabricated for binners
-    # that never ran (audit #6).
-    discovered_binners=\$(for d in batch_bins/*/; do
-        [ -d "\$d" ] || continue
-        b=\$(basename "\$d")
-        echo "\${b##*_}"
-    done | sort -u)
 
-    if [ -z "\$discovered_binners" ]; then
+    # The binner list is derived from the staged directories instead of a fixed
+    # set, so no header-only reports are fabricated for binners that never ran
+    # (audit #6)
+    if [ ! -s binners.txt ]; then
         echo "ERROR: no binner output directories were staged/recognized" >&2
         exit 1
     fi
 
-    for binner in \$discovered_binners; do
-        # Collect all bins for this binner across all samples
-        mkdir -p combined_\${binner}
-        
-        total_bins=0
-        for meta_id in ${meta_ids}; do
-            if [ -d "batch_bins/\${meta_id}_\${binner}" ]; then
-                bin_count=\$(find -L batch_bins/\${meta_id}_\${binner} -maxdepth 1 -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
-                if [ "\$bin_count" -gt 0 ]; then
-                    cp batch_bins/\${meta_id}_\${binner}/* combined_\${binner}/ 2>/dev/null || true
-                    total_bins=\$((total_bins + bin_count))
-                fi
-            fi
-        done
-        
-        if [ "\$total_bins" -eq 0 ]; then
-            echo "WARNING: No genome bins found for \$binner across all samples. Creating empty reports."
-            
-            # Create empty reports for each sample
-            for meta_id in ${meta_ids}; do
-                echo -e "Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes" > \${meta_id}_\${binner}_quality_report.tsv
-            done
-        else
-            echo "Found \$total_bins genome bins for \$binner across all samples. Running CheckM2 assessment..."
-            
-            checkm2 predict \\
-                --threads ${task.cpus} \\
-                --input combined_\${binner} \\
-                --output-directory checkm2_\${binner}_output \\
-                --database_path ${checkm_db} \\
-                -x .fa
-            
-            # Split the combined report by sample prefix
-            if [ -f checkm2_\${binner}_output/quality_report.tsv ]; then
-                # Process the combined report and split by sample
-                python3 <<-PYEOF
-				import sys
-				import os
-				
-				binner = "\${binner}"
-				meta_ids = "${meta_ids}".split()
-				
-				# Read the combined report
-				with open(f"checkm2_{binner}_output/quality_report.tsv", 'r') as f:
-				    header = f.readline()
-				    lines = f.readlines()
-				
-				# Create per-sample reports
-				sample_reports = {meta_id: [] for meta_id in meta_ids}
-				
-				for line in lines:
-				    if line.strip():
-				        # Extract sample ID from bin name (format: sampleID__binname.fa)
-				        bin_name = line.split('\t')[0]
-				        if '__' in bin_name:
-				            sample_id = bin_name.split('__')[0]
-				            if sample_id in sample_reports:
-				                # Remove the sample prefix from bin name in output
-				                original_bin_name = '__'.join(bin_name.split('__')[1:])
-				                modified_line = line.replace(bin_name, original_bin_name, 1)
-				                sample_reports[sample_id].append(modified_line)
-				
-				# Write per-sample reports
-				for meta_id in meta_ids:
-				    with open(f"{meta_id}_{binner}_quality_report.tsv", 'w') as f:
-				        f.write(header)
-				        if sample_reports[meta_id]:
-				            f.writelines(sample_reports[meta_id])
-				PYEOF
-            fi
-        fi
-    done
-    
+    total_bins=\$(( \$(wc -l < bin_map.tsv) - 1 ))
+    if [ "\$total_bins" -gt 0 ]; then
+        echo "Found \$total_bins genome bins across all samples and binners. Running CheckM2 assessment..."
+        checkm2 predict \\
+            --threads ${task.cpus} \\
+            --input all_bins \\
+            --output-directory checkm2_output \\
+            --database_path ${checkm_db} \\
+            -x .fa
+    else
+        echo "WARNING: No genome bins found across all samples. Creating empty reports."
+    fi
+
+    # One report per sample and binner: the binner's rows of the combined
+    # report, sorted by bin name, with the sample/binner prefix removed. A
+    # binner without bins in any sample gets header-only reports
+    python3 <<-PYEOF
+	import csv
+
+	meta_ids = "${meta_ids}".split()
+	binners = sorted(set(open("binners.txt").read().split()))
+	empty_header = "Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes\\n"
+
+	with open("bin_map.tsv") as f:
+	    bin_map = {row["name"]: row for row in csv.DictReader(f, delimiter="\\t")}
+	binners_with_bins = {row["binner"] for row in bin_map.values()}
+
+	header, rows = None, {}
+	if bin_map:
+	    with open("checkm2_output/quality_report.tsv") as f:
+	        header = f.readline()
+	        for line in f:
+	            if not line.strip():
+	                continue
+	            name, rest = line.split("\\t", 1)
+	            entry = bin_map[name]
+	            key = (entry["sample_id"], entry["binner"])
+	            rows.setdefault(key, []).append((entry["bin"], entry["bin"] + "\\t" + rest))
+
+	for binner in binners:
+	    for meta_id in meta_ids:
+	        with open(f"{meta_id}_{binner}_quality_report.tsv", "w") as out:
+	            if binner not in binners_with_bins:
+	                out.write(empty_header)
+	                continue
+	            out.write(header)
+	            out.writelines(line for _, line in sorted(rows.get((meta_id, binner), [])))
+	PYEOF
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         checkm2: \$(checkm2 --version 2>&1 | sed 's/checkm2: version //')

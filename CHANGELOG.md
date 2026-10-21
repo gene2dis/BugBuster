@@ -388,6 +388,19 @@ next release is tagged.
     counted by the stock code). `bin/run_microbe_census_py3fix.py` now also
     stops when the installed MicrobeCensus is not the v1.1.1 code it patches
 
+- **One CheckM2 run for all binners** (`CHECKM2_BATCH`): every bin of every
+  sample and binner goes into a single `checkm2 predict` (renamed
+  `<sample>__<binner>__<bin>`), which is then split into the same
+  per-sample, per-binner reports as before. On four test assemblies (228
+  bins) the step took 31 min instead of 47 (one DIAMOND search and model
+  load instead of one per binner), with peak memory 19 GB instead of 14.
+  Values move slightly: CheckM2's numbers depend on which genomes are
+  searched together (already the case before, when a binner's bins were
+  pooled across the run's samples), and 6 of the 228 rows changed by at
+  most 0.11 completeness and 0.02 contamination points; no bin changed
+  MIMAG quality class, and every other column is unchanged. Report rows are
+  now sorted by bin name
+
 - **Tool updates with unchanged outputs**
   - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
     (`community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3`,
