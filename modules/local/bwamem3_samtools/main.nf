@@ -36,7 +36,7 @@ process BWAMEM3_INDEX {
     // No resource label with a memory setting: withLabel would override the
     // size-based memory below. process_index only sets cpus and time.
     label 'process_index'
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     // Peak ~8 bytes per base of doubled text below ~1.07 Gbp and ~12 above
     // (bwa-mem3 docs): 28 B/base covers both with headroom. The FASTA is
@@ -92,7 +92,7 @@ process BWAMEM3_INDEX {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bwamem3: 0.14.0
+        bwamem3: 0.15.0
     END_VERSIONS
     """
 }
@@ -100,7 +100,7 @@ process BWAMEM3_INDEX {
 process BWAMEM3_SAMTOOLS {
     tag "${meta.id}"
     label 'process_high'
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     input:
     tuple val(meta), path(reads), path(contigs), path(index)
@@ -225,8 +225,8 @@ process BWAMEM3_SAMTOOLS {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bwamem3: 0.14.0
-        samtools: 1.22.1
+        bwamem3: 0.15.0
+        samtools: 1.24
     END_VERSIONS
     """
 }
@@ -234,7 +234,7 @@ process BWAMEM3_SAMTOOLS {
 process BINS_REFERENCE {
     tag "bins"
     label 'process_single'
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     input:
     path(bins)

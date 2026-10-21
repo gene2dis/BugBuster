@@ -25,7 +25,7 @@
 
 process BWAMEM3_DECONTAMINATE {
     tag "${meta.id}"
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     label 'process_high'
 
@@ -142,8 +142,8 @@ process BWAMEM3_DECONTAMINATE {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bwamem3: 0.14.0
-        samtools: 1.22.1
+        bwamem3: 0.15.0
+        samtools: 1.24
     END_VERSIONS
     """
 }

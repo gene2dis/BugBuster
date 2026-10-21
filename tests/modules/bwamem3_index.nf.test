@@ -33,7 +33,7 @@ nextflow_process {
             ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext ->
                 assert path("${index_dir}/sample1.${ext}").exists()
             }
-            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.14.0")
+            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.15.0")
         }
     }
 

@@ -40,7 +40,7 @@ nextflow_process {
             assert ann.contains("NC_001422.1")
             assert ann.contains("NC_001416.1")
 
-            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.14.0")
+            assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.15.0")
         }
     }
 }

@@ -372,6 +372,14 @@ next release is tagged.
 
 ### Changed
 
+- **Tool updates with unchanged outputs**
+  - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
+    (`community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3`,
+    built by Seqera Containers like the previous image) for every bwa-mem3
+    process. Existing bwa-mem3 indexes work unchanged; clean reads and index
+    files are byte-identical. The image is pinned for every container engine:
+    its singularity build lacks `find`, `zcat` and `gzip`
+
 - **nf-core modules updated (issue #35)**: `fastp` 1.0.1 → 1.4.0
   (`community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11`),
   `samtools/index` 1.22.1 → 1.24 (the pipeline's override,
