@@ -413,6 +413,9 @@ next release is tagged.
     `<sample>_contig.stats` keeps every number but labels sizes as `Mb` and
     `Kbp` where 39.06 wrote `MB` and `KB` (BBMap 40's `stats.sh`); nothing in
     the pipeline parses that file
+  - BLAST+ 2.15.0 → 2.17.0 (`quay.io/biocontainers/blast:2.17.0--h66d330f_0`)
+    for `NT_BLASTN`: on one assembly against the full nt database the hits
+    are byte-identical
   - Bakta 1.12.1 → 1.12.2 (`quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0`)
     for `BAKTA_BAKTA` (the pipeline's override of the nf-core module) and
     `FORMAT_BAKTA_DB`; same AMRFinderPlus (4.2.7), so existing databases keep
