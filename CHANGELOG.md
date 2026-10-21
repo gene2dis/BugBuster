@@ -372,6 +372,28 @@ next release is tagged.
 
 ### Changed
 
+- **nf-core modules updated (issue #35)**: `fastp` 1.0.1 → 1.4.0
+  (`community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11`),
+  `samtools/index` 1.22.1 → 1.24 (the pipeline's override,
+  `quay.io/biocontainers/samtools:1.24--h9dcdb79_1`), `kraken2/kraken2` and
+  `bracken/bracken` (same tool versions). All four now report their versions
+  on the `versions` topic; `software_versions.yml` keeps its format
+  - fastp 1.4.0 output: on 10 M CDC read pairs the trimmed and clean reads
+    were identical to 1.0.1. The fastp JSON gains an `adapter_dimer_reads`
+    filter count: 5,496 of the 426,918 failed reads, which 1.0.1 counted as
+    too short or low quality, so the failure reasons shift while the passed
+    count stays the same; on other data the read counts may shift slightly
+  - fastp gets `--thread` = CPUs − 2 for paired reads (two threads reserved
+    for reading and writing), so at the unchanged 8 CPUs it runs 6 workers;
+    it uses ~22 % less CPU time than 1.0.1 for the same reads
+  - The duplicate `--detect_adapter_for_pe` is gone from FASTP's `ext.args`
+    (the module passes it for paired reads)
+
+- **fastp writes its trimmed reads at gzip level 1** (`--compression 1`,
+  was level 4): the file is not published and is read once by
+  decontamination. 8-10 % faster and 7-9 % less CPU time for a 4 % larger
+  intermediate file; reads unchanged
+
 - **`--publish_dir_mode link` documented** (manual section 6.1, parameters,
   `DISK_OPTIMIZATION.md`): hard links take no extra space and survive
   deleting the work directory, but need the work directory and `--output` on
