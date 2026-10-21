@@ -413,6 +413,11 @@ next release is tagged.
     the `00_summary` RGI genes (80 % coverage) were the same 124, with read
     counts shifted for 59 of them. Results are not comparable read for read
     with runs made with RGI 6.0.3
+  - `bin/rgi_bwt_kma_fix.py` now also filters `--rgi_aligner bowtie2` and
+    `bwa`, which write every read to the SAM: 6.0.8 would hold each one in
+    memory (~1 KB per read). It drops only the pairs with no mapped mate,
+    which reach no RGI output (same tables as an unfiltered run on 500k read
+    pairs), and stops when the aligner fails
   - `bin/rgi_bwt_kma_fix.py` now also groups the kept reads by name, because
     6.0.8 runs `samtools fixmate`, which pairs only mates on adjacent lines
     and KMA writes them in a thread-dependent order: the BAM is now the same

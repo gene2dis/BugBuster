@@ -58,11 +58,12 @@ process RGI_BWT {
         ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
         
         # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI writes every read
-        # KMA reports, unplaced ones included (over 99% of a metagenome), to
-        # the SAM and loads the read table into memory (~390 bytes per clean
-        # read on disk); the wrapper keeps the reads placed on a reference,
-        # grouped by name so samtools fixmate pairs every mate pair. Remove it
-        # when RGI filters the SAM itself. --clean deletes the *.temp.* files
+        # the aligner reports, unplaced ones included (over 99% of a
+        # metagenome), to the SAM and loads the read table into memory (~390
+        # bytes per clean read on disk, ~1 KB in memory); the wrapper keeps
+        # the reads placed on a reference (for KMA grouped by name, so samtools
+        # fixmate pairs every mate pair). Remove it when RGI filters the SAM
+        # itself. --clean deletes the *.temp.* files
         # when rgi finishes; the files RGI_KMER and RGI_REPORT read have no
         # .temp in their names and are kept.
         rgi_bwt_kma_fix.py bwt \\
@@ -87,11 +88,12 @@ process RGI_BWT {
         fi
 
         # Create versions file (rgi --version prints the usage; KMA has no
-        # --version and bwa none at all)
+        # --version and bwa none at all: bare bwa exits 1, hence || true
+        # under pipefail)
         case ${aligner} in
-            kma)  aligner_version=\$(kma -v 2>&1 | sed -n 's/^KMA-//p') ;;
-            bwa)  aligner_version=\$(bwa 2>&1 | sed -n 's/^Version: //p') ;;
-            *)    aligner_version=\$(bowtie2 --version 2>/dev/null | sed -n '1s/.* version //p') ;;
+            kma)  aligner_version=\$(kma -v 2>&1 | sed -n 's/^KMA-//p' || true) ;;
+            bwa)  aligner_version=\$(bwa 2>&1 | sed -n 's/^Version: //p' || true) ;;
+            *)    aligner_version=\$(bowtie2 --version 2>/dev/null | sed -n '1s/.* version //p' || true) ;;
         esac
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

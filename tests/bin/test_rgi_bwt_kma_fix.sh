@@ -1,10 +1,11 @@
 #!/bin/bash
 #
 # Regression tests for bin/rgi_bwt_kma_fix.py (RGI_BWT). RGI's
-# BWT.align_kma writes every read KMA reports, unplaced ones included, to the
-# SAM that all later rgi bwt steps read (~390 bytes per clean read on disk,
-# and 6.0.8 loads the read table into memory). Runs inside the pinned RGI
-# image (the patch imports RGI's own module) with its real KMA and checks:
+# BWT.align_* methods write every read the aligner reports, unplaced ones
+# included, to the SAM that all later rgi bwt steps read (~390 bytes per clean
+# read on disk, and 6.0.8 loads the read table into memory). Runs inside the
+# pinned RGI image (the patch imports RGI's own module) with its real KMA,
+# bowtie2 and bwa and checks:
 #   - the version guard accepts the installed 6.0.8 methods and refuses any
 #     other one;
 #   - on paired reads where one pair maps and one does not, the unpatched
@@ -14,8 +15,11 @@
 #   - the filter drops records KMA writes at POS 0 (k-mer hits without an
 #     alignment, unplaced once samtools reads them) and keeps placed mates;
 #   - the kept records are grouped by read name (mates on adjacent lines, for
-#     samtools fixmate), keeping their order within a name;
-#   - a failing KMA stops the patched method; the unpatched one ignores it.
+#     samtools fixmate), keeping their order within a name, and the @HD line
+#     says so; a SAM without placed records keeps its header;
+#   - a failing KMA stops the patched method; the unpatched one ignores it;
+#   - the bowtie2 and bwa copies drop the pair that maps nowhere, keep every
+#     other record of the unpatched SAM, and stop when the aligner fails.
 #
 # Requirements: docker.
 #
@@ -83,8 +87,10 @@ revcomp = lambda s: ''.join(comp[c] for c in reversed(s))
 ref = rand(1000)
 with open('ref.fasta', 'w') as fh:
     fh.write('>ARO:3000001|ID:1|Name:geneA\n' + ref + '\n')
-subprocess.run(['kma', 'index', '-i', 'ref.fasta', '-o', 'idx'], check=True,
-               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+for index_cmd in (['kma', 'index', '-i', 'ref.fasta', '-o', 'idx'],
+                  ['bowtie2-build', '--quiet', 'ref.fasta', 'bt2idx'],
+                  ['bwa', 'index', '-p', 'bwaidx', 'ref.fasta']):
+    subprocess.run(index_cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 pairs = {'pair_hit': (ref[100:250], revcomp(ref[400:550])), 'pair_miss': (rand(150), rand(150))}
 for mate, path in ((0, 'r1.fastq'), (1, 'r2.fastq')):
     with open(path, 'w') as fh:
@@ -109,12 +115,11 @@ def names(recs):
     return sorted(r[0].split('/')[0] for r in recs)
 
 # Guard: refuses changed methods, then patches the installed ones
-originals = {n: getattr(BWT, n) for n in ('align_kma', 'align_kma_interleaved')}
+originals = {n: getattr(BWT, n) for n, _ in shim.REPLACEMENTS}
 class Changed(object):
-    def align_kma(self):
-        return None
-    def align_kma_interleaved(self):
-        return None
+    pass
+for n in originals:
+    setattr(Changed, n, lambda self: None)
 try:
     shim.patch(Changed)
     check('guard refuses a changed method', False)
@@ -132,7 +137,7 @@ check('unpatched align_kma_interleaved writes the unmapped pair to the SAM',
 
 shim.patch(BWT)
 check('guard accepts the installed RGI 6.0.8 methods',
-      BWT.align_kma is shim.align_kma and BWT.align_kma_interleaved is shim.align_kma_interleaved)
+      all(getattr(BWT, n) is f for n, f in shim.REPLACEMENTS))
 
 # Patched: mapped reads only, same alignments as the unpatched SAM
 BWT.align_kma(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'idx', 'fixed.sam')
@@ -153,25 +158,49 @@ sam = ['@HD\tVN:1.6', f'@SQ\tSN:{ref_name}\tLN:1000',
        f'unmapped_mate/2\t165\t{ref_name}\t101\t0\t*\t=\t101\t0\tA\tI',
        f'pos0/1\t69\t{ref_name}\t0\t0\t*\t*\t0\t0\tA\tI',
        'nohit/1\t77\t*\t0\t0\t*\t*\t0\t0\tA\tI']
-kept = subprocess.run(['awk', '-F', '\t', shim.PLACED_READS_AWK], input='\n'.join(sam) + '\n',
-                      capture_output=True, text=True, check=True).stdout.splitlines()
+def kma_filter(lines):
+    """Run a SAM through run_kma (a fake KMA that prints it) and return the kept lines."""
+    with open('in.sam', 'w') as fh:
+        fh.write('\n'.join(lines) + '\n')
+    open('out.sam.temp.res', 'w').close()
+    shim.run_kma('cat in.sam', 'out.sam')
+    with open('out.sam') as fh:
+        return fh.read().splitlines()
+kept = kma_filter(sam)
 check('filter keeps the header, placed reads and placed unmapped mates; drops POS 0 and unplaced reads',
       [l.split('\t')[0] for l in kept] == ['@HD', '@SQ', 'placed/1', 'unmapped_mate/2'])
 
 # Grouping: KMA writes records in thread order, mates often apart; fixmate
 # pairs adjacent records only
-with open('group.sam', 'w') as fh:
-    fh.write('\n'.join(['@HD\tVN:1.6', f'@SQ\tSN:{ref_name}\tLN:1000',
-                        f'b\t99\t{ref_name}\t5\t60\t1M\t*\t0\t0\tA\tI',
-                        f'a\t83\t{ref_name}\t9\t60\t1M\t*\t0\t0\tA\tI',
-                        f'b\t147\t{ref_name}\t7\t60\t1M\t*\t0\t0\tA\tI',
-                        f'a\t163\t{ref_name}\t3\t60\t1M\t*\t0\t0\tA\tI']) + '\n')
-shim.group_by_name('group.sam')
-with open('group.sam') as fh:
-    grouped = [l.split('\t')[:2] for l in fh.read().splitlines()]
+grouped = [l.split('\t')[:2] for l in kma_filter([
+    '@HD\tVN:1.6\tGO:reference', f'@SQ\tSN:{ref_name}\tLN:1000',
+    f'b\t99\t{ref_name}\t5\t60\t1M\t*\t0\t0\tA\tI',
+    f'a\t83\t{ref_name}\t9\t60\t1M\t*\t0\t0\tA\tI',
+    f'b\t147\t{ref_name}\t7\t60\t1M\t*\t0\t0\tA\tI',
+    f'a\t163\t{ref_name}\t3\t60\t1M\t*\t0\t0\tA\tI'])]
 check('kept records grouped by read name, header first, order kept within a name',
       grouped == [['@HD', 'VN:1.6'], ['@SQ', f'SN:{ref_name}'],
                   ['a', '83'], ['a', '163'], ['b', '99'], ['b', '147']])
+check('the @HD line says the records are grouped by query name',
+      kma_filter(['@HD\tVN:1.6\tGO:reference', 'a\t0\tr\t1\t60\t1M\t*\t0\t0\tA\tI'])[0] == '@HD\tVN:1.6\tGO:query')
+check('a SAM without placed records keeps its header',
+      kma_filter(['@HD\tVN:1.6', f'@SQ\tSN:{ref_name}\tLN:1000', 'nohit/1\t77\t*\t0\t0\t*\t*\t0\t0\tA\tI'])
+      == ['@HD\tVN:1.6', f'@SQ\tSN:{ref_name}\tLN:1000'])
+
+# bowtie2 and bwa: every record with a reference name, the rest unchanged
+for method, index in (('align_bowtie2', 'bt2idx'), ('align_bwa_paired_end_mapping', 'bwaidx')):
+    originals[method](bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', index, f'orig_{method}.sam')
+    getattr(BWT, method)(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', index, f'fixed_{method}.sam')
+    orig, fixed = records(f'orig_{method}.sam'), records(f'fixed_{method}.sam')
+    check(f'patched {method} drops the pair that maps nowhere and keeps the other records',
+          'pair_miss' in names(orig) and names(fixed) == ['pair_hit', 'pair_hit']
+          and fixed == [r for r in orig if r[2] != '*'])
+for method in ('align_bowtie2', 'align_bwa_paired_end_mapping'):
+    try:
+        getattr(BWT, method)(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', f'bad_{method}.sam')
+        check(f'patched {method} stops when the aligner fails', False)
+    except SystemExit as e:
+        check(f'patched {method} stops when the aligner fails', 'failed (exit status' in str(e))
 
 # A failing KMA (missing index): the unpatched method returns, the patched one stops
 originals['align_kma'](bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', 'bad_orig.sam')
@@ -199,4 +228,4 @@ check "wrapper patches and hands over to rgi bwt (--help)" wrapper_help
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
-[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 12 ]
+[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 17 ]
