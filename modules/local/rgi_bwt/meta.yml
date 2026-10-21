@@ -1,5 +1,5 @@
 name: rgi_bwt
-description: Read-level AMR gene detection with rgi bwt, aligning the paired host-removed reads of one sample to the CARD (and WildCARD, if loaded) reference alleles; singleton reads are excluded, and a sample without mapping results gets NA placeholder tables and no BAM. Runs through bin/rgi_bwt_kma_fix.py, which keeps only the reads KMA placed on a reference (RGI 6.0.3 kept every read, taking hours per sample and tens of GB of disk) and fails when KMA fails, and with --clean, which removes the temporary files
+description: Read-level AMR gene detection with rgi bwt, aligning the paired host-removed reads of one sample to the CARD (and WildCARD, if loaded) reference alleles; singleton reads are excluded, and a sample without mapping results gets NA placeholder tables and no BAM. Runs through bin/rgi_bwt_kma_fix.py, which keeps only the reads KMA placed on a reference, grouped by read name (RGI keeps every read, tens of GB of disk per deep sample and the whole read table in memory, and fixmate's mate pairing would follow KMA's thread order) and fails when KMA fails, and with --clean, which removes the temporary files
 keywords:
   - antimicrobial resistance
   - card
@@ -7,7 +7,7 @@ keywords:
   - metagenomics
 tools:
   - rgi:
-      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.3)
+      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.8)
       homepage: https://github.com/arpcard/rgi
       documentation: https://github.com/arpcard/rgi/blob/master/README.rst
       doi: "10.1093/nar/gkac920"

@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# Regression tests for bin/rgi_bwt_kma_fix.py (RGI_BWT). RGI 6.0.3's
+# Regression tests for bin/rgi_bwt_kma_fix.py (RGI_BWT). RGI's
 # BWT.align_kma writes every read KMA reports, unplaced ones included, to the
-# SAM that all later rgi bwt steps scan (hours per deep sample, ~390 bytes per
-# clean read on disk). Runs inside the pinned RGI image (the patch imports
-# RGI's own module) with its real KMA and checks:
-#   - the version guard accepts the installed 6.0.3 methods and refuses any
+# SAM that all later rgi bwt steps read (~390 bytes per clean read on disk,
+# and 6.0.8 loads the read table into memory). Runs inside the pinned RGI
+# image (the patch imports RGI's own module) with its real KMA and checks:
+#   - the version guard accepts the installed 6.0.8 methods and refuses any
 #     other one;
 #   - on paired reads where one pair maps and one does not, the unpatched
 #     method writes the unmapped reads to the SAM and the patched one writes
@@ -13,6 +13,8 @@
 #   - the same for the interleaved (single-file) method;
 #   - the filter drops records KMA writes at POS 0 (k-mer hits without an
 #     alignment, unplaced once samtools reads them) and keeps placed mates;
+#   - the kept records are grouped by read name (mates on adjacent lines, for
+#     samtools fixmate), keeping their order within a name;
 #   - a failing KMA stops the patched method; the unpatched one ignores it.
 #
 # Requirements: docker.
@@ -21,7 +23,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
-RGI_IMG="quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0"
+RGI_IMG="quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -117,9 +119,9 @@ try:
     shim.patch(Changed)
     check('guard refuses a changed method', False)
 except SystemExit as e:
-    check('guard refuses a changed method', 'not the 6.0.3 method' in str(e))
+    check('guard refuses a changed method', 'not the 6.0.8 method' in str(e))
 
-# Unpatched 6.0.3 methods (the bug): unmapped reads go to the SAM
+# Unpatched 6.0.8 methods (the bug): unmapped reads go to the SAM
 originals['align_kma'](bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'idx', 'orig.sam')
 orig = records('orig.sam')
 check('unpatched align_kma writes the unmapped pair to the SAM',
@@ -129,7 +131,7 @@ check('unpatched align_kma_interleaved writes the unmapped pair to the SAM',
       'pair_miss' in names(records('orig_int.sam')))
 
 shim.patch(BWT)
-check('guard accepts the installed RGI 6.0.3 methods',
+check('guard accepts the installed RGI 6.0.8 methods',
       BWT.align_kma is shim.align_kma and BWT.align_kma_interleaved is shim.align_kma_interleaved)
 
 # Patched: mapped reads only, same alignments as the unpatched SAM
@@ -155,6 +157,21 @@ kept = subprocess.run(['awk', '-F', '\t', shim.PLACED_READS_AWK], input='\n'.joi
                       capture_output=True, text=True, check=True).stdout.splitlines()
 check('filter keeps the header, placed reads and placed unmapped mates; drops POS 0 and unplaced reads',
       [l.split('\t')[0] for l in kept] == ['@HD', '@SQ', 'placed/1', 'unmapped_mate/2'])
+
+# Grouping: KMA writes records in thread order, mates often apart; fixmate
+# pairs adjacent records only
+with open('group.sam', 'w') as fh:
+    fh.write('\n'.join(['@HD\tVN:1.6', f'@SQ\tSN:{ref_name}\tLN:1000',
+                        f'b\t99\t{ref_name}\t5\t60\t1M\t*\t0\t0\tA\tI',
+                        f'a\t83\t{ref_name}\t9\t60\t1M\t*\t0\t0\tA\tI',
+                        f'b\t147\t{ref_name}\t7\t60\t1M\t*\t0\t0\tA\tI',
+                        f'a\t163\t{ref_name}\t3\t60\t1M\t*\t0\t0\tA\tI']) + '\n')
+shim.group_by_name('group.sam')
+with open('group.sam') as fh:
+    grouped = [l.split('\t')[:2] for l in fh.read().splitlines()]
+check('kept records grouped by read name, header first, order kept within a name',
+      grouped == [['@HD', 'VN:1.6'], ['@SQ', f'SN:{ref_name}'],
+                  ['a', '83'], ['a', '163'], ['b', '99'], ['b', '147']])
 
 # A failing KMA (missing index): the unpatched method returns, the patched one stops
 originals['align_kma'](bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', 'bad_orig.sam')
@@ -182,4 +199,4 @@ check "wrapper patches and hands over to rgi bwt (--help)" wrapper_help
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
-[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 11 ]
+[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 12 ]

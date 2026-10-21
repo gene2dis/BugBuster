@@ -3,30 +3,39 @@
 
 Usage: rgi_bwt_kma_fix.py <rgi arguments...>     e.g. rgi_bwt_kma_fix.py bwt --read_one ...
 
-RGI 6.0.3 BWT.align_kma / align_kma_interleaved write KMA's SAM output for
+RGI 6.0.8 BWT.align_kma / align_kma_interleaved write KMA's SAM output for
 every read, although well under 1% of a metagenome maps to CARD/WildCARD.
-Every later step of rgi bwt works on that file: two BAM copies, a read
-table, and then, for each reference sequence with reads (thousands with
-WildCARD), one scan of the whole read table. On an 81M-read sample that is
-81M rows scanned 7,859 times, hours per task, and the files hold ~390 bytes
-per clean read on disk.
+Every later step of rgi bwt works on that file: samtools fixmate, two BAM
+copies, and a read table that rgi then loads into memory (6.0.3 scanned the
+whole table once per reference with reads instead, thousands of passes with
+WildCARD). Unfiltered, the files hold ~390 bytes per clean read on disk and
+the table would hold every read in memory.
 
 This wrapper replaces both methods with copies that run the same KMA command
 and keep, of its SAM output, the header and the records placed on a
-reference (RNAME not '*' and POS not 0). The others are unplaced in the BAM
-rgi builds (KMA writes reads with k-mer hits but no alignment at POS 0, which
-samtools turns into unplaced unmapped reads), so they reach no rgi bwt
-output used downstream: the BAM's placed reads, and so the gene and allele
-tables, are the same. Only overall_mapping_stats.txt and
-artifacts_mapping_stats.txt change: their read totals now count the placed
-reads only. The copies also stop when KMA fails; the originals ignore it, so
-a failed alignment looked like a sample without hits.
+reference (RNAME not '*' and POS not 0), grouped by read name. KMA writes
+reads with k-mer hits but no alignment at POS 0 and reads without hits with
+RNAME '*'; neither is placed in the BAM. The copies also stop when KMA
+fails; the originals ignore it, so a failed alignment looked like a sample
+without hits.
+
+Grouping by name makes the BAM deterministic. 6.0.8 runs `samtools fixmate
+-z all -m` on the SAM, which pairs only mates on adjacent lines, and KMA
+writes its records in a thread-dependent order (mates are often apart, and
+the order changes between identical runs). On adjacent mates, fixmate sets
+the mate fields and moves an unmapped mate to its partner's position, where
+idxstats counts it as a read "with flanking sequence" (part of "All Mapped
+Reads"). Unfiltered, those counts and the allele table's Mate Pair Linkage
+change from run to run. With the filter, every pair whose two mates are
+placed gets its mate fields, and an unmapped mate is never counted, as in
+6.0.3 (flanking reads 0). overall_mapping_stats.txt and
+artifacts_mapping_stats.txt count the placed reads only.
 
 KMA's own outputs (consensus, VCF: the SNPs column of the allele table) vary
 between identical KMA runs with several threads, with or without this
 wrapper.
 
-The patches apply only to the exact RGI 6.0.3 methods: if an installed
+The patches apply only to the exact RGI 6.0.8 methods: if an installed
 source differs (an upstream fix or any other change), the wrapper stops with
 an error instead of patching blindly. Update or delete it when RGI is
 re-pinned. Other aligners (--aligner bowtie2|bwa) run unchanged.
@@ -40,18 +49,20 @@ import shutil
 import subprocess
 import sys
 
-# sha256 of inspect.getsource(BWT.<method>) as shipped in RGI 6.0.3
-# (quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0)
-RGI_603_METHOD_SHA256 = {
-    'align_kma':             '929c984dbb6641ef11722365c07115cfeba9ffa1f80b9225f9056b9befa14e2a',
-    'align_kma_interleaved': '982060f17da7819cac1cab83e33d1004e13de3f89e211e83a04ae9a0c2f6d10b',
+# sha256 of inspect.getsource(BWT.<method>) as shipped in RGI 6.0.8
+# (quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0)
+RGI_608_METHOD_SHA256 = {
+    'align_kma':             '6ff96153fa4bdfbd2f563e163c99004593a33b2821064b82255336c1e868e7ec',
+    'align_kma_interleaved': '6406e3246ebc6c4ba1482b595bdeee4046c139ce40da3506d7a6c15bb708a745',
 }
 
 # SAM header lines and the records placed on a reference
 PLACED_READS_AWK = '/^@/ || ($3 != "*" && $4 != 0)'
 
-# KMA 1.4.9 (the pinned image's) can exit 95 after a successful run; real
-# errors give other statuses (2 for a missing index, 137 for a kill)
+# KMA 1.4.9 (RGI 6.0.3's image) could exit 95 after a successful run; the
+# 1.6.11 of the pinned image exited 0 in every test, and 95 is still accepted
+# when the result table exists. Real errors give other statuses (2 for a
+# missing index, 137 for a kill)
 KMA_OK_STATUS = (0, 95)
 
 logger = None   # RGI's own logger (app.BWT.logger), set in main()
@@ -62,7 +73,8 @@ def run_kma(cmd, output_sam_file):
 
     Success needs an accepted KMA exit status, a successful filter, and
     KMA's result table (<output_sam_file>.temp.res, written when KMA closes
-    its files; rgi bwt reads it later for the read coverage).
+    its files; rgi bwt reads it later for the read coverage). The placed
+    records (well under 1% of the reads) are then grouped by read name.
     """
     with open(output_sam_file, 'w') as out:
         kma = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE)
@@ -73,10 +85,23 @@ def run_kma(cmd, output_sam_file):
         sys.exit(f'rgi_bwt_kma_fix.py: KMA failed (exit status {kma_status}): {cmd}')
     if awk_status != 0:
         sys.exit(f'rgi_bwt_kma_fix.py: filtering the KMA SAM failed (awk exit status {awk_status})')
+    group_by_name(output_sam_file)
+
+
+def group_by_name(sam_file):
+    """Rewrite a SAM file with its records stably sorted by QNAME (header first)."""
+    with open(sam_file) as f:
+        lines = f.readlines()
+    header = [line for line in lines if line.startswith('@')]
+    records = [line for line in lines if not line.startswith('@')]
+    records.sort(key=lambda line: line.split('\t', 1)[0])
+    with open(sam_file, 'w') as f:
+        f.writelines(header)
+        f.writelines(records)
 
 
 def align_kma(self, reference_genome, index_directory, output_sam_file):
-    """Fixed copy of BWT.align_kma (RGI 6.0.3): placed reads only, KMA exit check."""
+    """Fixed copy of BWT.align_kma (RGI 6.0.8): placed reads by name, KMA exit check."""
     self.check_index(index_directory=index_directory, reference_genome=reference_genome)
     logger.info("align reads -ipe {} {} to {}".format(self.read_one, self.read_two, reference_genome))
     run_kma("kma -mem_mode -ex_mode -1t1 -vcf -ipe {read_one} {read_two} -t {threads} -t_db {index_directory} "
@@ -86,7 +111,7 @@ def align_kma(self, reference_genome, index_directory, output_sam_file):
 
 
 def align_kma_interleaved(self, reference_genome, index_directory, output_sam_file):
-    """Fixed copy of BWT.align_kma_interleaved (RGI 6.0.3): placed reads only, KMA exit check."""
+    """Fixed copy of BWT.align_kma_interleaved (RGI 6.0.8): placed reads by name, KMA exit check."""
     self.check_index(index_directory=index_directory, reference_genome=reference_genome)
     logger.info("align reads -int {} to {}".format(self.read_one, reference_genome))
     run_kma("kma -mem_mode -ex_mode -1t1 -vcf -int {read_one} -t {threads} -t_db {index_directory} "
@@ -96,18 +121,18 @@ def align_kma_interleaved(self, reference_genome, index_directory, output_sam_fi
 
 
 def patch(bwt_cls):
-    """Replace the BWT methods after checking they are the 6.0.3 ones."""
+    """Replace the BWT methods after checking they are the 6.0.8 ones."""
     replacements = (('align_kma', align_kma), ('align_kma_interleaved', align_kma_interleaved))
     for name, _ in replacements:
         try:
             installed = inspect.getsource(getattr(bwt_cls, name))
         except (OSError, TypeError, AttributeError):
-            installed = ''   # no source to verify: treat as not the 6.0.3 method
+            installed = ''   # no source to verify: treat as not the 6.0.8 method
         digest = hashlib.sha256(installed.encode()).hexdigest()
-        if digest != RGI_603_METHOD_SHA256[name]:
+        if digest != RGI_608_METHOD_SHA256[name]:
             sys.exit(
                 f'rgi_bwt_kma_fix.py: the installed RGI BWT.{name} is not the '
-                f'6.0.3 method this patch targets (sha256 {digest}). Check '
+                f'6.0.8 method this patch targets (sha256 {digest}). Check '
                 'whether this RGI version still writes every read to the KMA '
                 'SAM, then update or delete bin/rgi_bwt_kma_fix.py.')
     for name, replacement in replacements:

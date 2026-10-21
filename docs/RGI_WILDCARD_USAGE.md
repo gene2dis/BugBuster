@@ -273,10 +273,11 @@ grep "version" /path/to/wildcard/index-for-model-sequences.txt
 
 **Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`, or a task takes hours
 
-RGI 6.0.3 writes every read KMA reports, placed on a reference or not, to its SAM and then scans that read
-table once per reference sequence with reads. `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which
-keeps only the reads placed on a reference (well under 1% of a metagenome; the gene and allele tables are
-unchanged), and with `--clean`, which removes the temporary files when the task ends. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
+RGI writes every read KMA reports, placed on a reference or not, to its SAM and builds its BAMs and read
+table from it (RGI 6.0.3 then scanned that table once per reference sequence with reads; 6.0.8 loads it into
+memory). `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads placed on a
+reference (well under 1% of a metagenome; the gene and allele tables are unchanged), and with `--clean`,
+which removes the temporary files when the task ends. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
 read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
 `RGI_BWT` task directories, or the whole `work/` once the run is done.
 
@@ -304,10 +305,10 @@ pipeline at it with `--custom_rgi_card_db`.
 # Conda/mamba (recommended)
 mamba create -n rgi -c conda-forge -c bioconda -c defaults rgi
 conda activate rgi
-rgi --version
+rgi main --version
 
 # Or Docker (the image the pipeline pins)
-docker pull quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0
+docker pull quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0
 ```
 
 ### Step 2: Download CARD

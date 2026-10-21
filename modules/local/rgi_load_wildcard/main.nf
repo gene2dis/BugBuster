@@ -1,5 +1,7 @@
 process RGI_LOAD_WILDCARD {
-    container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/rgi:6.0.8--pyh05cac1d_0' :
+        'quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0' }"
     
     tag "card_wildcard"
     label 'process_medium'
@@ -112,7 +114,7 @@ process RGI_LOAD_WILDCARD {
         # Create versions file
         cat <<-END_VERSIONS > ../versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | sed -n 's/.*rgi \\([0-9.]*\\).*/\\1/p' || echo "unknown")
+            rgi: \$(rgi main --version 2>/dev/null || echo "unknown")
             card: \$(python3 -c "import json; data=json.load(open('card.json')); print(data.get('_version', 'unknown'))" 2>/dev/null || echo "unknown")
         END_VERSIONS
 
@@ -126,7 +128,7 @@ process RGI_LOAD_WILDCARD {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: 6.0.3
+            rgi: 6.0.8
             card: 3.2.9
         END_VERSIONS
         """
