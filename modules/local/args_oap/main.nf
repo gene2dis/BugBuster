@@ -18,12 +18,14 @@ process ARGS_OAP {
         def prefix = "${meta.id}"
 
     """
+    # args_oap globs its input folder, so the reads get a folder of their own;
+    # links instead of copies (it reads through them, performance review E6)
     mkdir tmp_reads
-    cp -rL ${reads[0]} tmp_reads/${prefix}_tmp_reads_R1.fastq.gz
-    cp -rL ${reads[1]} tmp_reads/${prefix}_tmp_reads_R2.fastq.gz
+    ln -s ../${reads[0]} tmp_reads/${prefix}_tmp_reads_R1.fastq.gz
+    ln -s ../${reads[1]} tmp_reads/${prefix}_tmp_reads_R2.fastq.gz
 
     if [ ${reads[2]} != null ]; then
-        cp -rL ${reads[2]} tmp_reads/${prefix}_tmp_reads_S.fastq.gz
+        ln -s ../${reads[2]} tmp_reads/${prefix}_tmp_reads_S.fastq.gz
     fi
 
     args_oap stage_one -i tmp_reads \\

@@ -19,7 +19,7 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - reads:
       type: file
-      description: Host-removed reads [R1, R2, optional singleton]; copied into a temporary input directory as <sample>_tmp_reads_{R1,R2,S}.fastq.gz
+      description: Host-removed reads [R1, R2, optional singleton]; linked (not copied) into a temporary input directory as <sample>_tmp_reads_{R1,R2,S}.fastq.gz
       pattern: "*.fastq.gz"
 
 output:
