@@ -47,15 +47,17 @@ process RGI_BWT {
 
         # RGI --local looks for localDB/ in the current directory. Symlink the
         # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
-        # per task (audit #17): cp -rs makes real directories and a symlink per
-        # file, so reads go through the symlinks, while any file RGI creates at
-        # runtime (an aligner index under localDB/bwt/) lands in this task's
-        # localDB/, not the shared published database.
+        # per task (audit #17): cp -rsL makes real directories (following
+        # symlinked ones, localDB itself included) and a symlink per file, so
+        # reads go through the symlinks, while any file RGI creates at runtime
+        # (an aligner index under localDB/bwt/) lands in this task's localDB/,
+        # not the shared published database. bin/rgi_bwt_kma_fix.py removes
+        # the symlinks of an incomplete index before RGI rebuilds it.
         if [ ! -d ${card_db}/localDB ]; then
             echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
             exit 1
         fi
-        cp -rs "\$(readlink -f ${card_db})/localDB" localDB
+        cp -rsL "\$(readlink -f ${card_db}/localDB)" localDB
         
         # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI writes every read
         # the aligner reports, unplaced ones included (over 99% of a
@@ -104,6 +106,9 @@ process RGI_BWT {
 
     stub:
         def prefix = "${meta.id}"
+        def aligner = params.rgi_aligner ?: 'kma'
+        // the aligner versions in the pinned image
+        def aligner_version = [kma: '1.6.11', bowtie2: '2.5.5', bwa: '0.7.19-r1273'][aligner] ?: 'unknown'
         """
         touch ${prefix}_rgi_bwt.allele_mapping_data.txt
         touch ${prefix}_rgi_bwt.gene_mapping_data.txt
@@ -114,7 +119,7 @@ process RGI_BWT {
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
             rgi: 6.0.8
-            kma: 1.6.11
+            ${aligner}: ${aligner_version}
         END_VERSIONS
         """
 }

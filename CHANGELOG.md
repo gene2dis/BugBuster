@@ -417,7 +417,9 @@ next release is tagged.
     `bwa`, which write every read to the SAM: 6.0.8 would hold each one in
     memory (~1 KB per read). It drops only the pairs with no mapped mate,
     which reach no RGI output (same tables as an unfiltered run on 500k read
-    pairs), and stops when the aligner fails
+    pairs), and stops when the aligner fails. A killed aligner or filter
+    stops the task with 128 + signal, so an out-of-memory kill (137) is
+    retried with more memory
   - `bin/rgi_bwt_kma_fix.py` now also groups the kept reads by name, because
     6.0.8 runs `samtools fixmate`, which pairs only mates on adjacent lines
     and KMA writes them in a thread-dependent order: the BAM is now the same
@@ -554,8 +556,11 @@ next release is tagged.
   shared directory and an aligner index that `rgi bwt` builds at run time
   (`--rgi_include_wildcard false`, or `--rgi_aligner bowtie2|bwa`, with a
   database that has no such index yet) went into the database. `RGI_BWT` and
-  `RGI_KMER` now build the task's `localDB/` with `cp -rs` (real directories,
-  one symlink per file)
+  `RGI_KMER` now build the task's `localDB/` with `cp -rsL` (real
+  directories, also for a symlinked `localDB/`, and one symlink per file).
+  When an index there is incomplete, `bin/rgi_bwt_kma_fix.py` removes the
+  task's symlinks to it before RGI rebuilds it, so the aligner writes new
+  files in the task instead of through the links
 
 - **ARGS_OAP time limit**: stage one ran with `process_low` (4 CPUs, 8 h) and
   took 6-8 h on 55-70 M read pairs; one sample hit the limit, and on the

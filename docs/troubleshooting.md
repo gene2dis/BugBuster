@@ -367,6 +367,9 @@ whole read table in memory), and checks that the aligner succeeded. Its messages
   run, so 95 is still accepted when KMA has written its result table.
 - **"bowtie2 failed" / "bwa failed (exit status N)"** (`--rgi_aligner bowtie2|bwa`): the alignment
   failed, usually a missing or incomplete index in the task's `localDB/`.
+- **"filtering the KMA SAM failed"** (or the bowtie2/bwa SAM): the filter, or for KMA the sort that groups
+  the reads by name, failed; awk exit status 137 means it was killed, usually out of memory, and the task is
+  retried with more memory.
 - **"the installed RGI BWT.<method> is not the 6.0.8 method this patch targets":** the RGI container was
   changed. Use the pinned image, or, when updating RGI, check whether the new version still writes every read
   to the SAM, then update or remove `bin/rgi_bwt_kma_fix.py`.

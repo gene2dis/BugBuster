@@ -19,7 +19,12 @@
 #     says so; a SAM without placed records keeps its header;
 #   - a failing KMA stops the patched method; the unpatched one ignores it;
 #   - the bowtie2 and bwa copies drop the pair that maps nowhere, keep every
-#     other record of the unpatched SAM, and stop when the aligner fails.
+#     other record of the unpatched SAM, and stop when the aligner fails;
+#   - a killed aligner or grouping sort stops rgi with 128 + signal (137, so
+#     RGI_BWT retries with more memory), and a failed filter is reported as
+#     the filter, not as the aligner it took down with SIGPIPE;
+#   - rebuilding an incomplete index replaces the task's symlinks to it and
+#     leaves the linked (shared database) files untouched.
 #
 # Requirements: docker.
 #
@@ -57,7 +62,9 @@ in_rgi() {
 echo "=== rgi_bwt_kma_fix.py test suite ==="
 
 cat > "${TMP_DIR}/run_tests.py" <<'PY'
+import contextlib
 import importlib.util
+import io
 import os
 import random
 import subprocess
@@ -114,6 +121,16 @@ def records(sam):
 def names(recs):
     return sorted(r[0].split('/')[0] for r in recs)
 
+def stops(call):
+    """Run call; return (exit code, stderr) if it stops rgi, else None."""
+    err = io.StringIO()
+    try:
+        with contextlib.redirect_stderr(err):
+            call()
+    except SystemExit as e:
+        return e.code, err.getvalue()
+    return None
+
 # Guard: refuses changed methods, then patches the installed ones
 originals = {n: getattr(BWT, n) for n, _ in shim.REPLACEMENTS}
 class Changed(object):
@@ -137,7 +154,8 @@ check('unpatched align_kma_interleaved writes the unmapped pair to the SAM',
 
 shim.patch(BWT)
 check('guard accepts the installed RGI 6.0.8 methods',
-      all(getattr(BWT, n) is f for n, f in shim.REPLACEMENTS))
+      all(getattr(BWT, n) is f for n, f in shim.REPLACEMENTS)
+      and BWT.create_index.__qualname__ == 'patch.<locals>.create_index')
 
 # Patched: mapped reads only, same alignments as the unpatched SAM
 BWT.align_kma(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'idx', 'fixed.sam')
@@ -196,20 +214,60 @@ for method, index in (('align_bowtie2', 'bt2idx'), ('align_bwa_paired_end_mappin
           'pair_miss' in names(orig) and names(fixed) == ['pair_hit', 'pair_hit']
           and fixed == [r for r in orig if r[2] != '*'])
 for method in ('align_bowtie2', 'align_bwa_paired_end_mapping'):
-    try:
-        getattr(BWT, method)(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', f'bad_{method}.sam')
-        check(f'patched {method} stops when the aligner fails', False)
-    except SystemExit as e:
-        check(f'patched {method} stops when the aligner fails', 'failed (exit status' in str(e))
+    stop = stops(lambda: getattr(BWT, method)(
+        bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', f'bad_{method}.sam'))
+    check(f'patched {method} stops when the aligner fails',
+          stop is not None and stop[0] != 0 and 'failed (exit status' in stop[1])
 
 # A failing KMA (missing index): the unpatched method returns, the patched one stops
 originals['align_kma'](bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', 'bad_orig.sam')
 check('unpatched align_kma ignores a failing KMA', True)
-try:
-    BWT.align_kma(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', 'bad.sam')
-    check('patched align_kma stops when KMA fails', False)
-except SystemExit as e:
-    check('patched align_kma stops when KMA fails', 'KMA failed' in str(e))
+stop = stops(lambda: BWT.align_kma(bwt('r1.fastq', 'r2.fastq'), 'ref.fasta', 'no_such_index', 'bad.sam'))
+check('patched align_kma stops when KMA fails',
+      stop is not None and stop[0] != 0 and 'KMA failed' in stop[1])
+
+# Killed children: 128 + signal, the status RGI_BWT's errorStrategy retries
+open('killed.sam.temp.res', 'w').close()
+stop = stops(lambda: shim.run_kma('sh -c "kill -9 \\$\\$"', 'killed.sam'))
+check('a killed KMA stops rgi with exit status 137',
+      stop is not None and stop[0] == 137 and 'KMA failed' in stop[1])
+os.makedirs('fake_sort', exist_ok=True)
+for name, body in (('killed', 'cat >/dev/null; kill -9 $$'), ('early', 'exit 3')):
+    os.makedirs(f'fake_sort/{name}', exist_ok=True)
+    with open(f'fake_sort/{name}/sort', 'w') as fh:
+        fh.write(f'#!/bin/sh\n{body}\n')
+    os.chmod(f'fake_sort/{name}/sort', 0o755)
+path = os.environ['PATH']
+os.environ['PATH'] = f'{work}/fake_sort/killed:{path}'
+stop = stops(lambda: kma_filter(sam))
+check('a killed grouping sort stops rgi with exit status 137',
+      stop is not None and stop[0] == 137 and 'filtering the KMA SAM failed' in stop[1])
+# A sort that exits without reading: awk dies of SIGPIPE, then the aligner
+with open('many.sam', 'w') as fh:
+    fh.write('\n'.join(sam[:2] + [sam[2]] * 200000) + '\n')
+os.environ['PATH'] = f'{work}/fake_sort/early:{path}'
+open('early.sam.temp.res', 'w').close()
+stop = stops(lambda: shim.run_kma('cat many.sam', 'early.sam'))
+os.environ['PATH'] = path
+check('a failed filter is reported as the filter, not as the aligner',
+      stop is not None and stop[0] != 0 and 'filtering the KMA SAM failed' in stop[1])
+
+# Rebuilding an incomplete staged index: the task's symlinks are replaced,
+# the shared files they point to are not written
+os.makedirs('shared/bwt', exist_ok=True)
+os.makedirs('task/bwt', exist_ok=True)
+with open('shared/bwt/kma.name', 'w') as fh:
+    fh.write('shared\n')
+os.symlink(os.path.abspath('shared/bwt/kma.name'), 'task/bwt/kma.name')
+obj = bwt('r1.fastq', 'r2.fastq')
+del obj.check_index
+obj.aligner = 'kma'
+BWT.create_index(obj, index_directory='task/bwt/kma', reference_genome='ref.fasta')
+with open('shared/bwt/kma.name') as fh:
+    shared_kept = fh.read() == 'shared\n'
+check('an index rebuild writes new files in the task, not through the staged symlinks',
+      shared_kept and not os.path.islink('task/bwt/kma.name')
+      and os.path.isfile('task/bwt/kma.name') and os.path.isfile('task/bwt/kma.comp.b'))
 
 sys.exit(0 if all(results) else 1)
 PY
@@ -228,4 +286,4 @@ check "wrapper patches and hands over to rgi bwt (--help)" wrapper_help
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
-[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 17 ]
+[ "${FAIL}" -eq 0 ] && [ "${PASS}" -ge 22 ]

@@ -106,7 +106,7 @@ def execute_threads(self, split_sequences, j, amr_kmers, type):
 
 def patch(kmers_cls):
     """Replace the CARDkmers methods after checking they are the 6.0.8 ones."""
-    for name, replacement in (('execute_threads', execute_threads),):
+    for name in RGI_608_METHOD_SHA256:
         try:
             installed = inspect.getsource(getattr(kmers_cls, name))
         except (OSError, TypeError, AttributeError):
@@ -118,8 +118,7 @@ def patch(kmers_cls):
                 f'not the 6.0.8 method this patch targets (sha256 {digest}). '
                 'Check whether this RGI version still needs the fix, then '
                 'update or delete bin/rgi_kmer_kma_fix.py.')
-    for name, replacement in (('execute_threads', execute_threads),):
-        setattr(kmers_cls, name, replacement)
+    kmers_cls.execute_threads = execute_threads
 
 
 def arm_time_limit(seconds):

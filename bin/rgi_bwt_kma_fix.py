@@ -42,6 +42,14 @@ unfiltered run.
 overall_mapping_stats.txt and artifacts_mapping_stats.txt count the kept
 records only.
 
+A failed aligner or filter stops rgi with its exit status (128 + signal for
+a killed one), so RGI_BWT retries a task killed for memory (137).
+
+The task stages localDB/ as one symlink per file. When an index there is
+incomplete, RGI rebuilds it with the aligner, which would write through
+those symlinks into the shared database; the wrapper first removes the
+task's symlinks to that index, so the rebuild writes new files in the task.
+
 KMA's own outputs (consensus, VCF: the SNPs column of the allele table) vary
 between identical KMA runs with several threads, with or without this
 wrapper.
@@ -52,6 +60,7 @@ an error instead of patching blindly. Update or delete it when RGI is
 re-pinned.
 """
 
+import glob
 import hashlib
 import inspect
 import os
@@ -69,16 +78,19 @@ RGI_608_METHOD_SHA256 = {
     'align_bowtie2_unpaired':       'a4e6c2e019607c984855092b4d0dddd15f6762903913e5b441b1191eeb4ac84d',
     'align_bwa_paired_end_mapping': '4e0cee70bb8ab090f8e7d3a255c538ce335cc356e67b96c1e9115ac64d5f3d38',
     'align_bwa_single_end_mapping': 'badfde083ed212dcd63e5b3de3c28f0a66b0a238d1fcc231dd0fd8442014ec03',
+    'create_index':                 'b3aafd80ea560b53c24d8200eb3bfad199f9e3de070ef22600228b772a427c3d',
 }
 
 # KMA: the header (its @HD line now says the records are grouped by query
 # name) and the records placed on a reference, grouped by read name: a
-# stable sort in a child process, whose output follows the flushed header
+# stable sort in a child process, whose output follows the flushed header.
+# busybox awk's close() returns the sort's wait status (the signal number
+# for a killed sort), passed on as 128 + signal
 KMA_PLACED_READS_AWK = (
     'BEGIN { by_name = "LC_ALL=C sort -s -t \'\\t\' -k1,1" } '
     '/^@/ { if ($1 == "@HD") sub(/\\tGO:[a-z]+/, "\\tGO:query"); print; next } '
     '$3 != "*" && $4 != 0 { print | by_name; n++ } '
-    'END { fflush(); if (n && close(by_name) != 0) exit 1 }'
+    'END { fflush(); if (n && (r = close(by_name)) != 0) exit (r % 256 ? 128 + r % 128 : 1) }'
 )
 
 # bowtie2/bwa: the header and every record with a reference name
@@ -91,6 +103,12 @@ ALIGNED_READS_AWK = '/^@/ || $3 != "*"'
 KMA_OK_STATUS = (0, 95)
 
 logger = None   # RGI's own logger (app.BWT.logger), set in main()
+
+
+def fail(message, status):
+    """Stop rgi with a failed child's exit status, 128 + signal for a killed one."""
+    sys.stderr.write(f'rgi_bwt_kma_fix.py: {message}\n')
+    sys.exit(128 - status if status < 0 else status or 1)
 
 
 def run_filtered(cmd, output_sam_file, awk_program):
@@ -114,19 +132,28 @@ def run_kma(cmd, output_sam_file):
     its files; rgi bwt reads it later for the read coverage).
     """
     kma_status, awk_status = run_filtered(cmd, output_sam_file, KMA_PLACED_READS_AWK)
-    if kma_status not in KMA_OK_STATUS or not os.path.exists(f'{output_sam_file}.temp.res'):
-        sys.exit(f'rgi_bwt_kma_fix.py: KMA failed (exit status {kma_status}): {cmd}')
+    # checked first: a failed filter closes the pipe, and KMA then dies of SIGPIPE
     if awk_status != 0:
-        sys.exit(f'rgi_bwt_kma_fix.py: filtering the KMA SAM failed (awk exit status {awk_status})')
+        fail(f'filtering the KMA SAM failed (awk exit status {awk_status})', awk_status)
+    if kma_status not in KMA_OK_STATUS or not os.path.exists(f'{output_sam_file}.temp.res'):
+        fail(f'KMA failed (exit status {kma_status}): {cmd}', kma_status)
 
 
 def run_aligner(name, cmd, output_sam_file):
     """Run a bowtie2/bwa command line and keep the records with a reference name."""
     status, awk_status = run_filtered(cmd, output_sam_file, ALIGNED_READS_AWK)
-    if status != 0:
-        sys.exit(f'rgi_bwt_kma_fix.py: {name} failed (exit status {status}): {cmd}')
     if awk_status != 0:
-        sys.exit(f'rgi_bwt_kma_fix.py: filtering the {name} SAM failed (awk exit status {awk_status})')
+        fail(f'filtering the {name} SAM failed (awk exit status {awk_status})', awk_status)
+    if status != 0:
+        fail(f'{name} failed (exit status {status}): {cmd}', status)
+
+
+def unlink_staged_index(index_directory):
+    """Remove the task's symlinks to the index files <index_directory>.*."""
+    directory, prefix = os.path.split(index_directory)
+    for path in glob.glob(os.path.join(glob.escape(directory), glob.escape(prefix) + '.*')):
+        if os.path.islink(path):
+            os.unlink(path)
 
 
 def align_kma(self, reference_genome, index_directory, output_sam_file):
@@ -195,7 +222,7 @@ REPLACEMENTS = (
 
 def patch(bwt_cls):
     """Replace the BWT methods after checking they are the 6.0.8 ones."""
-    for name, _ in REPLACEMENTS:
+    for name in RGI_608_METHOD_SHA256:
         try:
             installed = inspect.getsource(getattr(bwt_cls, name))
         except (OSError, TypeError, AttributeError):
@@ -209,6 +236,15 @@ def patch(bwt_cls):
                 'SAM, then update or delete bin/rgi_bwt_kma_fix.py.')
     for name, replacement in REPLACEMENTS:
         setattr(bwt_cls, name, replacement)
+
+    rgi_create_index = bwt_cls.create_index
+
+    def create_index(self, index_directory, reference_genome):
+        """BWT.create_index (RGI 6.0.8) after unlinking the staged index files."""
+        unlink_staged_index(index_directory)
+        rgi_create_index(self, index_directory=index_directory, reference_genome=reference_genome)
+
+    bwt_cls.create_index = create_index
 
 
 def main():

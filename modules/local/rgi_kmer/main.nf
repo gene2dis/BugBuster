@@ -41,15 +41,15 @@ process RGI_KMER {
 
         # RGI --local looks for localDB/ in the current directory. Symlink the
         # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
-        # per task (audit #17): cp -rs makes real directories and a symlink per
-        # file, so reads go through the symlinks, while any file RGI creates at
-        # runtime (an aligner index under localDB/bwt/) lands in this task's
-        # localDB/, not the shared published database.
+        # per task (audit #17): cp -rsL makes real directories (following
+        # symlinked ones, localDB itself included) and a symlink per file, so
+        # any file RGI creates at runtime lands in this task's localDB/, not
+        # the shared published database (as in RGI_BWT; kmer_query only reads).
         if [ ! -d ${card_db}/localDB ]; then
             echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
             exit 1
         fi
-        cp -rs "\$(readlink -f ${card_db})/localDB" localDB
+        cp -rsL "\$(readlink -f ${card_db}/localDB)" localDB
         # kmer_query exits 0 with no output when the k-mer database is not
         # loaded. Say so and skip it: the empty JSON keeps the declared output,
         # and the summary reports the sample's RGI hosts as 'no_kmer_data'
