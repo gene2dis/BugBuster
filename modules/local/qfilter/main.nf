@@ -3,7 +3,7 @@ process QFILTER {
     tag "${meta.id}"
     label 'process_single'
 
-    container 'ubuntu:22.04'
+    container 'ubuntu:24.04'
 
     input:
         tuple val(meta), path(reads), path(json)
@@ -62,7 +62,7 @@ process QFILTER {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bash: 5.1.16
+            bash: 5.2.21
         END_VERSIONS
         """
 }

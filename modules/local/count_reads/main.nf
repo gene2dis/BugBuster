@@ -4,8 +4,8 @@ process COUNT_READS {
     label 'process_single'
 
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
-        'ubuntu:22.04' }"
+        'https://depot.galaxyproject.org/singularity/ubuntu:24.04' :
+        'ubuntu:24.04' }"
 
     input:
         tuple val(meta), path(reads)
@@ -53,7 +53,7 @@ process COUNT_READS {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            gzip: 1.10
+            gzip: 1.12
         END_VERSIONS
         """
 }

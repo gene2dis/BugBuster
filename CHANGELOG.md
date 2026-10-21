@@ -379,6 +379,9 @@ next release is tagged.
     process. Existing bwa-mem3 indexes work unchanged; clean reads and index
     files are byte-identical. The image is pinned for every container engine:
     its singularity build lacks `find`, `zcat` and `gzip`
+  - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
+    `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
+    now shows bash 5.2.21 and gzip 1.12)
 
 - **nf-core modules updated (issue #35)**: `fastp` 1.0.1 → 1.4.0
   (`community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11`),

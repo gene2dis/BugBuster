@@ -24,8 +24,8 @@ process CONTIG_FILTER_SUMMARY {
     label 'process_single'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/ubuntu:22.04' :
-        'ubuntu:22.04' }"
+        'https://depot.galaxyproject.org/singularity/ubuntu:24.04' :
+        'ubuntu:24.04' }"
     
     input:
     path(filter_reports)
@@ -175,7 +175,7 @@ process CONTIG_FILTER_SUMMARY {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bash: 5.1.0
+        bash: 5.2.21
     END_VERSIONS
     """
 }
