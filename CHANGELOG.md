@@ -372,6 +372,15 @@ next release is tagged.
 
 ### Changed
 
+- **Less I/O in three read-level steps, same outputs**
+  - `BWAMEM3_DECONTAMINATE` and `BOWTIE2_DECONTAMINATE` take the clean read
+    count from the aligner's own summary (samtools fastq's processed and
+    singleton counts; bowtie2's "aligned concordantly 0 times") instead of
+    decompressing the written reads again (`bin/clean_read_count.sh`, which
+    stops the task if the summary line is missing)
+  - `ARGS_OAP` links the reads into its input folder instead of copying
+    them (a full extra copy of each sample's reads per task)
+
 - **Tool updates with unchanged outputs**
   - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
     (`community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3`,
