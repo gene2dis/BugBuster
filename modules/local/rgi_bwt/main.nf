@@ -47,15 +47,15 @@ process RGI_BWT {
 
         # RGI --local looks for localDB/ in the current directory. Symlink the
         # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
-        # per task (audit #17): reads go through the symlinks, while any file
-        # RGI creates at runtime lands in this task's localDB/, not the shared
-        # published database.
+        # per task (audit #17): cp -rs makes real directories and a symlink per
+        # file, so reads go through the symlinks, while any file RGI creates at
+        # runtime (an aligner index under localDB/bwt/) lands in this task's
+        # localDB/, not the shared published database.
         if [ ! -d ${card_db}/localDB ]; then
             echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
             exit 1
         fi
-        mkdir localDB
-        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
+        cp -rs "\$(readlink -f ${card_db})/localDB" localDB
         
         # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI writes every read
         # the aligner reports, unplaced ones included (over 99% of a

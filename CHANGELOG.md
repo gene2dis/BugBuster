@@ -549,6 +549,14 @@ next release is tagged.
 
 ### Fixed
 
+- **RGI_BWT no longer writes into the shared RGI database**: the task linked
+  each top-level entry of the database's `localDB/`, so `localDB/bwt` was the
+  shared directory and an aligner index that `rgi bwt` builds at run time
+  (`--rgi_include_wildcard false`, or `--rgi_aligner bowtie2|bwa`, with a
+  database that has no such index yet) went into the database. `RGI_BWT` and
+  `RGI_KMER` now build the task's `localDB/` with `cp -rs` (real directories,
+  one symlink per file)
+
 - **ARGS_OAP time limit**: stage one ran with `process_low` (4 CPUs, 8 h) and
   took 6-8 h on 55-70 M read pairs; one sample hit the limit, and on the
   local executor the kill surfaced as `process hasn't exited`, which stops
