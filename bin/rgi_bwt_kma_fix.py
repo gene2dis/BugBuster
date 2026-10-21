@@ -89,15 +89,25 @@ def run_kma(cmd, output_sam_file):
 
 
 def group_by_name(sam_file):
-    """Rewrite a SAM file with its records stably sorted by QNAME (header first)."""
-    with open(sam_file) as f:
-        lines = f.readlines()
-    header = [line for line in lines if line.startswith('@')]
-    records = [line for line in lines if not line.startswith('@')]
-    records.sort(key=lambda line: line.split('\t', 1)[0])
-    with open(sam_file, 'w') as f:
-        f.writelines(header)
-        f.writelines(records)
+    """Rewrite a SAM file with its records stably sorted by QNAME (header first).
+
+    The sort runs in child processes, so its memory (about 1 GB for the
+    3 M placed records of an ARG-rich deep sample) is released before rgi
+    loads its databases.
+    """
+    grouped = f'{sam_file}.byname'
+    with open(grouped, 'wb') as out:
+        header = subprocess.run(['awk', '/^@/', sam_file], stdout=out)
+        out.flush()
+        records = subprocess.Popen(['awk', '!/^@/', sam_file], stdout=subprocess.PIPE)
+        by_name = subprocess.Popen(['sort', '-s', '-t', '\t', '-k1,1'], stdin=records.stdout, stdout=out,
+                                   env=dict(os.environ, LC_ALL='C'))
+        records.stdout.close()   # sort holds the pipe now
+        sort_status, records_status = by_name.wait(), records.wait()
+    if header.returncode or records_status or sort_status:
+        sys.exit(f'rgi_bwt_kma_fix.py: grouping the KMA SAM by read name failed (awk {header.returncode}, '
+                 f'{records_status}; sort {sort_status})')
+    os.replace(grouped, sam_file)
 
 
 def align_kma(self, reference_genome, index_directory, output_sam_file):
