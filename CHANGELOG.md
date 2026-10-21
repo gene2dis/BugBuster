@@ -383,16 +383,21 @@ next release is tagged.
     filter count: 5,496 of the 426,918 failed reads, which 1.0.1 counted as
     too short or low quality, so the failure reasons shift while the passed
     count stays the same; on other data the read counts may shift slightly
-  - fastp gets `--thread` = CPUs − 2 for paired reads (two threads reserved
-    for reading and writing), so at the unchanged 8 CPUs it runs 6 workers;
-    it uses ~22 % less CPU time than 1.0.1 for the same reads
+  - fastp gets `--thread` = CPUs − 2 for paired reads (fastp 1.3.6 no
+    longer counts its two reader threads in `--thread`), so at the unchanged
+    8 CPUs it runs 6 workers instead of 8. FASTP per task is therefore slower
+    than before: 76 s vs 63 s per 10 M read pairs (72 s with the level 1
+    output below), although fastp 1.4.0 itself uses ~22 % less CPU time than
+    1.0.1 and is as fast at the same thread count. CPUs stay at 8: every CPU
+    count reserves the same core-seconds per read; on a large host,
+    `withName: '.*:FASTP' { cpus = 10 }` in a `-c` file restores the old speed
   - The duplicate `--detect_adapter_for_pe` is gone from FASTP's `ext.args`
     (the module passes it for paired reads)
 
 - **fastp writes its trimmed reads at gzip level 1** (`--compression 1`,
   was level 4): the file is not published and is read once by
-  decontamination. 8-10 % faster and 7-9 % less CPU time for a 4 % larger
-  intermediate file; reads unchanged
+  decontamination. Against level 4 with fastp 1.4.0: 8-10 % faster and 7-9 %
+  less CPU time for a 4 % larger intermediate file; reads unchanged
 
 - **`--publish_dir_mode link` documented** (manual section 6.1, parameters,
   `DISK_OPTIMIZATION.md`): hard links take no extra space and survive
