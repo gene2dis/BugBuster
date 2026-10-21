@@ -22,8 +22,8 @@ process BBMAP {
     label 'process_single'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/bbmap:39.06--h92535d8_0' :
-        'quay.io/biocontainers/bbmap:39.06--h92535d8_0' }"
+        'https://depot.galaxyproject.org/singularity/bbmap:40.05--h09cc210_0' :
+        'quay.io/biocontainers/bbmap:40.05--h09cc210_0' }"
 
     // Publishing is configured in config/modules.config (withName: 'BBMAP')
 
@@ -132,7 +132,7 @@ process BBMAP {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bbmap: 39.06
+        bbmap: 40.05
     END_VERSIONS
     """
 }

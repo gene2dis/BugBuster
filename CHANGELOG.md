@@ -401,6 +401,11 @@ next release is tagged.
     drops that line from its published log. The bowtie2+samtools image is
     pinned for every container engine: its singularity build lacks `gzip`,
     `zcat` and `find`
+  - BBMap 39.06 → 40.05 (`BBMAP`, biocontainer and its depot singularity
+    build): filtered contigs are byte-identical. The published
+    `<sample>_contig.stats` keeps every number but labels sizes as `Mb` and
+    `Kbp` where 39.06 wrote `MB` and `KB` (BBMap 40's `stats.sh`); nothing in
+    the pipeline parses that file
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)
