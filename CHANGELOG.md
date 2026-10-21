@@ -528,7 +528,7 @@ next release is tagged.
   of the old request. Still doubled on retry and capped by `--max_memory`
 
 - **CPU requests sized to measured use** (`config/modules.config`):
-  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2, `WOLTKA_CLASSIFY` 8 → 2,
+  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2 (4 since the parallel base count, above), `WOLTKA_CLASSIFY` 8 → 2,
   `TAXONOMY_PHYLOSEQ` 4 → 2 (each used well under its request in real runs),
   and `CHECKM2_BATCH` 8 → 16 (one task over every bin at the end of a binning
   run, 585-673 % CPU of 8). Outputs are unchanged; more tasks fit at once
