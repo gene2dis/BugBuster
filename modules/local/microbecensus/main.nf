@@ -10,8 +10,9 @@
     py3 biocontainer ships an unreleased-upstream-fix gap that crashes the
     stock CLI before any work (upstream issue #32; the py2 image is broken
     differently — Q4 register row has the full story). The wrapper
-    monkeypatches the one broken function and delegates; everything else is
-    the stock tool. Reads are passed comma-joined (documented paired-end
+    monkeypatches the broken function, replaces the single-threaded count of
+    every input base with a parallel one giving the same total (performance
+    review M6), and delegates; everything else is the stock tool. Reads are passed comma-joined (documented paired-end
     form; reads are treated independently, so the singleton file rides
     along). Read length is auto-detected and rounded DOWN to the nearest
     trained model (50..150 by 10, then 175..500); a median below 50 bp makes

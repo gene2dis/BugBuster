@@ -380,6 +380,13 @@ next release is tagged.
     stops the task if the summary line is missing)
   - `ARGS_OAP` links the reads into its input folder instead of copying
     them (a full extra copy of each sample's reads per task)
+  - `MICROBECENSUS` counts the bases of its input files in parallel (one
+    process per file, reading plain FASTQ in large blocks) instead of
+    MicrobeCensus' single-threaded parser, which took about as long as the
+    genome-size estimate at full depth; `total_bases` and the genome
+    equivalents are unchanged (files that are not plain 4-line FASTQ are
+    counted by the stock code). `bin/run_microbe_census_py3fix.py` now also
+    stops when the installed MicrobeCensus is not the v1.1.1 code it patches
 
 - **Tool updates with unchanged outputs**
   - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
