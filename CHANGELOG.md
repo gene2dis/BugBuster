@@ -386,7 +386,10 @@ next release is tagged.
     genome-size estimate at full depth; `total_bases` and the genome
     equivalents are unchanged (files that are not plain 4-line FASTQ are
     counted by the stock code). `bin/run_microbe_census_py3fix.py` now also
-    stops when the installed MicrobeCensus is not the v1.1.1 code it patches
+    stops when the installed MicrobeCensus is not the v1.1.1 code it patches.
+    It now asks for 4 CPUs (was 2): its RAPsearch step took 40 min at 2
+    threads, 21 at 4 and 14 at 8 on the 2 M sampled reads, so a full-depth
+    sample should take ~30 min instead of ~50
 
 - **One CheckM2 run for all binners** (`CHECKM2_BATCH`): every bin of every
   sample and binner goes into a single `checkm2 predict` (renamed
