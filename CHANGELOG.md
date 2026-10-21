@@ -413,6 +413,11 @@ next release is tagged.
     `<sample>_contig.stats` keeps every number but labels sizes as `Mb` and
     `Kbp` where 39.06 wrote `MB` and `KB` (BBMap 40's `stats.sh`); nothing in
     the pipeline parses that file
+  - Bakta 1.12.1 → 1.12.2 (`quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0`)
+    for `BAKTA_BAKTA` (the pipeline's override of the nf-core module) and
+    `FORMAT_BAKTA_DB`; same AMRFinderPlus (4.2.7), so existing databases keep
+    working. On one real bin every annotation is identical; only the version
+    and date in the headers change
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)
