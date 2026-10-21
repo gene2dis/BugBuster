@@ -61,9 +61,8 @@ workflow QC {
         // Paired-read fastp reports for the results summary (read length)
         ch_fastp_json = FASTP.out.json.map { _meta, json_file -> json_file }
 
-        // Collect versions
-        ch_versions = ch_versions.mix(FASTP.out.versions.first())
-        ch_versions = ch_versions.mix(FASTP_SINGLETON.out.versions.first())
+        // FASTP and FASTP_SINGLETON report their versions on the versions topic
+        // (collected in main.nf), not through ch_versions
 
         //
         // Rejoin trimmed singletons with their paired reads, then combine with

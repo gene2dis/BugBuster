@@ -46,7 +46,7 @@ nextflow_process {
 
             assert process.out.html
             assert process.out.log
-            assert process.out.versions
+            assert process.out.versions_fastp
         }
     }
 
@@ -76,7 +76,7 @@ nextflow_process {
         then {
             assert process.success
             assert process.out.reads
-            assert process.out.versions
+            assert process.out.versions_fastp
         }
     }
 }

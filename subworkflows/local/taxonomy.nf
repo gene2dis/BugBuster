@@ -55,14 +55,14 @@ workflow TAXONOMY {
             false,  // save_output_fastqs
             false   // save_reads_assignment
         )
-        ch_versions = ch_versions.mix(KRAKEN2.out.versions.first())
-        
+        // KRAKEN2 and BRACKEN report their versions on the versions topic
+        // (collected in main.nf), not through ch_versions
+
         // Run Bracken abundance estimation
         BRACKEN(
             KRAKEN2.out.report,
             kraken_db.first()
         )
-        ch_versions = ch_versions.mix(BRACKEN.out.versions.first())
         
         // Generate unified taxonomy report
         TAXONOMY_REPORT(

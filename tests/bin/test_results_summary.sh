@@ -538,6 +538,10 @@ v = parse_versions('       "KARGVA":\n           kargva: 1.0\n       END_VERSION
                    '"RGI_BWT":\n    rgi:\n\n\nunknown\n    kma:  Invalid option:\t--version\n')
 assert v == {"KARGVA": {"kargva": "1.0"}, "FASTP": {"fastp": "1.0.1"},
              "RGI_BWT": {"rgi": "unknown", "kma": "unknown"}}, v
+# the catalog names processes as parse_versions keys them: the nf-core aliases (TAXONOMY:KRAKEN2 -> KRAKEN2)
+from summary_catalog import stage_status
+kv = parse_versions('"TAXONOMY:KRAKEN2":\n    kraken2: 2.1.6\n"TAXONOMY:BRACKEN":\n    bracken: 3.0.1\n')
+assert dict((st["key"], s) for st, s in stage_status(kv, set()))["taxonomy"] == "ran, no table found"
 # one tier per gene across methods: the first method's tier wins
 k = pd.DataFrame({"gene": ["g1"], "tier": [2], "category": ["a"], "tier_note": [""],
                   "resistance_snp_status": [""], "resistance_snps_found": [""]})

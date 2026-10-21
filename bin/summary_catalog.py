@@ -14,7 +14,7 @@ STAGES = [
     {
         "key": "taxonomy", "title": "Taxonomic profiling",
         "params": "--taxonomic_profiler (sylph | kraken2 | sourmash | none)",
-        "processes": ["SYLPH_PROFILE", "SYLPH_TAXPROF", "KRAKEN2_KRAKEN2", "BRACKEN_BRACKEN", "SOURMASH",
+        "processes": ["SYLPH_PROFILE", "SYLPH_TAXPROF", "KRAKEN2", "BRACKEN", "SOURMASH",
                       "TAXONOMY_PHYLOSEQ"],
         "summary": "taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence, watchlist; taxonomy heatmaps",
     },

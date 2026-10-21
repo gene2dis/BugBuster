@@ -15,21 +15,21 @@
                     },
                     "bracken/bracken": {
                         "branch": "master",
-                        "git_sha": "41dfa3f7c0ffabb96a6a813fe321c6d1cc5b6e46",
+                        "git_sha": "6d46786420b4d7bc88eba026eb389c0c5535d120",
                         "installed_by": [
                             "modules"
                         ]
                     },
                     "fastp": {
                         "branch": "master",
-                        "git_sha": "b8f1de0ac853ae5b56c63450d47438f899c553d0",
+                        "git_sha": "1e31555fd8e5f4e959283d6db859a1f3a17fe25f",
                         "installed_by": [
                             "modules"
                         ]
                     },
                     "kraken2/kraken2": {
                         "branch": "master",
-                        "git_sha": "1a9dc0fd9f8f61099b3c912df1ab97fac72a1f86",
+                        "git_sha": "d67d33d5925fcec4691b499670fa2bd926fd2be5",
                         "installed_by": [
                             "modules"
                         ]
@@ -44,7 +44,7 @@
                     },
                     "samtools/index": {
                         "branch": "master",
-                        "git_sha": "c8be52dba1166c678e74cda9c3a3c221635c8bb1",
+                        "git_sha": "5f344f0e41fdfaf2506f89400e42a2689d6ab323",
                         "installed_by": [
                             "modules"
                         ]
