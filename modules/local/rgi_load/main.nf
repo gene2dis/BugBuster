@@ -1,5 +1,7 @@
 process RGI_LOAD {
-    container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/rgi:6.0.8--pyh05cac1d_0' :
+        'quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0' }"
     
     tag "card_${card_version}"
     label 'process_download'
@@ -114,7 +116,7 @@ process RGI_LOAD {
         # Create versions file
         cat <<-END_VERSIONS > ../versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | grep -oP 'rgi \\K[0-9.]+' || echo "unknown")
+            rgi: \$(rgi main --version 2>/dev/null || echo "unknown")
             card: \$(python3 -c "import json; print(json.load(open('card.json')).get('_version', 'unknown'))" 2>/dev/null || echo "unknown")
         END_VERSIONS
 
@@ -128,7 +130,7 @@ process RGI_LOAD {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: 6.0.3
+            rgi: 6.0.8
             card: 3.2.9
         END_VERSIONS
         """

@@ -1,5 +1,7 @@
 process RGI_KMER {
-    container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/rgi:6.0.8--pyh05cac1d_0' :
+        'quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0' }"
     
     label 'process_medium'
     
@@ -39,15 +41,15 @@ process RGI_KMER {
 
         # RGI --local looks for localDB/ in the current directory. Symlink the
         # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
-        # per task (audit #17): reads go through the symlinks, while any file
-        # RGI creates at runtime lands in this task's localDB/, not the shared
-        # published database.
+        # per task (audit #17): cp -rsL makes real directories (following
+        # symlinked ones, localDB itself included) and a symlink per file, so
+        # any file RGI creates at runtime lands in this task's localDB/, not
+        # the shared published database (as in RGI_BWT; kmer_query only reads).
         if [ ! -d ${card_db}/localDB ]; then
             echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
             exit 1
         fi
-        mkdir localDB
-        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
+        cp -rsL "\$(readlink -f ${card_db}/localDB)" localDB
         # kmer_query exits 0 with no output when the k-mer database is not
         # loaded. Say so and skip it: the empty JSON keeps the declared output,
         # and the summary reports the sample's RGI hosts as 'no_kmer_data'
@@ -70,9 +72,9 @@ process RGI_KMER {
         fi
         
         # Run RGI kmer_query for pathogen-of-origin prediction, through
-        # bin/rgi_kmer_kma_fix.py: RGI 6.0.3 misreads KMA BAMs and waits
-        # forever on a worker that died (e.g. out of memory); the wrapper fixes
-        # both and stops the run after ${time_limit} s. Remove at the RGI re-pin.
+        # bin/rgi_kmer_kma_fix.py: RGI waits forever on a worker that died
+        # (e.g. out of memory); the wrapper fails the task instead and stops
+        # the run after ${time_limit} s. Remove it when RGI checks its workers.
         # Every worker is a fork of the process holding the k-mer database, so
         # memory grows with -n (task.cpus, set low in modules.config).
         rgi_kmer_kma_fix.py --time-limit ${time_limit} kmer_query \\
@@ -95,7 +97,7 @@ process RGI_KMER {
         # Create versions file
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | sed -n 's/.*rgi \\([0-9.]*\\).*/\\1/p' || echo "unknown")
+            rgi: \$(rgi main --version 2>/dev/null || echo "unknown")
         END_VERSIONS
         """
 
@@ -109,7 +111,7 @@ process RGI_KMER {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: 6.0.3
+            rgi: 6.0.8
         END_VERSIONS
         """
 }

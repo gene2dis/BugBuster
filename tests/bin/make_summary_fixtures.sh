@@ -18,7 +18,7 @@
 #                        the uncertain-species flag is exercised
 #   metadata.tsv         one subject, two visits
 #   rgi/sampleA_rgi_bwt.allele_mapping_data.txt
-#                        RGI 6.0.3 bwt allele table (real 24-column header):
+#                        RGI 6.0.x bwt allele table (real 24-column header):
 #                        KPC-2 on two reference sequences (100% and 60%
 #                        coverage, read counts summed), KPC-3 at 30% (below the
 #                        80% cutoff), TEM-1 at 95%, CTX-M-15 at 50% (K-MARVEL

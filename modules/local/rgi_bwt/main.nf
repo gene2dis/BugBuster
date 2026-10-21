@@ -1,5 +1,7 @@
 process RGI_BWT {
-    container 'quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/rgi:6.0.8--pyh05cac1d_0' :
+        'quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0' }"
     
     label 'process_medium'
     
@@ -45,24 +47,27 @@ process RGI_BWT {
 
         # RGI --local looks for localDB/ in the current directory. Symlink the
         # DB contents per file instead of copying the multi-GB CARD/WildCARD DB
-        # per task (audit #17): reads go through the symlinks, while any file
-        # RGI creates at runtime lands in this task's localDB/, not the shared
-        # published database.
+        # per task (audit #17): cp -rsL makes real directories (following
+        # symlinked ones, localDB itself included) and a symlink per file, so
+        # reads go through the symlinks, while any file RGI creates at runtime
+        # (an aligner index under localDB/bwt/) lands in this task's localDB/,
+        # not the shared published database. bin/rgi_bwt_kma_fix.py removes
+        # the symlinks of an incomplete index before RGI rebuilds it.
         if [ ! -d ${card_db}/localDB ]; then
             echo "ERROR: ${card_db} does not contain a localDB directory (expected an 'rgi load --local' database)" >&2
             exit 1
         fi
-        mkdir localDB
-        ln -s "\$(readlink -f ${card_db})/localDB"/* localDB/
+        cp -rsL "\$(readlink -f ${card_db}/localDB)" localDB
         
-        # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI 6.0.3 writes every
-        # read KMA reports, unplaced ones included (over 99% of a metagenome),
-        # to the SAM and then scans that read table once per reference with
-        # reads (hours on a deep sample, ~390 bytes per clean read on disk);
-        # the wrapper keeps the reads placed on a reference. Remove it at the
-        # RGI re-pin. --clean deletes the *.temp.* files when rgi finishes;
-        # the files RGI_KMER and RGI_REPORT read have no .temp in their names
-        # and are kept.
+        # Run RGI bwt through bin/rgi_bwt_kma_fix.py: RGI writes every read
+        # the aligner reports, unplaced ones included (over 99% of a
+        # metagenome), to the SAM and loads the read table into memory (~390
+        # bytes per clean read on disk, ~1 KB in memory); the wrapper keeps
+        # the reads placed on a reference (for KMA grouped by name, so samtools
+        # fixmate pairs every mate pair). Remove it when RGI filters the SAM
+        # itself. --clean deletes the *.temp.* files
+        # when rgi finishes; the files RGI_KMER and RGI_REPORT read have no
+        # .temp in their names and are kept.
         rgi_bwt_kma_fix.py bwt \\
             --read_one ${read_one} \\
             ${read_two ? "--read_two ${read_two}" : ""} \\
@@ -84,16 +89,26 @@ process RGI_BWT {
             rgi_bwt_lowcov_fallback.sh ${prefix}_rgi_bwt
         fi
 
-        # Create versions file
+        # Create versions file (rgi --version prints the usage; KMA has no
+        # --version and bwa none at all: bare bwa exits 1, hence || true
+        # under pipefail)
+        case ${aligner} in
+            kma)  aligner_version=\$(kma -v 2>&1 | sed -n 's/^KMA-//p' || true) ;;
+            bwa)  aligner_version=\$(bwa 2>&1 | sed -n 's/^Version: //p' || true) ;;
+            *)    aligner_version=\$(bowtie2 --version 2>/dev/null | sed -n '1s/.* version //p' || true) ;;
+        esac
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: \$(rgi --version 2>&1 | sed -n 's/.*rgi \\([0-9.]*\\).*/\\1/p' || echo "unknown")
-            ${aligner}: \$(${aligner} --version 2>&1 | head -1 || echo "unknown")
+            rgi: \$(rgi main --version 2>/dev/null || echo "unknown")
+            ${aligner}: \${aligner_version:-unknown}
         END_VERSIONS
         """
 
     stub:
         def prefix = "${meta.id}"
+        def aligner = params.rgi_aligner ?: 'kma'
+        // the aligner versions in the pinned image
+        def aligner_version = [kma: '1.6.11', bowtie2: '2.5.5', bwa: '0.7.19-r1273'][aligner] ?: 'unknown'
         """
         touch ${prefix}_rgi_bwt.allele_mapping_data.txt
         touch ${prefix}_rgi_bwt.gene_mapping_data.txt
@@ -103,8 +118,8 @@ process RGI_BWT {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            rgi: 6.0.3
-            kma: 1.4.14
+            rgi: 6.0.8
+            ${aligner}: ${aligner_version}
         END_VERSIONS
         """
 }

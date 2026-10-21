@@ -355,26 +355,31 @@ eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
 check whether issue #620 is fixed in the new version and update or remove
 `bin/emapper_ogs_fix.py` accordingly.
 
-### RGI_BWT fails: "KMA failed" or "not the 6.0.3 method"
+### RGI_BWT fails: "KMA failed", "bowtie2 failed" or "not the 6.0.8 method"
 
-`RGI_BWT` runs `rgi bwt` through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads KMA placed on a
-reference (RGI 6.0.3 kept every read, which made the task take hours and tens of GB of disk) and checks that
-KMA succeeded. Its messages:
+`RGI_BWT` runs `rgi bwt` through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads the aligner placed on
+a reference, for KMA grouped by read name (RGI keeps every read: tens of GB of disk per deep sample and the
+whole read table in memory), and checks that the aligner succeeded. Its messages:
 
 - **"KMA failed (exit status N)":** the alignment failed (status 2: a missing or incomplete KMA index in
   `localDB/`; 137: killed, usually out of memory, retried with more memory). RGI itself ignored this and
-  reported the sample as having no hits. KMA 1.4.9 can exit 95 after a successful run, so 95 is accepted
-  when KMA has written its result table.
-- **"the installed RGI BWT.<method> is not the 6.0.3 method this patch targets":** the RGI container was
+  reported the sample as having no hits. KMA 1.4.9 (RGI 6.0.3's image) could exit 95 after a successful
+  run, so 95 is still accepted when KMA has written its result table.
+- **"bowtie2 failed" / "bwa failed (exit status N)"** (`--rgi_aligner bowtie2|bwa`): the alignment
+  failed, usually a missing or incomplete index in the task's `localDB/`.
+- **"filtering the KMA SAM failed"** (or the bowtie2/bwa SAM): the filter, or for KMA the sort that groups
+  the reads by name, failed; awk exit status 137 means it was killed, usually out of memory, and the task is
+  retried with more memory.
+- **"the installed RGI BWT.<method> is not the 6.0.8 method this patch targets":** the RGI container was
   changed. Use the pinned image, or, when updating RGI, check whether the new version still writes every read
-  to the KMA SAM, then update or remove `bin/rgi_bwt_kma_fix.py`.
+  to the SAM, then update or remove `bin/rgi_bwt_kma_fix.py`.
 
-### RGI_KMER fails: "worker was killed", "did not finish within", or "not the 6.0.3 method"
+### RGI_KMER fails: "worker was killed", "did not finish within", or "not the 6.0.8 method"
 
 `RGI_KMER` runs `rgi kmer_query` through `bin/rgi_kmer_kma_fix.py`. That wrapper
-fixes two RGI 6.0.3 bugs that made the task hang forever: KMA BAMs (the default
-`--rgi_aligner kma`) were read from the wrong columns, and the run waited forever
-for a worker that had died. It also stops a run that takes too long. Its messages:
+fixes an RGI bug that made the task hang forever: the run waited for a worker
+that had died. (It also fixed RGI 6.0.3's reading of KMA BAMs, which RGI 6.0.8
+does correctly.) It also stops a run that takes too long. Its messages:
 
 - **"an rgi kmer_query worker was killed by signal 9 (out of memory?)" (exit 137):**
   a worker ran out of memory. Each worker is a copy of the process holding the
@@ -404,7 +409,7 @@ for a worker that had died. It also stops a run that takes too long. Its message
   }
   ```
 
-- **"the installed RGI CARDkmers.<method> is not the 6.0.3 method this patch
+- **"the installed RGI CARDkmers.<method> is not the 6.0.8 method this patch
   targets":** the RGI container was changed (a `process.container` override, or a
   pipeline update to a newer RGI). Use the pinned image, or, when updating RGI,
   check whether the new version still needs the fixes, then update or remove

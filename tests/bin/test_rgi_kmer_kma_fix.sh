@@ -1,15 +1,14 @@
 #!/bin/bash
 #
-# Regression tests for bin/rgi_kmer_kma_fix.py (RGI_KMER). RGI 6.0.3's
-# CARDkmers.get_bwt_sequences read KMA BAMs from the wrong SAM columns (RNAME
-# as the flag, QUAL as the sequence), so every kmer_query worker exited and
-# the parent hung. Runs inside the pinned RGI image (the patch imports RGI's
+# Regression tests for bin/rgi_kmer_kma_fix.py (RGI_KMER). RGI's
+# CARDkmers.execute_threads waits forever on a kmer_query worker that died
+# without a result. Runs inside the pinned RGI image (the patch imports RGI's
 # own module) and checks:
-#   - the version guard accepts the installed 6.0.3 method and refuses any
+#   - the version guard accepts the installed 6.0.8 method and refuses any
 #     other one;
-#   - on a BAM whose @PG is KMA, the unpatched method writes ARO names as
-#     flags (the bug) and the patched one writes numeric flags and the real
-#     read sequences;
+#   - RGI 6.0.8's own get_bwt_sequences reads a KMA BAM correctly (numeric
+#     flags, read sequences, every record), the RGI 6.0.3 bug the wrapper
+#     patched until the re-pin;
 #   - a worker that dies without a result (out-of-memory kill, or exit()
 #     without a result) makes the patched execute_threads exit with the
 #     worker's status, where the unpatched one waits forever;
@@ -21,7 +20,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
-RGI_IMG="quay.io/biocontainers/rgi:6.0.3--pyha8f3691_0"
+RGI_IMG="quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0"
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -51,9 +50,9 @@ in_rgi() {
 echo "=== rgi_kmer_kma_fix.py test suite ==="
 
 # Three reads aligned to a CARD-like reference, @PG written by KMA, as RGI_BWT
-# produces with --rgi_aligner kma. RGI's extraction loop (`while read line;
-# do awk ...; done`) consumes the first record before awk starts, so two of
-# the three records reach the FASTA; the patch keeps that upstream behaviour.
+# produces with --rgi_aligner kma. RGI 6.0.3 took the flag and sequence from
+# the wrong columns of such a BAM and its shell loop dropped the first record;
+# 6.0.8 reads it with pysam.
 REF='ARO:3003198|ID:41|Name:rmtH|NCBI:KC544262.1'
 SEQ1="$(printf 'ACGT%.0s' {1..10})"
 SEQ2="$(printf 'TTGCA%.0s' {1..8})"
@@ -62,7 +61,7 @@ QUAL="$(printf 'I%.0s' {1..40})"
 cat > "${TMP_DIR}/kma.sam" <<EOF
 @HD	VN:1.6	SO:coordinate
 @SQ	SN:${REF}	LN:1000
-@PG	ID:KMA	PN:kma	VN:1.4.9
+@PG	ID:KMA	PN:kma	VN:1.6.11
 read_1/1	65	${REF}	1	60	40M	*	0	0	${SEQ1}	${QUAL}
 read_2/1	65	${REF}	11	42	40M	*	0	0	${SEQ2}	${QUAL}
 read_3/2	129	${REF}	21	30	40M	*	0	0	${SEQ3}	${QUAL}
@@ -98,38 +97,34 @@ def extract(method, name):
         lines = fh.read().splitlines()
     return [l[1:].split('__') for l in lines[0::2]], lines[1::2]
 
-# Unpatched 6.0.3 method on a KMA BAM: the bug
-headers, seqs = extract(CARDkmers.get_bwt_sequences, 'orig.fasta')
-check('unpatched method writes the reference name as the flag on a KMA BAM',
-      len(headers) == 2 and all(not h[2].isdigit() for h in headers))
-
 # Guard: refuses a changed method, then patches the installed one
 class Changed(object):
-    def get_bwt_sequences(self):
-        return None
     def execute_threads(self):
         return None
 try:
     shim.patch(Changed)
     check('guard refuses a changed method', False)
 except SystemExit as e:
-    check('guard refuses a changed method', 'not the 6.0.3 method' in str(e))
+    check('guard refuses a changed method', 'not the 6.0.8 method' in str(e))
+original_extract = CARDkmers.get_bwt_sequences
 shim.patch(CARDkmers)
-check('guard accepts the installed RGI 6.0.3 method',
-      CARDkmers.get_bwt_sequences is shim.get_bwt_sequences
-      and CARDkmers.execute_threads is shim.execute_threads)
+check('guard accepts the installed RGI 6.0.8 method',
+      CARDkmers.execute_threads is shim.execute_threads
+      and CARDkmers.get_bwt_sequences is original_extract)
 
-headers, seqs = extract(CARDkmers.get_bwt_sequences, 'fixed.fasta')
-check('patched method: qname__rname__flag__mapq headers',
+# RGI 6.0.8's own BAM extraction on a KMA BAM (no patch any more)
+headers, seqs = extract(CARDkmers.get_bwt_sequences, 'stock.fasta')
+check('6.0.8 extraction: qname__rname__flag__mapq headers, every record',
       [h for h in headers] == [
+          ['read_1/1', 'ARO:3003198|ID:41|Name:rmtH|NCBI:KC544262.1', '65', '60'],
           ['read_2/1', 'ARO:3003198|ID:41|Name:rmtH|NCBI:KC544262.1', '65', '42'],
           ['read_3/2', 'ARO:3003198|ID:41|Name:rmtH|NCBI:KC544262.1', '129', '30']])
-check('patched method: read sequences, not qualities',
-      seqs == ['TTGCA' * 8, 'GGCAT' * 8])
+check('6.0.8 extraction: read sequences, not qualities',
+      seqs == ['ACGT' * 10, 'TTGCA' * 8, 'GGCAT' * 8])
 obj = object.__new__(CARDkmers)
 obj.input_bam_file = os.path.join(work, 'kma.bam')
-read, model, flag, mapq = obj.get_bwt_alignment_data('__'.join(headers[1]))
-check('RGI parses the patched header (mate 2 read name)', read == 'read_3/2/2' and flag == '129')
+read, model, flag, mapq = obj.get_bwt_alignment_data('__'.join(headers[2]))
+check('RGI parses the header (mate 2 read name)', read == 'read_3/2/2' and flag == '129')
 
 # Dead workers: run execute_threads in a child interpreter on fake workers
 # ('ok' sends its chunk back, 'kill' is SIGKILLed like an OOM kill, 'quiet'
@@ -164,7 +159,7 @@ proc = fan('patched', 'ok,kill,ok')
 check('killed worker: exit 137 (Nextflow retries it with more memory)',
       proc.returncode == 137 and 'killed by signal 9' in proc.stderr)
 proc = fan('patched', 'ok,quiet')
-# (Python 3.8 gives a bare exit() in a worker exit code 1, not 0)
+# (a bare exit() in a worker gives exit code 1, not 0)
 check('worker without a result: exit 1 with a message',
       proc.returncode == 1 and ('before sending its result' in proc.stderr
                                 or 'without a result' in proc.stderr))
@@ -211,7 +206,7 @@ while IFS= read -r line; do
     esac
 done < <(in_rgi python3 -B run_tests.py "${REPO_DIR}/bin/rgi_kmer_kma_fix.py" "${TMP_DIR}" 2>/dev/null || true)
 
-check "all 15 in-container checks reported" test $((PASS + FAIL)) -eq 15
+check "all 14 in-container checks reported" test $((PASS + FAIL)) -eq 14
 
 echo ""
 echo "=== ${PASS} passed, ${FAIL} failed ==="

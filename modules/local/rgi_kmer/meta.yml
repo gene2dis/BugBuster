@@ -1,5 +1,5 @@
 name: rgi_kmer
-description: Pathogen-of-origin prediction for the CARD-mapped reads of one sample with rgi kmer_query --bwt on the rgi bwt BAM (k-mer size --rgi_kmer_size, default 61; minimum k-mer coverage --rgi_min_kmer_coverage, default 10). Runs through bin/rgi_kmer_kma_fix.py, which patches RGI 6.0.3's KMA BAM parsing and its wait on dead workers, and stops the run after ext.time_limit (default 2 h)
+description: Pathogen-of-origin prediction for the CARD-mapped reads of one sample with rgi kmer_query --bwt on the rgi bwt BAM (k-mer size --rgi_kmer_size, default 61; minimum k-mer coverage --rgi_min_kmer_coverage, default 10). Runs through bin/rgi_kmer_kma_fix.py, which patches RGI's wait on dead workers (a killed worker fails the task with its exit status), and stops the run after ext.time_limit (default 2 h)
 keywords:
   - antimicrobial resistance
   - pathogen of origin
@@ -7,7 +7,7 @@ keywords:
   - card
 tools:
   - rgi:
-      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.3)
+      description: Resistance Gene Identifier, predicts resistomes from protein or nucleotide data, including metagenomic reads, against CARD (RGI 6.0.8)
       homepage: https://github.com/arpcard/rgi
       documentation: https://github.com/arpcard/rgi/blob/master/README.rst
       doi: "10.1093/nar/gkac920"

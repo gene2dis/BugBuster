@@ -113,7 +113,7 @@ Done:
 Still open:
 
 - **Fallback table headers (confirmed).** Zero-hit samples are reported with 0 genes, but the headers of
-  `bin/rgi_bwt_lowcov_fallback.sh` are those of `rgi main` (16 and 27 columns), not RGI 6.0.3's `rgi bwt` tables
+  `bin/rgi_bwt_lowcov_fallback.sh` are those of `rgi main` (16 and 27 columns), not RGI's `rgi bwt` tables
   (26 and 24). RGI_REPORT and the summary treat a table without hits as "no hits" whatever its header; anything else
   reading them would not.
 - **vanG is tier 1 and RGI finds it in 26 of 32 batch1 samples**, mostly from WildCARD sequences of Clostridia
