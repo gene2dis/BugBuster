@@ -9,7 +9,7 @@
 
 process BOWTIE2_DECONTAMINATE {
     tag "${meta.id}"
-    container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
+    container 'quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0'
 
     label 'process_high'
 
@@ -114,7 +114,7 @@ process BOWTIE2_DECONTAMINATE {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bowtie2: 2.5.3
+        bowtie2: 2.5.5
     END_VERSIONS
     """
 }

@@ -379,6 +379,19 @@ next release is tagged.
     process. Existing bwa-mem3 indexes work unchanged; clean reads and index
     files are byte-identical. The image is pinned for every container engine:
     its singularity build lacks `find`, `zcat` and `gzip`
+  - Bowtie2 2.5.3 → 2.5.5 (`quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0`)
+    for `BOWTIE2_DECONTAMINATE`, `BOWTIE2_BUILD_COMBINED` and `WOLTKA_ALIGN`,
+    and one Seqera Containers image with Bowtie2 2.5.5 and samtools 1.24
+    (`community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48`)
+    for `BOWTIE2_SAMTOOLS` (was Bowtie2 2.4.4 + samtools 1.16.1) and
+    `BOWTIE2_SAMTOOLS_DEPTH` (was Bowtie2 2.5.1 + samtools 1.17), with the
+    same parameters. Indexes are byte-identical, decontamination keeps the
+    same reads. The bioconda 2.5.5 build checks for an AVX2 binary it does not
+    ship, so it prints `Failed to launch x86-64-v3 version` on most CPUs and
+    runs the default binary, as 2.5.3 did (no speed change); `WOLTKA_ALIGN`
+    drops that line from its published log. The bowtie2+samtools image is
+    pinned for every container engine: its singularity build lacks `gzip`,
+    `zcat` and `find`
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)

@@ -22,9 +22,9 @@ process BOWTIE2_SAMTOOLS {
     tag "${meta.id}"
     label 'process_high'
     
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:a0ffedb52808e102887f6ce600d092675bf3528a-0' :
-        'quay.io/biocontainers/mulled-v2-ac74a7f02cebcfcc07d8e8d1d750af9c83b4d45a:a0ffedb52808e102887f6ce600d092675bf3528a-0' }"
+    // Seqera Containers bowtie2 2.5.5 + samtools 1.24, pinned for every engine:
+    // its singularity build has no gzip, zcat or find (CONTRIBUTING)
+    container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
 
     input:
     tuple val(meta), path(reads), path(contigs)
@@ -283,21 +283,21 @@ process BOWTIE2_SAMTOOLS {
     # Note: In real stub testing, you might want to use samtools to create a proper empty BAM
     echo -e "@HD\tVN:1.6\tSO:coordinate" > header.sam
     echo -e "@SQ\tSN:contig_1\tLN:1000" >> header.sam
-    echo -e "@PG\tID:bowtie2\tPN:bowtie2\tVN:2.5.1" >> header.sam
+    echo -e "@PG\tID:bowtie2\tPN:bowtie2\tVN:2.5.5" >> header.sam
     
     # Convert to BAM (creates minimal valid BAM file)
     samtools view -bS header.sam > ${prefix}_all_reads.bam 2>/dev/null || touch ${prefix}_all_reads.bam
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bowtie2: 2.5.1
-        samtools: 1.17
+        bowtie2: 2.5.5
+        samtools: 1.24
     END_VERSIONS
     """
 }
 
 process BOWTIE2_SAMTOOLS_DEPTH {
-    container 'quay.io/sangerpathogens/bowtie2-samtools:1.1-c1'
+    container 'community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48'
 
     tag "${meta.id}"
     label 'process_high'
@@ -371,8 +371,8 @@ process BOWTIE2_SAMTOOLS_DEPTH {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bowtie2: 2.5.1
-            samtools: 1.17
+            bowtie2: 2.5.5
+            samtools: 1.24
         END_VERSIONS
         """
 }
