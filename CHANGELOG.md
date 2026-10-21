@@ -378,7 +378,7 @@ next release is tagged.
   `quay.io/biocontainers/samtools:1.24--h9dcdb79_1`), `kraken2/kraken2` and
   `bracken/bracken` (same tool versions). All four now report their versions
   on the `versions` topic; `software_versions.yml` keeps its format
-  - fastp 1.4.0 output: on 10 M CDC read pairs the trimmed and clean reads
+  - fastp 1.4.0 output: on 10 M read pairs of a large sample the trimmed and clean reads
     were identical to 1.0.1. The fastp JSON gains an `adapter_dimer_reads`
     filter count: 5,496 of the 426,918 failed reads, which 1.0.1 counted as
     too short or low quality, so the failure reasons shift while the passed
