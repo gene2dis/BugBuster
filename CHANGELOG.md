@@ -395,6 +395,38 @@ next release is tagged.
   - The duplicate `--detect_adapter_for_pe` is gone from FASTP's `ext.args`
     (the module passes it for paired reads)
 
+- **RGI 6.0.3 → 6.0.8** (`quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0`, and
+  the depot.galaxyproject.org singularity build of the same tag) for
+  `RGI_BWT`, `RGI_KMER`, `RGI_LOAD` and `RGI_LOAD_WILDCARD`. Inside: KMA
+  1.6.11 (was 1.4.9), samtools 1.22.1 (was 1.9), DIAMOND 2.2.1 (was 0.8.36).
+  Existing `rgi load` databases (made with 6.0.3) work unchanged
+  - `rgi bwt` no longer rescans its read table once per reference with
+    reads: on 10 M read pairs `RGI_BWT` takes 12-15 min instead of 17 min
+    and reads 23-28 GB instead of 40-81 GB, and its memory is 4.3 GB (6.0.3:
+    13-18 GB, which the trace reported as ~57 GB). `RGI_KMER` takes ~4 min
+    instead of ~5.5
+  - Results change slightly because of KMA 1.6.11 (RGI 6.0.8 requires KMA
+    >= 1.4.17): reads land on nearly the same references, but KMA reports
+    more references with a consensus sequence, and `rgi bwt` reports only
+    those. On three samples at 10 M read pairs the raw gene tables list
+    53-61 % more genes (mostly under 10 reads) and 5-11 % more mapped reads;
+    the `00_summary` RGI genes (80 % coverage) were the same 124, with read
+    counts shifted for 59 of them. Results are not comparable read for read
+    with runs made with RGI 6.0.3
+  - `bin/rgi_bwt_kma_fix.py` now also groups the kept reads by name, because
+    6.0.8 runs `samtools fixmate`, which pairs only mates on adjacent lines
+    and KMA writes them in a thread-dependent order: the BAM is now the same
+    between runs, and the Mate Pair Linkage columns are filled in.
+    `bin/rgi_kmer_kma_fix.py` drops its KMA BAM fix (6.0.8 reads the BAM
+    correctly, including the first alignment, which the old fix skipped)
+  - `software_versions.yml` now records the RGI and KMA versions (both were
+    empty or wrong: `rgi --version` and `kma --version` print usage)
+  - `RGI_BWT` asks for 4 CPUs (was 8) and 8 GB times the attempt (was
+    36 GB): it used 190-290 % CPU at either size and took 4-11 % longer at 4
+    CPUs on 10 M read pairs, and its memory stays at ~4.3 GB from 1 M to 10 M
+    read pairs (0.4 GB without WildCARD). `RGI_KMER` keeps 2 CPUs and 36 GB
+    (20-22 GB measured; a few deep samples need the 72 GB retry)
+
 - **fastp writes its trimmed reads at gzip level 1** (`--compression 1`,
   was level 4): the file is not published and is read once by
   decontamination. Against level 4 with fastp 1.4.0: 8-10 % faster and 7-9 %
