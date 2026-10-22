@@ -18,7 +18,7 @@ tools:
       doi: "10.1186/s40168-018-0401-z"
       licence: ["MIT"]
   - amrfinderplus:
-      description: NCBI AMRFinderPlus; amrfinder_update refreshes the AMRFinderPlus database bundled in the Bakta database (bakta 1.12.1 image)
+      description: NCBI AMRFinderPlus; amrfinder_update refreshes the AMRFinderPlus database bundled in the Bakta database (bakta 1.12.2 image)
       homepage: https://github.com/ncbi/amr/wiki
       documentation: https://github.com/ncbi/amr/wiki
       doi: "10.1038/s41598-021-91456-0"

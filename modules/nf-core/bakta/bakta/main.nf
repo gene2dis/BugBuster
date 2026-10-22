@@ -58,7 +58,7 @@ process BAKTA_BAKTA {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bakta: \$(bakta --version 2>&1 | sed 's/.*bakta //')
+        bakta: \$(bakta --version 2>/dev/null | sed -n 's/^bakta //p')
         bakta_db: \$(cat ${db}/DB_VERSION 2>/dev/null || echo custom)
     END_VERSIONS
     """
@@ -87,7 +87,7 @@ process BAKTA_BAKTA {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bakta: \$(bakta --version 2>&1 | sed 's/.*bakta //')
+        bakta: \$(bakta --version 2>/dev/null | sed -n 's/^bakta //p')
         bakta_db: stub
     END_VERSIONS
     """

@@ -436,7 +436,9 @@ next release is tagged.
     for `BAKTA_BAKTA` (the pipeline's override of the nf-core module) and
     `FORMAT_BAKTA_DB`; same AMRFinderPlus (4.2.7), so existing databases keep
     working. On one real bin every annotation is identical; only the version
-    and date in the headers change
+    and date in the headers change. `BAKTA_BAKTA` now reads the version from
+    `bakta --version`'s standard output only: 1.12.2 prints a Python
+    `SyntaxWarning` on standard error, which ended up in `versions.yml`
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)

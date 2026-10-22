@@ -12,7 +12,7 @@
     stub contract (CI runs -stub): every declared output for one fanned-out
     bin element, the config-side ext.prefix scheme (<sample>_<bin>.*, which
     keeps files of different bins apart inside mags/<sample>/), and the
-    versions.yml capture — 'bakta: 1.12.1' also pins the modules.config
+    versions.yml capture — 'bakta: 1.12.2' also pins the modules.config
     container override (the module's own wave image ships 1.12.0).
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -58,7 +58,7 @@ nextflow_process {
             assert process.out.hypotheticals_tsv.size() == 1
             assert process.out.hypotheticals_faa.size() == 1
             def versions = path(process.out.versions.get(0)).text
-            assert versions.contains('bakta: 1.12.1')
+            assert versions.contains('bakta: 1.12.2')
             assert versions.contains('bakta_db: stub')
         }
     }
