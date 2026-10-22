@@ -43,13 +43,14 @@ import multiprocessing
 from microbe_census import microbe_census as mc
 
 # sha256 of the installed v1.1.1 source (inspect.getsource for functions,
-# the file for the CLI) in microbecensus:1.1.1--pyhca03a8a_2
+# the file without its shebang line for the CLI) in
+# microbecensus:1.1.1--pyhca03a8a_2
 V111_SHA256 = {
     'check_rapsearch': 'b7aa269483cc01d3ba1086084678dfd6ecf28d0222a3c2a91e2ed214b6e2b18c',
     'count_bases': '7960d0e88054abe10460de62339692eae84c698f7764db42f47f386cb4cb5544',
     'read_seqfile': 'd5877c51c219be62bc88d5796cbab8adf8933360ff375dc521dfc776103173b0',
     'open_file': '9f72f1386e8c78cb1ea7bec4cd36c3245b2504485ffcf0445c6bffaea3975c3b',
-    'cli': '3a98134604c4a848f732639379c0913f34a5df182bc5704c86f08dd83366d688',
+    'cli': 'c76becdae164f6639e9184bef39d348a5978687b6ff488b514310e9b83827343',
 }
 
 CHUNK = 8 * 1024 * 1024
@@ -148,13 +149,22 @@ def count_bases(args):
                    for i, path in enumerate(files[start:start + width], start)]
         for worker in workers:
             worker.start()
+        # Join first: a worker killed before reporting (OOM killer) would
+        # otherwise leave results.get() waiting forever. Each result is a
+        # few bytes, so the queue's pipe never fills and blocks a worker.
+        for worker in workers:
+            worker.join()
+        died = [path for worker, path in zip(workers, files[start:start + width])
+                if worker.exitcode != 0]
+        if died:
+            sys.exit('count_bases: worker died (%s) on %s'
+                     % (', '.join(str(w.exitcode) for w in workers if w.exitcode != 0),
+                        ', '.join(died)))
         for _ in workers:
             _index, bases, error = results.get()
             if error is not None:
                 sys.exit('count_bases failed on %s' % error)
             total += bases
-        for worker in workers:
-            worker.join()
     return total
 
 
@@ -163,6 +173,9 @@ def check_version(cli):
                for name in ('check_rapsearch', 'count_bases', 'read_seqfile', 'open_file')}
     with open(cli) as handle:
         sources['cli'] = handle.read()
+    # The install rewrites the shebang line (conda prefix): leave it out
+    if sources['cli'].startswith('#!'):
+        sources['cli'] = sources['cli'].split('\n', 1)[1]
     changed = [name for name, text in sources.items()
                if hashlib.sha256(text.encode()).hexdigest() != V111_SHA256[name]]
     if changed:

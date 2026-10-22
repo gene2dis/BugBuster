@@ -8,8 +8,9 @@
 #     quality line starting with '@', an empty file) through its fast path;
 #   - files the fast path must not read (CR line ends, FASTA, wrapped or
 #     short-quality FASTQ, leading junk) fall back to the stock count;
-#   - several files at once (the forked workers) sum to the stock total;
-#   - the guard refuses a changed function.
+#   - several files at once (the forked workers) sum to the stock total, and
+#     a worker killed before reporting stops the count instead of hanging;
+#   - the guard ignores the CLI shebang line and refuses a changed function.
 #
 # Requirements: docker.
 #
@@ -37,6 +38,8 @@ printf 'junk\n@r1\nACGT\n+\nIIII\n' > leading_junk.fastq
 
 cat > check.py <<'EOF'
 import importlib.util
+import os
+import signal
 import shutil
 import sys
 
@@ -71,6 +74,27 @@ files = ['plain.fastq.gz', 'crlf.fastq', 'seqs.fasta', 'no_last_newline.fastq']
 for threads in (1, 2, 8):
     ok, new, old = same(files, threads)
     check(f'four files, {threads} worker(s): {new} = stock {old}', ok)
+
+fast = wrapper.fastq_bases
+def killed(path):
+    if path == 'plain.fastq':
+        os.kill(os.getpid(), signal.SIGKILL)
+    return fast(path)
+wrapper.fastq_bases = killed
+try:
+    wrapper.count_bases({'verbose': False, 'seqfiles': ['plain.fastq.gz', 'plain.fastq'], 'threads': 2})
+    check('a killed worker stops the count', False)
+except SystemExit as stop:
+    check('a killed worker stops the count', 'plain.fastq' in str(stop))
+wrapper.fastq_bases = fast
+
+cli = shutil.which('run_microbe_census.py')
+with open(cli) as handle:
+    text = handle.read()
+with open('cli_other_prefix.py', 'w') as handle:
+    handle.write('#!/opt/conda/envs/mc/bin/python\n' + text.split('\n', 1)[1])
+wrapper.check_version('cli_other_prefix.py')
+check('version guard ignores the shebang line', True)
 
 mc = wrapper.mc
 original = mc.read_seqfile
