@@ -7,7 +7,7 @@
 # bowtie2 2.5.5 on 2 M read pairs of a real metagenome, where the counts
 # matched `zcat | wc -l` of the written files, plus samtools on a
 # constructed SAM with two orphan unmapped mates (6 processed, 2 singletons,
-# 4 reads written to -1/-2).
+# 4 reads written to -1/-2), and bowtie2's whole summary for an empty input.
 #
 # Requirements: bash only.
 #
@@ -91,11 +91,21 @@ EOF
 
 : > "${TMP_DIR}/empty.log"
 
+# bowtie2 2.5.5 on an empty FASTQ (-U or -1/-2): no per-category lines
+cat > "${TMP_DIR}/bowtie2_no_reads.log" <<'EOF'
+[WARNING] Failed to launch x86-64-v3 version, staying with default
+[WARNING] Failed to launch x86-64-v3 version, staying with default
+0 reads
+0.00% overall alignment rate
+EOF
+
 expect "samtools fastq, paired"               samtools_paired.log  samtools          3756998
 expect "samtools fastq, orphan mates removed" samtools_orphans.log samtools          4
 expect "samtools fastq, single-end"           samtools_single.log  samtools          298003
 expect "bowtie2 --un-conc, 2 x pairs"         bowtie2_paired.log   bowtie2-paired    3695082
 expect "bowtie2 --un"                         bowtie2_unpaired.log bowtie2-unpaired  288005
+expect "bowtie2 --un-conc, empty input"       bowtie2_no_reads.log bowtie2-paired    0
+expect "bowtie2 --un, empty input"            bowtie2_no_reads.log bowtie2-unpaired  0
 # The paired summary's mate lines ("aligned 0 times") must not be taken
 # for unpaired input, nor a missing line for zero
 expect_error "samtools mode on a bowtie2 log"     bowtie2_paired.log   samtools

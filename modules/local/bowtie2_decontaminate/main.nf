@@ -54,7 +54,8 @@ process BOWTIE2_DECONTAMINATE {
         -1 ${r1} \\
         -2 ${r2} \\
         --un-conc-gz ${prefix}_clean_tmp.%.fastq.gz > ${prefix}_bowtie_mapped_${db_alias} \\
-        2> ${prefix}_bowtie2_paired.log
+        2> ${prefix}_bowtie2_paired.log \\
+        || { rc=\$?; cat ${prefix}_bowtie2_paired.log >&2; exit \$rc; }
     cat ${prefix}_bowtie2_paired.log >&2
 
     # Rename output files. bowtie2 puts the mate number at the '%'; without
@@ -75,7 +76,8 @@ process BOWTIE2_DECONTAMINATE {
         -p ${task.cpus} \\
         -U ${singleton} \\
         --un-gz ${prefix}_singleton_clean > ${prefix}_bowtie_singleton_mapped_${db_alias} \\
-        2> ${prefix}_bowtie2_singleton.log
+        2> ${prefix}_bowtie2_singleton.log \\
+        || { rc=\$?; cat ${prefix}_bowtie2_singleton.log >&2; exit \$rc; }
     cat ${prefix}_bowtie2_singleton.log >&2
 
     mv ${prefix}_singleton_clean ${prefix}_Singleton_clean.fastq.gz

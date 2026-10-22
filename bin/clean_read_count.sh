@@ -15,6 +15,9 @@
 #                     concordantly 0 times", times two (reads in R1 + R2)
 #   bowtie2-unpaired  bowtie2 -U --un: the reads that "aligned 0 times"
 #
+# On empty input bowtie2 prints only "0 reads" and the overall rate, with
+# no per-category lines: that counts as 0 clean reads.
+#
 # Exits 1 when the expected line is missing, so a changed message format
 # stops the task instead of reporting a wrong count.
 #
@@ -32,6 +35,11 @@ first_match() {
     sed -nE "s/$1/\\1/p" "${log}" | head -n 1
 }
 
+# bowtie2's whole summary for empty input
+no_reads() {
+    grep -qx '0 reads' "${log}"
+}
+
 case "${mode}" in
     samtools)
         processed=$(first_match '^\[M::bam2fq_mainloop\] processed ([0-9]+) reads$')
@@ -44,6 +52,9 @@ case "${mode}" in
         ;;
     bowtie2-paired)
         pairs=$(first_match '^ *([0-9]+) \([0-9.]+%\) aligned concordantly 0 times$')
+        if [ -z "${pairs}" ] && no_reads; then
+            pairs=0
+        fi
         if [ -z "${pairs}" ]; then
             echo "ERROR: no bowtie2 'aligned concordantly 0 times' line in ${log}" >&2
             exit 1
@@ -52,6 +63,9 @@ case "${mode}" in
         ;;
     bowtie2-unpaired)
         reads=$(first_match '^ *([0-9]+) \([0-9.]+%\) aligned 0 times$')
+        if [ -z "${reads}" ] && no_reads; then
+            reads=0
+        fi
         if [ -z "${reads}" ]; then
             echo "ERROR: no bowtie2 'aligned 0 times' line in ${log}" >&2
             exit 1

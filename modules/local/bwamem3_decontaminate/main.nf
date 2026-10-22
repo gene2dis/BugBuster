@@ -85,7 +85,8 @@ process BWAMEM3_DECONTAMINATE {
             -0 /dev/null \\
             -s /dev/null \\
             - \\
-            2> ${prefix}_fastq_paired.log
+            2> ${prefix}_fastq_paired.log \\
+        || { rc=\$?; cat ${prefix}_fastq_paired.log >&2; exit \$rc; }
     cat ${prefix}_fastq_paired.log >&2
 
     # Clean reads = records that passed -f 12 -F 0x900 ("processed N reads")
@@ -109,7 +110,8 @@ process BWAMEM3_DECONTAMINATE {
             -F 0x900 \\
             -0 ${prefix}_Singleton_clean.fastq.gz \\
             - \\
-            2> ${prefix}_fastq_singleton.log
+            2> ${prefix}_fastq_singleton.log \\
+        || { rc=\$?; cat ${prefix}_fastq_singleton.log >&2; exit \$rc; }
     cat ${prefix}_fastq_singleton.log >&2
 
     Singleton_count=\$(clean_read_count.sh ${prefix}_fastq_singleton.log samtools)
