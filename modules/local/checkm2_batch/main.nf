@@ -103,6 +103,10 @@ process CHECKM2_BATCH {
             --output-directory checkm2_output \\
             --database_path ${checkm_db} \\
             -x .fa
+        if [ ! -s checkm2_output/quality_report.tsv ]; then
+            echo "ERROR: checkm2 predict wrote no checkm2_output/quality_report.tsv for \$total_bins bins" >&2
+            exit 1
+        fi
     else
         echo "WARNING: No genome bins found across all samples. Creating empty reports."
     fi

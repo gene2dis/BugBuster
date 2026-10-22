@@ -402,7 +402,10 @@ next release is tagged.
   pooled across the run's samples), and 6 of the 228 rows changed by at
   most 0.11 completeness and 0.02 contamination points; no bin changed
   MIMAG quality class, and every other column is unchanged. Report rows are
-  now sorted by bin name
+  now sorted by bin name. Bins are linked into the run instead of copied,
+  and `.fasta`/`.fna` bins are now assessed too (before, they were
+  collected but skipped by `-x .fa`). A missing CheckM2 report now stops
+  the task with a message instead of a Python traceback
 
 - **Tool updates with unchanged outputs**
   - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
