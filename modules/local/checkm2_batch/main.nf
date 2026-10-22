@@ -45,7 +45,7 @@ process CHECKM2_BATCH {
     set -euo pipefail
 
     # Every bin of every sample and binner goes into one directory as
-    # <sample>__<binner>__<bin file>, so one checkm2 run (one DIAMOND search,
+    # <sample>__<binner>__<bin>.fa, so one checkm2 run (one DIAMOND search,
     # one model load) covers them all. bin_map.tsv maps each CheckM2 name
     # (the file name without .fa) back to its sample, binner and bin name.
     mkdir -p all_bins
@@ -76,15 +76,14 @@ process CHECKM2_BATCH {
             *) continue ;;
         esac
 
-        bin_count=\$(find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) 2>/dev/null | wc -l)
-        if [ "\$bin_count" -gt 0 ]; then
-            echo "Found \$bin_count bins for \${sample_id} \${binner}"
-            find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
-                bin_name=\$(basename "\$bin_file")
-                cp "\$bin_file" "all_bins/\${sample_id}__\${binner}__\${bin_name}"
-                printf '%s\\t%s\\t%s\\t%s\\n' "\${sample_id}__\${binner}__\${bin_name%.fa}" "\$sample_id" "\$binner" "\${bin_name%.fa}" >> bin_map.tsv
-            done
-        fi
+        # Linked, not copied, and named .fa whatever the extension, since
+        # checkm2 runs with -x .fa
+        find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
+            bin_name=\$(basename "\$bin_file")
+            bin_name=\${bin_name%.*}
+            ln -s "../\$bin_file" "all_bins/\${sample_id}__\${binner}__\${bin_name}.fa"
+            printf '%s\\t%s\\t%s\\t%s\\n' "\${sample_id}__\${binner}__\${bin_name}" "\$sample_id" "\$binner" "\$bin_name" >> bin_map.tsv
+        done
     done
 
     # The binner list is derived from the staged directories instead of a fixed
