@@ -59,8 +59,8 @@ nextflow_process {
             assert process.out.empty_contig_report.size() == 0
 
             def versions = path(process.out.versions.get(0)).text
-            assert versions.contains("bwamem3: 0.14.0")
-            assert versions.contains("samtools: 1.22.1")
+            assert versions.contains("bwamem3: 0.15.0")
+            assert versions.contains("samtools: 1.24")
         }
     }
 

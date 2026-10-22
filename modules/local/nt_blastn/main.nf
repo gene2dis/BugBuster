@@ -1,5 +1,5 @@
 process NT_BLASTN {
-    container 'quay.io/biocontainers/blast:2.15.0--pl5321h6f7f691_1'
+    container 'quay.io/biocontainers/blast:2.17.0--h66d330f_0'
 
     // Full-nt megablast: memory-hungry (label scales memory/time by attempt
     // under the global retry-on-OOM errorStrategy)
@@ -56,7 +56,7 @@ process NT_BLASTN {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            blastn: 2.15.0
+            blastn: 2.17.0
         END_VERSIONS
         """
 }

@@ -8,7 +8,7 @@
 
 process BOWTIE2_BUILD_COMBINED {
     tag "${index_name}"
-    container 'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0'
+    container 'quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0'
 
     label 'process_medium'
 
@@ -67,7 +67,7 @@ process BOWTIE2_BUILD_COMBINED {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bowtie2: 2.5.3
+        bowtie2: 2.5.5
     END_VERSIONS
     """
 }

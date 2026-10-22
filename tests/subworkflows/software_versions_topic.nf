@@ -13,7 +13,7 @@ include { SOFTWARE_VERSIONS } from '../../subworkflows/local/software_versions'
 process TOPIC_VERSIONS_EMITTER {
     tag "${id}"
     label 'process_single'
-    container 'ubuntu:22.04'
+    container 'ubuntu:24.04'
 
     input:
     val id

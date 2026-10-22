@@ -141,6 +141,14 @@ jobs:
         run: |
           tests/bin/test_read_role.sh
 
+      - name: Run decontamination read-count tests
+        run: |
+          tests/bin/test_clean_read_count.sh
+
+      - name: Run MicrobeCensus base-count patch tests
+        run: |
+          tests/bin/test_microbe_census_count.sh
+
       - name: Run MEGAHIT memory wrapper tests
         run: |
           tests/bin/test_megahit_run.sh

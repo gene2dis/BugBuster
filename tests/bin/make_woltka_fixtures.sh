@@ -14,7 +14,7 @@
 set -euo pipefail
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-BOWTIE2_IMG="quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0"
+BOWTIE2_IMG="quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0"
 
 python3 "${REPO}/tests/bin/make_woltka_fixtures.py"
 

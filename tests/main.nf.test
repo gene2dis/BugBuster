@@ -1426,7 +1426,7 @@ nextflow_pipeline {
 
             // Provenance: the pinned container version reaches the aggregate
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
-            assert vtext.contains("bakta: 1.12.1")
+            assert vtext.contains("bakta: 1.12.2")
         }
     }
 

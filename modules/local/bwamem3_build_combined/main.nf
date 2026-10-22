@@ -17,7 +17,7 @@
 
 process BWAMEM3_BUILD_COMBINED {
     tag "${index_name}"
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     label 'process_medium'
 
@@ -80,7 +80,7 @@ process BWAMEM3_BUILD_COMBINED {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bwamem3: 0.14.0
+        bwamem3: 0.15.0
     END_VERSIONS
     """
 }

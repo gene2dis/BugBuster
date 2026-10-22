@@ -268,8 +268,8 @@ process FORMAT_BAKTA_DB {
     // binary that will consume it. wget/tar/xz verified present in the image
     // (busybox tar; -xJf --strip-components extraction verified live).
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/bakta:1.12.1--pyhdfd78af_0' :
-        'quay.io/biocontainers/bakta:1.12.1--pyhdfd78af_0' }"
+        'https://depot.galaxyproject.org/singularity/bakta:1.12.2--pyhdfd78af_0' :
+        'quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0' }"
 
     label 'process_download_extensive'
 

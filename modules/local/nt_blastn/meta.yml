@@ -7,7 +7,7 @@ keywords:
   - nt
 tools:
   - blast:
-      description: BLAST+ command-line suite; blastn -task megablast is used (2.15.0)
+      description: BLAST+ command-line suite; blastn -task megablast is used (2.17.0)
       homepage: https://blast.ncbi.nlm.nih.gov/Blast.cgi
       documentation: https://www.ncbi.nlm.nih.gov/books/NBK279690/
       doi: "10.1186/1471-2105-10-421"

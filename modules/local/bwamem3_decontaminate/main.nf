@@ -25,7 +25,7 @@
 
 process BWAMEM3_DECONTAMINATE {
     tag "${meta.id}"
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:65dfdfc4140db421'
+    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
 
     label 'process_high'
 
@@ -84,12 +84,15 @@ process BWAMEM3_DECONTAMINATE {
             -2 ${prefix}_R2_clean.fastq.gz \\
             -0 /dev/null \\
             -s /dev/null \\
-            -
+            - \\
+            2> ${prefix}_fastq_paired.log \\
+        || { rc=\$?; cat ${prefix}_fastq_paired.log >&2; exit \$rc; }
+    cat ${prefix}_fastq_paired.log >&2
 
-    # Count clean reads
-    R1_lines=\$(zcat ${prefix}_R1_clean.fastq.gz | wc -l)
-    R1_count=\$(( R1_lines / 4 ))
-    final_reads=\$(( R1_count * 2 ))
+    # Clean reads = records that passed -f 12 -F 0x900 ("processed N reads")
+    # minus those without their mate ("discarded N singletons", sent to -s),
+    # i.e. the reads written to R1 + R2; no second pass over the output
+    final_reads=\$(clean_read_count.sh ${prefix}_fastq_paired.log samtools)
 
     # Process singleton reads if present
     ${singleton ? """
@@ -106,10 +109,12 @@ process BWAMEM3_DECONTAMINATE {
             -f 4 \\
             -F 0x900 \\
             -0 ${prefix}_Singleton_clean.fastq.gz \\
-            -
+            - \\
+            2> ${prefix}_fastq_singleton.log \\
+        || { rc=\$?; cat ${prefix}_fastq_singleton.log >&2; exit \$rc; }
+    cat ${prefix}_fastq_singleton.log >&2
 
-    Singleton_lines=\$(zcat ${prefix}_Singleton_clean.fastq.gz | wc -l)
-    Singleton_count=\$(( Singleton_lines / 4 ))
+    Singleton_count=\$(clean_read_count.sh ${prefix}_fastq_singleton.log samtools)
     echo -e \"Id\\tClean reads (${db_alias} removed)\\tClean singletons (${db_alias} removed)\" > ${prefix}_${db_alias}_decontamination_report.tsv
     echo -e \"${prefix}\\t\${final_reads}\\t\${Singleton_count}\" >> ${prefix}_${db_alias}_decontamination_report.tsv
     """ : """
@@ -142,8 +147,8 @@ process BWAMEM3_DECONTAMINATE {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bwamem3: 0.14.0
-        samtools: 1.22.1
+        bwamem3: 0.15.0
+        samtools: 1.24
     END_VERSIONS
     """
 }

@@ -559,7 +559,7 @@ once (~300 MB from NCBI; adds a new dated subdirectory and repoints the
 ```bash
 docker run --rm -u $(id -u):$(id -g) \
     -v /path/to/bakta_db/amrfinderplus-db:/amrdb \
-    quay.io/biocontainers/bakta:1.12.1--pyhdfd78af_0 \
+    quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0 \
     amrfinder_update --force_update --database /amrdb
 ```
 Then re-run with `-resume` (the Bakta tasks re-run because their database

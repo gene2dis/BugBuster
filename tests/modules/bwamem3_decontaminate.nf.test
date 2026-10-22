@@ -81,8 +81,8 @@ nextflow_process {
             assert report[1] == "singleton_test\t12\t4"
 
             def versions = path(process.out.versions.get(0)).text
-            assert versions.contains("bwamem3: 0.14.0")
-            assert versions.contains("samtools: 1.22.1")
+            assert versions.contains("bwamem3: 0.15.0")
+            assert versions.contains("samtools: 1.24")
         }
     }
 

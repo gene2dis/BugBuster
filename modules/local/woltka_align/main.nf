@@ -38,8 +38,8 @@ process WOLTKA_ALIGN {
     label 'process_high_memory'
 
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
-        'https://depot.galaxyproject.org/singularity/bowtie2:2.5.3--py310ha0a81b8_0' :
-        'quay.io/biocontainers/bowtie2:2.5.3--py310ha0a81b8_0' }"
+        'https://depot.galaxyproject.org/singularity/bowtie2:2.5.5--ha27dd3b_0' :
+        'quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0' }"
 
     input:
     tuple val(meta), path(reads), path(wol_db)
@@ -79,6 +79,11 @@ process WOLTKA_ALIGN {
         | sed 's/\$/\\t*\\t*/' \\
         | gzip > ${prefix}.wol.sam.gz
 
+    # The bioconda bowtie2 2.5.5 build tries an x86-64-v3 binary it does not
+    # ship and warns once per run on AVX2 hosts, then aligns with the default
+    # binary as 2.5.3 did; keep that line out of the published log
+    sed -i '/^\\[WARNING\\] Failed to launch x86-64-v3 version, staying with default\$/d' ${prefix}.bowtie2.log
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         bowtie2: \$(bowtie2 --version 2>&1 | sed -n 's/.*bowtie2-align-s version //p' | head -1)
@@ -93,7 +98,7 @@ process WOLTKA_ALIGN {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bowtie2: 2.5.3
+        bowtie2: 2.5.5
     END_VERSIONS
     """
 }

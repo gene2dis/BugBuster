@@ -372,6 +372,80 @@ next release is tagged.
 
 ### Changed
 
+- **Less I/O in three read-level steps, same outputs**
+  - `BWAMEM3_DECONTAMINATE` and `BOWTIE2_DECONTAMINATE` take the clean read
+    count from the aligner's own summary (samtools fastq's processed and
+    singleton counts; bowtie2's "aligned concordantly 0 times") instead of
+    decompressing the written reads again (`bin/clean_read_count.sh`, which
+    stops the task if the summary line is missing)
+  - `ARGS_OAP` links the reads into its input folder instead of copying
+    them (a full extra copy of each sample's reads per task)
+  - `MICROBECENSUS` counts the bases of its input files in parallel (one
+    process per file, reading plain FASTQ in large blocks) instead of
+    MicrobeCensus' single-threaded parser, which took about as long as the
+    genome-size estimate at full depth; `total_bases` and the genome
+    equivalents are unchanged (files that are not plain 4-line FASTQ are
+    counted by the stock code). `bin/run_microbe_census_py3fix.py` now also
+    stops when the installed MicrobeCensus is not the v1.1.1 code it patches.
+    It now asks for 4 CPUs (was 2): its RAPsearch step took 40 min at 2
+    threads, 21 at 4 and 14 at 8 on the 2 M sampled reads, so a full-depth
+    sample should take ~30 min instead of ~50
+
+- **One CheckM2 run for all binners** (`CHECKM2_BATCH`): every bin of every
+  sample and binner goes into a single `checkm2 predict` (renamed
+  `<sample>__<binner>__<bin>`), which is then split into the same
+  per-sample, per-binner reports as before. On four test assemblies (228
+  bins) the step took 31 min instead of 47 (one DIAMOND search and model
+  load instead of one per binner), with peak memory 19 GB instead of 14.
+  Values move slightly: CheckM2's numbers depend on which genomes are
+  searched together (already the case before, when a binner's bins were
+  pooled across the run's samples), and 6 of the 228 rows changed by at
+  most 0.11 completeness and 0.02 contamination points; no bin changed
+  MIMAG quality class, and every other column is unchanged. Report rows are
+  now sorted by bin name. Bins are linked into the run instead of copied,
+  and `.fasta`/`.fna` bins are now assessed too (before, they were
+  collected but skipped by `-x .fa`). A missing CheckM2 report now stops
+  the task with a message instead of a Python traceback
+
+- **Tool updates with unchanged outputs**
+  - bwa-mem3 0.14.0 → 0.15.0 and samtools 1.22.1 → 1.24
+    (`community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3`,
+    built by Seqera Containers like the previous image) for every bwa-mem3
+    process. Existing bwa-mem3 indexes work unchanged; clean reads and index
+    files are byte-identical. The image is pinned for every container engine:
+    its singularity build lacks `find`, `zcat` and `gzip`
+  - Bowtie2 2.5.3 → 2.5.5 (`quay.io/biocontainers/bowtie2:2.5.5--ha27dd3b_0`)
+    for `BOWTIE2_DECONTAMINATE`, `BOWTIE2_BUILD_COMBINED` and `WOLTKA_ALIGN`,
+    and one Seqera Containers image with Bowtie2 2.5.5 and samtools 1.24
+    (`community.wave.seqera.io/library/bowtie2_samtools:6243cc3671a7ee48`)
+    for `BOWTIE2_SAMTOOLS` (was Bowtie2 2.4.4 + samtools 1.16.1) and
+    `BOWTIE2_SAMTOOLS_DEPTH` (was Bowtie2 2.5.1 + samtools 1.17), with the
+    same parameters. Indexes are byte-identical, decontamination keeps the
+    same reads. The bioconda 2.5.5 build checks for an AVX2 binary it does not
+    ship, so it prints `Failed to launch x86-64-v3 version` on most CPUs and
+    runs the default binary, as 2.5.3 did (no speed change); `WOLTKA_ALIGN`
+    drops that line from its published log. The bowtie2+samtools image is
+    pinned for every container engine: its singularity build lacks `gzip`,
+    `zcat` and `find`
+  - BBMap 39.06 → 40.05 (`BBMAP`, biocontainer and its depot singularity
+    build): filtered contigs are byte-identical. The published
+    `<sample>_contig.stats` keeps every number but labels sizes as `Mb` and
+    `Kbp` where 39.06 wrote `MB` and `KB` (BBMap 40's `stats.sh`); nothing in
+    the pipeline parses that file
+  - BLAST+ 2.15.0 → 2.17.0 (`quay.io/biocontainers/blast:2.17.0--h66d330f_0`)
+    for `NT_BLASTN`: on one assembly against the full nt database the hits
+    are byte-identical
+  - Bakta 1.12.1 → 1.12.2 (`quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0`)
+    for `BAKTA_BAKTA` (the pipeline's override of the nf-core module) and
+    `FORMAT_BAKTA_DB`; same AMRFinderPlus (4.2.7), so existing databases keep
+    working. On one real bin every annotation is identical; only the version
+    and date in the headers change. `BAKTA_BAKTA` now reads the version from
+    `bakta --version`'s standard output only: 1.12.2 prints a Python
+    `SyntaxWarning` on standard error, which ended up in `versions.yml`
+  - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
+    `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
+    now shows bash 5.2.21 and gzip 1.12)
+
 - **nf-core modules updated (issue #35)**: `fastp` 1.0.1 → 1.4.0
   (`community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11`),
   `samtools/index` 1.22.1 → 1.24 (the pipeline's override,
@@ -459,7 +533,7 @@ next release is tagged.
   of the old request. Still doubled on retry and capped by `--max_memory`
 
 - **CPU requests sized to measured use** (`config/modules.config`):
-  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2, `WOLTKA_CLASSIFY` 8 → 2,
+  `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2 (4 since the parallel base count, above), `WOLTKA_CLASSIFY` 8 → 2,
   `TAXONOMY_PHYLOSEQ` 4 → 2 (each used well under its request in real runs),
   and `CHECKM2_BATCH` 8 → 16 (one task over every bin at the end of a binning
   run, 585-673 % CPU of 8). Outputs are unchanged; more tasks fit at once
