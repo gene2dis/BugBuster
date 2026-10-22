@@ -107,7 +107,7 @@ process BOWTIE2_SAMTOOLS {
             
             # Generate versions file
             printf '"${task.process}":\\n' > versions.yml
-            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>/dev/null | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
             printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
@@ -169,7 +169,7 @@ process BOWTIE2_SAMTOOLS {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bowtie2: \$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')
+            bowtie2: \$(bowtie2 --version 2>/dev/null | head -n 1 | sed 's/.*version //; s/ .*//')
             samtools: \$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')
         END_VERSIONS
         """
@@ -208,7 +208,7 @@ process BOWTIE2_SAMTOOLS {
             
             # Generate versions file
             printf '"%s":\\n' "${task.process}" > versions.yml
-            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+            printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>/dev/null | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
             printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
             
             exit 0
@@ -270,7 +270,7 @@ process BOWTIE2_SAMTOOLS {
         
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bowtie2: \$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')
+            bowtie2: \$(bowtie2 --version 2>/dev/null | head -n 1 | sed 's/.*version //; s/ .*//')
             samtools: \$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')
         END_VERSIONS
         """
@@ -359,7 +359,7 @@ process BOWTIE2_SAMTOOLS_DEPTH {
         done
 
         printf '"%s":\\n' "${task.process}" > versions.yml
-        printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>&1 | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
+        printf '    bowtie2: %s\\n' "\$(bowtie2 --version 2>/dev/null | head -n 1 | sed 's/.*version //; s/ .*//')" >> versions.yml
         printf '    samtools: %s\\n' "\$(samtools --version 2>&1 | head -n 1 | sed 's/samtools //')" >> versions.yml
 	"""
 
