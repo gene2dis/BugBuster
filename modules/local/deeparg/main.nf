@@ -24,11 +24,35 @@ process DEEPARG_BINS {
         # deeparg on a literal '*.faa'
         shopt -s nullglob
 
+        # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
+        # starts one thread per host core whatever the task's CPUs, and the
+        # image's OpenBLAS does the same in the classifier. A diamond wrapper
+        # first on PATH adds --threads; deeparg ignores DIAMOND's exit status,
+        # so the real binary must be found here.
+        DEEPARG_REAL_DIAMOND=\$(command -v diamond) || { echo "diamond not found" >&2; exit 1; }
+        export DEEPARG_REAL_DIAMOND
+        mkdir diamond_wrapper
+        cat > diamond_wrapper/diamond <<-'END_WRAPPER'
+        #!/bin/sh
+        case "\$1" in
+            blastp|blastx|view) exec "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS" ;;
+        esac
+        exec "\$DEEPARG_REAL_DIAMOND" "\$@"
+        END_WRAPPER
+        chmod +x diamond_wrapper/diamond
+        export PATH="\$PWD/diamond_wrapper:\$PATH"
+
         # The image's cp is BusyBox: without -L it copies the staged input
         # directory as a symlink, and ../ inside it is no longer the task dir
         cp -rL ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
+
+        # Up to ${task.cpus} bins run at once; their threads share the task's CPUs
+        bins=(*.faa)
+        jobs=\$(( \${#bins[@]} < ${task.cpus} ? \${#bins[@]} : ${task.cpus} ))
+        export DEEPARG_DIAMOND_THREADS=\$(( ${task.cpus} / (jobs > 0 ? jobs : 1) ))
+        export OPENBLAS_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS OMP_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS
 
         # Parallel processing of bins using background jobs
         pids=()
@@ -105,6 +129,26 @@ process DEEPARG_CONTIGS {
         # nf-core prodigal emits gzipped proteins; deeparg cannot read gzip.
         # gzip -cdf also passes plain FASTA through unchanged.
         gzip -cdf ${prodigal_contigs} > ${prefix}_proteins_input.faa
+
+        # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
+        # starts one thread per host core whatever the task's CPUs, and the
+        # image's OpenBLAS does the same in the classifier. A diamond wrapper
+        # first on PATH adds --threads; deeparg ignores DIAMOND's exit status,
+        # so the real binary must be found here.
+        DEEPARG_REAL_DIAMOND=\$(command -v diamond) || { echo "diamond not found" >&2; exit 1; }
+        export DEEPARG_REAL_DIAMOND
+        mkdir diamond_wrapper
+        cat > diamond_wrapper/diamond <<-'END_WRAPPER'
+        #!/bin/sh
+        case "\$1" in
+            blastp|blastx|view) exec "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS" ;;
+        esac
+        exec "\$DEEPARG_REAL_DIAMOND" "\$@"
+        END_WRAPPER
+        chmod +x diamond_wrapper/diamond
+        export PATH="\$PWD/diamond_wrapper:\$PATH"
+        export DEEPARG_DIAMOND_THREADS=${task.cpus}
+        export OPENBLAS_NUM_THREADS=${task.cpus} OMP_NUM_THREADS=${task.cpus}
 
         deeparg predict \\
                 -d ${deeparg_db} \\
