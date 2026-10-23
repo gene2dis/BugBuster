@@ -629,7 +629,8 @@ next release is tagged.
   with no thread count, so DIAMOND started one thread per host core (81 on
   an 80-core server) in an 8-CPU task, and the image's OpenBLAS did the same
   in the classifier; DEEPARG_BINS, which runs up to `task.cpus` predictions
-  at once, reached ~640 threads. A `diamond` wrapper in the task directory
+  at once, reached 641 threads as its eight classifiers started (80 OpenBLAS
+  threads each) and ~370 while DIAMOND ran. A `diamond` wrapper in the task directory
   now adds `--threads`: `task.cpus` for DEEPARG_CONTIGS, and the task's CPUs
   divided among the concurrent bins for DEEPARG_BINS; OpenBLAS gets the same
   limit. On one assembly and one 8-chunk bin set, at most 31 and 16 threads;
