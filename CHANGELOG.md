@@ -625,6 +625,12 @@ next release is tagged.
 
 ### Fixed
 
+- **DEEPARG_BINS could not run**: the image's `cp` is BusyBox, which copies
+  the staged proteins directory as a symlink, so `../<database>` inside it
+  did not resolve and DIAMOND and the classifier failed (and the per-bin
+  outputs went into the upstream task's directory). It now copies with
+  `cp -rL`
+
 - **RGI_BWT no longer writes into the shared RGI database**: the task linked
   each top-level entry of the database's `localDB/`, so `localDB/bwt` was the
   shared directory and an aligner index that `rgi bwt` builds at run time

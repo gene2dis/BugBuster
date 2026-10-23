@@ -24,7 +24,9 @@ process DEEPARG_BINS {
         # deeparg on a literal '*.faa'
         shopt -s nullglob
 
-        cp -r ${prodigal_bins} tmp_bins
+        # The image's cp is BusyBox: without -L it copies the staged input
+        # directory as a symlink, and ../ inside it is no longer the task dir
+        cp -rL ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
 
