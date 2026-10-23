@@ -48,15 +48,18 @@ process DEEPARG_BINS {
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
 
-        # Up to ${task.cpus} bins run at once; their threads share the task's CPUs
+        # Parallel processing of bins using background jobs: up to ${task.cpus}
+        # at once, and each batch's threads share the task's CPUs
         bins=(*.faa)
-        jobs=\$(( \${#bins[@]} < ${task.cpus} ? \${#bins[@]} : ${task.cpus} ))
-        export DEEPARG_DIAMOND_THREADS=\$(( ${task.cpus} / (jobs > 0 ? jobs : 1) ))
-        export OPENBLAS_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS OMP_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS
-
-        # Parallel processing of bins using background jobs
+        remaining=\${#bins[@]}
         pids=()
-        for bin_prot in *.faa; do
+        for bin_prot in "\${bins[@]}"; do
+            if [ \${#pids[@]} -eq 0 ]; then
+                jobs=\$(( remaining < ${task.cpus} ? remaining : ${task.cpus} ))
+                export DEEPARG_DIAMOND_THREADS=\$(( ${task.cpus} / jobs ))
+                export OPENBLAS_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS OMP_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS
+            fi
+            remaining=\$(( remaining - 1 ))
             bin_name=\$(echo \$bin_prot | sed -E 's/_proteins.faa//g')
             
             # Run deeparg in background
@@ -87,7 +90,7 @@ process DEEPARG_BINS {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
         END_VERSIONS
 	"""
 
@@ -160,7 +163,7 @@ process DEEPARG_CONTIGS {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
         END_VERSIONS
         """
 
