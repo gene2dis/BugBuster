@@ -625,6 +625,23 @@ next release is tagged.
 
 ### Fixed
 
+- **DeepARG used every core on the host**: `deeparg predict` runs DIAMOND
+  with no thread count, so DIAMOND started one thread per host core (81 on
+  an 80-core server) in an 8-CPU task, and the image's OpenBLAS did the same
+  in the classifier; DEEPARG_BINS, which runs up to `task.cpus` predictions
+  at once, reached 641 threads as its eight classifiers started (80 OpenBLAS
+  threads each) and ~370 while DIAMOND ran. A `diamond` wrapper in the task directory
+  now adds `--threads`: `task.cpus` for DEEPARG_CONTIGS, and the task's CPUs
+  divided among the concurrent bins for DEEPARG_BINS; OpenBLAS gets the same
+  limit. On one assembly and one 8-chunk bin set, at most 31 and 16 threads;
+  ARG tables identical apart from the 16th significant digit of
+  `probability`
+- **DEEPARG_BINS could not run**: the image's `cp` is BusyBox, which copies
+  the staged proteins directory as a symlink, so `../<database>` inside it
+  did not resolve and DIAMOND and the classifier failed (and the per-bin
+  outputs went into the upstream task's directory). It now copies with
+  `cp -rL`
+
 - **RGI_BWT no longer writes into the shared RGI database**: the task linked
   each top-level entry of the database's `localDB/`, so `localDB/bwt` was the
   shared directory and an aligner index that `rgi bwt` builds at run time

@@ -24,13 +24,42 @@ process DEEPARG_BINS {
         # deeparg on a literal '*.faa'
         shopt -s nullglob
 
-        cp -r ${prodigal_bins} tmp_bins
+        # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
+        # starts one thread per host core whatever the task's CPUs, and the
+        # image's OpenBLAS does the same in the classifier. A diamond wrapper
+        # first on PATH adds --threads; deeparg ignores DIAMOND's exit status,
+        # so the real binary must be found here.
+        DEEPARG_REAL_DIAMOND=\$(command -v diamond) || { echo "diamond not found" >&2; exit 1; }
+        export DEEPARG_REAL_DIAMOND
+        mkdir diamond_wrapper
+        cat > diamond_wrapper/diamond <<-'END_WRAPPER'
+        #!/bin/sh
+        case "\$1" in
+            blastp|blastx|view) exec "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS" ;;
+        esac
+        exec "\$DEEPARG_REAL_DIAMOND" "\$@"
+        END_WRAPPER
+        chmod +x diamond_wrapper/diamond
+        export PATH="\$PWD/diamond_wrapper:\$PATH"
+
+        # The image's cp is BusyBox: without -L it copies the staged input
+        # directory as a symlink, and ../ inside it is no longer the task dir
+        cp -rL ${prodigal_bins} tmp_bins
         mkdir ${prefix}_deeparg_results
         cd tmp_bins
 
-        # Parallel processing of bins using background jobs
+        # Parallel processing of bins using background jobs: up to ${task.cpus}
+        # at once, and each batch's threads share the task's CPUs
+        bins=(*.faa)
+        remaining=\${#bins[@]}
         pids=()
-        for bin_prot in *.faa; do
+        for bin_prot in "\${bins[@]}"; do
+            if [ \${#pids[@]} -eq 0 ]; then
+                jobs=\$(( remaining < ${task.cpus} ? remaining : ${task.cpus} ))
+                export DEEPARG_DIAMOND_THREADS=\$(( ${task.cpus} / jobs ))
+                export OPENBLAS_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS OMP_NUM_THREADS=\$DEEPARG_DIAMOND_THREADS
+            fi
+            remaining=\$(( remaining - 1 ))
             bin_name=\$(echo \$bin_prot | sed -E 's/_proteins.faa//g')
             
             # Run deeparg in background
@@ -61,7 +90,7 @@ process DEEPARG_BINS {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
         END_VERSIONS
 	"""
 
@@ -104,6 +133,26 @@ process DEEPARG_CONTIGS {
         # gzip -cdf also passes plain FASTA through unchanged.
         gzip -cdf ${prodigal_contigs} > ${prefix}_proteins_input.faa
 
+        # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
+        # starts one thread per host core whatever the task's CPUs, and the
+        # image's OpenBLAS does the same in the classifier. A diamond wrapper
+        # first on PATH adds --threads; deeparg ignores DIAMOND's exit status,
+        # so the real binary must be found here.
+        DEEPARG_REAL_DIAMOND=\$(command -v diamond) || { echo "diamond not found" >&2; exit 1; }
+        export DEEPARG_REAL_DIAMOND
+        mkdir diamond_wrapper
+        cat > diamond_wrapper/diamond <<-'END_WRAPPER'
+        #!/bin/sh
+        case "\$1" in
+            blastp|blastx|view) exec "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS" ;;
+        esac
+        exec "\$DEEPARG_REAL_DIAMOND" "\$@"
+        END_WRAPPER
+        chmod +x diamond_wrapper/diamond
+        export PATH="\$PWD/diamond_wrapper:\$PATH"
+        export DEEPARG_DIAMOND_THREADS=${task.cpus}
+        export OPENBLAS_NUM_THREADS=${task.cpus} OMP_NUM_THREADS=${task.cpus}
+
         deeparg predict \\
                 -d ${deeparg_db} \\
                 --model LS \\
@@ -114,7 +163,7 @@ process DEEPARG_CONTIGS {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            deeparg: \$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p' || echo 1.0.4)
+            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
         END_VERSIONS
         """
 
