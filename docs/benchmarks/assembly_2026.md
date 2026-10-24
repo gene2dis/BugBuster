@@ -1,19 +1,19 @@
 # Co-assembly: read normalization, MEGAHIT settings and MetaHipMer2
 
-Benchmark run 2026-10-23 to 2026-10-24 (roadmap Phase 5b, items A1–A3). It asks three questions about the co-assembly step:
+Benchmark run 2026-10-23 to 2026-10-24. It asks three questions about the co-assembly step:
 
 - **A1:** does digital normalization of the assembler input (BBNorm) make the co-assembly cheaper without losing bins?
 - **A2:** do MEGAHIT settings (`--min-count 3`, a shorter k-mer list) do the same?
 - **A3:** is MetaHipMer2 2.2.2.0 a useful alternative assembler on this kind of machine?
 
-No pipeline code changed. Every variant ran the pipeline's own MEGAHIT command, and its contigs went through the pipeline's own modules from the 1 kb filter to CheckM2.
+No pipeline code changed. Every MEGAHIT variant ran the pipeline's own MEGAHIT command, and its contigs went through the pipeline's own modules from the 1 kb filter to CheckM2. MetaHipMer2 ran on its own (A3 section) and produced no contigs.
 
 **Outcome (recommendations, for the owner's decision):**
 
 - **A1:** add normalization as an opt-in step, default off, with one mode (`normalize`, no error correction). At this depth it cost 11.7 CPU-hours to save 2.1 in the assembly. Error correction gave the same assembly for 2.3 more CPU-hours.
-- **A2:** expose `--megahit_min_count` (default 2) and `--megahit_k_list`, and make the default k-mer list `21,41,61,81,101,121,141`: 12 % less assembly CPU time for 0.7 % less sequence, and no fewer bins. Keep `--min-count 3` as a knob for co-assemblies that run out of memory or time, not as the default.
+- **A2:** expose `--megahit_min_count` (default 2) and `--megahit_k_list` (default: MEGAHIT's own list), and document `21,41,61,81,101,121,141` for large co-assemblies: 12 % less assembly CPU time for 0.7 % less sequence and no fewer bins, but from one co-assembly and near the edge of what this loaded machine can measure. Keep `--min-count 3` as a knob for co-assemblies that run out of memory or time, not as the default.
 - **A3:** do not add MetaHipMer2 as an assembler option for single-node runs.
-- **MEGAHIT memory:** request memory from the size of the input for co-assembly: `max(72 GB, 6 GB per GB of gzipped pooled reads) × attempt`.
+- **MEGAHIT memory:** request memory from the size of the input for co-assembly: `max(72 GB, 6 GB per GB of gzipped pooled reads) × attempt`, and tell users of large co-assemblies to raise `--max_memory` (default 128 GB), which caps every request.
 
 ## Summary
 
@@ -49,7 +49,7 @@ No pipeline code changed. Every variant ran the pipeline's own MEGAHIT command, 
 **Machine and runs:**
 
 - 4 × Xeon E7-4820 v4 (40 cores, 80 threads, AVX2), 2 TB RAM; Docker; Nextflow 26.04.4 for the binning chain.
-- Every assembly ran in its own container at `process_high`'s first attempt, 16 CPUs and 72 GB, through `bin/megahit_run.sh` as the MEGAHIT module calls it (so `-m` = 90 % of 72 GB).
+- Every MEGAHIT assembly ran in its own container at `process_high`'s first attempt, 16 CPUs and 72 GB, through `bin/megahit_run.sh` as the MEGAHIT module calls it (so `-m` = 90 % of 72 GB).
 - Other users kept the 1-minute load at 104–232 on 80 threads the whole time. Each 16-CPU container got 4–5 threads on average, so wall times are about 3× what an idle machine gives. Several variants ran at the same time.
 - Time and memory come from the container's cgroup (CPU-seconds, peak memory, peak anonymous memory), sampled every 2 s. "Peak anon" is the process memory; the cgroup peak also counts page cache.
 
@@ -114,10 +114,10 @@ Against the baselines (identical after the filter, so any change is outside the 
 | klist | −12 % | −0.7 % | −0.8 % | −2.2 % | −0.21 |
 | mc3klist | −21 % | −6.0 % | −9.8 % | −10.9 % | −0.83 |
 | norm | −17 % (+75 % with BBNorm) | −2.6 % | −5.6 % | −4.4 % | −0.47 |
-| normecc | −17 % (+94 %) | −2.6 % | −5.7 % | −4.4 % | −0.42 |
+| normecc | −17 % (+94 %) | −2.6 % | −5.6 % | −4.4 % | −0.42 |
 | normklist | −23 % (+69 %) | −3.2 % | −6.5 % | −6.3 % | −0.54 |
 
-Each setting raises N50 because it drops short contigs, not because the long ones grow. Halving the reads cost MEGAHIT only 26 % of its CPU time (16.9 → 12.6 CPU-h, on different loads), and 25 % of the sequence in contigs ≥ 1 kb.
+Each setting raises N50 because it drops short contigs, not because the long ones grow. Halving the reads cost MEGAHIT only 25 % of its CPU time (16.9 → 12.6 CPU-h, on different loads), and 25 % of the sequence in contigs ≥ 1 kb.
 
 **A1, the normalization step itself.**
 
@@ -149,7 +149,7 @@ Each setting raises N50 because it drops short contigs, not because the long one
 Map-back and bins are against the full reads. Completeness and contamination are CheckM2's, for MetaWRAP's refined bins.
 
 - **Every variant is within the baseline spread for refined bins** (23–25 vs 23–24) and for MIMAG high plus medium (22–24 vs 23–24).
-- **The two k-list variants are outside it for MIMAG high**, in their favour: 15 and 14 vs 10–11 for the baselines and 11–12 for every other variant. Their total stayed the same, so bins moved from medium to high rather than new bins appearing. Each variant ran once, so this is a lead to check on the Phase 5c run, not a measured gain.
+- **The two k-list variants are outside it for MIMAG high**, in their favour: 15 and 14 vs 10–11 for the baselines and 11–12 for every other variant. Their total stayed the same, so bins moved from medium to high rather than new bins appearing. Each variant ran once, so this is a lead to check when the settings are applied, not a measured gain.
 - **Map-back fell with every setting**, by 0.2 (klist) to 0.8 points (mc3klist), against 0 between the baselines. That is roughly the share of sequence each setting dropped.
 - **Depth is what matters for the bins.** The full-depth assembly gave 35 refined bins and 17 MIMAG high, and mapped 91.2 % of the reads.
 
@@ -162,7 +162,7 @@ Map-back and bins are against the full reads. Completeness and contamination are
 | MetaWRAP | 2 h 47 min – 3 h 31 min | 3.1–3.7 | 10–11 | 68.7 GB |
 | CheckM2 (all three bin sets) | 21–41 min | 5–10 | ~3.5 | 14.2 GB |
 
-SemiBin2's self-training is the largest single cost of a co-assembly, larger than MEGAHIT's. It used a quarter to a third of its 8 CPUs. Phase 7a (the binning benchmark) looks at this.
+SemiBin2's self-training is the largest single cost of a co-assembly, larger than MEGAHIT's. It used a quarter to a third of its 8 CPUs. It is worth its own benchmark (pre-trained models, CPU count).
 
 ## A3: MetaHipMer2 2.2.2.0
 
@@ -173,19 +173,19 @@ SemiBin2's self-training is the largest single cost of a co-assembly, larger tha
 - **Uncompressed FASTQ.** It rejects gzip input. Decompressing the subsample took 1.3 min and 11.8 GB of disk; the full reads of a large co-assembly would need tens to hundreds of GB of scratch space.
 - **Paired read names ending in `/1` and `/2`** (or an Illumina `1:N:…` comment). With two paired files, its reader finds the start of a record only from those markers. The pipeline's clean reads have neither, and the first run stopped at once with "Missing record info" and "Could not find the partition boundary". Rewriting the names took 4.6 min.
 - **A memory setting from the task.** It sizes its k-mer tables from the free memory in `/proc/meminfo`, which inside a container is the host's (987 GB here), not the container's limit. It estimated 3.34 GB per rank of tables for k=21 and, seeing room, scaled them up 3× (the code's maximum). At 72 GB the container killed it after 4.8 min. In a pipeline it would need `--kcount-fraction-mem` set from the task's memory, and it would still not adapt to a scheduler's limit.
-- **A shared-memory size.** Without `--procs` it starts one rank per core (80) and hangs at Docker's default `/dev/shm`; the runs here used `--procs 16`, `--shm-size` equal to the memory limit and `GASNET_PHYSMEM_MAX`.
+- **A shared-memory size.** Without `--procs` it starts one rank per hardware thread (80) and hangs at Docker's default `/dev/shm`; the runs here used `--procs 16`, `--shm-size` equal to the memory limit and `GASNET_PHYSMEM_MAX`.
 
 **Cost.** With a 256 GB limit (and the same 1.84 GB shared heap per rank) it ran for 2 h 04 min and was stopped by the owner's decision while still at k=21, the first of its five k values (21, 31, 47, 63, 95, then scaffolding). By then it had used 12.0 CPU-hours, about what the whole MEGAHIT baseline used (12.5), and peaked at 114 GB (MEGAHIT: 4.3 GB anon, 7.8 GB cgroup). Its k=21 k-mer analysis alone took 40 min. No contigs, map-back or bins exist for it.
 
-**Why stop it.** MetaHipMer2's speed comes from spreading one assembly over many nodes of a cluster, which MEGAHIT cannot do. On one node it was slower in CPU time, not only in wall time, so more cores would not close the gap, and it needed ~25× MEGAHIT's memory.
+**Why stop it.** MetaHipMer2's speed comes from spreading one assembly over many nodes of a cluster, which MEGAHIT cannot do. On one node it was slower in CPU time, not only in wall time, so more cores would not close the gap, and it needed ~27× MEGAHIT's process memory (114 vs 4.3 GB anonymous; 15× by cgroup peak, 114 vs 7.8 GB).
 
 ## Recommendations and defaults
 
 **A1: opt-in, default `none`.** `--assembly_read_reduction none|normalize`, with `normalize` = `bbnorm.sh target=100 min=2 prefilter=t`, on the assembler input only. Leave out the error-correction mode: it gave the same assembly for 2.3 more CPU-hours. Size BBNorm's `-Xmx` from the task's memory (e.g. 85 %); 16 CPUs and 72 GB covered this set with room to spare. The case for it is a deep co-assembly, where it removes far more than 16 % of the reads. That case was not measured here: if the owner wants a default other than `none`, a deep real set should be measured first.
 
-**A2: shorter k-mer list by default, min-count unchanged.**
+**A2: expose both settings, keep MEGAHIT's defaults.**
 
-- `--megahit_k_list` default `21,41,61,81,101,121,141`: 12 % less assembly CPU time, 0.7 % less sequence, 2.2 % fewer contigs ≥ 2.5 kb, 0.2 points less map-back, and no fewer bins (more MIMAG high in its one run). If the owner prefers outputs to stay MEGAHIT's own, the default can be empty (MEGAHIT's list) and the shorter list documented. The saving is ~1.5 CPU-hours on a 12.6 CPU-hour assembly, against a ~30 CPU-hour binning chain.
+- `--megahit_k_list` default empty (MEGAHIT's own list), with `21,41,61,81,101,121,141` documented for large co-assemblies: 12 % less assembly CPU time, 0.7 % less sequence, 2.2 % fewer contigs ≥ 2.5 kb, 0.2 points less map-back, and no fewer bins (more MIMAG high in its one run). It is not the default because the MEGAHIT process also runs every per-sample assembly, which was not benchmarked, the saving is near the edge of what this machine can measure, and it is ~1.5 CPU-hours on a 12.6 CPU-hour assembly against a ~30 CPU-hour binning chain. A co-assembly-only default is the alternative if the owner wants the saving now.
 - `--megahit_min_count` default 2. Document 3 as the setting for co-assemblies that run out of memory in the graph build or run too long: it cut the graph-build minimum by 17 % and CPU time by 11 %, for 5 % less sequence at this (understated) depth.
 
 **A3: do not adopt** for single-node runs (section above). If it is ever reconsidered for a cluster, the module would need uncompressed `/1` `/2` input, `--kcount-fraction-mem` from the task's memory, `--procs` and a shared-memory size.
@@ -199,8 +199,9 @@ SemiBin2's self-training is the largest single cost of a co-assembly, larger tha
 | a 404 M-read co-assembly | ~25 GB (estimated, not measured) | ~86 GB at k=21 | not kept; killed at 72 GB on the first attempt after 2 h 19 min |
 
 - Memory grows faster than the input: about 1.8 GB of peak per GB of gzipped reads on the small set, and at least 3.4 GB per GB (the graph-build minimum alone) on the large one. A co-assembly of many samples adds distinct k-mers with every sample.
-- On this set, the peak was 1.8× the graph-build minimum. If that ratio holds, the 404 M-read co-assembly needs ~150 GB. The first attempt fails at 72 GB, and the second at 144 GB is at the edge.
-- **Recommended:** for co-assembly, `memory = max(72 GB, 6 GB × gzipped pooled reads in GB) × attempt`, the same pattern as BWAMEM3_INDEX's size-based request (`resourceLimits` still caps it at `--max_memory`). It gives 72 GB here and ~150 GB for the 404 M-read co-assembly, and saves its 2 h 19 min failed first attempt. Per-sample assembly can keep 72 GB. A request does not make MEGAHIT faster; over-requesting only holds memory other tasks could use.
+- On this set, the peak was 1.8× the graph-build minimum. If that ratio holds, the 404 M-read co-assembly needs ~150 GB. The first attempt fails at 72 GB. With the default `--max_memory 128 GB`, which caps every request through `resourceLimits`, the retries get 128 GB, not 144 and 216: below that estimate.
+- **Recommended:** for co-assembly, `memory = max(72 GB, 6 GB × gzipped pooled reads in GB) × attempt`. It gives 72 GB here and ~150 GB for the 404 M-read co-assembly, and saves its 2 h 19 min failed first attempt, but only if the user raises `--max_memory` above 128 GB; the docs should say so for large co-assemblies. Per-sample assembly can keep 72 GB.
+- **How:** MEGAHIT has `label 'process_high'`, and a label's `memory` in the config overrides a `memory` directive in the process, so a size-based `memory {}` in the module (BWAMEM3_INDEX's pattern, which works only because its `process_index` label sets no memory) would have no effect. It needs a `withName: 'MEGAHIT'` memory closure in `config/modules.config` that branches on `meta.id == 'coassembly'`, or a label without memory. A request does not make MEGAHIT faster; over-requesting only holds memory other tasks could use.
 
 ## Caveats
 
