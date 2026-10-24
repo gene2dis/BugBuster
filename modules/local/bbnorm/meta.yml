@@ -1,0 +1,43 @@
+name: bbnorm
+description: Digital normalization of the assembler input with BBNorm (--assembly_read_reduction normalize; arguments from ext.args, heap from the task memory). Paired reads are normalized in one call (the pooled reads of every sample under co-assembly); singletons pass through unchanged. Only MEGAHIT gets the output; mapping, coverage, binning and gene counting use the full clean reads
+keywords:
+  - normalization
+  - read reduction
+  - assembly
+  - bbmap
+  - metagenomics
+tools:
+  - bbmap:
+      description: BBTools suite of short-read tools; this module uses bbnorm.sh (k-mer based depth normalization)
+      homepage: https://sourceforge.net/projects/bbmap/
+      documentation: https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbnorm-guide/
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - reads:
+      type: file
+      description: Host-removed reads of one sample (R1, R2[, singleton], by position), or of every sample pooled under co-assembly (roles from the file names, bin/read_role.sh)
+      pattern: "*.{fastq,fq}{,.gz}"
+
+output:
+  - reads:
+      type: tuple
+      description: Tuple of meta and the normalized reads, sorted by name (R1, R2, then the singletons when there are any); singletons are links to the input files, one per file, with their compression kept
+      pattern: "*_norm_{R1.fastq.gz,R2.fastq.gz,singleton*}"
+  - report:
+      type: file
+      description: TSV with sample_id, method (bbnorm), pairs_in, pairs_kept and percent_kept, counted from the files
+      pattern: "*_read_reduction.tsv"
+  - log:
+      type: file
+      description: BBNorm's own log (stderr)
+      pattern: "*_bbnorm.log"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

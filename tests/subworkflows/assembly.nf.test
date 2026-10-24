@@ -1,0 +1,204 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ASSEMBLY Subworkflow Test
+
+    Roadmap A1: --assembly_read_reduction normalize reduces the reads MEGAHIT
+    gets, and only those. Every alignment (the pooled or per-sample BAM for
+    binning and coverage, the per-sample counting BAMs) and the reads passed
+    on with the contigs must be the full input reads. nf-test sees outputs,
+    not inputs, so the tests read the staged links in each task's work
+    directory (tests/lib/TaskInputs.groovy); MEGAHIT's own task, reached
+    through BBMAP's staged contigs, must hold the normalized reads.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_workflow {
+
+    name "Test ASSEMBLY Subworkflow"
+    script "../../subworkflows/local/assembly.nf"
+    workflow "ASSEMBLY"
+
+    options "-stub"
+
+    test("per-sample assembly with normalization aligns the full reads (bwa-mem3)") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "assembly"
+                assembly_read_reduction = "normalize"
+                read_aligner            = "bwamem3"
+                include_binning         = true
+                contig_level_functional = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'test_sample1' ], [ file("\${reads}/test_sample1_R1.fastq.gz"), file("\${reads}/test_sample1_R2.fastq.gz") ] ],
+                    [ [ id: 'test_sample2' ], [ file("\${reads}/test_sample2_R1.fastq.gz"), file("\${reads}/test_sample2_R2.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("BBNORM") } == 2
+            ['test_sample1', 'test_sample2'].each { id ->
+                def full = ["${id}_R1.fastq.gz", "${id}_R2.fastq.gz"]
+                def bam = workflow.out.bam.find { item -> item[0].id == id }
+                assert TaskInputs.stagedReads(bam[2]) == full
+                def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
+                assert TaskInputs.stagedReads(counting[1]) == full
+                def contigs = workflow.out.contigs.find { item -> item[0].id == id }
+                assert contigs[1].collect { f -> new File(f.toString()).name } == full
+                // MEGAHIT (reached through BBMAP's staged contigs) got the normalized reads
+                def filtered = workflow.out.contigs_meta.find { item -> item[0].id == id }
+                assert TaskInputs.upstreamStagedReads(filtered[1], "${id}_contigs.fa") ==
+                    ["${id}_norm_R1.fastq.gz", "${id}_norm_R2.fastq.gz"]
+            }
+        }
+    }
+
+    test("co-assembly with normalization aligns the full reads (bwa-mem3)") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "coassembly"
+                assembly_read_reduction = "normalize"
+                read_aligner            = "bwamem3"
+                include_binning         = true
+                contig_level_functional = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'test_sample1' ], [ file("\${reads}/test_sample1_R1.fastq.gz"), file("\${reads}/test_sample1_R2.fastq.gz") ] ],
+                    [ [ id: 'test_sample2' ], [ file("\${reads}/test_sample2_R1.fastq.gz"), file("\${reads}/test_sample2_R2.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("BBNORM") } == 1
+            // Pooled alignment for binning: every sample's full reads
+            assert workflow.out.bam.size() == 1
+            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == [
+                "test_sample1_R1.fastq.gz", "test_sample1_R2.fastq.gz",
+                "test_sample2_R1.fastq.gz", "test_sample2_R2.fastq.gz"
+            ]
+            // Per-sample alignments for gene counting: each sample's full reads
+            ['test_sample1', 'test_sample2'].each { id ->
+                def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
+                assert TaskInputs.stagedReads(counting[1]) == ["${id}_R1.fastq.gz", "${id}_R2.fastq.gz"]
+            }
+            // MEGAHIT got one normalized set of the pooled reads
+            assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "coassembly_contigs.fa") ==
+                ["coassembly_norm_R1.fastq.gz", "coassembly_norm_R2.fastq.gz"]
+        }
+    }
+
+    test("per-sample assembly with normalization aligns the full reads (bowtie2)") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "assembly"
+                assembly_read_reduction = "normalize"
+                read_aligner            = "bowtie2"
+                include_binning         = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'singleton_test' ], [ file("\${reads}/singleton_test_R1.fastq.gz"), file("\${reads}/singleton_test_R2.fastq.gz"), file("\${reads}/singleton_test_S.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            def full = ["singleton_test_R1.fastq.gz", "singleton_test_R2.fastq.gz", "singleton_test_S.fastq.gz"]
+            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == full
+            assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "singleton_test_contigs.fa") ==
+                ["singleton_test_norm_R1.fastq.gz", "singleton_test_norm_R2.fastq.gz", "singleton_test_norm_singleton.fastq.gz"]
+        }
+    }
+
+    test("co-assembly with normalization aligns the full reads (bowtie2)") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "coassembly"
+                assembly_read_reduction = "normalize"
+                read_aligner            = "bowtie2"
+                include_binning         = true
+                contig_level_functional = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'test_sample1' ], [ file("\${reads}/test_sample1_R1.fastq.gz"), file("\${reads}/test_sample1_R2.fastq.gz") ] ],
+                    [ [ id: 'test_sample2' ], [ file("\${reads}/test_sample2_R1.fastq.gz"), file("\${reads}/test_sample2_R2.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == [
+                "test_sample1_R1.fastq.gz", "test_sample1_R2.fastq.gz",
+                "test_sample2_R1.fastq.gz", "test_sample2_R2.fastq.gz"
+            ]
+            ['test_sample1', 'test_sample2'].each { id ->
+                def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
+                assert TaskInputs.stagedReads(counting[1]) == ["${id}_R1.fastq.gz", "${id}_R2.fastq.gz"]
+            }
+            assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "coassembly_contigs.fa") ==
+                ["coassembly_norm_R1.fastq.gz", "coassembly_norm_R2.fastq.gz"]
+        }
+    }
+
+    test("without read reduction MEGAHIT gets the full reads and BBNORM does not run") {
+        when {
+            params {
+                output        = "${outputDir}"
+                assembly_mode = "assembly"
+                read_aligner  = "bwamem3"
+                include_binning = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'test_sample1' ], [ file("\${reads}/test_sample1_R1.fastq.gz"), file("\${reads}/test_sample1_R2.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BBNORM") }
+            def full = ["test_sample1_R1.fastq.gz", "test_sample1_R2.fastq.gz"]
+            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == full
+            assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "test_sample1_contigs.fa") == full
+        }
+    }
+}

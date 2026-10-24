@@ -527,6 +527,33 @@
             "fa_icon": "fas fa-puzzle-piece",
             "description": "Parameters for genome assembly and contig filtering.",
             "properties": {
+                "assembly_read_reduction": {
+                    "type": "string",
+                    "default": "none",
+                    "enum": [
+                        "none",
+                        "normalize"
+                    ],
+                    "description": "Reduce the reads MEGAHIT gets: 'none' or 'normalize' (BBNorm target=100 min=2 prefilter=t).",
+                    "help_text": "Only the assembler input is reduced: mapping, coverage, binning and gene counting use the full clean reads. Under co-assembly the pooled reads of every sample are normalized together. Requires --assembly_mode assembly or coassembly.",
+                    "fa_icon": "fas fa-compress"
+                },
+                "megahit_k_list": {
+                    "type": "string",
+                    "default": "",
+                    "pattern": "^$|^[0-9]*[13579](,[0-9]*[13579])*$",
+                    "description": "MEGAHIT --k-list (comma-separated odd k values); empty uses MEGAHIT's own list.",
+                    "help_text": "21,41,61,81,101,121,141 is the shorter list documented for large co-assemblies (12 % less assembly CPU time, 0.7 % less sequence in the assembly benchmark).",
+                    "fa_icon": "fas fa-list-ol"
+                },
+                "megahit_min_count": {
+                    "type": "integer",
+                    "default": 2,
+                    "minimum": 1,
+                    "description": "MEGAHIT --min-count: minimum multiplicity of a k-mer for the graph (MEGAHIT's default is 2).",
+                    "help_text": "3 is documented for co-assemblies that run out of memory or time: less graph-build memory and CPU time, for less assembled sequence.",
+                    "fa_icon": "fas fa-filter"
+                },
                 "bbmap_length": {
                     "type": "integer",
                     "default": 1000,

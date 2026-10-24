@@ -1,0 +1,196 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BBNORM Module Test
+
+    Real BBNorm runs (ext.args from config/modules.config) on the committed
+    read fixtures. The fixtures are shallow, so min=2 drops most pairs; the
+    tests check pairing, the counts in the report, singleton pass-through
+    and, for co-assembly, that every pooled sample's reads go in (a pooling
+    that stopped at the first file would lose the second sample).
+    max_memory is capped: BBNorm's k-mer tables fill whatever heap it gets.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BBNORM Process"
+    script "../../modules/local/bbnorm/main.nf"
+    process "BBNORM"
+
+    test("normalizes a paired sample and reports pairs in and kept") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'test_sample1' ],
+                    [
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.size() == 2
+            assert reads[0].toString().endsWith("test_sample1_norm_R1.fastq.gz")
+            assert reads[1].toString().endsWith("test_sample1_norm_R2.fastq.gz")
+            def r1 = path(reads[0]).linesGzip.size() / 4
+            def r2 = path(reads[1]).linesGzip.size() / 4
+            assert r1 == r2
+            assert r1 > 0 && r1 <= 500
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[0] == 'test_sample1'
+            assert row[1] == 'bbnorm'
+            assert row[2] as Integer == 500
+            assert row[3] as Integer == r1
+            assert path(process.out.log[0]).text.contains("Total reads in")
+        }
+    }
+
+    test("passes singletons through unchanged") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'singleton_test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.size() == 3
+            assert reads[2].toString().endsWith("singleton_test_norm_singleton.fastq.gz")
+            assert path(reads[2]).linesGzip == path("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz").linesGzip
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[2] as Integer == 10
+        }
+    }
+
+    test("normalizes the pooled reads of every co-assembly sample in one call") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly' ],
+                    [
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample2_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample2_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.size() == 2
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[0] == 'coassembly'
+            // 500 pairs per sample: both files went in
+            assert row[2] as Integer == 1000
+            // Read names of each fixture's genome: both samples' reads come out
+            def names = path(reads[0]).linesGzip.findAll { line -> line.startsWith('@') }
+            assert names.any { name -> name.startsWith('@NC_006347') }
+            assert names.any { name -> name.startsWith('@CP009257') }
+            assert path(reads[1]).linesGzip.size() == path(reads[0]).linesGzip.size()
+        }
+    }
+
+    test("takes a single sample's reads by position, whatever their names") {
+        // With QC off the reads keep their input names, which need not carry
+        // an R1/R2 token; per-sample reads are R1, R2[, singleton] by position
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                def raw = file("${outputDir}/raw")
+                raw.mkdirs()
+                def reads = "${projectDir}/tests/data/reads"
+                file("\${reads}/singleton_test_R1.fastq.gz").copyTo(raw.resolve('libA_fwd.fq.gz'))
+                file("\${reads}/singleton_test_R2.fastq.gz").copyTo(raw.resolve('libA_rev.fq.gz'))
+                file("\${reads}/singleton_test_S.fastq.gz").copyTo(raw.resolve('libA_orphans.fq.gz'))
+                input[0] = [
+                    [ id: 'libA' ],
+                    [ raw.resolve('libA_fwd.fq.gz'), raw.resolve('libA_rev.fq.gz'), raw.resolve('libA_orphans.fq.gz') ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.collect { f -> new File(f.toString()).name } ==
+                ['libA_norm_R1.fastq.gz', 'libA_norm_R2.fastq.gz', 'libA_norm_singleton.fastq.gz']
+            assert path(reads[2]).linesGzip == path("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz").linesGzip
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[2] as Integer == 10
+        }
+    }
+
+    test("keeps each pooled singleton file as its own link") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                def raw = file("${outputDir}/raw")
+                raw.mkdirs()
+                def reads = "${projectDir}/tests/data/reads"
+                ['sA', 'sB'].each { id ->
+                    ['R1', 'R2', 'singleton'].each { role ->
+                        def src = role == 'singleton' ? 'singleton_test_S' : "singleton_test_\${role}"
+                        file("\${reads}/\${src}.fastq.gz").copyTo(raw.resolve("\${id}_\${role}.fastq.gz"))
+                    }
+                }
+                input[0] = [
+                    [ id: 'coassembly' ],
+                    ['sA', 'sB'].collectMany { id -> ['R1', 'R2', 'singleton'].collect { role -> raw.resolve("\${id}_\${role}.fastq.gz") } }
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.collect { f -> new File(f.toString()).name } ==
+                ['coassembly_norm_R1.fastq.gz', 'coassembly_norm_R2.fastq.gz',
+                 'coassembly_norm_singleton_1.fastq.gz', 'coassembly_norm_singleton_2.fastq.gz']
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[2] as Integer == 20
+        }
+    }
+}
