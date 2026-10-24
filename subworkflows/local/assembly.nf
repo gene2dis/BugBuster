@@ -188,8 +188,7 @@ workflow ASSEMBLY {
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
             // Prepare input: combine all original reads with filtered contigs
             // More efficient: collect reads first, then combine with contigs
-            ch_alignment_input = ch_pooled_reads
-                .map { all_reads -> [[id: "coassembly"], all_reads] }
+            ch_alignment_input = ch_coassembly_reads
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
                 .map { meta, reads_list, contigs -> [meta, reads_list, contigs] }
 

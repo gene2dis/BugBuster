@@ -18,14 +18,14 @@ input:
       description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
   - reads:
       type: file
-      description: Host-removed reads of one sample, or of every sample pooled under co-assembly; R1/R2/singleton roles come from the file names (bin/read_role.sh)
-      pattern: "*.fastq.gz"
+      description: Host-removed reads of one sample (R1, R2[, singleton], by position), or of every sample pooled under co-assembly (roles from the file names, bin/read_role.sh)
+      pattern: "*.{fastq,fq}{,.gz}"
 
 output:
   - reads:
       type: tuple
-      description: Tuple of meta and the normalized reads, sorted by name (R1, R2, then the singletons when there are any)
-      pattern: "*_norm_{R1,R2,singleton}.fastq.gz"
+      description: Tuple of meta and the normalized reads, sorted by name (R1, R2, then the singletons when there are any); singletons are links to the input files, one per file, with their compression kept
+      pattern: "*_norm_{R1.fastq.gz,R2.fastq.gz,singleton*}"
   - report:
       type: file
       description: TSV with sample_id, method (bbnorm), pairs_in, pairs_kept and percent_kept, counted from the files

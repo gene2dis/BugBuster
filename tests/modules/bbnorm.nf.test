@@ -122,4 +122,75 @@ nextflow_process {
             assert path(reads[1]).linesGzip.size() == path(reads[0]).linesGzip.size()
         }
     }
+
+    test("takes a single sample's reads by position, whatever their names") {
+        // With QC off the reads keep their input names, which need not carry
+        // an R1/R2 token; per-sample reads are R1, R2[, singleton] by position
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                def raw = file("${outputDir}/raw")
+                raw.mkdirs()
+                def reads = "${projectDir}/tests/data/reads"
+                file("\${reads}/singleton_test_R1.fastq.gz").copyTo(raw.resolve('libA_fwd.fq.gz'))
+                file("\${reads}/singleton_test_R2.fastq.gz").copyTo(raw.resolve('libA_rev.fq.gz'))
+                file("\${reads}/singleton_test_S.fastq.gz").copyTo(raw.resolve('libA_orphans.fq.gz'))
+                input[0] = [
+                    [ id: 'libA' ],
+                    [ raw.resolve('libA_fwd.fq.gz'), raw.resolve('libA_rev.fq.gz'), raw.resolve('libA_orphans.fq.gz') ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.collect { f -> new File(f.toString()).name } ==
+                ['libA_norm_R1.fastq.gz', 'libA_norm_R2.fastq.gz', 'libA_norm_singleton.fastq.gz']
+            assert path(reads[2]).linesGzip == path("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz").linesGzip
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[2] as Integer == 10
+        }
+    }
+
+    test("keeps each pooled singleton file as its own link") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "2.GB"
+            }
+            process {
+                """
+                def raw = file("${outputDir}/raw")
+                raw.mkdirs()
+                def reads = "${projectDir}/tests/data/reads"
+                ['sA', 'sB'].each { id ->
+                    ['R1', 'R2', 'singleton'].each { role ->
+                        def src = role == 'singleton' ? 'singleton_test_S' : "singleton_test_\${role}"
+                        file("\${reads}/\${src}.fastq.gz").copyTo(raw.resolve("\${id}_\${role}.fastq.gz"))
+                    }
+                }
+                input[0] = [
+                    [ id: 'coassembly' ],
+                    ['sA', 'sB'].collectMany { id -> ['R1', 'R2', 'singleton'].collect { role -> raw.resolve("\${id}_\${role}.fastq.gz") } }
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reads = process.out.reads[0][1]
+            assert reads.collect { f -> new File(f.toString()).name } ==
+                ['coassembly_norm_R1.fastq.gz', 'coassembly_norm_R2.fastq.gz',
+                 'coassembly_norm_singleton_1.fastq.gz', 'coassembly_norm_singleton_2.fastq.gz']
+            def row = path(process.out.report[0]).readLines()[1].split('\t')
+            assert row[2] as Integer == 20
+        }
+    }
 }
