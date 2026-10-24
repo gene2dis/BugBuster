@@ -147,6 +147,13 @@ exitCode: 137
    nextflow run main.nf --max_memory '256.GB' ...
    ```
 
+   Co-assembly MEGAHIT already requests 6 GB per GB of gzipped pooled reads
+   (at least 72 GB), but every request is capped by `--max_memory` (default
+   128 GB): for a large co-assembly, raise it to the node's RAM first.
+   `--megahit_min_count 3` lowers MEGAHIT's graph-build memory (17 % in the
+   assembly benchmark, for 5 % less assembled sequence), and
+   `--assembly_read_reduction normalize` shrinks the assembler input.
+
 2. For specific processes, put the setting in a config file and pass it with
    `-c custom.config` (requests above `--max_memory` are still capped by it):
    ```groovy

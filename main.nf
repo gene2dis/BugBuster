@@ -59,6 +59,8 @@ def printHelp() {
       --read_aligner                Aligner for host removal, reads->contigs and bin depth: 'bwamem3' (needs AVX2), 'bowtie2' (default: ${params.read_aligner})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
       --assembly_read_reduction     Reduce the assembler input only: 'none', 'normalize' (BBNorm) (default: ${params.assembly_read_reduction})
+      --megahit_k_list              MEGAHIT --k-list, e.g. 21,41,61,81,101,121,141 (default: MEGAHIT's own list)
+      --megahit_min_count           MEGAHIT --min-count (default: ${params.megahit_min_count})
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})

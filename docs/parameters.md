@@ -677,6 +677,21 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **When to use it**: deep co-assemblies, where most reads come from a few highly covered genomes. In the [assembly benchmark](benchmarks/assembly_2026.md) (a 5-sample co-assembly of 19.4 M pairs) it kept 84 % of the pairs and cost 11.7 CPU-hours to save 2.1 in MEGAHIT, with the same bins; the saving grows with depth.
 - **Example**: `--assembly_read_reduction normalize`
 
+### `--megahit_k_list`
+- **Type**: String (comma-separated odd k values)
+- **Default**: empty (MEGAHIT's own list, `21,29,39,59,79,99,119,141`)
+- **Description**: MEGAHIT `--k-list`. For large co-assemblies, `21,41,61,81,101,121,141` took 12 % less assembly CPU time for 0.7 % less assembled sequence and no fewer bins in the assembly benchmark. MEGAHIT checks the values itself (odd, 15-255, steps of at most 28).
+- **Example**: `--megahit_k_list 21,41,61,81,101,121,141`
+
+### `--megahit_min_count`
+- **Type**: Integer
+- **Default**: `2` (MEGAHIT's default)
+- **Minimum**: `1`
+- **Description**: MEGAHIT `--min-count`, the minimum multiplicity of a k-mer kept in the graph. `3` is a setting for co-assemblies that run out of memory in the graph build or run too long: in the assembly benchmark it lowered the graph-build memory by 17 % and the CPU time by 11 %, for 5 % less sequence in contigs of at least 1 kb.
+- **Example**: `--megahit_min_count 3`
+
+**MEGAHIT memory:** per-sample assembly requests 72 GB on the first attempt. Co-assembly requests 6 GB per GB of gzipped pooled reads (an uncompressed FASTQ counts as a quarter of its size), at least 72 GB, times the attempt. Every request is capped by `--max_memory` (default 128 GB), so a large co-assembly needs `--max_memory` raised to the node's RAM: a 404 M-read co-assembly needed ~86 GB just for MEGAHIT's graph build.
+
 ### `--bbmap_length`
 - **Type**: Integer
 - **Default**: `1000`

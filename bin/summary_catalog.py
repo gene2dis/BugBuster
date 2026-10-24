@@ -52,7 +52,7 @@ STAGES = [
     },
     {
         "key": "assembly", "title": "Assembly (MEGAHIT)",
-        "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize)",
+        "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize), --megahit_k_list, --megahit_min_count",
         "processes": ["BBNORM", "MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
         "summary": "not summarised yet",
     },

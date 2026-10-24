@@ -385,7 +385,24 @@ next release is tagged.
     for deep co-assemblies; error correction gave the same assembly for 2.3
     more CPU-hours and is not offered
 
+- **MEGAHIT settings as parameters (`--megahit_k_list`, `--megahit_min_count`)**
+  - Passed to MEGAHIT only when they differ from its defaults (MEGAHIT's own
+    k-mer list, `--min-count 2`), so the default command is unchanged
+  - Documented for large co-assemblies: `--megahit_k_list
+    21,41,61,81,101,121,141` (12 % less assembly CPU time for 0.7 % less
+    sequence and no fewer bins in the benchmark) and `--megahit_min_count 3`
+    for co-assemblies that run out of memory or time (17 % less graph-build
+    memory and 11 % less CPU time, for 5 % less sequence)
+
 ### Changed
+
+- **Co-assembly MEGAHIT memory from the input size**: the co-assembly task
+  requests 6 GB per GB of gzipped pooled reads, at least 72 GB, times the
+  attempt (was 72 GB × attempt for every MEGAHIT task); per-sample assembly
+  keeps 72 GB. A 404 M-read co-assembly needed ~86 GB for MEGAHIT's graph
+  build and failed its first attempt at 72 GB after 2 h 19 min; it now
+  requests ~150 GB. Requests are capped by `--max_memory` (default 128 GB),
+  which a large co-assembly needs raised (`docs/manual.md`)
 
 - **Less I/O in three read-level steps, same outputs**
   - `BWAMEM3_DECONTAMINATE` and `BOWTIE2_DECONTAMINATE` take the clean read
