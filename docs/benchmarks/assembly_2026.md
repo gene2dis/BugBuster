@@ -26,11 +26,11 @@ No pipeline code changed. Every MEGAHIT variant ran the pipeline's own MEGAHIT c
 | mc3klist | 10.03 | | 25,144 (127.93) | 21,344 | 87.09 % | 23 | 14 / 9 |
 | norm | 10.51 | 11.65 | 26,298 (132.45) | 19,417 | 87.45 % | 25 | 12 / 12 |
 | normecc | 10.52 | 13.97 | 26,290 (132.45) | 19,413 | 87.50 % | 24 | 11 / 11 |
-| normklist | 9.70 | 11.65 | 26,059 (131.75) | 20,180 | 87.38 % | TBD | TBD |
+| normklist | 9.70 | 11.65 | 26,059 (131.75) | 20,180 | 87.38 % | 24 | 11 / 12 |
 | full depth (reference) | 16.9 | | 34,888 (182.41) | 19,512 | 91.24 % | 35 | 17 / 18 |
 
 - **No setting changed the bins as much as depth did.** Every subsampled variant gave 23–25 refined bins and 22–24 MIMAG high plus medium bins. The full-depth assembly gave 35 and 35.
-- **The shorter k-mer list is the only change that saves time at almost no cost.** Assembly CPU time fell 12 %. Total length fell 0.7 % and contigs ≥ 2.5 kb fell 2.2 %. Both k-list variants moved bins from MIMAG medium to high (14–15 high vs 10–12 elsewhere) without changing their total.
+- **The shorter k-mer list is the only change that saves time at almost no cost.** Assembly CPU time fell 12 %. Total length fell 0.7 % and contigs ≥ 2.5 kb fell 2.2 %. Two of the three k-list variants moved bins from MIMAG medium to high (14–15 high vs 10–12 elsewhere) without changing their total; the third, on normalized reads, gave 11, so that gain is not established.
 - **`--min-count 3` trades sequence for time.** CPU time fell 11 %, but it lost 5 % of the sequence in contigs ≥ 1 kb, 9 % of those contigs, and 0.6 points of map-back. Its bins are within the baseline spread.
 - **Normalization costs more than it saves at this depth.** It kept 84 % of the pairs and saved 2.1 CPU-hours in MEGAHIT, but took 11.7 CPU-hours itself.
 - **No MEGAHIT setting lowered MEGAHIT's peak memory.** Peak anonymous memory was 4.26 GB in every run without normalization, and 3.62 GB with it. `--min-count 3` lowered only the graph build's minimum (2.4 → 2.0 GB).
@@ -143,13 +143,13 @@ Each setting raises N50 because it drops short contigs, not because the long one
 | mc3klist | 87.09 % | 49 | 49 | 23 | 14 / 7 | 14 / 9 | 95.17 / 0.70 |
 | norm | 87.45 % | 50 | 52 | 25 | 12 / 9 | 12 / 12 | 94.75 / 0.56 |
 | normecc | 87.50 % | 53 | 55 | 24 | 11 / 10 | 11 / 11 | 92.22 / 0.56 |
-| normklist | 87.38 % | TBD | TBD | TBD | TBD | TBD | TBD |
+| normklist | 87.38 % | 53 | 55 | 24 | 11 / 10 | 11 / 12 | 90.73 / 0.49 |
 | full depth | 91.24 % | 66 | 74 | 35 | 17 / 16 | 17 / 18 | 91.39 / 0.60 |
 
 Map-back and bins are against the full reads. Completeness and contamination are CheckM2's, for MetaWRAP's refined bins.
 
 - **Every variant is within the baseline spread for refined bins** (23–25 vs 23–24) and for MIMAG high plus medium (22–24 vs 23–24).
-- **The two k-list variants are outside it for MIMAG high**, in their favour: 15 and 14 vs 10–11 for the baselines and 11–12 for every other variant. Their total stayed the same, so bins moved from medium to high rather than new bins appearing. Each variant ran once, so this is a lead to check when the settings are applied, not a measured gain.
+- **Two of the three k-list variants are outside it for MIMAG high**, in their favour: klist 15 and mc3klist 14, vs 10–11 for the baselines and 11–12 for every other variant. Their total stayed the same, so bins moved from medium to high rather than new bins appearing. The third, normklist, gave 11 high, the same as the baselines and as norm (12) without the k-list. Each variant ran once, so this is a lead to check when the settings are applied, not a measured gain.
 - **Map-back fell with every setting**, by 0.2 (klist) to 0.8 points (mc3klist), against 0 between the baselines. That is roughly the share of sequence each setting dropped.
 - **Depth is what matters for the bins.** The full-depth assembly gave 35 refined bins and 17 MIMAG high, and mapped 91.2 % of the reads.
 
@@ -185,7 +185,7 @@ SemiBin2's self-training is the largest single cost of a co-assembly, larger tha
 
 **A2: expose both settings, keep MEGAHIT's defaults.**
 
-- `--megahit_k_list` default empty (MEGAHIT's own list), with `21,41,61,81,101,121,141` documented for large co-assemblies: 12 % less assembly CPU time, 0.7 % less sequence, 2.2 % fewer contigs ≥ 2.5 kb, 0.2 points less map-back, and no fewer bins (more MIMAG high in its one run). It is not the default because the MEGAHIT process also runs every per-sample assembly, which was not benchmarked, the saving is near the edge of what this machine can measure, and it is ~1.5 CPU-hours on a 12.6 CPU-hour assembly against a ~30 CPU-hour binning chain. A co-assembly-only default is the alternative if the owner wants the saving now.
+- `--megahit_k_list` default empty (MEGAHIT's own list), with `21,41,61,81,101,121,141` documented for large co-assemblies: 12 % less assembly CPU time, 0.7 % less sequence, 2.2 % fewer contigs ≥ 2.5 kb, 0.2 points less map-back, and no fewer bins (more MIMAG high in its one run, but not on normalized reads). It is not the default because the MEGAHIT process also runs every per-sample assembly, which was not benchmarked, the saving is near the edge of what this machine can measure, and it is ~1.5 CPU-hours on a 12.6 CPU-hour assembly against a ~30 CPU-hour binning chain. A co-assembly-only default is the alternative if the owner wants the saving now.
 - `--megahit_min_count` default 2. Document 3 as the setting for co-assemblies that run out of memory in the graph build or run too long: it cut the graph-build minimum by 17 % and CPU time by 11 %, for 5 % less sequence at this (understated) depth.
 
 **A3: do not adopt** for single-node runs (section above). If it is ever reconsidered for a cluster, the module would need uncompressed `/1` `/2` input, `--kcount-fraction-mem` from the task's memory, `--procs` and a shared-memory size.
