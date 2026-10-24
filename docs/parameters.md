@@ -680,7 +680,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--megahit_k_list`
 - **Type**: String (comma-separated odd k values)
 - **Default**: empty (MEGAHIT's own list, `21,29,39,59,79,99,119,141`)
-- **Description**: MEGAHIT `--k-list`. For large co-assemblies, `21,41,61,81,101,121,141` took 12 % less assembly CPU time for 0.7 % less assembled sequence and no fewer bins in the assembly benchmark. MEGAHIT checks the values itself (odd, 15-255, steps of at most 28).
+- **Description**: MEGAHIT `--k-list`. For large co-assemblies, `21,41,61,81,101,121,141` took 12 % less assembly CPU time for 0.7 % less assembled sequence and no fewer bins in the assembly benchmark. Even values are rejected at launch; MEGAHIT checks the rest itself (15-255, steps of at most 28).
 - **Example**: `--megahit_k_list 21,41,61,81,101,121,141`
 
 ### `--megahit_min_count`
@@ -690,7 +690,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: MEGAHIT `--min-count`, the minimum multiplicity of a k-mer kept in the graph. `3` is a setting for co-assemblies that run out of memory in the graph build or run too long: in the assembly benchmark it lowered the graph-build memory by 17 % and the CPU time by 11 %, for 5 % less sequence in contigs of at least 1 kb.
 - **Example**: `--megahit_min_count 3`
 
-**MEGAHIT memory:** per-sample assembly requests 72 GB on the first attempt. Co-assembly requests 6 GB per GB of gzipped pooled reads (an uncompressed FASTQ counts as a quarter of its size), at least 72 GB, times the attempt. Every request is capped by `--max_memory` (default 128 GB), so a large co-assembly needs `--max_memory` raised to the node's RAM: a 404 M-read co-assembly needed ~86 GB just for MEGAHIT's graph build.
+**MEGAHIT memory:** per-sample assembly requests 72 GB on the first attempt. Co-assembly requests 6 GB per GB of gzipped pooled reads (an uncompressed FASTQ counts as a quarter of its size), at least 72 GB, times the attempt. Every request is capped by `--max_memory` (default 128 GB), so a large co-assembly needs `--max_memory` raised to the node's RAM: a 404 M-read co-assembly needed ~86 GB just for MEGAHIT's graph build. This request is set by name (`withName: 'MEGAHIT'` in `config/modules.config`), so a site config that raises `process_high` memory does not reach MEGAHIT; set `withName: 'MEGAHIT' { memory = ... }` in a `-c` file instead.
 
 ### `--bbmap_length`
 - **Type**: Integer

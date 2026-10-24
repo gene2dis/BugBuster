@@ -541,7 +541,7 @@
                 "megahit_k_list": {
                     "type": "string",
                     "default": "",
-                    "pattern": "^$|^[0-9]+(,[0-9]+)*$",
+                    "pattern": "^$|^[0-9]*[13579](,[0-9]*[13579])*$",
                     "description": "MEGAHIT --k-list (comma-separated odd k values); empty uses MEGAHIT's own list.",
                     "help_text": "21,41,61,81,101,121,141 is the shorter list documented for large co-assemblies (12 % less assembly CPU time, 0.7 % less sequence in the assembly benchmark).",
                     "fa_icon": "fas fa-list-ol"
