@@ -58,6 +58,7 @@ def printHelp() {
       --quality_control             Enable QC and host filtering (default: ${params.quality_control})
       --read_aligner                Aligner for host removal, reads->contigs and bin depth: 'bwamem3' (needs AVX2), 'bowtie2' (default: ${params.read_aligner})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
+      --assembly_read_reduction     Reduce the assembler input only: 'none', 'normalize' (BBNorm) (default: ${params.assembly_read_reduction})
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
@@ -247,6 +248,9 @@ workflow {
     if (flagOn(params.contig_level_functional) && params.assembly_mode == 'none') {
         error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
+    if (params.assembly_read_reduction != 'none' && params.assembly_mode == 'none') {
+        error("--assembly_read_reduction ${params.assembly_read_reduction} reduces the assembler input, but --assembly_mode is 'none'")
+    }
     if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
@@ -328,7 +332,7 @@ workflow {
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
     log.info "  Read aligner         : ${params.read_aligner}"
-    log.info "  Assembly mode        : ${params.assembly_mode}"
+    log.info "  Assembly mode        : ${params.assembly_mode}${params.assembly_mode != 'none' && params.assembly_read_reduction != 'none' ? " (assembler input: ${params.assembly_read_reduction})" : ''}"
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"

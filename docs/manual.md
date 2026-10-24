@@ -26,7 +26,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 
 - **Read Quality Control**: Filtering, trimming, and host decontamination
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
-- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
+- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT, with optional BBNorm normalization of the assembler input
 - **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
 - **Bin Refinement**: Quality improvement with MetaWRAP (when two or more binners run)
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
@@ -684,7 +684,17 @@ Sylph runs with its defaults plus `-u`; its abundance tables are described in
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `--assembly_read_reduction` | `none` | `normalize`: BBNorm on the reads MEGAHIT gets (pooled under co-assembly) |
 | `--bbmap_length` | `1000` | Minimum contig length after BBMap filtering |
+
+**Only the assembler input is reduced.** With `--assembly_read_reduction
+normalize`, MEGAHIT assembles the normalized reads, and everything after it
+(BBMap's contig filter, the read alignments, coverage, binning and gene
+counting) uses the full clean reads, so abundances and bin depths are not
+affected. Normalization pays off on deep co-assemblies; on a 19.4 M-pair
+co-assembly it cost more CPU time than it saved (see
+[the assembly benchmark](benchmarks/assembly_2026.md) and `docs/parameters.md`
+for the numbers behind each setting).
 
 ### 6.8 Binning Options
 
@@ -1059,11 +1069,13 @@ results/
 │   │   └── {sample}/
 │   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_length bp)
 │   │       ├── {sample}_contig.stats           # Assembly statistics
-│   │       └── {sample}_contigs.fa             # Raw MEGAHIT contigs
+│   │       ├── {sample}_contigs.fa             # Raw MEGAHIT contigs
+│   │       └── {sample}_read_reduction.tsv     # Pairs in/kept, + {sample}_bbnorm.log (if assembly_read_reduction='normalize')
 │   └── coassembly/                             # Co-assembly (if assembly_mode='coassembly')
 │       ├── coassembly_filtered_contigs.fa      # Filtered contigs
 │       ├── coassembly_contig.stats             # Assembly statistics
-│       └── coassembly_contigs.fa               # Raw MEGAHIT contigs
+│       ├── coassembly_contigs.fa               # Raw MEGAHIT contigs
+│       └── coassembly_read_reduction.tsv       # Pairs in/kept, + coassembly_bbnorm.log (if assembly_read_reduction='normalize')
 ├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
 │   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
 │   │   └── {sample}/

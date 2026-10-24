@@ -52,8 +52,8 @@ STAGES = [
     },
     {
         "key": "assembly", "title": "Assembly (MEGAHIT)",
-        "params": "--assembly_mode (assembly | coassembly | none)",
-        "processes": ["MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
+        "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize)",
+        "processes": ["BBNORM", "MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
         "summary": "not summarised yet",
     },
     {

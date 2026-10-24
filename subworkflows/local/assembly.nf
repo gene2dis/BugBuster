@@ -8,6 +8,9 @@
         This subworkflow handles metagenome assembly using MEGAHIT, followed by contig
         filtering with BBMap, and optional read alignment with Bowtie2 or bwa-mem3
         (--read_aligner) plus SAMtools for downstream binning and coverage analysis.
+        With --assembly_read_reduction normalize, BBNorm normalizes the reads
+        MEGAHIT gets, and only those: BBMap, the alignments and everything
+        downstream use the full reads.
     
     INPUTS:
         reads: Channel of [meta, reads] tuples for per-sample assembly
@@ -31,6 +34,7 @@
 ----------------------------------------------------------------------------------------
 */
 
+include { BBNORM               } from '../../modules/local/bbnorm/main'
 include { MEGAHIT              } from '../../modules/local/megahit/main'
 include { BBMAP                } from '../../modules/local/bbmap/main'
 include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main'
@@ -60,19 +64,30 @@ workflow ASSEMBLY {
     ch_counting_bam = channel.empty()
     ch_filter_reports = channel.empty()
     ch_empty_reports = channel.empty()
+    def reduce_reads = params.assembly_read_reduction == 'normalize'
 
     //
     // Per-sample assembly mode
     //
     if ( params.assembly_mode == "assembly" ) {
+        // Assembler input: the clean reads, or their normalized copy
+        ch_assembler_reads = reads
+        if ( reduce_reads ) {
+            BBNORM(reads)
+            ch_assembler_reads = BBNORM.out.reads
+            ch_versions = ch_versions.mix(BBNORM.out.versions.first())
+        }
+
         // Assemble reads with local MEGAHIT (unified process)
-        MEGAHIT(reads)
+        MEGAHIT(ch_assembler_reads)
         
         // Collect versions
         ch_versions = ch_versions.mix(MEGAHIT.out.versions.first())
         
-        // Filter contigs by length with BBMap
-        BBMAP(MEGAHIT.out.contigs_and_reads)
+        // Filter contigs by length with BBMap. BBMAP passes its reads on to
+        // the alignment below, so with read reduction it gets the full reads
+        // rather than MEGAHIT's input
+        BBMAP(reduce_reads ? reads.join(MEGAHIT.out.contigs_only) : MEGAHIT.out.contigs_and_reads)
         
         // Collect BBMap versions
         ch_versions = ch_versions.mix(BBMAP.out.versions.first())
@@ -126,14 +141,30 @@ workflow ASSEMBLY {
             .toSortedList { a, b -> a[0].id <=> b[0].id }
             .map { items -> items.collect { item -> item[1] }.flatten() }
 
+        ch_coassembly_reads = ch_pooled_reads.map { all_reads -> [[id: "coassembly"], all_reads] }
+
+        // Assembler input: the pooled reads, or their normalized copy (one
+        // BBNorm call over every sample's reads)
+        ch_assembler_reads = ch_coassembly_reads
+        if ( reduce_reads ) {
+            BBNORM(ch_coassembly_reads)
+            ch_assembler_reads = BBNORM.out.reads
+            ch_versions = ch_versions.mix(BBNORM.out.versions.first())
+        }
+
         // Co-assemble all reads with unified MEGAHIT process
-        MEGAHIT(ch_pooled_reads.map { all_reads -> [[id: "coassembly"], all_reads] })
+        MEGAHIT(ch_assembler_reads)
         
         // Collect versions
         ch_versions = ch_versions.mix(MEGAHIT.out.versions.first())
         
-        // Filter contigs by length with unified BBMAP process
-        BBMAP(MEGAHIT.out.contigs_and_reads)
+        // Filter contigs by length with unified BBMAP process (with the full
+        // pooled reads under read reduction, as in per-sample mode)
+        BBMAP(
+            reduce_reads
+                ? ch_coassembly_reads.combine(MEGAHIT.out.contigs_only.map { _meta, contigs -> contigs })
+                : MEGAHIT.out.contigs_and_reads
+        )
         
         // Collect BBMap versions
         ch_versions = ch_versions.mix(BBMAP.out.versions.first())

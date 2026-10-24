@@ -370,6 +370,21 @@ next release is tagged.
     per-sample co-assembly counting alignments, the FUNCTIONAL_ANNOTATION
     subworkflow and its parameters)
 
+- **Optional read normalization before assembly (`--assembly_read_reduction`)**
+  - `normalize` runs BBNorm (`BBNORM`, BBMap 40.05 image, `target=100 min=2
+    prefilter=t`, heap from the task memory) on the reads MEGAHIT gets, and
+    only those: BBMap's contig filter, the read alignments, coverage, binning
+    and gene counting keep using the full clean reads. Under co-assembly the
+    pooled reads of every sample are normalized in one call; singletons pass
+    through unchanged. Default `none` (no change)
+  - `03_assembly/<sample or coassembly>/*_read_reduction.tsv` (pairs in and
+    kept) and BBNorm's log
+  - Chosen from the co-assembly benchmark (`docs/benchmarks/assembly_2026.md`):
+    on a 5-sample co-assembly of 19.4 M pairs it kept 84 % of the pairs and
+    cost 11.7 CPU-hours to save 2.1 in MEGAHIT, with the same bins, so it is
+    for deep co-assemblies; error correction gave the same assembly for 2.3
+    more CPU-hours and is not offered
+
 ### Changed
 
 - **Less I/O in three read-level steps, same outputs**

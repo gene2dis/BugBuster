@@ -1490,6 +1490,41 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects an invalid assembly_read_reduction value") {
+        // Roadmap A1: only 'none' and 'normalize' exist (nf-schema enum)
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_read_reduction = "normalize_ecc"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("assembly_read_reduction")
+        }
+    }
+
+    test("Rejects assembly_read_reduction with assembly_mode none") {
+        // Roadmap A1: the reduction only applies to the assembler input
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode           = "none"
+                assembly_read_reduction = "normalize"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--assembly_read_reduction normalize reduces the assembler input")
+        }
+    }
+
     test("Stub run wires the sylph taxonomic profiler with the registry database") {
         // No --custom_sylph_*: pins the FORMAT_SYLPH_DB / FORMAT_SYLPH_TAXONOMY
         // provisioning path for the default gtdb_r232 entry (stubbed, so
