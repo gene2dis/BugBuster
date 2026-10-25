@@ -486,6 +486,24 @@ next release is tagged.
     and date in the headers change. `BAKTA_BAKTA` now reads the version from
     `bakta --version`'s standard output only: 1.12.2 prints a Python
     `SyntaxWarning` on standard error, which ended up in `versions.yml`
+  - Kraken2 2.1.6 → 2.17.2 for `KRAKEN2` (the nf-core module, pipeline
+    override): a Seqera Containers image built from the module's recipe
+    with kraken2 2.17.2, coreutils 9.5 and pigz 2.8
+    (`community.wave.seqera.io/library/kraken2_coreutils_pigz:658cf70caab8666d`;
+    the kraken2 biocontainer has no pigz, which the module calls). It is
+    pinned for every container engine: its singularity build lacks `gzip`,
+    and kraken2 then classifies 0 reads of a gzipped input and exits 0.
+    Databases built with Kraken2 2.1.x load unchanged; on three real samples
+    of 2 M read pairs the Kraken2 and Bracken reports are byte-identical.
+    2.17.2 classifies faster and loads a database in parallel: alone, a
+    sample took ~1 min instead of ~2.3 against a 67 GB database, and three
+    samples at once against an 8 GB database 30-34 s instead of 39-47 s;
+    but three samples loading the 67 GB database at the same time took
+    7-8 min instead of ~3
+  - sourmash 4.8.11 → 4.9.4 (`quay.io/biocontainers/sourmash:4.9.4--hdfd78af_0`,
+    and the depot.galaxyproject.org singularity build of the same tag) for
+    `SOURMASH` and `SOURMASH_TAX_PREPARE`: the same taxonomy database, gather
+    columns and matches on three real samples (GTDB RS226 k31); same speed
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)
