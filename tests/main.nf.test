@@ -1609,6 +1609,44 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run wires sourmash with a custom database (no download)") {
+        // sourmash is no longer the default (roadmap M4), so pin its wiring
+        // here. tests/data/sourmash holds placeholders (an empty zip and the
+        // first row of the GTDB RS226 lineages): stubs do not read them
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "sourmash"
+                custom_sourmash_db = [
+                    "${projectDir}/tests/data/sourmash/stub_db.zip",
+                    "${projectDir}/tests/data/sourmash/stub_lineages.csv"
+                ]
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH_TAX_PREPARE") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_REPORT") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_PHYLOSEQ") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH") } == 0
+
+            assert path("${outputDir}/02_taxonomy/sourmash/test_sample1_smgather_gtdb_220_k31.with-lineages.csv").exists()
+            assert path("${outputDir}/02_taxonomy/tables/Reads_report_taxonomy.csv").exists()
+            assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("sourmash: 4.9.4")
+        }
+    }
+
     test("Stub run wires sylph with custom database and taxonomy files (no download)") {
         options "-stub"
 
