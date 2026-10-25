@@ -495,11 +495,11 @@ next release is tagged.
     and kraken2 then classifies 0 reads of a gzipped input and exits 0.
     Databases built with Kraken2 2.1.x load unchanged; on three real samples
     of 2 M read pairs the Kraken2 and Bracken reports are byte-identical.
-    2.17.2 classifies faster and loads a database in parallel: alone, a
-    sample took ~1 min instead of ~2.3 against a 67 GB database, and three
-    samples at once against an 8 GB database 30-34 s instead of 39-47 s;
-    but three samples loading the 67 GB database at the same time took
-    7-8 min instead of ~3
+    2.17.2 classifies faster and loads a database with 8 threads (2.1.6:
+    one): alone, a sample took ~1 min instead of ~2.3 against a 67 GB
+    database, and three samples at once against an 8 GB database 30-34 s
+    instead of 39-47 s; but three samples loading the 67 GB database at the
+    same time took 7-8 min instead of ~3
   - sourmash 4.8.11 → 4.9.4 (`quay.io/biocontainers/sourmash:4.9.4--hdfd78af_0`,
     and the depot.galaxyproject.org singularity build of the same tag) for
     `SOURMASH` and `SOURMASH_TAX_PREPARE`: the same taxonomy database, gather
