@@ -1,5 +1,7 @@
 process SOURMASH {
-    container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'
+    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/sourmash:4.9.4--hdfd78af_0' :
+        'quay.io/biocontainers/sourmash:4.9.4--hdfd78af_0' }"
 
     tag "${meta.id}"
     label 'process_single'
@@ -50,8 +52,9 @@ process SOURMASH {
             unclassified=\$(echo "1 \${classified}" | awk '{print \$1 - \$2}')
         else
             # No matches found - create a header-only CSV matching the real
-            # sourmash 4.8 gather + tax annotate output so downstream parsers
-            # can recognize the format (captured from sourmash 4.8.11)
+            # sourmash gather + tax annotate output so downstream parsers
+            # can recognize the format (captured from sourmash 4.8.11; 4.9.4
+            # writes the same 33 columns)
             echo "intersect_bp,f_orig_query,f_match,f_unique_to_query,f_unique_weighted,average_abund,median_abund,std_abund,filename,name,md5,f_match_orig,unique_intersect_bp,gather_result_rank,remaining_bp,query_filename,query_name,query_md5,query_bp,ksize,moltype,scaled,query_n_hashes,query_abundance,query_containment_ani,match_containment_ani,average_containment_ani,max_containment_ani,potential_false_negative,n_unique_weighted_found,sum_weighted_found,total_weighted_hashes,lineage" > ${prefix}_smgather_${db_name}.with-lineages.csv
             classified=0
             unclassified=1
@@ -80,7 +83,7 @@ process SOURMASH {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            sourmash: 4.8.11
+            sourmash: 4.9.4
         END_VERSIONS
         """
 }

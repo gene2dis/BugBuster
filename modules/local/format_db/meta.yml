@@ -30,7 +30,7 @@ tools:
       doi: "10.1101/2025.10.08.681127"
       licence: ["GPL-3.0"]
   - sourmash:
-      description: FracMinHash sketching and comparison toolkit; sourmash tax prepare converts the lineage CSV into a SQLite taxonomy database (4.8.11)
+      description: FracMinHash sketching and comparison toolkit; sourmash tax prepare converts the lineage CSV into a SQLite taxonomy database (4.9.4)
       homepage: https://sourmash.readthedocs.io/
       documentation: https://sourmash.readthedocs.io/
       doi: "10.21105/joss.00027"
