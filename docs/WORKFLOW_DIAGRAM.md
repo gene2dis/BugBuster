@@ -320,7 +320,7 @@ flowchart TD
 | `quality_control` | `true` | Enable QC and host filtering |
 | `read_aligner` | `'bwamem3'` | Aligner for host removal, reads→contigs and bin depth: 'bwamem3', or 'bowtie2' (fallback for CPUs without AVX2 or < ~75 GB RAM) |
 | `assembly_mode` | `'assembly'` | Assembly mode: 'assembly', 'coassembly', 'none' |
-| `taxonomic_profiler` | `'sourmash'` | Profiler: 'kraken2', 'sourmash', 'sylph', 'none' |
+| `taxonomic_profiler` | `'sylph'` | Profiler: 'kraken2', 'sourmash', 'sylph', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |

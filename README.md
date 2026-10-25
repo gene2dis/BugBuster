@@ -209,7 +209,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--output` | *required* | Output directory |
 | `--quality_control` | `true` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, or `none` |
+| `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, or `none` (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | Enable binning and refinement |
 | `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
 | `--min_read_sample` | `0` | Minimum reads required after QC |

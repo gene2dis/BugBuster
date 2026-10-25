@@ -469,7 +469,7 @@ breaks `-resume`.
 |-----------|---------|---------|-------------|
 | `--quality_control` | `true` | `true`, `false` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
-| `--taxonomic_profiler` | `sourmash` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool |
+| `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables MetaWRAP |
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |

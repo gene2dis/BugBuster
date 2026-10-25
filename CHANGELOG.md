@@ -397,6 +397,17 @@ next release is tagged.
 
 ### Changed
 
+- **Default taxonomic profiler is now sylph** (`--taxonomic_profiler sylph`,
+  was `sourmash`): sylph profile + sylph-tax against GTDB r232. A run that
+  keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of
+  sylph-tax metadata) unless `--custom_sylph_db` and
+  `--custom_sylph_taxonomy` point at local copies; sourmash runs needed a
+  17 GB GTDB r220 download. Results are not comparable with sourmash runs
+  (different method, database and GTDB release): set
+  `--taxonomic_profiler sourmash` to continue a series of sourmash results.
+  On three real samples of 2 M read pairs, `SYLPH_PROFILE` took 15-22 s per
+  sample at 4 CPUs where `SOURMASH` took 19-23 min on one CPU
+
 - **Co-assembly MEGAHIT memory from the input size**: the co-assembly task
   requests 6 GB per GB of gzipped pooled reads, at least 72 GB, times the
   attempt (was 72 GB × attempt for every MEGAHIT task); per-sample assembly
