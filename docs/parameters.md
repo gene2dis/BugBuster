@@ -673,7 +673,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Type**: String
 - **Default**: `none`
 - **Options**: `none`, `normalize`
-- **Description**: Reduce the reads MEGAHIT assembles. `normalize` runs BBNorm (`bbnorm.sh target=100 min=2 prefilter=t`, heap from the task memory) on the assembler input only: BBMap, the read alignments, coverage, binning and gene counting use the full clean reads. Under co-assembly the pooled reads of every sample are normalized together; singletons pass through unchanged. Pairs in and kept are written to `03_assembly/<sample or coassembly>/*_read_reduction.tsv`, with BBNorm's log next to it. Requires `--assembly_mode assembly` or `coassembly`.
+- **Description**: Reduce the reads MEGAHIT assembles. `normalize` runs BBNorm (`bbnorm.sh target=100 min=2 prefilter=t`, heap from the task memory) on the assembler input only: BBMap, the read alignments, coverage, binning and gene counting use the full clean reads. Under co-assembly the pooled reads of every sample are normalized together; singletons pass through unchanged. Pairs in and kept are written to `03_assembly/per_sample/<sample>/` or `03_assembly/coassembly/` (`*_read_reduction.tsv`), with BBNorm's log next to it. Requires `--assembly_mode assembly` or `coassembly`.
 - **When to use it**: deep co-assemblies, where most reads come from a few highly covered genomes. In the [assembly benchmark](benchmarks/assembly_2026.md) (a 5-sample co-assembly of 19.4 M pairs) it kept 84 % of the pairs and cost 11.7 CPU-hours to save 2.1 in MEGAHIT, with the same bins; the saving grows with depth.
 - **Example**: `--assembly_read_reduction normalize`
 

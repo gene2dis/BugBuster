@@ -158,7 +158,7 @@ nextflow_process {
         }
     }
 
-    test("keeps each pooled singleton file as its own link") {
+    test("keeps each pooled singleton file as its own copy") {
         when {
             params {
                 max_cpus   = 2
@@ -189,6 +189,8 @@ nextflow_process {
             assert reads.collect { f -> new File(f.toString()).name } ==
                 ['coassembly_norm_R1.fastq.gz', 'coassembly_norm_R2.fastq.gz',
                  'coassembly_norm_singleton_1.fastq.gz', 'coassembly_norm_singleton_2.fastq.gz']
+            // Copies, not links: MEGAHIT's container may not see the link's target
+            reads.drop(2).each { f -> assert !java.nio.file.Files.isSymbolicLink(new File(f.toString()).toPath()) }
             def row = path(process.out.report[0]).readLines()[1].split('\t')
             assert row[2] as Integer == 20
         }

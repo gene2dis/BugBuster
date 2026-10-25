@@ -87,32 +87,15 @@ process BBNORM {
         exit 1
     fi
 
-    # Pairs in and kept, counted from the files (BBNorm logs reads per input
-    # file pair and per pass). The input is counted while BBNorm runs.
-    count_reads() {
-        case "\$1" in
-            *.gz) gzip -cd "\$1" ;;
-            *)    cat "\$1" ;;
-        esac | awk 'END { print NR / 4 }'
-    }
-    count_pairs_in() {
-        local n=0 c f
-        for f in "\${R1_files[@]}"; do
-            c=\$(count_reads "\$f")
-            n=\$(( n + c ))
-        done
-        echo "\$n" > .pairs_in
-    }
-    count_pairs_in &
-    count_pid=\$!
-
     # BBNorm reads its input more than once, so no pipes: several files go in
     # as comma-separated lists, read one pair of files after the other
     in1=\$(IFS=,; echo "\${R1_files[*]}")
     in2=\$(IFS=,; echo "\${R2_files[*]}")
 
-    # Its log is published; on failure its end goes to stderr for the report
-    if ! bbnorm.sh ${heap} \\
+    # Its log is published; on failure its end goes to stderr for the report,
+    # and its exit status is kept (137 from an out-of-memory kill is retried)
+    rc=0
+    bbnorm.sh ${heap} \\
         in1="\$in1" \\
         in2="\$in2" \\
         out1=${prefix}_norm_R1.fastq.gz \\
@@ -120,15 +103,17 @@ process BBNORM {
         threads=${task.cpus} \\
         zl=4 \\
         ${args} \\
-        2> ${prefix}_bbnorm.log; then
-        kill \$count_pid 2> /dev/null || true
+        2> ${prefix}_bbnorm.log || rc=\$?
+    if [ \$rc -ne 0 ]; then
         tail -n 50 ${prefix}_bbnorm.log >&2
-        exit 1
+        exit \$rc
     fi
 
-    # Singletons go to the assembler unchanged (links, compression kept):
-    # BBNorm cannot write paired and unpaired reads in one call, and they are
-    # a small share of the reads. Several (co-assembly) stay separate files.
+    # Singletons go to the assembler unchanged (compression kept): BBNorm
+    # cannot write paired and unpaired reads in one call, and they are a small
+    # share of the reads. Several (co-assembly) stay separate files. They are
+    # copied, not linked: a link to the staged input can point outside what
+    # MEGAHIT's container mounts (raw reads elsewhere when QC is off).
     singleton_suffix() {
         case "\$1" in
             *.gz)  echo fastq.gz ;;
@@ -137,16 +122,19 @@ process BBNORM {
         esac
     }
     if [ \${#S_files[@]} -eq 1 ]; then
-        ln -s "\${S_files[0]}" ${prefix}_norm_singleton.\$(singleton_suffix "\${S_files[0]}")
+        cp -L "\${S_files[0]}" ${prefix}_norm_singleton.\$(singleton_suffix "\${S_files[0]}")
     else
         for i in "\${!S_files[@]}"; do
-            ln -s "\${S_files[i]}" ${prefix}_norm_singleton_\$(( i + 1 )).\$(singleton_suffix "\${S_files[i]}")
+            cp -L "\${S_files[i]}" ${prefix}_norm_singleton_\$(( i + 1 )).\$(singleton_suffix "\${S_files[i]}")
         done
     fi
 
-    wait \$count_pid
-    pairs_in=\$(cat .pairs_in)
-    pairs_kept=\$(count_reads ${prefix}_norm_R1.fastq.gz)
+    # Pairs in from BBNorm's log (pass 1 logs the reads of each input file
+    # pair, so the input is not read again); pairs kept counted from R1
+    pairs_in=\$(awk '/\\*  *Pass [0-9]/ { pass = \$3 }
+        pass == 1 && /^Total reads in:/ { n += \$4 }
+        END { printf "%d", n / 2 }' ${prefix}_bbnorm.log)
+    pairs_kept=\$(gzip -cd ${prefix}_norm_R1.fastq.gz | awk 'END { printf "%d", NR / 4 }')
 
     printf 'sample_id\\tmethod\\tpairs_in\\tpairs_kept\\tpercent_kept\\n' > ${prefix}_read_reduction.tsv
     awk -v s=${prefix} -v i="\$pairs_in" -v k="\$pairs_kept" \\

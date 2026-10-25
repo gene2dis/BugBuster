@@ -377,8 +377,8 @@ next release is tagged.
     and gene counting keep using the full clean reads. Under co-assembly the
     pooled reads of every sample are normalized in one call; singletons pass
     through unchanged. Default `none` (no change)
-  - `03_assembly/<sample or coassembly>/*_read_reduction.tsv` (pairs in and
-    kept) and BBNorm's log
+  - `*_read_reduction.tsv` (pairs in and kept) and BBNorm's log, in
+    `03_assembly/per_sample/<sample>/` or `03_assembly/coassembly/`
   - Chosen from the co-assembly benchmark (`docs/benchmarks/assembly_2026.md`):
     on a 5-sample co-assembly of 19.4 M pairs it kept 84 % of the pairs and
     cost 11.7 CPU-hours to save 2.1 in MEGAHIT, with the same bins, so it is

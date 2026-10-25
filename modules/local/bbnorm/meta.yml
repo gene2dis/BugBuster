@@ -24,11 +24,11 @@ input:
 output:
   - reads:
       type: tuple
-      description: Tuple of meta and the normalized reads, sorted by name (R1, R2, then the singletons when there are any); singletons are links to the input files, one per file, with their compression kept
+      description: Tuple of meta and the normalized reads, sorted by name (R1, R2, then the singletons when there are any); singletons are copies of the input files, one per file, with their compression kept
       pattern: "*_norm_{R1.fastq.gz,R2.fastq.gz,singleton*}"
   - report:
       type: file
-      description: TSV with sample_id, method (bbnorm), pairs_in, pairs_kept and percent_kept, counted from the files
+      description: TSV with sample_id, method (bbnorm), pairs_in, pairs_kept and percent_kept (pairs in from the BBNorm log, pairs kept counted from the output)
       pattern: "*_read_reduction.tsv"
   - log:
       type: file
