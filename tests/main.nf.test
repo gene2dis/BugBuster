@@ -1561,7 +1561,8 @@ nextflow_pipeline {
         }
     }
 
-    test("Stub run wires the sylph taxonomic profiler with the registry database") {
+    test("Stub run wires the default taxonomic profiler (sylph) with the registry database") {
+        // No --taxonomic_profiler: pins sylph as the default (roadmap M4).
         // No --custom_sylph_*: pins the FORMAT_SYLPH_DB / FORMAT_SYLPH_TAXONOMY
         // provisioning path for the default gtdb_r232 entry (stubbed, so
         // nothing is downloaded)
@@ -1573,7 +1574,6 @@ nextflow_pipeline {
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "none"
-                taxonomic_profiler = "sylph"
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
