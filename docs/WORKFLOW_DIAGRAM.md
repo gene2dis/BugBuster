@@ -505,7 +505,7 @@ results/
 ## Execution Modes
 
 ### Mode 1: Default Run
-- QC → Taxonomy (Sourmash) → per-sample Assembly (MEGAHIT + BBMap contig filter)
+- QC → Taxonomy (Sylph) → per-sample Assembly (MEGAHIT + BBMap contig filter)
 - Binning, ARG prediction and functional annotation are off by default; the
   full pipeline needs their flags, e.g.
   `--include_binning true --binners semibin,metabat2 --read_arg_prediction true --contig_tax_and_arg true --contig_level_functional true`

@@ -328,7 +328,8 @@ Specify custom database paths to skip automatic downloads:
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --custom_kraken_db /shared/databases/bugbuster/kraken2_standard8 \
+    --custom_sylph_db /shared/databases/bugbuster/sylph/gtdb-r232-c200-dbv2.syl2db \
+    --custom_sylph_taxonomy /shared/databases/bugbuster/sylph/gtdb_r232_metadata.tsv.gz \
     --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
@@ -1660,6 +1661,7 @@ nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
     --databases_dir /shared/databases/bugbuster \
+    --taxonomic_profiler kraken2 \
     --custom_kraken_db /shared/databases/bugbuster/kraken2_gtdb220 \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
@@ -1731,7 +1733,9 @@ params {
     max_time   = '120.h'
     
     // Pre-downloaded databases
-    custom_kraken_db         = '/shared/db/kraken2_standard8'
+    custom_sylph_db          = '/shared/db/sylph/gtdb-r232-c200-dbv2.syl2db'
+    custom_sylph_taxonomy    = '/shared/db/sylph/gtdb_r232_metadata.tsv.gz'
+    custom_kraken_db         = '/shared/db/kraken2_standard8'   // used with --taxonomic_profiler kraken2
     custom_checkm2_db        = '/shared/db/checkm2/uniref100.KO.1.dmnd'
     custom_gtdbtk_db              = '/shared/db/release232'
     custom_decontamination_index  = '/shared/db/bwamem3_index/contaminants_index'
@@ -1854,7 +1858,7 @@ export NXF_SINGULARITY_CACHEDIR=/path/to/cache
 curl -I https://genome-idx.s3.amazonaws.com
 
 # Manually download and specify custom path
---custom_kraken_db /path/to/manually/downloaded/db
+--taxonomic_profiler kraken2 --custom_kraken_db /path/to/manually/downloaded/db
 ```
 
 #### SLURM Job Failures

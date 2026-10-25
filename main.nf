@@ -288,6 +288,14 @@ workflow {
     if (params.taxonomic_profiler == 'sylph' && (params.custom_sylph_db as boolean) != (params.custom_sylph_taxonomy as boolean)) {
         error("--custom_sylph_db and --custom_sylph_taxonomy must be given together: a sylph database and the sylph-tax metadata of the same release (e.g. gtdb-r232-c200-dbv2.syl2db with gtdb_r232_metadata.tsv.gz). Pass both, or neither to download the --sylph_db entry")
     }
+    // The default profiler is sylph since 2.0.0 (before, sourmash): a command
+    // that names only another profiler's database would now download the
+    // sylph database and ignore its own, so say so before the downloads start
+    def custom_tax_dbs = [kraken2: params.custom_kraken_db, sourmash: params.custom_sourmash_db, sylph: params.custom_sylph_db]
+    def other_tax_dbs = custom_tax_dbs.findAll { profiler, db -> db && profiler != params.taxonomic_profiler }.keySet()
+    if (params.taxonomic_profiler != 'none' && !custom_tax_dbs[params.taxonomic_profiler] && other_tax_dbs) {
+        log.warn "--taxonomic_profiler is ${params.taxonomic_profiler} (the default is sylph since 2.0.0), which ignores the custom ${other_tax_dbs.join(' and ')} database given and downloads its registry database. Set --taxonomic_profiler ${other_tax_dbs[0]} to use it"
+    }
     def valid_superfocus_aligners = ['diamond', 'mmseqs2']
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
         error("Invalid --superfocus_aligner '${params.superfocus_aligner}'. Valid options: ${valid_superfocus_aligners.join(', ')}")
