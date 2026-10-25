@@ -294,7 +294,8 @@ workflow {
     def custom_tax_dbs = [kraken2: params.custom_kraken_db, sourmash: params.custom_sourmash_db, sylph: params.custom_sylph_db]
     def other_tax_dbs = custom_tax_dbs.findAll { profiler, db -> db && profiler != params.taxonomic_profiler }.keySet()
     if (params.taxonomic_profiler != 'none' && !custom_tax_dbs[params.taxonomic_profiler] && other_tax_dbs) {
-        log.warn "--taxonomic_profiler is ${params.taxonomic_profiler} (the default is sylph since 2.0.0), which ignores the custom ${other_tax_dbs.join(' and ')} database given and downloads its registry database. Set --taxonomic_profiler ${other_tax_dbs[0]} to use it"
+        def default_note = params.taxonomic_profiler == 'sylph' ? ' (the default since 2.0.0; before, sourmash)' : ''
+        log.warn "--taxonomic_profiler is ${params.taxonomic_profiler}${default_note}: it ignores the custom ${other_tax_dbs.join(' and ')} database${other_tax_dbs.size() > 1 ? 's' : ''} given and downloads its own registry database. To use a custom one, set --taxonomic_profiler ${other_tax_dbs.join(' or ')}"
     }
     def valid_superfocus_aligners = ['diamond', 'mmseqs2']
     if (!(params.superfocus_aligner in valid_superfocus_aligners)) {
