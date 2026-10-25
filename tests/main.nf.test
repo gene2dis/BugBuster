@@ -1641,7 +1641,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_PHYLOSEQ") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH") } == 0
 
-            assert path("${outputDir}/02_taxonomy/sourmash/test_sample1_smgather_gtdb_220_k31.with-lineages.csv").exists()
+            // a custom database is still labelled with the --sourmash_db key
+            // (unlike sylph's file-name label), so the name is not pinned here
+            assert path("${outputDir}/02_taxonomy/sourmash").list().count { f -> f.fileName.toString() ==~ /test_sample1_smgather_.+\.with-lineages\.csv/ } == 1
             assert path("${outputDir}/02_taxonomy/tables/Reads_report_taxonomy.csv").exists()
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("sourmash: 4.9.4")
         }
