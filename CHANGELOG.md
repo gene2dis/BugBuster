@@ -389,8 +389,9 @@ next release is tagged.
   - Passed to MEGAHIT only when they differ from its defaults (MEGAHIT's own
     k-mer list, `--min-count 2`), so the default command is unchanged
   - Documented for large co-assemblies: `--megahit_k_list
-    21,41,61,81,101,121,141` (12 % less assembly CPU time for 0.7 % less
-    sequence and no fewer bins in the benchmark) and `--megahit_min_count 3`
+    21,41,61,81,101,121,141` (0.7 % less sequence and no fewer bins in the
+    benchmark; 12 % less assembly CPU time on the subsampled co-assembly, not
+    reproduced in one full-depth run on a loaded host) and `--megahit_min_count 3`
     for co-assemblies that run out of memory or time (17 % less graph-build
     memory and 11 % less CPU time, for 5 % less sequence)
 

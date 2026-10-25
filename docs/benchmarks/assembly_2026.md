@@ -11,7 +11,7 @@ No pipeline code changed. Every MEGAHIT variant ran the pipeline's own MEGAHIT c
 **Outcome (recommendations, for the owner's decision):**
 
 - **A1:** add normalization as an opt-in step, default off, with one mode (`normalize`, no error correction). At this depth it cost 11.7 CPU-hours to save 2.1 in the assembly. Error correction gave the same assembly for 2.3 more CPU-hours.
-- **A2:** expose `--megahit_min_count` (default 2) and `--megahit_k_list` (default: MEGAHIT's own list), and document `21,41,61,81,101,121,141` for large co-assemblies: 12 % less assembly CPU time for 0.7 % less sequence and no fewer bins, but from one co-assembly and near the edge of what this loaded machine can measure. Keep `--min-count 3` as a knob for co-assemblies that run out of memory or time, not as the default.
+- **A2:** expose `--megahit_min_count` (default 2) and `--megahit_k_list` (default: MEGAHIT's own list), and document `21,41,61,81,101,121,141` for large co-assemblies: 12 % less assembly CPU time for 0.7 % less sequence and no fewer bins, but from one co-assembly and near the edge of what this loaded machine can measure (a later full-depth run did not reproduce the CPU saving; see Machine and runs). Keep `--min-count 3` as a knob for co-assemblies that run out of memory or time, not as the default.
 - **A3:** do not add MetaHipMer2 as an assembler option for single-node runs.
 - **MEGAHIT memory:** request memory from the size of the input for co-assembly: `max(72 GB, 6 GB per GB of gzipped pooled reads) × attempt`, and tell users of large co-assemblies to raise `--max_memory` (default 128 GB), which caps every request.
 
@@ -28,6 +28,7 @@ No pipeline code changed. Every MEGAHIT variant ran the pipeline's own MEGAHIT c
 | normecc | 10.52 | 13.97 | 26,290 (132.45) | 19,413 | 87.50 % | 24 | 11 / 11 |
 | normklist | 9.70 | 11.65 | 26,059 (131.75) | 20,180 | 87.38 % | 24 | 11 / 12 |
 | full depth (reference) | 16.9 | | 34,888 (182.41) | 19,512 | 91.24 % | 35 | 17 / 18 |
+| full depth, klist (later check) | 18.7 | | 34,563 (181.25) | 19,829 | 91.06 % | 35 | 18 / 17 |
 
 - **No setting changed the bins as much as depth did.** Every subsampled variant gave 23–25 refined bins and 22–24 MIMAG high plus medium bins. The full-depth assembly gave 35 and 35.
 - **The shorter k-mer list is the only change that saves time at almost no cost.** Assembly CPU time fell 12 %. Total length fell 0.7 % and contigs ≥ 2.5 kb fell 2.2 %. Two of the three k-list variants moved bins from MIMAG medium to high (14–15 high vs 10–12 elsewhere) without changing their total; the third, on normalized reads, gave 11, so that gain is not established.
@@ -54,6 +55,8 @@ No pipeline code changed. Every MEGAHIT variant ran the pipeline's own MEGAHIT c
 - Time and memory come from the container's cgroup (CPU-seconds, peak memory, peak anonymous memory), sampled every 2 s. "Peak anon" is the process memory; the cgroup peak also counts page cache.
 
 **CPU-hours compare better than wall time, but not perfectly.** Under that load, threads share physical cores, which inflates CPU-seconds. The two baselines ran at the same time and differ by 2 %. The other variants ran at other times and loads (the baselines from 104 to 157, mc3 and klist from 130 to 201, mc3klist and the normalized ones from 185 to 229). So the 11–12 % savings of mc3 and klist are probably real but near the edge of what this machine can show. The normalization step's cost (+90 % of the assembly) is far outside that.
+
+**Check at full depth (2026-10-25, after the benchmark).** The pipeline with the new `--megahit_k_list 21,41,61,81,101,121,141`, run on the full 38.9 M pairs, was compared with the full-depth reference. Sequence and bins agreed with the subsample: 0.64 % less sequence in contigs ≥ 1 kb, map-back 91.06 % vs 91.24 %, and 35 refined bins in both (MIMAG high / medium 18 / 17 vs 17 / 18, within the baseline spread). Assembly CPU time went the other way: 18.7 CPU-hours vs 16.9 (+10 %). These CPU-hours come from the pipeline trace, not a cgroup, and the two runs were single runs on different days, this one at load ~130. So the k-list's CPU saving is not established; its small loss of sequence is.
 
 **Binning chain, per assembly:** BBMAP (1 kb filter) → bwa-mem3 index → bwa-mem3 mapping of the pooled full reads with the pipeline's filter (`--bwamem3_min_identity 0.95`, `--bwamem3_min_aligned_length 50`) → depth → MetaBAT2 and SemiBin2 (`train_self`, as in co-assembly mode) → MetaWRAP → CheckM2. The modules and `config/modules.config` came from dev `7d42827`. Map-back is the share of primary reads mapped in `samtools flagstat` of that BAM; reads failing the filter stay in it as unmapped.
 
