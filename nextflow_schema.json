@@ -539,10 +539,10 @@
                     "fa_icon": "fas fa-compress"
                 },
                 "megahit_k_list": {
-                    "type": "string",
+                    "type": ["string", "integer"],
                     "default": "",
                     "pattern": "^$|^[0-9]*[13579](,[0-9]*[13579])*$",
-                    "description": "MEGAHIT --k-list (comma-separated odd k values); empty uses MEGAHIT's own list.",
+                    "description": "MEGAHIT --k-list (comma-separated odd k values, 15-255, at most 28 apart); empty uses MEGAHIT's own list.",
                     "help_text": "21,41,61,81,101,121,141 is the shorter list documented for large co-assemblies (0.7 % less sequence and no fewer bins in the assembly benchmark; its CPU saving, 12 % on the subsampled co-assembly, was not reproduced at full depth).",
                     "fa_icon": "fas fa-list-ol"
                 },

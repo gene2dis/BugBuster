@@ -253,6 +253,15 @@ workflow {
     if (params.assembly_read_reduction != 'none' && params.assembly_mode == 'none') {
         error("--assembly_read_reduction ${params.assembly_read_reduction} reduces the assembler input, but --assembly_mode is 'none'")
     }
+    // MEGAHIT's own k-list rules, checked before hours of QC or BBNorm. A
+    // single value arrives as an Integer on Nextflow 25.10.
+    if (params.megahit_k_list.toString()) {
+        def k_values = params.megahit_k_list.toString().tokenize(',').collect { k -> k as Integer }.sort()
+        def k_steps = (1..<k_values.size()).collect { i -> k_values[i] - k_values[i - 1] }
+        if (k_values.any { k -> k < 15 || k > 255 || k % 2 == 0 } || k_steps.any { step -> step > 28 }) {
+            error("--megahit_k_list ${params.megahit_k_list}: MEGAHIT needs odd k values from 15 to 255, at most 28 apart")
+        }
+    }
     if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }

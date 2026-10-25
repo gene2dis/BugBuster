@@ -1524,6 +1524,25 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects a megahit_k_list MEGAHIT would refuse") {
+        // Roadmap A2: odd values pass the schema; the launch check applies
+        // MEGAHIT's range (15-255) and step (at most 28) rules
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode  = "assembly"
+                megahit_k_list = "21,51"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("at most 28 apart")
+        }
+    }
+
     test("Rejects assembly_read_reduction with assembly_mode none") {
         // Roadmap A1: the reduction only applies to the assembler input
         when {

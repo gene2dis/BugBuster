@@ -680,7 +680,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--megahit_k_list`
 - **Type**: String (comma-separated odd k values)
 - **Default**: empty (MEGAHIT's own list, `21,29,39,59,79,99,119,141`)
-- **Description**: MEGAHIT `--k-list`. For large co-assemblies, `21,41,61,81,101,121,141` gave 0.7 % less assembled sequence and no fewer bins in the assembly benchmark, both on the subsampled co-assembly and in one run at full depth. Its CPU saving is uncertain: 12 % less assembly CPU time on the subsampled co-assembly, but 10 % more in the full-depth run, both on a heavily loaded host. Even values are rejected at launch; MEGAHIT checks the rest itself (15-255, steps of at most 28).
+- **Description**: MEGAHIT `--k-list`. For large co-assemblies, `21,41,61,81,101,121,141` gave 0.7 % less assembled sequence and no fewer bins in the assembly benchmark, both on the subsampled co-assembly and in one run at full depth. Its CPU saving is uncertain: 12 % less assembly CPU time on the subsampled co-assembly, but 10 % more in the full-depth run, both on a heavily loaded host. The values must be odd, from 15 to 255 and at most 28 apart (MEGAHIT's own rules, checked at launch).
 - **Example**: `--megahit_k_list 21,41,61,81,101,121,141`
 
 ### `--megahit_min_count`
