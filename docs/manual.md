@@ -26,7 +26,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 
 - **Read Quality Control**: Filtering, trimming, and host decontamination
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
-- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT
+- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT, with optional BBNorm normalization of the assembler input
 - **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
 - **Bin Refinement**: Quality improvement with MetaWRAP (when two or more binners run)
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
@@ -84,11 +84,14 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
 - **Set `--max_memory` to the node's RAM** (default 128 GB). Task requests are
   capped by it, and on a local machine it is also the memory pool Nextflow
   schedules from, so it decides what runs, not the table above. Decontamination
-  and MEGAHIT request 72 GB each on the first attempt (`process_high`), although
-  decontamination peaked at ~16 GB. A deep co-assembly needs more: three
-  samples with 404M clean reads in total needed ~86 GB at k=21, so MEGAHIT ran
-  out of memory and is retried with 144 GB. To skip the failed attempt on
-  deep co-assemblies, raise the request in a `-c` config file (see
+  and per-sample MEGAHIT request 72 GB each on the first attempt
+  (`process_high`), although decontamination peaked at ~16 GB. Co-assembly
+  MEGAHIT requests memory from its input: 6 GB per GB of gzipped pooled reads,
+  at least 72 GB (a co-assembly of 404M clean reads needed ~86 GB at k=21 for
+  the graph build alone; for its ~25 GB of reads, estimated, the request is
+  ~150 GB). The request is capped by `--max_memory`, so **a large co-assembly
+  needs `--max_memory` above its 128 GB default**; otherwise it gets 128 GB
+  and may run out of memory (see
   [Out of memory](troubleshooting.md#out-of-memory)). MetaWRAP bin refinement
   requests 80 GB on the first attempt (peaks of 67-69 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
@@ -684,7 +687,19 @@ Sylph runs with its defaults plus `-u`; its abundance tables are described in
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
+| `--assembly_read_reduction` | `none` | `normalize`: BBNorm on the reads MEGAHIT gets (pooled under co-assembly) |
+| `--megahit_k_list` | MEGAHIT's own list | MEGAHIT `--k-list`; `21,41,61,81,101,121,141` for large co-assemblies |
+| `--megahit_min_count` | `2` | MEGAHIT `--min-count`; `3` for co-assemblies that run out of memory or time |
 | `--bbmap_length` | `1000` | Minimum contig length after BBMap filtering |
+
+**Only the assembler input is reduced.** With `--assembly_read_reduction
+normalize`, MEGAHIT assembles the normalized reads, and everything after it
+(BBMap's contig filter, the read alignments, coverage, binning and gene
+counting) uses the full clean reads, so abundances and bin depths are not
+affected. Normalization pays off on deep co-assemblies; on a 19.4 M-pair
+co-assembly it cost more CPU time than it saved (see
+[the assembly benchmark](benchmarks/assembly_2026.md) and `docs/parameters.md`
+for the numbers behind each setting).
 
 ### 6.8 Binning Options
 
@@ -1059,11 +1074,13 @@ results/
 │   │   └── {sample}/
 │   │       ├── {sample}_filtered_contigs.fa    # Filtered contigs (≥ bbmap_length bp)
 │   │       ├── {sample}_contig.stats           # Assembly statistics
-│   │       └── {sample}_contigs.fa             # Raw MEGAHIT contigs
+│   │       ├── {sample}_contigs.fa             # Raw MEGAHIT contigs
+│   │       └── {sample}_read_reduction.tsv     # Pairs in/kept, + {sample}_bbnorm.log (if assembly_read_reduction='normalize')
 │   └── coassembly/                             # Co-assembly (if assembly_mode='coassembly')
 │       ├── coassembly_filtered_contigs.fa      # Filtered contigs
 │       ├── coassembly_contig.stats             # Assembly statistics
-│       └── coassembly_contigs.fa               # Raw MEGAHIT contigs
+│       ├── coassembly_contigs.fa               # Raw MEGAHIT contigs
+│       └── coassembly_read_reduction.tsv       # Pairs in/kept, + coassembly_bbnorm.log (if assembly_read_reduction='normalize')
 ├── 04_binning/                                 # Metagenomic binning (if include_binning=true)
 │   ├── per_sample/                             # Per-sample binning (if assembly_mode='assembly')
 │   │   └── {sample}/
