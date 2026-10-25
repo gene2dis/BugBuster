@@ -702,6 +702,17 @@ next release is tagged.
 
 ### Fixed
 
+- **sourmash failures reported as unclassified samples**: `SOURMASH` ran
+  `sourmash gather ... || true`, so a failed gather (e.g.
+  `--sourmash_tax_rank genus` or `strain`, which pick k=21 or k=51, against
+  the k31-only GTDB database) gave a header-only table and 100 %
+  unclassified with exit 0; sourmash 4.9.4 exits 0 with no table when
+  nothing matches, which the module still handles, and an error now fails
+  the task. Uncompressed reads (`--quality_control false`) were streamed
+  through `zcat`, which failed inside the process substitution and left an
+  empty sketch; sourmash now reads the files itself (`--merge`, the same
+  signature as before on gzipped reads)
+
 - **DeepARG used every core on the host**: `deeparg predict` runs DIAMOND
   with no thread count, so DIAMOND started one thread per host core (81 on
   an 80-core server) in an 8-CPU task, and the image's OpenBLAS did the same

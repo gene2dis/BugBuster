@@ -33,14 +33,18 @@ process SOURMASH {
             reads instanceof List && reads.size() > 1 ? "${reads[0]} ${reads[1]}" : "${reads[0]}"
 
         """
-        # Sketch reads with appropriate k-mer size
-        sourmash sketch dna <(zcat ${input_reads}) -p k=${kmer},scaled=1000,abund -o ${prefix}.sig
+        # Sketch reads with appropriate k-mer size; sourmash reads gzipped or
+        # plain FASTQ itself and --merge gives one signature for all the files
+        # (the same hashes and abundances as sketching them concatenated)
+        sourmash sketch dna ${input_reads} -p k=${kmer},scaled=1000,abund --merge "${prefix}" -o ${prefix}.sig
         
         # Rename signature for clarity
         sourmash signature rename ${prefix}.sig "${prefix}" -o ${prefix}_k${kmer}_renamed.sig
         
-        # Gather matches against database (allow failure if no matches found)
-        sourmash gather ${prefix}_k${kmer}_renamed.sig ${db} -k ${kmer} -o ${prefix}_smgather_${db_name}.csv || true
+        # Gather matches against database. No match exits 0 and writes no CSV;
+        # an error (e.g. no signature of this k-mer size in the database, an
+        # empty sketch) exits non-zero and fails the task
+        sourmash gather ${prefix}_k${kmer}_renamed.sig ${db} -k ${kmer} -o ${prefix}_smgather_${db_name}.csv
         
         # Check if gather produced results
         if [ -f "${prefix}_smgather_${db_name}.csv" ] && [ -s "${prefix}_smgather_${db_name}.csv" ]; then

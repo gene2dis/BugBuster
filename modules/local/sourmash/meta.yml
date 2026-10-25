@@ -20,7 +20,7 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - reads:
       type: file
-      description: Host-removed reads [R1, R2] or [R1, R2, Singleton] (gzipped; streamed together with zcat into one sketch)
+      description: Host-removed reads [R1, R2] or [R1, R2, Singleton] (gzipped or plain FASTQ; sketched together into one signature with --merge)
       pattern: "*.fastq.gz"
   - db:
       type: file
