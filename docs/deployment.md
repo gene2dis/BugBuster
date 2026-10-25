@@ -293,7 +293,8 @@ Then specify paths:
 
 ```bash
 nextflow run main.nf \
-    --custom_kraken_db /shared/db/kraken2/standard-8 \
+    --custom_sylph_db /shared/db/sylph/gtdb-r232-c200-dbv2.syl2db \
+    --custom_sylph_taxonomy /shared/db/sylph/gtdb_r232_metadata.tsv.gz \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
     --custom_eggnog_db /shared/db/eggnog/eggnog_db \

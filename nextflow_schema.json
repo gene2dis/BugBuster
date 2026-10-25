@@ -59,7 +59,7 @@
                 },
                 "taxonomic_profiler": {
                     "type": "string",
-                    "default": "sourmash",
+                    "default": "sylph",
                     "enum": [
                         "kraken2",
                         "sourmash",
@@ -67,6 +67,7 @@
                         "none"
                     ],
                     "description": "Software for taxonomic profiling at read level.",
+                    "help_text": "Default 'sylph' (since 2.0.0; before, 'sourmash'): sylph profile + sylph-tax against GTDB r232 (--sylph_db; the default database is a 19 GB download, or pass --custom_sylph_db with --custom_sylph_taxonomy). Results from different profilers or databases are not comparable; set --taxonomic_profiler sourmash to continue a series of sourmash runs.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "include_binning": {

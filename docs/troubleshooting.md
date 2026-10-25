@@ -764,7 +764,8 @@ ERROR: Failed to download database from URL
 2. Use pre-downloaded databases:
    ```bash
    nextflow run main.nf \
-       --custom_kraken_db /path/to/kraken_db \
+       --custom_sylph_db /path/to/gtdb-r232-c200-dbv2.syl2db \
+       --custom_sylph_taxonomy /path/to/gtdb_r232_metadata.tsv.gz \
        --custom_checkm2_db /path/to/checkm2_db \
        ...
    ```

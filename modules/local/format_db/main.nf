@@ -461,7 +461,9 @@ process FORMAT_KMARVEL_DB {
 
 process SOURMASH_TAX_PREPARE {
 
-    container 'quay.io/biocontainers/sourmash:4.8.11--hdfd78af_0'
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/sourmash:4.9.4--hdfd78af_0' :
+        'quay.io/biocontainers/sourmash:4.9.4--hdfd78af_0' }"
 
     tag "sourmash_tax_prepare"
     label 'process_single'
@@ -489,7 +491,7 @@ process SOURMASH_TAX_PREPARE {
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            sourmash: 4.8.11
+            sourmash: 4.9.4
         END_VERSIONS
         """
 }

@@ -397,6 +397,29 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
+  to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
+  r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of
+  sylph-tax metadata) unless `--custom_sylph_db` and
+  `--custom_sylph_taxonomy` point at local copies; sourmash runs needed a
+  17 GB GTDB r220 download. Results are not comparable with sourmash runs
+  (different method, database and GTDB release): set
+  `--taxonomic_profiler sourmash` to continue a series of sourmash results.
+  On three real samples of 2 M read pairs, `SYLPH_PROFILE` took 15-22 s per
+  sample at 4 CPUs where `SOURMASH` took 19-23 min on one CPU. What else
+  changes for an existing setup:
+  - singleton reads are no longer profiled: sylph reads R1/R2 only (it
+    would treat a singleton file as a separate sample), where sourmash
+    sketched R1, R2 and the singletons together
+  - `SYLPH_PROFILE` requests 4 CPUs and 12 GB with the default two-stage
+    database (36 GB for a single-stage `.syldb`), where `SOURMASH` requested
+    1 CPU and 4 GB
+  - `--custom_sourmash_db` alone no longer runs sourmash: pass
+    `--taxonomic_profiler sourmash` with it (a custom Kraken2 database
+    already needed `--taxonomic_profiler kraken2`). The pipeline warns at
+    launch when the selected profiler has no custom database and another
+    profiler's does
+
 - **Co-assembly MEGAHIT memory from the input size**: the co-assembly task
   requests 6 GB per GB of gzipped pooled reads, at least 72 GB, times the
   attempt (was 72 GB × attempt for every MEGAHIT task); per-sample assembly
@@ -475,6 +498,27 @@ next release is tagged.
     and date in the headers change. `BAKTA_BAKTA` now reads the version from
     `bakta --version`'s standard output only: 1.12.2 prints a Python
     `SyntaxWarning` on standard error, which ended up in `versions.yml`
+  - Kraken2 2.1.6 → 2.17.2 for `KRAKEN2` (the nf-core module, pipeline
+    override): a Seqera Containers image built from the module's recipe
+    with kraken2 2.17.2, coreutils 9.5 and pigz 2.8
+    (`community.wave.seqera.io/library/kraken2_coreutils_pigz:658cf70caab8666d`;
+    the kraken2 biocontainer has no pigz, which the module calls). It is
+    pinned for every container engine: its singularity build lacks `gzip`,
+    and kraken2 then classifies 0 reads of a gzipped input and exits 0.
+    Databases built with Kraken2 2.1.x load unchanged; on three real samples
+    of 2 M read pairs the Kraken2 and Bracken reports are byte-identical.
+    2.17.2 classifies faster and loads a database with 8 threads (2.1.6:
+    one): alone, a sample took ~1 min instead of ~2.3 against a 67 GB
+    database, and three samples at once against an 8 GB database 30-34 s
+    instead of 39-47 s; but three samples loading the 67 GB database at the
+    same time took 7-8 min instead of ~3
+  - sourmash 4.8.11 → 4.9.4 (`quay.io/biocontainers/sourmash:4.9.4--hdfd78af_0`,
+    and, under singularity and apptainer, the depot.galaxyproject.org
+    singularity build of the same tag; before, the docker image for every
+    engine) for `SOURMASH` and `SOURMASH_TAX_PREPARE`: the same taxonomy
+    database, gather columns and matches on three real samples (GTDB RS226
+    k31); same speed. Both processes ran under apptainer from the sif with
+    docker's outputs
   - ubuntu 22.04 → 24.04 for `QFILTER`, `COUNT_READS` and
     `CONTIG_FILTER_SUMMARY` (read counts identical; `software_versions.yml`
     now shows bash 5.2.21 and gzip 1.12)
@@ -657,6 +701,17 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **sourmash failures reported as unclassified samples**: `SOURMASH` ran
+  `sourmash gather ... || true`, so a failed gather (e.g.
+  `--sourmash_tax_rank genus` or `strain`, which pick k=21 or k=51, against
+  the k31-only GTDB database) gave a header-only table and 100 %
+  unclassified with exit 0; sourmash 4.9.4 exits 0 with no table when
+  nothing matches, which the module still handles, and an error now fails
+  the task. Uncompressed reads (`--quality_control false`) were streamed
+  through `zcat`, which failed inside the process substitution and left an
+  empty sketch; sourmash now reads the files itself (`--merge`, the same
+  signature as before on gzipped reads)
 
 - **DeepARG used every core on the host**: `deeparg predict` runs DIAMOND
   with no thread count, so DIAMOND started one thread per host core (81 on

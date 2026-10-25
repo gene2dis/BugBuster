@@ -77,9 +77,9 @@ Complete reference for all BugBuster pipeline parameters.
 
 ### `--taxonomic_profiler`
 - **Type**: String
-- **Default**: `sourmash`
+- **Default**: `sylph` (was `sourmash` before 2.0.0)
 - **Options**: `kraken2`, `sourmash`, `sylph`, `none`
-- **Description**: Tool for taxonomic profiling at read level. `sylph` profiles the paired clean reads by containment ANI against a sylph genome database (`sylph profile -u`) and turns the genome hits into lineages with sylph-tax; like `kraken2`, it uses R1/R2 only (a singleton file would be a separate sylph sample)
+- **Description**: Tool for taxonomic profiling at read level. `sylph` profiles the paired clean reads by containment ANI against a sylph genome database (`sylph profile -u`) and turns the genome hits into lineages with sylph-tax; like `kraken2`, it uses R1/R2 only (a singleton file would be a separate sylph sample). The default `sylph` downloads its database (GTDB r232, 19 GB) unless `--custom_sylph_db` and `--custom_sylph_taxonomy` are set. Results from different profilers (or databases) are not comparable, so keep `--taxonomic_profiler sourmash` to extend a series of runs made with the old default
 - **Example**: `--taxonomic_profiler kraken2`
 
 ### `--include_binning`
