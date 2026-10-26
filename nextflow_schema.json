@@ -633,21 +633,37 @@
                     "fa_icon": "fas fa-weight",
                     "hidden": true
                 },
-                "metawrap_completeness": {
+                "bin_min_completeness": {
                     "type": "integer",
                     "default": 50,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Minimum bin completeness threshold for MetaWRAP.",
+                    "description": "Minimum CheckM2 completeness (%) of a refined bin (Binette, with >= 2 binners).",
                     "fa_icon": "fas fa-percentage"
                 },
-                "metawrap_contamination": {
+                "bin_max_contamination": {
                     "type": "integer",
                     "default": 10,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Maximum bin contamination threshold for MetaWRAP.",
+                    "description": "Maximum CheckM2 contamination (%) of a refined bin (Binette, with >= 2 binners).",
                     "fa_icon": "fas fa-percentage"
+                },
+                "metawrap_completeness": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Deprecated alias of --bin_min_completeness (MetaWRAP was replaced by Binette).",
+                    "fa_icon": "fas fa-percentage",
+                    "hidden": true
+                },
+                "metawrap_contamination": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Deprecated alias of --bin_max_contamination (MetaWRAP was replaced by Binette).",
+                    "fa_icon": "fas fa-percentage",
+                    "hidden": true
                 },
                 "semibin_env_model": {
                     "type": "string",

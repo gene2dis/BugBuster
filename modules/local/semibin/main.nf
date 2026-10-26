@@ -58,7 +58,7 @@ process SEMIBIN {
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
         # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets MetaWRAP and the rest of the sample go on; any
+        # with a note lets Binette and the rest of the sample go on; any
         # other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then
@@ -122,7 +122,7 @@ process SEMIBIN {
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
         # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets MetaWRAP and the rest of the sample go on; any
+        # with a note lets Binette and the rest of the sample go on; any
         # other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then

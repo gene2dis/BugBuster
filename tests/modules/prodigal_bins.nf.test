@@ -3,7 +3,7 @@
     PRODIGAL_BINS Module Test
 
     Regression test for audit item #22: the `for file in *.fa` loop ran without
-    nullglob, so a bins dir holding only a MetaWRAP SKIPPED/FAILED marker (no
+    nullglob, so a bins dir holding only a refiner's SKIPPED/FAILED marker (no
     *.fa) fed prodigal a literal '*.fa' and crashed the task. It must now
     succeed with empty output dirs. Fixtures come from
     tests/bin/make_bin_fixtures.py.

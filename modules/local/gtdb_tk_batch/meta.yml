@@ -21,7 +21,7 @@ input:
   - all_bins:
       type: directory
       description: |
-        Bin directories to classify (staged as bin_?/) - single-binner outputs or MetaWRAP-refined
+        Bin directories to classify (staged as bin_?/) - single-binner outputs or Binette-refined
         directories, recognised by name with bin/identify_bin_dir.sh; bins are *.fa, *.fasta or *.fna files
   - gtdbtk_db:
       type: directory

@@ -1,11 +1,9 @@
 #!/bin/bash
 #
-# identify_bin_dir.sh <bin_dir_path> <metawrap_dir_suffix>
+# identify_bin_dir.sh <bin_dir_path>
 #
-# Recognizes a binner output directory by name and prints "<sample_id>\t<binner>".
-# The MetaWRAP directory name depends on params.metawrap_completeness/contamination
-# (e.g. "metawrap_50_10_bins"), so the expected suffix is passed in by the caller
-# instead of being hardcoded here (audit #6).
+# Recognizes a binner output directory by name and prints "<sample_id>\t<binner>";
+# Binette's refined bins (<sample>_binette_bins) report the binner "binette".
 #
 # Exits 1 on an unrecognized directory name: the batch QC/taxonomy processes only
 # receive binner output dirs, so an unknown name means a naming drift bug and must
@@ -13,17 +11,16 @@
 #
 set -euo pipefail
 
-if [ "$#" -ne 2 ]; then
-    echo "Usage: identify_bin_dir.sh <bin_dir_path> <metawrap_dir_suffix>" >&2
+if [ "$#" -ne 1 ]; then
+    echo "Usage: identify_bin_dir.sh <bin_dir_path>" >&2
     exit 2
 fi
 
 bin_dir="$1"
-metawrap_suffix="$2"
 name="$(basename "$bin_dir")"
 
-if [ -n "$metawrap_suffix" ] && [[ "$name" == *_"$metawrap_suffix" ]]; then
-    printf '%s\t%s\n' "${name%_"$metawrap_suffix"}" "metawrap"
+if [[ "$name" == *_binette_bins ]]; then
+    printf '%s\t%s\n' "${name%_binette_bins}" "binette"
 elif [[ "$name" == *_metabat_bins ]]; then
     printf '%s\t%s\n' "${name%_metabat_bins}" "metabat"
 elif [[ "$name" == *_semibin_output_bins ]]; then
@@ -43,6 +40,6 @@ elif [[ "$name" == comebin_res_bins ]]; then
         exit 1
     fi
 else
-    echo "ERROR: unrecognized bin directory name '$name' (expected *_metabat_bins, *_semibin_output_bins, *_comebin_bins, comebin_res_bins, or *_${metawrap_suffix})" >&2
+    echo "ERROR: unrecognized bin directory name '$name' (expected *_metabat_bins, *_semibin_output_bins, *_comebin_bins, comebin_res_bins or *_binette_bins)" >&2
     exit 1
 fi

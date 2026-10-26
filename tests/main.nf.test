@@ -409,7 +409,7 @@ nextflow_pipeline {
     }
 
     test("Stub run publishes assembly and binning outputs") {
-        // Pins the config-side publishing for BBMAP and METAWRAP
+        // Pins the config-side publishing for BBMAP and BINETTE
         // (config/modules.config withName blocks): their outputs must land in
         // the numbered layout. Guards the removal of the dead module-level
         // publishDir mode 'move' blocks (audit #23) and any future selector
@@ -435,14 +435,14 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().any { task -> task.name.contains("BBMAP") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("METAWRAP") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("BINETTE") }
 
             // BBMAP outputs published to the numbered assembly layout
             assert path("${outputDir}/03_assembly/per_sample/test_sample1/test_sample1_filtered_contigs.fa").exists()
             assert path("${outputDir}/03_assembly/per_sample/test_sample1/test_sample1_contig.stats").exists()
 
-            // METAWRAP refined bins published to the numbered binning layout
-            assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_metawrap_50_10_bins").exists()
+            // BINETTE refined bins published to the numbered binning layout
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_binette_bins").exists()
 
             // Audit #14: the single METABAT2 selector must deliver the FULL
             // arg set; the previously winning selector dropped these three.
@@ -1400,7 +1400,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
 
-            // Per-bin fan-out: 2 samples x 2 MetaWRAP stub bins = 4 tasks
+            // Per-bin fan-out: 2 samples x 2 Binette stub bins = 4 tasks
             assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA_BAKTA") } == 4
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_BAKTA_DB") } == 1
 
@@ -1451,7 +1451,7 @@ nextflow_pipeline {
 
     test("Rejects mag_level_functional with a single binner") {
         // T7 owner decision (2026-08-30): the only bin quality filter is
-        // MetaWRAP refinement (-c/-x), which runs only with >= 2 binners;
+        // refinement (MetaWRAP then, Binette since Phase 7b), which runs only with >= 2 binners;
         // Bakta must never see unfiltered single-binner output
         when {
             params {

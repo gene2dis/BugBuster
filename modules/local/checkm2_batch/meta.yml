@@ -23,7 +23,7 @@ input:
       description: |
         Bin directories from every binner and sample (staged as bin_?/), recognised by name with
         bin/identify_bin_dir.sh (<sample>_metabat_bins, <sample>_semibin_output_bins, COMEBin and
-        <sample>_metawrap_<completeness>_<contamination>_bins); bins are *.fa, *.fasta or *.fna files
+        <sample>_binette_bins); bins are *.fa, *.fasta or *.fna files
   - checkm_db:
       type: file
       description: CheckM2 DIAMOND database (downloaded by FORMAT_CHECKM2_DB or --custom_checkm2_db), passed to --database_path
@@ -32,12 +32,12 @@ input:
 output:
   - all_reports:
       type: tuple
-      description: Tuple of meta_list and the per-sample, per-binner CheckM2 reports (<sample>_<binner>_quality_report.tsv, sample prefix stripped from bin names; header-only for a binner with no bins); the glob also matches the MetaWRAP reports
+      description: Tuple of meta_list and the per-sample, per-binner CheckM2 reports (<sample>_<binner>_quality_report.tsv, sample prefix stripped from bin names; header-only for a binner with no bins); the glob also matches the Binette reports
       pattern: "*_*_quality_report.tsv"
-  - metawrap_report:
+  - refined_report:
       type: tuple
-      description: Optional; tuple of meta_list and the per-sample reports for MetaWRAP-refined bins, present only when MetaWRAP ran
-      pattern: "*_metawrap_quality_report.tsv"
+      description: Optional; tuple of meta_list and the per-sample reports for Binette-refined bins, present only when Binette's bins were staged
+      pattern: "*_binette_quality_report.tsv"
   - versions:
       type: file
       description: Software versions

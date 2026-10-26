@@ -397,6 +397,26 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (bin refinement)**: Binette 1.2.1 replaces MetaWRAP 1.2 for bin
+  refinement with two or more `--binners` (Phase 7a benchmark,
+  `docs/benchmarks/binning_2026.md`). On four per-sample assemblies it kept 45
+  bins, 26 of them MIMAG high quality, where MetaWRAP kept 44 (23), for 3.0
+  instead of 23.0 CPU-hours and 11 instead of 35 GB, and it found every GTDB
+  species MetaWRAP found. What changes for an existing setup:
+  - refined bins are published as `refined_bins/<sample>_binette_bins/binette_binN.fa`
+    (was `<sample>_metawrap_<completeness>_<contamination>_bins/bin.N.fa`),
+    their CheckM2 report as `<sample>_binette_quality_report.tsv` (was
+    `_metawrap_`), and the bin reports label them `Binette` (was `Metawrap`);
+    Bakta and the ARG bin clustering name their outputs after the new bins
+  - `--bin_min_completeness` / `--bin_max_contamination` (defaults 50 / 10)
+    replace `--metawrap_completeness` / `--metawrap_contamination`, which still
+    work with a warning; an old name and its new one with different values stop
+    the run at launch. Binette applies the cutoffs with CheckM2 scores
+    (MetaWRAP used CheckM 1)
+  - `BINETTE` requests 8 CPUs and 36 GB (`process_medium`); `METAWRAP`
+    requested 16 CPUs and 80 GB
+  - a binner without bins is left out of the refinement, and a single bin set
+    is refined like any other (MetaWRAP 1.2 could not refine one set)
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of

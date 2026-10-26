@@ -1,5 +1,5 @@
 name: bin_quality_report
-description: Per-sample assembly mode bin quality report (bin/bin_quality_report.py) - classifies CheckM2-assessed bins as High, Mid or Low quality, plots completeness vs contamination for raw and MetaWRAP-refined bins, and writes summary tables; warns and writes header-only tables and a placeholder plot if every report is empty, fails if no CheckM2 file is staged
+description: Per-sample assembly mode bin quality report (bin/bin_quality_report.py) - classifies CheckM2-assessed bins as High, Mid or Low quality, plots completeness vs contamination for raw and Binette-refined bins, and writes summary tables; warns and writes header-only tables and a placeholder plot if every report is empty, fails if no CheckM2 file is staged
 keywords:
   - binning
   - bin quality
@@ -27,11 +27,11 @@ input:
 output:
   - plots:
       type: file
-      description: Completeness vs contamination scatter plot, raw and refined (MetaWRAP) panels (Total_bins_quality_plot.png)
+      description: Completeness vs contamination scatter plot, raw and refined (Binette) panels (Total_bins_quality_plot.png)
       pattern: "*.png"
   - tables:
       type: file
-      description: Bin counts per binner and quality class (Mag_quality_summary.csv), all bins (All_Mag_quality_table.csv) and MetaWRAP-refined bins only (Refined_Mag_quality_table.csv)
+      description: Bin counts per binner and quality class (Mag_quality_summary.csv), all bins (All_Mag_quality_table.csv) and Binette-refined bins only (Refined_Mag_quality_table.csv)
       pattern: "*.csv"
   - versions:
       type: file

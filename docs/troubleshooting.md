@@ -504,12 +504,13 @@ harness tests.
 **Error:**
 ```
 --mag_level_functional requires --include_binning (Bakta annotates the refined bins)
---mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners ...
+--mag_level_functional requires at least two --binners: Binette refinement and its completeness/contamination quality filter only run with >= 2 binners ...
 ```
 
 **Cause:** deliberate validation, not a bug. Bakta annotates the refined bins,
 so binning must be enabled — and the pipeline's only bin quality filter is
-MetaWRAP refinement (`-c`/`-x`, defaults 50/10), which only runs when at least
+Binette refinement (`--bin_min_completeness` / `--bin_max_contamination`,
+defaults 50/10), which only runs when at least
 two binners are selected. With a single binner the bins channel carries raw,
 unfiltered binner output, and the MAG branch refuses to annotate unfiltered
 bins.
@@ -518,7 +519,7 @@ bins.
 ```bash
 nextflow run main.nf ... --include_binning --binners semibin,metabat2 --mag_level_functional
 ```
-Note that Bakta annotates every MetaWRAP-refined bin; it does not further
+Note that Bakta annotates every Binette-refined bin; it does not further
 filter on CheckM2 scores, and it does not detect or exclude
 archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before
 interpreting annotations of non-bacterial bins.
@@ -1040,16 +1041,16 @@ host removal:
 - `SemiBin found no bins`: SemiBin2 had no bin before reclustering.
 - `All contigs < <N>bp - SemiBin skipped`: no contig is long enough for SemiBin2.
 - `No bin reached <completeness>% completeness and <contamination>% contamination`:
-  MetaWRAP ran, but no refined bin passed `--metawrap_completeness` /
-  `--metawrap_contamination` (default 50 / 10).
-- `No bins available for refinement`: no binner produced a bin for MetaWRAP.
+  Binette ran, but no refined bin passed `--bin_min_completeness` /
+  `--bin_max_contamination` (default 50 / 10).
+- `No bins available for refinement`: no binner produced a bin for Binette.
 
 The run finishes on purpose instead of failing. A report step still fails when
 an input file is missing, which points to a real pipeline problem.
 
 **What to try:** check the clean-read counts in `Reads_report.csv` and the
 assembly size first. Co-assembling samples (`--assembly_mode coassembly`) or
-sequencing deeper gives the binners more coverage. Lowering the MetaWRAP
+sequencing deeper gives the binners more coverage. Lowering the refinement
 thresholds keeps lower-quality bins, at the cost of more incomplete or
 contaminated MAGs.
 

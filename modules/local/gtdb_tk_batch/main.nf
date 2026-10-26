@@ -40,7 +40,6 @@ process GTDB_TK_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
-    def metawrap_suffix = task.ext.metawrap_dir_suffix ?: "metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"
     """
     set -euo pipefail
 
@@ -52,7 +51,7 @@ process GTDB_TK_BATCH {
     # Process ALL staged bin directories - parse sample_id from directory names
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. The input channel
     # already carries exactly the dirs to classify (single-binner outputs, or
-    # MetaWRAP-refined dirs), so every dir must be recognized; identify_bin_dir.sh
+    # Binette-refined dirs), so every dir must be recognized; identify_bin_dir.sh
     # fails loudly on naming drift (audit #6).
     for staged_dir in bin_*/; do
         staged_dir=\${staged_dir%/}  # Remove trailing slash
@@ -61,7 +60,7 @@ process GTDB_TK_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${metawrap_suffix}")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir")
         sample_id=\${id_line%%\$'\\t'*}
 
         echo "Processing \$(basename "\$bin_dir") -> sample_id=\$sample_id"

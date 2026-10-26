@@ -16,7 +16,7 @@
     emits eggNOG-only CAZy).
 
     MAG branch (--mag_level_functional, T7): Bakta annotation of every
-    refined bin, one task per bin. The per-sample MetaWRAP bins directory is
+    refined bin, one task per bin. The per-sample Binette bins directory is
     fanned out into per-bin elements (meta.id stays the source sample and
     keys the mags/<meta.id>/ output; meta.bin carries the bin name); a
     marker-only directory (SKIPPED.txt, no bins recovered) yields zero
@@ -158,9 +158,10 @@ workflow FUNCTIONAL_ANNOTATION {
 
     //
     // MAG branch (T7, design doc Section 4.5): Bakta per refined bin.
-    // ch_refined_bins only ever carries MetaWRAP-refined directories here —
+    // ch_refined_bins only ever carries Binette-refined directories here —
     // main.nf validation requires >= 2 binners, so the quality filter
-    // (bin_refinement -c/-x) always ran on what gets annotated
+    // (--bin_min_completeness / --bin_max_contamination) always ran on what
+    // gets annotated
     //
     if ( flagOn(params.mag_level_functional) ) {
         ch_bins = ch_refined_bins.flatMap { meta, bins_dir ->

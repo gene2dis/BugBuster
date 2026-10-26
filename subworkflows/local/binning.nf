@@ -2,7 +2,7 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     BINNING SUBWORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Metagenomic binning using multiple tools and refinement with MetaWRAP
+    Metagenomic binning using multiple tools and refinement with Binette
     
     DESCRIPTION:
         This subworkflow performs mode-agnostic metagenomic binning. It accepts
@@ -16,13 +16,13 @@
         reads: [meta, reads] - Original reads (optional, only for co-assembly bin coverage)
     
     OUTPUTS:
-        refined_bins: [meta, bins] - MetaWRAP-refined bins
+        refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
         versions: Tool version information
     
     WORKFLOW:
         1. Calculate contig depth from BAM files (if MetaBAT2 selected)
         2. Run selected binning tools in parallel (from: MetaBAT2, SemiBin, COMEBin)
-        3. If >=2 binners selected, refine bins with MetaWRAP
+        3. If >=2 binners selected, refine bins with Binette
         4. Assess quality with CheckM2
         5. Classify taxonomy with GTDB-Tk
         6. Generate reports (mode-specific: simple reports for assembly, 
@@ -35,7 +35,7 @@ include { CALCULATE_DEPTH            } from '../../modules/local/calculate_depth
 include { METABAT2                   } from '../../modules/local/metabat2/main'
 include { SEMIBIN                    } from '../../modules/local/semibin/main'
 include { COMEBIN                    } from '../../modules/local/comebin/main'
-include { METAWRAP                   } from '../../modules/local/metawrap/main'
+include { BINETTE                    } from '../../modules/local/binette/main'
 include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/main'
 include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
 include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
@@ -65,7 +65,7 @@ workflow BINNING {
     def use_semibin  = 'semibin' in binners_list
     def use_comebin  = 'comebin' in binners_list
     def num_binners  = binners_list.size()
-    def use_metawrap = num_binners >= 2
+    def use_refiner  = num_binners >= 2
 
     //
     // Unified binning workflow - mode-agnostic
@@ -96,25 +96,27 @@ workflow BINNING {
     if (use_semibin)  ch_binner_bins = ch_binner_bins.mix(SEMIBIN.out.bins)
     if (use_comebin)  ch_binner_bins = ch_binner_bins.mix(COMEBIN.out.bins)
 
-    // Refine bins with MetaWRAP when >=2 binners are selected
-    if (use_metawrap) {
-        // Group binner outputs by sample for MetaWRAP. groupTuple lists the
-        // bins in binner-completion order; sort them by directory name so the
-        // task hash (and -resume) does not depend on which binner finished
-        // first (design doc Q19)
+    // Refine bins with Binette when >=2 binners are selected
+    if (use_refiner) {
+        // Group binner outputs by sample for Binette, with the sample's
+        // contigs. groupTuple lists the bins in binner-completion order; sort
+        // them by directory name so the task hash (and -resume) does not
+        // depend on which binner finished first (design doc Q19)
         ch_bins_grouped = ch_binner_bins
             .map { meta, bins -> [meta.id, meta, bins] }
             .groupTuple(by: 0, size: num_binners)
-            .map { _id, metas, bins_list -> [metas[0], bins_list.sort(false) { b -> b.name }] }
+            .map { id, metas, bins_list -> [id, metas[0], bins_list.sort(false) { b -> b.name }] }
+            .join(contigs_and_bam.map { meta, contigs, _bam -> [meta.id, contigs] })
+            .map { _id, meta, bins_list, contigs -> [meta, bins_list, contigs] }
 
-        METAWRAP(ch_bins_grouped)
-        ch_refined_bins = METAWRAP.out.bins
-        ch_versions = ch_versions.mix(METAWRAP.out.versions.first())
+        BINETTE(ch_bins_grouped.combine(checkm2_db))
+        ch_refined_bins = BINETTE.out.bins
+        ch_versions = ch_versions.mix(BINETTE.out.versions.first())
 
-        // All bins for CHECKM2: individual binners + metawrap refined
+        // All bins for CHECKM2: individual binners + Binette refined
         ch_all_bins_for_checkm = ch_binner_bins.mix(ch_refined_bins)
     } else {
-        // Single binner: use output directly, no MetaWRAP
+        // Single binner: use output directly, no refinement
         ch_refined_bins = ch_binner_bins
         ch_all_bins_for_checkm = ch_binner_bins
     }
@@ -145,7 +147,7 @@ workflow BINNING {
                 // Use findLastIndexOf to correctly handle sample names that contain binner keywords
                 def filename = report.name
                 def parts = filename.tokenize('_')
-                def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'binette'] }
                 def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
                 
                 if (!sample_reports.containsKey(sample_id)) {
@@ -169,9 +171,9 @@ workflow BINNING {
             }
         }
     
-    // CheckM2 reports for refined bins (metawrap when available, all reports otherwise)
-    if (use_metawrap) {
-        ch_checkm_refined = ch_checkm_batch.metawrap_report
+    // CheckM2 reports for refined bins (Binette's when refined, all reports otherwise)
+    if (use_refiner) {
+        ch_checkm_refined = ch_checkm_batch.refined_report
             .flatMap { meta_list, reports ->
                 // Group reports by sample
                 def sample_reports = [:]
@@ -179,7 +181,7 @@ workflow BINNING {
                 report_files.each { report ->
                     def filename = report.name
                     def parts = filename.tokenize('_')
-                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'metawrap'] }
+                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'binette'] }
                     def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
                     
                     if (!sample_reports.containsKey(sample_id)) {
@@ -194,7 +196,7 @@ workflow BINNING {
                         mid == sample_id
                     }
                     if (meta == null) {
-                        error "CheckM2 metawrap: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
+                        error "CheckM2 binette: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                     }
                     [meta, report_list]
                 }
@@ -260,7 +262,7 @@ workflow BINNING {
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
         // Bin depth needs at least one refined bin: a bin set can be empty
-        // (MetaWRAP or SemiBin write only SKIPPED.txt when nothing passes),
+        // (Binette or SemiBin write only SKIPPED.txt when nothing passes),
         // and both depth paths fail on an empty reference. BIN_SUMMARY then
         // writes a header-only table from the empty quality/taxonomy reports
         def ch_bins_for_depth = ch_refined_bins

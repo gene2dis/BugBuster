@@ -101,7 +101,7 @@ def main():
         all_tax_reports.append(result)
     
     # No sample has a classified bin: binning found nothing usable on this
-    # data (SemiBin and MetaWRAP now finish with empty bin sets). Warn and
+    # data (SemiBin and Binette now finish with empty bin sets). Warn and
     # write a header-only summary and a placeholder plot so the run can
     # finish; a missing GTDB-Tk file above still fails
     if not all_tax_reports:

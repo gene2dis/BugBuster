@@ -240,6 +240,22 @@ workflow {
         error("Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}")
     }
 
+    // --metawrap_completeness / --metawrap_contamination name MetaWRAP's
+    // cutoffs, which Binette took over: still accepted, with a warning.
+    // BINETTE reads the alias (config/modules.config) unless the new param is
+    // set to another value, which is a contradiction
+    [
+        [params.metawrap_completeness, 'metawrap_completeness', params.bin_min_completeness, 'bin_min_completeness', 50],
+        [params.metawrap_contamination, 'metawrap_contamination', params.bin_max_contamination, 'bin_max_contamination', 10],
+    ].each { old_value, old_name, new_value, new_name, default_value ->
+        if (old_value != null) {
+            if ((new_value as Integer) != default_value && (new_value as Integer) != (old_value as Integer)) {
+                error("--${old_name} ${old_value} and --${new_name} ${new_value} disagree: --${old_name} is a deprecated alias of --${new_name}; pass only --${new_name}")
+            }
+            log.warn "--${old_name} is deprecated (MetaWRAP was replaced by Binette): using ${old_value} as --${new_name}. Pass --${new_name} instead"
+        }
+    }
+
     // Reject contradictory feature combinations instead of silently skipping stages
     if (flagOn(params.include_binning) && params.assembly_mode == 'none') {
         error("--include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
@@ -269,7 +285,7 @@ workflow {
         error("--mag_level_functional requires --include_binning (Bakta annotates the refined bins)")
     }
     if (flagOn(params.mag_level_functional) && binners_list.size() < 2) {
-        error("--mag_level_functional requires at least two --binners: MetaWRAP refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
+        error("--mag_level_functional requires at least two --binners: Binette refinement and its completeness/contamination quality filter only run with >= 2 binners, and Bakta must only annotate quality-filtered bins. Got: ${binners_list.join(', ')}")
     }
     // Read-level functional backend (design doc Section 7: unknown values
     // are rejected at launch). The schema enum already enforces this; kept
@@ -355,7 +371,7 @@ workflow {
     log.info "  Assembly mode        : ${params.assembly_mode}${params.assembly_mode != 'none' && params.assembly_read_reduction != 'none' ? " (assembler input: ${params.assembly_read_reduction})" : ''}"
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
-    log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ MetaWRAP refinement)' : ''}"
+    log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
     log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
