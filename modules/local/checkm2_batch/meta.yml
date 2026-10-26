@@ -22,8 +22,9 @@ input:
       type: directory
       description: |
         Bin directories from every binner and sample (staged as bin_?/), recognised by name with
-        bin/identify_bin_dir.sh (<sample>_metabat_bins, <sample>_semibin_output_bins, COMEBin and
-        <sample>_binette_bins); bins are *.fa, *.fasta or *.fna files
+        bin/identify_bin_dir.sh (<sample>_metabat_bins, <sample>_semibin_output_bins or COMEBin; the
+        pipeline runs it with a single binner only, as Binette reports CheckM2 quality otherwise); bins are
+        *.fa, *.fasta or *.fna files
   - checkm_db:
       type: file
       description: CheckM2 DIAMOND database (downloaded by FORMAT_CHECKM2_DB or --custom_checkm2_db), passed to --database_path
@@ -32,12 +33,8 @@ input:
 output:
   - all_reports:
       type: tuple
-      description: Tuple of meta_list and the per-sample, per-binner CheckM2 reports (<sample>_<binner>_quality_report.tsv, sample prefix stripped from bin names; header-only for a binner with no bins); the glob also matches the Binette reports
+      description: Tuple of meta_list and the per-sample, per-binner CheckM2 reports (<sample>_<binner>_quality_report.tsv, sample prefix stripped from bin names; header-only for a binner with no bins)
       pattern: "*_*_quality_report.tsv"
-  - refined_report:
-      type: tuple
-      description: Optional; tuple of meta_list and the per-sample reports for Binette-refined bins, present only when Binette's bins were staged
-      pattern: "*_binette_quality_report.tsv"
   - versions:
       type: file
       description: Software versions

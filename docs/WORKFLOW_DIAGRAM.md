@@ -260,18 +260,18 @@ flowchart TD
     SemiBin --> BinCount
     COMEBin --> BinCount
 
-    BinCount -->|≥2 binners| Binette[BINETTE<br/>Bin Refinement & Consolidation]
+    BinCount -->|≥2 binners| Binette[BINETTE<br/>Bin Refinement, CheckM2 on raw + refined bins]
     BinCount -->|1 binner| DirectOut[Use binner output directly]
 
     %% Quality and Taxonomy
-    Binette --> AllBins[All bins:<br/>individual + refined]
-    DirectOut --> AllBins
-    AllBins --> CheckM[CHECKM2<br/>Completeness & Contamination]
+    DirectOut --> CheckM[CHECKM2<br/>Completeness & Contamination<br/>single binner only]
+    Binette --> Quality[CheckM2 reports<br/>raw + refined bins]
+    CheckM --> Quality
     Binette --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
     DirectOut --> GTDBTK
 
     %% Mode-specific reporting
-    CheckM --> ModeCheck{Assembly<br/>Mode?}
+    Quality --> ModeCheck{Assembly<br/>Mode?}
     GTDBTK --> ModeCheck
 
     ModeCheck -->|assembly| AssemblyReports[Per-Sample Reports]
@@ -282,7 +282,7 @@ flowchart TD
     CoassemblyReports --> BinCov["BINS_REFERENCE + BWAMEM3_BINS_INDEX<br/>+ BWAMEM3_BIN_DEPTH: each sample vs all bins<br/>(or BOWTIE2_SAMTOOLS_DEPTH per bin)<br/>skipped when no refined bins"]
     BinCov --> Bedtools["BEDTOOLS_BIN_DEPTH (or BEDTOOLS)<br/>Coverage Statistics"]
     Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
-    CheckM --> Summary
+    Quality --> Summary
     GTDBTK --> Summary
 
     %% Output
@@ -293,7 +293,7 @@ flowchart TD
 **Key Features:**
 - **Unified workflow**: Single implementation handles both assembly and co-assembly modes
 - **Selectable binners**: Run any combination of MetaBAT2, SemiBin, and COMEBin via `--binners`
-- **Conditional Binette**: Bin refinement only runs when ≥2 binners are selected
+- **Conditional Binette**: Bin refinement only runs when ≥2 binners are selected; Binette then reports CheckM2 quality for the raw and the refined bins, so the separate CheckM2 step (CHECKM2_BATCH) runs only for a single binner
 - **Single-binner mode**: When only one binner is selected, its output is used directly (no refinement)
 - **Mode-specific reporting**:
   - Assembly mode: Simple quality and taxonomy reports
@@ -433,8 +433,8 @@ flowchart LR
 | `METABAT2` | if `metabat2` in `--binners` | Binning by coverage and composition |
 | `SEMIBIN` | if `semibin` in `--binners` | Semi-supervised binning |
 | `COMEBIN` | if `comebin` in `--binners` | Contrastive learning binning |
-| `BINETTE` | if ≥2 binners selected | Bin refinement and consolidation |
-| `CHECKM2_BATCH` | always | Bin completeness and contamination |
+| `BINETTE` | if ≥2 binners selected | Bin refinement; CheckM2 reports for the raw and refined bins |
+| `CHECKM2_BATCH` | with a single binner (Binette reports CheckM2 quality otherwise) | Bin completeness and contamination |
 | `GTDB_TK_BATCH` | always | Bin taxonomic classification |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | assembly mode | Per-sample quality/taxonomy reports |
 | `BINS_REFERENCE` + `BWAMEM3_BINS_INDEX` + `BWAMEM3_BIN_DEPTH` + `BEDTOOLS_BIN_DEPTH` (or `BOWTIE2_SAMTOOLS_DEPTH` + `BEDTOOLS`) / `BIN_SUMMARY` | co-assembly mode | Bin coverage (skipped when no refined bins) and comprehensive summary |

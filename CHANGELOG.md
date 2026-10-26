@@ -417,6 +417,19 @@ next release is tagged.
     requested 16 CPUs and 80 GB
   - a binner without bins is left out of the refinement, and a single bin set
     is refined like any other (MetaWRAP 1.2 could not refine one set)
+- **CheckM2 taken from Binette when bins are refined** (performance review
+  M7): with two or more binners, Binette's own CheckM2 run on the raw and the
+  refined bins replaces `CHECKM2_BATCH`, which now runs only for a single
+  binner. On four per-sample assemblies the separate run took 4.5 CPU-hours
+  and 12 GB, and Binette's reports put every bin (176 raw, 45 refined) in the
+  same MIMAG class as it. The reports keep their names and place
+  (`quality/checkm2/<sample>_<binner>_quality_report.tsv`) and CheckM2 1.1.0's
+  columns (`bin/binette_quality_reports.py`). Small output changes: values come
+  from one CheckM2 run per sample, so completeness can differ from a separate
+  run by up to ~2.6 points near the thresholds; `Total_Coding_Sequences` and
+  `Average_Gene_Length` come from Binette's gene calls on the whole assembly
+  (within ~2 % of CheckM2's per-bin counts on a real bin), and
+  `Translation_Table_Used` and `Additional_Notes` are empty
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of

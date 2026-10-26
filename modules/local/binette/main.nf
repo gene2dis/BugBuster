@@ -8,13 +8,19 @@
     SemiBin, COMEBin), scores every input and intermediate bin with CheckM2 and
     keeps the best non-overlapping set that reaches params.bin_min_completeness
     and params.bin_max_contamination (Phase 7a benchmark,
-    docs/benchmarks/binning_2026.md)
+    docs/benchmarks/binning_2026.md). Its CheckM2 scores of the input and
+    refined bins are written in CHECKM2_BATCH's per-binner report format
+    (bin/binette_quality_reports.py), so no separate CheckM2 run is needed
+    when bins are refined (performance review M7)
 
     Input:
         tuple val(meta), path(bin_dirs), path(contigs), path(checkm2_db)
 
     Output:
         bins: tuple val(meta), path(binette_bins)
+        quality_reports: tuple val(meta), path(<id>_<binner>_quality_report.tsv), one per
+            staged binner directory plus <id>_binette_quality_report.tsv
+        refined_report: tuple val(meta), path(<id>_binette_quality_report.tsv)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */
@@ -34,6 +40,8 @@ process BINETTE {
 
     output:
     tuple val(meta), path("${meta.id}_binette_bins"), emit: bins
+    tuple val(meta), path("*_quality_report.tsv"), emit: quality_reports
+    tuple val(meta), path("${meta.id}_binette_quality_report.tsv"), emit: refined_report
     path "versions.yml", emit: versions
 
     when:
@@ -88,6 +96,17 @@ process BINETTE {
         fi
     fi
 
+    # CheckM2 reports of every binner's bins and of the refined bins, from
+    # Binette's own CheckM2 run (header-only when Binette did not run)
+    binette_out_arg=""
+    [[ -d binette_out ]] && binette_out_arg="--binette-out binette_out"
+    binette_quality_reports.py \\
+        --sample ${prefix} \\
+        \$binette_out_arg \\
+        --final-bins "\$out_dir" \\
+        ${bin_dirs}
+    rm -rf binette_out/temporary_files
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         binette: \$(binette --version 2>&1 | sed 's/^Binette //')
@@ -119,6 +138,9 @@ process BINETTE {
     >contig_3
     GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
     EOF
+
+    # Header-only CheckM2 reports, one per staged binner directory
+    binette_quality_reports.py --sample ${prefix} --final-bins ${prefix}_binette_bins ${bin_dirs}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

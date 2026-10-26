@@ -711,8 +711,8 @@ for the numbers behind each setting).
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated list of binners to run. At least one required. Binette refinement runs when ≥2 binners are selected. |
 
 **Selection logic:**
-- **1 binner selected** → runs that binner only, no refinement, binner output used directly
-- **≥2 binners selected** → runs selected binners + Binette bin refinement
+- **1 binner selected** → runs that binner only, no refinement, binner output used directly; CheckM2 scores its bins in a separate step
+- **≥2 binners selected** → runs selected binners + Binette bin refinement; Binette's own CheckM2 run scores the raw and the refined bins, and the pipeline publishes those reports in `quality/checkm2/` (no separate CheckM2 step)
 
 #### Basic Binning Parameters
 

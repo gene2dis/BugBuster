@@ -125,6 +125,10 @@ jobs:
         run: |
           tests/bin/test_report_scripts.sh
 
+      - name: Run Binette CheckM2 report conversion tests (performance review M7)
+        run: |
+          tests/bin/test_binette_quality_reports.sh
+
       - name: Run results summary regression tests
         run: |
           tests/bin/test_results_summary.sh

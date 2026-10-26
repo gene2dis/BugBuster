@@ -4,6 +4,8 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Batched bin quality assessment using CheckM2
     
+    Runs only with a single binner: with two or more, Binette's own CheckM2
+    reports replace it (performance review M7, modules/local/binette).
     One checkm2 predict over every bin of every sample and binner (bins renamed
     <sample>__<binner>__<bin>), so the DIAMOND database is searched and the
     models are loaded once per run instead of once per binner (performance
@@ -14,7 +16,6 @@
     
     Output:
         all_reports: tuple val(meta), path(quality_reports) - per sample
-        refined_report: tuple val(meta), path(binette_quality_report) - per sample (optional; only when Binette ran)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */
@@ -32,7 +33,6 @@ process CHECKM2_BATCH {
 
     output:
     tuple val(meta_list), path("*_*_quality_report.tsv"), emit: all_reports
-    tuple val(meta_list), path("*_binette_quality_report.tsv"), emit: refined_report, optional: true
     path "versions.yml", emit: versions
 
     when:
@@ -156,7 +156,7 @@ process CHECKM2_BATCH {
     """
     # Create stub quality report files for each sample and binner
     for meta_id in ${meta_ids}; do
-        for binner in metabat semibin comebin binette; do
+        for binner in metabat semibin comebin; do
             cat > \${meta_id}_\${binner}_quality_report.tsv << 'EOF'
     Name	Completeness	Contamination
     bin.1	95.5	2.1

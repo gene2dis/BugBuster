@@ -35,6 +35,14 @@ output:
       type: tuple
       description: Tuple of meta and the refined bin directory (binette_binN.fa)
       pattern: "*_binette_bins"
+  - quality_reports:
+      type: tuple
+      description: Tuple of meta and the CheckM2 reports from Binette's own CheckM2 run, in CHECKM2_BATCH's format (<id>_<binner>_quality_report.tsv per staged binner directory, header-only for a binner without bins, plus <id>_binette_quality_report.tsv); gene counts come from Binette's gene calls on the whole assembly
+      pattern: "*_quality_report.tsv"
+  - refined_report:
+      type: tuple
+      description: Tuple of meta and the CheckM2 report of the refined bins
+      pattern: "*_binette_quality_report.tsv"
   - versions:
       type: file
       description: Software versions

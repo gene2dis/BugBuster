@@ -46,7 +46,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
 18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
 19. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
-20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2) (with ≥2 binners, taken from Binette's own CheckM2 run on the raw and refined bins)
 21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 22. Bin reports.
 23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only Binette quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)

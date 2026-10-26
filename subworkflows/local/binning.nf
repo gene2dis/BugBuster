@@ -23,7 +23,7 @@
         1. Calculate contig depth from BAM files (if MetaBAT2 selected)
         2. Run selected binning tools in parallel (from: MetaBAT2, SemiBin, COMEBin)
         3. If >=2 binners selected, refine bins with Binette
-        4. Assess quality with CheckM2
+        4. Assess quality with CheckM2 (Binette's own run when refined)
         5. Classify taxonomy with GTDB-Tk
         6. Generate reports (mode-specific: simple reports for assembly, 
            coverage analysis for co-assembly)
@@ -113,77 +113,44 @@ workflow BINNING {
         ch_refined_bins = BINETTE.out.bins
         ch_versions = ch_versions.mix(BINETTE.out.versions.first())
 
-        // All bins for CHECKM2: individual binners + Binette refined
-        ch_all_bins_for_checkm = ch_binner_bins.mix(ch_refined_bins)
+        // Binette scores every input and refined bin with CheckM2 and writes
+        // the per-binner reports CHECKM2_BATCH would (performance review M7),
+        // so the separate CheckM2 run is skipped
+        ch_checkm_all_reports = BINETTE.out.quality_reports
+        ch_checkm_refined = BINETTE.out.refined_report
     } else {
         // Single binner: use output directly, no refinement
         ch_refined_bins = ch_binner_bins
-        ch_all_bins_for_checkm = ch_binner_bins
-    }
 
-    // Collect all bins for batched CHECKM2 processing, sorted by sample and
-    // bin directory so the batch input does not follow task completion order
-    // (which changed the task hash and defeated -resume; design doc Q19)
-    ch_all_sample_bins = ch_all_bins_for_checkm
-        .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
-        .map { items ->
-            def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
-            def all_paths = items.collect { item -> item[1] }
-            [meta_list, all_paths]
-        }
-    
-    // Batched quality assessment with CheckM2
-    ch_checkm_batch = CHECKM2_BATCH(ch_all_sample_bins.combine(checkm2_db))
-    ch_versions = ch_versions.mix(CHECKM2_BATCH.out.versions.first())
-    
-    // Transform batched output back to per-sample format
-    ch_checkm_all_reports = ch_checkm_batch.all_reports
-        .flatMap { meta_list, reports ->
-            // Group reports by sample
-            def sample_reports = [:]
-            def report_files = reports instanceof List ? reports : [reports]
-            report_files.each { report ->
-                // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
-                // Use findLastIndexOf to correctly handle sample names that contain binner keywords
-                def filename = report.name
-                def parts = filename.tokenize('_')
-                def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'binette'] }
-                def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
-                
-                if (!sample_reports.containsKey(sample_id)) {
-                    sample_reports[sample_id] = []
-                }
-                sample_reports[sample_id].add(report)
+        // Collect all bins for batched CHECKM2 processing, sorted by sample and
+        // bin directory so the batch input does not follow task completion order
+        // (which changed the task hash and defeated -resume; design doc Q19)
+        ch_all_sample_bins = ch_binner_bins
+            .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
+            .map { items ->
+                def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
+                def all_paths = items.collect { item -> item[1] }
+                [meta_list, all_paths]
             }
-            // Emit per-sample tuples
-            sample_reports.collect { sample_id, report_list ->
-                def meta = meta_list.find { m -> 
-                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
-                    mid == sample_id
-                }
-                // Every report is named <sample>_<binner>_...: an unmatched
-                // one is a naming bug, and dropping it would silently skip
-                // the bin reports
-                if (meta == null) {
-                    error "CheckM2: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
-                }
-                [meta, report_list]
-            }
-        }
-    
-    // CheckM2 reports for refined bins (Binette's when refined, all reports otherwise)
-    if (use_refiner) {
-        ch_checkm_refined = ch_checkm_batch.refined_report
+
+        // Batched quality assessment with CheckM2
+        ch_checkm_batch = CHECKM2_BATCH(ch_all_sample_bins.combine(checkm2_db))
+        ch_versions = ch_versions.mix(CHECKM2_BATCH.out.versions.first())
+
+        // Transform batched output back to per-sample format
+        ch_checkm_all_reports = ch_checkm_batch.all_reports
             .flatMap { meta_list, reports ->
                 // Group reports by sample
                 def sample_reports = [:]
                 def report_files = reports instanceof List ? reports : [reports]
                 report_files.each { report ->
+                    // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                    // Use findLastIndexOf to correctly handle sample names that contain binner keywords
                     def filename = report.name
                     def parts = filename.tokenize('_')
-                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin', 'binette'] }
+                    def binnerIdx = parts.findLastIndexOf { part -> part in ['metabat', 'semibin', 'comebin'] }
                     def sample_id = binnerIdx > 0 ? parts[0..<binnerIdx].join('_') : parts[0]
-                    
+
                     if (!sample_reports.containsKey(sample_id)) {
                         sample_reports[sample_id] = []
                     }
@@ -191,20 +158,24 @@ workflow BINNING {
                 }
                 // Emit per-sample tuples
                 sample_reports.collect { sample_id, report_list ->
-                    def meta = meta_list.find { m -> 
+                    def meta = meta_list.find { m ->
                         def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
                         mid == sample_id
                     }
+                    // Every report is named <sample>_<binner>_...: an unmatched
+                    // one is a naming bug, and dropping it would silently skip
+                    // the bin reports
                     if (meta == null) {
-                        error "CheckM2 binette: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
+                        error "CheckM2: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                     }
                     [meta, report_list]
                 }
             }
-    } else {
+
+        // The single binner's bins are the refined bins
         ch_checkm_refined = ch_checkm_all_reports
     }
-    
+
     // Collect refined bins for batched GTDB-Tk (sorted, as for CHECKM2 above)
     ch_all_refined_bins = ch_refined_bins
         .filter { _meta, bins -> bins != null }

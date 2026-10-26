@@ -479,7 +479,7 @@ metabat_minContig: 2500
 
 - `binners` accepts a **comma-separated string**: `"semibin,metabat2"`; spaces around the commas are ignored in YAML (on the command line, write it without spaces)
 - `bin_min_completeness` and `bin_max_contamination` are **ignored** when only one binner is selected (`metawrap_completeness` / `metawrap_contamination` are deprecated aliases)
-- CheckM2 and GTDB-Tk **always run** regardless of binner selection
+- CheckM2 and GTDB-Tk **always run** regardless of binner selection (with ≥2 binners CheckM2 runs inside Binette)
 
 ---
 
