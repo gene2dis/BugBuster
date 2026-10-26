@@ -460,7 +460,7 @@ nextflow_pipeline {
             assert vtext.contains("megahit:")
             assert vtext.contains("metabat2:")
             // Pins the GTDB-Tk container/stub version bump in lockstep
-            assert vtext.contains("gtdbtk: 2.7.2")
+            assert vtext.contains("gtdbtk: 2.8.0")
             // Every versions.yml heredoc must close: a script line below the
             // block's base indentation left END_VERSIONS indented, so the
             // terminator was written into versions.yml and the aggregate was

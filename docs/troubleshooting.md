@@ -808,7 +808,7 @@ MemoryError in GTDB-TK
 **Symptom:** `GTDB_TK_BATCH` fails at startup complaining about the reference
 data version or missing files under `GTDBTK_DATA_PATH`.
 
-**Cause:** the pipeline pins GTDB-Tk 2.7.2, which accepts **only GTDB R232**
+**Cause:** the pipeline pins GTDB-Tk 2.8.0, which accepts **only GTDB R232**
 reference data. Older R220/R226 packages — including a `databases/gtdbtk/`
 directory cached by a previous pipeline version — require GTDB-Tk ≤ 2.6.1 and
 no longer work.

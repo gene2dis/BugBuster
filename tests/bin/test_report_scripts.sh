@@ -211,7 +211,7 @@ expect_fail "bin_quality: no CheckM2 file still fails" bin_quality_report.py
 # bin_tax_report.py (GTDB-Tk batch summary format)
 #
 echo "--- bin_tax_report.py ---"
-# GTDB-Tk >= 2.7 (the pinned 2.7.2) names the reference column
+# GTDB-Tk >= 2.7 (the pinned 2.8.0) names the reference column
 # closest_genome_reference; the script's fallback also accepts the legacy
 # fastani_reference name (<= 2.6-era summaries). Both branches are pinned.
 BT_WORK="${WORK}/bin_tax_happy"

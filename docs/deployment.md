@@ -280,7 +280,7 @@ For better performance, pre-download databases to shared storage:
 # Sourmash GTDB r220 (~17 GB)
 # Sylph GTDB r232 .syl2db (~19 GB) + sylph-tax metadata (~5.5 MB; recipe in manual.md)
 # CheckM2 (~2.9 GB)
-# GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.7.2)
+# GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.8.0)
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
 # Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)

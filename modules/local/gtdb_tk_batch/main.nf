@@ -24,8 +24,8 @@ process GTDB_TK_BATCH {
     label 'process_high_memory'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/gtdbtk:2.7.2--pyhdfd78af_1' :
-        'quay.io/biocontainers/gtdbtk:2.7.2--pyhdfd78af_1' }"
+        'https://depot.galaxyproject.org/singularity/gtdbtk:2.8.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(gtdbtk_db)
@@ -199,7 +199,7 @@ process GTDB_TK_BATCH {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        gtdbtk: 2.7.2
+        gtdbtk: 2.8.0
     END_VERSIONS
     """
 }

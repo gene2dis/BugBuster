@@ -207,7 +207,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
-| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.8.0; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
 | **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` |
@@ -620,7 +620,7 @@ breaks `-resume`.
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
-| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
+| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.8.0) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
@@ -642,7 +642,7 @@ breaks `-resume`.
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
+| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.8.0, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |

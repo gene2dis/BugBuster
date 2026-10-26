@@ -447,6 +447,11 @@ next release is tagged.
     and its depot.galaxyproject.org image under singularity, which `CLUSTERING`
     did not have) for `CLUSTERING`: the ARG clusters of 456 proteins were
     identical at all four identity levels
+  - GTDB-Tk 2.7.2 → 2.8.0 (`quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0`
+    and its depot.galaxyproject.org image, which has every command
+    `GTDB_TK_BATCH` calls) for `GTDB_TK_BATCH`, with the same R232 reference
+    data. It ships skani 0.4.0 (2.7.2: 0.3.2), which reads the R232 sketches;
+    classifications were identical on 120 and 219 genomes
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of

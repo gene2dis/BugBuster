@@ -248,7 +248,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--gtdbtk_db`
 - **Type**: String
 - **Default**: `release_232`
-- **Description**: GTDB-TK database release version. The pinned GTDB-Tk 2.7.2 accepts only GTDB R232 data (older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and no longer work)
+- **Description**: GTDB-TK database release version. The pinned GTDB-Tk 2.8.0 accepts only GTDB R232 data (older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and no longer work)
 - **Size**: ~61 GB download
 - **Example**: `--gtdbtk_db release_232`
 
@@ -375,7 +375,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_gtdbtk_db`
 - **Type**: String (directory path)
-- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.7.2, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
+- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.8.0, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
 - **Example**: `--custom_gtdbtk_db /path/to/release232`
 
 ### `--custom_deeparg_db`
