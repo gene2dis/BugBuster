@@ -430,6 +430,11 @@ next release is tagged.
   `Average_Gene_Length` come from Binette's gene calls on the whole assembly
   (within ~2 % of CheckM2's per-bin counts on a real bin), and
   `Translation_Table_Used` and `Additional_Notes` are empty
+- **GTDB-Tk places genomes with 4 pplacer threads** (performance review
+  M10; new `--gtdbtk_pplacer_cpus`, default 4, was a fixed 1): on 119 genomes
+  forced through pplacer the backbone tree took 17.9 instead of 36.2 min and a
+  class-level tree 72.9 instead of 108.9 min, for 142.5 instead of 133.3 GB.
+  Classifications identical. `GTDB_TK_BATCH` keeps its 256 GB request
 - **Binning tool updates** (Phase 7a benchmark, `docs/benchmarks/binning_2026.md`)
   - SemiBin2 2.1.0 → 2.6.0 (`quay.io/biocontainers/semibin:2.6.0--pyhdfd78af_0`)
     for `SEMIBIN`, with a fixed `--random-seed` (new `--semibin_random_seed`,

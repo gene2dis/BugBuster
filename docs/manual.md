@@ -722,6 +722,8 @@ for the numbers behind each setting).
 | `--bin_min_completeness` | `50` | Minimum CheckM2 completeness (%) of a refined bin (used when ≥2 binners; was `--metawrap_completeness`, still accepted with a warning) |
 | `--bin_max_contamination` | `10` | Maximum CheckM2 contamination (%) of a refined bin (used when ≥2 binners; was `--metawrap_contamination`, still accepted with a warning) |
 | `--semibin_env_model` | `human_gut` | SemiBin environment model |
+| `--semibin_random_seed` | `11` | SemiBin2 `--random-seed`, so reruns give the same bins |
+| `--gtdbtk_pplacer_cpus` | `4` | Threads for GTDB-Tk's pplacer step (capped at the task's CPUs) |
 
 **SemiBin Environment Models:**
 - `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`

@@ -758,6 +758,12 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: SemiBin2 `--random-seed`. With a fixed seed, reruns on the same input give the same bins; without one, SemiBin2 2.6.0 gave one bin more or less between reruns of the same sample
 - **Example**: `--semibin_random_seed 42`
 
+#### `--gtdbtk_pplacer_cpus`
+- **Type**: Integer
+- **Default**: `4`
+- **Description**: Threads for GTDB-Tk's pplacer step (`--pplacer_cpus`), capped at the `GTDB_TK_BATCH` task's CPUs. pplacer places only the genomes the ANI screen does not classify; with 4 threads a class-level tree took 60 GB for one genome and up to 142 GB for about 50, and placement was 1.5-2x faster than with 1 thread for ~7 % more memory. `GTDB_TK_BATCH` requests 256 GB (`process_high_memory`); lower this before lowering `--max_memory` below that
+- **Example**: `--gtdbtk_pplacer_cpus 1`
+
 ### Advanced MetaBAT2 Parameters
 
 #### `--metabat_maxP`

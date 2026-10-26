@@ -691,6 +691,13 @@
                     "minimum": 0,
                     "description": "SemiBin2 --random-seed. A fixed seed makes reruns on the same input give the same bins (unseeded runs differ by about one bin).",
                     "fa_icon": "fas fa-dice"
+                },
+                "gtdbtk_pplacer_cpus": {
+                    "type": "integer",
+                    "default": 4,
+                    "minimum": 1,
+                    "description": "Threads for GTDB-Tk's pplacer step (--pplacer_cpus), capped at the task's CPUs. Each thread adds memory: 4 threads place genomes 1.5-2x faster than 1 for ~7 % more.",
+                    "fa_icon": "fas fa-microchip"
                 }
             }
         },

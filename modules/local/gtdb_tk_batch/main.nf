@@ -40,6 +40,9 @@ process GTDB_TK_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
+    // pplacer threads (performance review M10): 4 placed genomes 1.5-2x
+    // faster than 1 for ~7 % more memory; never more than the task's CPUs
+    def pplacer_cpus = Math.min(params.gtdbtk_pplacer_cpus as Integer, task.cpus as Integer)
     """
     set -euo pipefail
 
@@ -99,7 +102,7 @@ process GTDB_TK_BATCH {
             --out_dir gtdbtk_output \\
             --cpus ${task.cpus} \\
             --extension .fa \\
-            --pplacer_cpus 1
+            --pplacer_cpus ${pplacer_cpus}
         
         # Split the combined reports by sample prefix
         if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ]; then
