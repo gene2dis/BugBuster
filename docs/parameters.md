@@ -97,7 +97,7 @@ Complete reference for all BugBuster pipeline parameters.
   - `--binners semibin` — single fast binner, no refinement (default)
   - `--binners semibin,metabat2` — two binners + Binette refinement
   - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
-- **Note**: Only takes effect when `--include_binning true` is set
+- **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
 ### `--read_arg_prediction`
 - **Type**: Boolean

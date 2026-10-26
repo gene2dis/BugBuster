@@ -473,7 +473,7 @@ metabat_minContig: 2500
 |-------|------|-------|
 | `semibin` | SemiBin2 | Fast; requires `--semibin_env_model` |
 | `metabat2` | MetaBAT2 | Requires contig depth calculation |
-| `comebin` | COMEBin | Slow on CPU; best with GPU |
+| `comebin` | COMEBin | CPU only and costly: ~38 CPU-hours on a 37 Mbp assembly (1-1.6 CPU-hours per Mbp) |
 
 ### Important Notes
 

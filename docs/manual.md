@@ -714,6 +714,16 @@ for the numbers behind each setting).
 - **1 binner selected** → runs that binner only, no refinement, binner output used directly; CheckM2 scores its bins in a separate step
 - **≥2 binners selected** → runs selected binners + Binette bin refinement; Binette's own CheckM2 run scores the raw and the refined bins, and the pipeline publishes those reports in `quality/checkm2/` (no separate CheckM2 step)
 
+> **COMEBin is costly.** It runs on CPU only (the pipeline has no GPU path; 8 CPUs
+> per sample) and took 38 CPU-hours (6 h wall) on a 37 Mbp per-sample assembly,
+> about 370 times SemiBin2; its cost grows with the assembly, about 1-1.6
+> CPU-hours per Mbp of contigs. In the Phase 7a benchmark
+> (`docs/benchmarks/binning_2026.md`) adding it to SemiBin2 + MetaBAT2 gave
+> Binette one more genome and one more high-quality bin on one sample, and the
+> only passing bin on a small one. A failed attempt is retried with smaller
+> batches; if the last attempt fails too, its bin folder holds `FAILED.txt` and
+> the run goes on without it.
+
 #### Basic Binning Parameters
 
 | Parameter | Default | Description |

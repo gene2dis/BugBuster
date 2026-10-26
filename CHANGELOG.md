@@ -452,6 +452,19 @@ next release is tagged.
     and its depot.galaxyproject.org image under singularity, which `CLUSTERING`
     did not have) for `CLUSTERING`: the ARG clusters of 456 proteins were
     identical at all four identity levels
+  - COMEBin 1.0.4 → 1.1.0 (`quay.io/biocontainers/comebin:1.1.0--hdfd78af_2`)
+    for `COMEBIN`, which stays opt-in. The image needs three fixes, all in the
+    module: its `realpath` is BusyBox's, which lacks the `-e`/`-m`/`--` options
+    `run_comebin.sh` uses (a Python `realpath` is written into the task
+    directory), the default device is `cuda` on a CPU-only PyTorch (`-d cpu`),
+    and bins keep the whole contig header (cut to the name). Same CPU time as
+    1.0.4 (38 CPU-hours on a 37 Mbp assembly) with less memory. `COMEBIN` now
+    requests 8 CPUs (was 16; it kept at most ~7 busy) and documents its cost.
+    **Fix**: a failed attempt now fails the task, so Nextflow retries it with the
+    smaller batch settings; before, the first failure (an out-of-memory kill
+    included) wrote `FAILED.txt` and exited 0, so the retries never ran and the
+    run went on with an empty COMEBin. `FAILED.txt` is now written only when the
+    last attempt fails
   - GTDB-Tk 2.7.2 → 2.8.0 (`quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0`
     and its depot.galaxyproject.org image, which has every command
     `GTDB_TK_BATCH` calls) for `GTDB_TK_BATCH`, with the same R232 reference

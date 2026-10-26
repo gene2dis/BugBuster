@@ -285,6 +285,12 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 --include_binning true --binners semibin,metabat2,comebin
 ```
 
+> **COMEBin is costly.** It runs on CPU only (8 CPUs per sample) and took 38
+> CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (1-1.6 CPU-hours per
+> Mbp of contigs, so an estimated 100-160 CPU-hours for a 100 Mbp assembly). After refinement it
+> added one genome on one of two benchmarked samples
+> (`docs/benchmarks/binning_2026.md`). Leave it out unless that is worth the time.
+
 ### ARG Prediction Options
 
 | Parameter | Default | Description |
