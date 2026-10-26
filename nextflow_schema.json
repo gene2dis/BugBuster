@@ -685,6 +685,20 @@
                     "description": "SemiBin environment model for binning.",
                     "fa_icon": "fas fa-globe"
                 },
+                "semibin_coassembly_mode": {
+                    "type": "string",
+                    "default": "pretrained",
+                    "enum": ["pretrained", "train_self"],
+                    "description": "SemiBin2 under --assembly_mode coassembly: a pre-trained model (--semibin_coassembly_env_model) on the pooled BAM, or a model trained on the co-assembly (train_self; ~40x the CPU time).",
+                    "fa_icon": "fas fa-brain"
+                },
+                "semibin_coassembly_env_model": {
+                    "type": "string",
+                    "default": "global",
+                    "enum": ["human_gut", "dog_gut", "ocean", "soil", "cat_gut", "human_oral", "mouse_gut", "pig_gut", "built_environment", "wastewater", "chicken_caecum", "global"],
+                    "description": "SemiBin2 pre-trained model for the co-assembly (--semibin_coassembly_mode pretrained). Per-sample assemblies use --semibin_env_model.",
+                    "fa_icon": "fas fa-globe"
+                },
                 "semibin_random_seed": {
                     "type": "integer",
                     "default": 11,

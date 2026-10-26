@@ -5,8 +5,13 @@
     Metagenomic binning using SemiBin2
     
     Supports both per-sample and co-assembly modes:
-    - Per-sample: Uses single_easy_bin workflow
-    - Co-assembly: Uses multi-step workflow (generate features → train → bin)
+    - Pre-trained model (single_easy_bin --environment): every per-sample
+      assembly (params.semibin_env_model) and, by default, the co-assembly
+      (params.semibin_coassembly_env_model) on its pooled BAM
+    - Self-trained model (generate features → train_self → bin_short): the
+      co-assembly with params.semibin_coassembly_mode = 'train_self' (Phase
+      7a: 24.8 CPU-hours against 0.65 for the pre-trained model; after
+      Binette both gave 36 bins, 25 and 23 of them high quality)
     
     Input:
         tuple val(meta), path(contigs), path(bam)
@@ -37,10 +42,11 @@ process SEMIBIN {
 
     script:
     prefix = meta.id
-    def env_model = params.semibin_env_model
+    def is_coassembly = (meta.id == 'coassembly')
+    def train_self = is_coassembly && params.semibin_coassembly_mode == 'train_self'
+    def env_model = is_coassembly ? params.semibin_coassembly_env_model : params.semibin_env_model
     // A fixed seed: unseeded SemiBin2 gives a bin more or less between reruns
     def seed = params.semibin_random_seed
-    def is_coassembly = (meta.id == 'coassembly')
     
     // Input validation
     if (!meta || !meta.id) {
@@ -53,8 +59,8 @@ process SEMIBIN {
         error "SEMIBIN: No BAM file(s) provided for sample ${meta.id}"
     }
     
-    if (is_coassembly) {
-        // Co-assembly mode: multi-step workflow
+    if (train_self) {
+        // Co-assembly, self-trained model: multi-step workflow
         """
         set -euo pipefail
         
@@ -122,7 +128,7 @@ process SEMIBIN {
         END_VERSIONS
         """
     } else {
-        // Per-sample mode: single easy bin
+        // Pre-trained model: single easy bin
         """
         set -euo pipefail
         

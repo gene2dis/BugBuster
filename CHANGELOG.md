@@ -430,6 +430,16 @@ next release is tagged.
   `Average_Gene_Length` come from Binette's gene calls on the whole assembly
   (within ~2 % of CheckM2's per-bin counts on a real bin), and
   `Translation_Table_Used` and `Additional_Notes` are empty
+- **SemiBin2 bins a co-assembly with a pre-trained model** (new
+  `--semibin_coassembly_mode`, default `pretrained`, and
+  `--semibin_coassembly_env_model`, default `global`): `single_easy_bin` on
+  the pooled BAM instead of training a model on the co-assembly. On a
+  five-sample co-assembly training took 24.8 CPU-hours (8.5 h), more than the
+  MEGAHIT assembly, and the pre-trained model 0.65; after Binette both gave 36
+  bins (25 and 23 MIMAG high quality). Co-assembly bins change;
+  `--semibin_coassembly_mode train_self` keeps the previous method, now at 4
+  CPUs (more threads made training slower). Per-sample assemblies keep
+  `--semibin_env_model` (`human_gut`)
 - **GTDB-Tk places genomes with 4 pplacer threads** (performance review
   M10; new `--gtdbtk_pplacer_cpus`, default 4, was a fixed 1): on 119 genomes
   forced through pplacer the backbone tree took 17.9 instead of 36.2 min and a

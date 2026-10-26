@@ -269,7 +269,9 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
 | `--bin_min_completeness` | `50` | Minimum CheckM2 completeness (%) of a refined bin — used only when ≥2 binners (was `--metawrap_completeness`, still accepted) |
 | `--bin_max_contamination` | `10` | Maximum CheckM2 contamination (%) of a refined bin — used only when ≥2 binners (was `--metawrap_contamination`, still accepted) |
-| `--semibin_env_model` | `human_gut` | SemiBin environment model |
+| `--semibin_env_model` | `human_gut` | SemiBin environment model (per-sample assemblies) |
+| `--semibin_coassembly_mode` | `pretrained` | Co-assembly: pre-trained model on the pooled BAM, or `train_self` (~40× the CPU time) |
+| `--semibin_coassembly_env_model` | `global` | SemiBin pre-trained model for the co-assembly |
 
 **SemiBin Models**: `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`, `human_oral`, `chicken_caecum`, `ocean`, `soil`, `wastewater`, `built_environment`, `global`
 

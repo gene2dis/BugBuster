@@ -758,6 +758,20 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: SemiBin2 `--random-seed`. With a fixed seed, reruns on the same input give the same bins; without one, SemiBin2 2.6.0 gave one bin more or less between reruns of the same sample
 - **Example**: `--semibin_random_seed 42`
 
+#### `--semibin_coassembly_mode`
+- **Type**: String
+- **Default**: `pretrained`
+- **Options**: `pretrained`, `train_self`
+- **Description**: How SemiBin2 bins a co-assembly (`--assembly_mode coassembly`). `pretrained` runs `single_easy_bin` with the pre-trained model `--semibin_coassembly_env_model` on the pooled BAM; `train_self` trains a model on the co-assembly first (the pipeline's behaviour before 2.0.0). On a five-sample co-assembly `train_self` took 24.8 CPU-hours (8.5 h) against 0.65 for the pre-trained model, more than the MEGAHIT assembly itself; after Binette refinement both gave 36 bins (25 and 23 MIMAG high quality, within CheckM2's noise near the threshold). `train_self` runs at 4 CPUs: more threads made it slower
+- **Example**: `--semibin_coassembly_mode train_self`
+
+#### `--semibin_coassembly_env_model`
+- **Type**: String
+- **Default**: `global`
+- **Options**: as `--semibin_env_model`
+- **Description**: SemiBin2 pre-trained model for the co-assembly with `--semibin_coassembly_mode pretrained`. Per-sample assemblies use `--semibin_env_model` (default `human_gut`). The benchmark used `global`
+- **Example**: `--semibin_coassembly_env_model soil`
+
 #### `--gtdbtk_pplacer_cpus`
 - **Type**: Integer
 - **Default**: `4`
