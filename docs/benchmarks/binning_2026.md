@@ -10,13 +10,15 @@ Benchmark run 2026-10-25 to 2026-10-26. It asks seven questions about the binnin
 - **(f) COMEBin:** keep or remove. BugBuster runs it on CPU only.
 - **(g) SemiBin2 in co-assembly mode:** where `train_self` spends its 7–10 h, whether more CPUs help, and what a pre-trained model gives instead.
 
-No pipeline code changed. Every run used the pipeline's own modules, with the updated images swapped in by config and a few workarounds in the harness only (Setup). Pins and fixes are for Phase 7b, after the owner's decision.
+No pipeline code changed. Every run used the pipeline's own modules, with the updated images swapped in by config and a few workarounds in the harness only (Setup). Pins and fixes are for Phase 7b.
 
-**Outcome (recommendations, for the owner's decision):**
+**Decision (owner, 2026-10-26):** all recommendations below approved, with the GTDB-Tk 2.8.0 biocontainer (skani 0.4.0) and SemiBin2's pre-trained `global` model for co-assembly. Phase 7b applies them, Phase 7c the co-assembly coverage.
+
+**Outcome (recommendations):**
 
 - **Refiner: replace MetaWRAP with Binette.** Same or more bins and MIMAG high bins than MetaWRAP on both sets, every GTDB species MetaWRAP found plus one, at about an eighth of the CPU time and a third of the memory (asm set: 3.0 vs 23.0 CPU-hours, 11.2 vs 34.5 GB). DAS Tool is cheaper still but lost bins and kept one below 50 % completeness.
-- **CheckM2 on raw bins: drop it under Binette.** Binette runs CheckM2 on every input bin and every final bin and writes both reports. Its classes matched a separate CheckM2 run on all 176 raw and all 45 refined bins. The separate run costs 4.5 CPU-hours and 12 GB on the asm set.
-- **Pins:** SemiBin2 2.6.0 (more high-quality bins: 23 vs 18 raw on the asm set, 24 vs 17 in the co-assembly), with `--random-seed`. MetaBAT2 2.18, with its bin headers cut to the contig name. MMseqs2 18 (identical clusters). GTDB-Tk 2.8.0 (identical calls); the owner chooses between two images (section (a)).
+- **CheckM2 on raw bins: drop it under Binette.** Binette runs CheckM2 on every input bin and every final bin and writes both reports. Its classes matched a separate CheckM2 run on all 176 raw and all 45 refined bins of the asm set; on the co-assembly sets one or two bins near the 90 % line fell in a different class (section (d)). The separate run costs 4.5 CPU-hours and 12 GB on the asm set.
+- **Pins:** SemiBin2 2.6.0 (more high-quality bins: 23 vs 18 raw on the asm set, 24 vs 17 in the co-assembly), with `--random-seed`. MetaBAT2 2.18, with its bin headers cut to the contig name. MMseqs2 18 (identical clusters). GTDB-Tk 2.8.0 (identical calls); two images, which differ in skani version (section (a)); the owner chose the biocontainer.
 - **COMEBin: keep as an option (not the default, as today), with a cost warning and 8 CPUs.** It took 38 CPU-hours on the sample measured in Phase 5, in both versions: about 370× SemiBin2. After Binette it added one genome, upgraded one bin to high quality and added 39 % more sequence in passing bins on that sample, and gave the only passing bin on the small one. COMEBin 1.1.0 does not run as built: it needs a `realpath` fix, `-d cpu` and its bin headers cut.
 - **Co-assembly: a pre-trained SemiBin2 model on the pooled BAM, and per-sample depths for MetaBAT2.** After Binette this gave 36 bins with 25 MIMAG high, the same as the best self-trained run, with SemiBin2 at 0.65 CPU-hours instead of 24.8 (38× less; self-training cost more than the assembly). Per-sample coverage doubles MetaBAT2's high-quality bins (11 → 23); a pre-trained SemiBin2 model cannot use it (one coverage column only), and self-trained SemiBin2 gained nothing from it.
 - **pplacer:** with `--pplacer_cpus 4`, one genome in a class-level tree took 60 GB, a few 124–131 GB, and fifty 141–142 GB. GTDB_TK_BATCH's 256 GB request covers it; 160 GB would cover every case measured. In the normal runs, 0 of 120 asm genomes and 2 of 219 co-assembly genomes reached pplacer.
@@ -29,11 +31,11 @@ No pipeline code changed. Every run used the pipeline's own modules, with the up
 | SemiBin2 2.1.0 → 2.6.0 | MIMAG high raw bins 18 → 23 (asm), 17 → 24 (coasm); same cost per sample; `train_self` 18.3 → 24.8 CPU-h; co-assembly mode breaks (`model.pt`) | pin, with `--random-seed` and the `model.pt` fix |
 | MetaBAT2 2.15 → 2.18 | high 11 → 14 (asm), 11 → 11 (coasm); bin headers gain depth fields, which made MetaWRAP's bins wrong | pin, with headers cut |
 | MMseqs2 15 → 18 | identical clusters at every identity level | pin |
-| GTDB-Tk 2.7.2 → 2.8.0 | identical classifications (120 asm and 219 coasm genomes); skani 0.4.0 reads the R232 sketches | pin; owner chooses the image |
+| GTDB-Tk 2.7.2 → 2.8.0 | identical classifications (120 asm and 219 coasm genomes); skani 0.4.0 reads the R232 sketches | pin; biocontainer image (owner's choice) |
 | Refiner (L1) | asm: Binette 45 bins, 26 high, 158.4 Mbp, 3.0 CPU-h, 11.2 GB vs MetaWRAP 44, 23, 152.9 Mbp, 23.0 CPU-h, 34.5 GB; coasm the same pattern | Binette |
-| CheckM2 on raw bins (M7) | 4.5 CPU-h, 12 GB on the asm set; Binette's reports agree with it on every bin | take it from Binette |
+| CheckM2 on raw bins (M7) | 4.5 CPU-h, 12 GB on the asm set; Binette's reports agree with it on every asm bin, and on all but 1–2 bins near the 90 % line in the co-assembly | take it from Binette |
 | pplacer at 4 CPUs (M10) | 0 of 120 asm and 2 of 219 coasm genomes reach it; a class-level tree then takes 60 GB (1 genome) to 142 GB (53, forced) | keep the 256 GB request |
-| Co-assembly coverage (M1) | per-sample depths: MetaBAT2 high 11 → 23; refined set unchanged (36 bins, 24–25 high) | per-sample depths for MetaBAT2 |
+| Co-assembly coverage (M1) | per-sample depths: MetaBAT2 high 11 → 23; refined set unchanged (36 bins, 23–25 high) | per-sample depths for MetaBAT2 |
 | SemiBin2 co-assembly mode | `train_self` 24.8 CPU-h, slower with more threads; pre-trained 0.65 CPU-h; with per-sample MetaBAT2, Binette gives 36 bins, 25 high either way | pre-trained model by default |
 | COMEBin | 38 CPU-h on a 36.6 Mbp assembly (both versions); after Binette +1 genome, +1 high, +39 % Mbp on that sample; 1.1.0 broken as built; failures silent | keep as an option with a cost warning; fix failure handling |
 
@@ -100,7 +102,7 @@ Each command the modules call was run with `--version` or `--help` inside the im
 | GTDB-Tk 2.8.0, Seqera Containers build `community.wave.seqera.io/library/gtdbtk_skani:d13cc293988742dd` | Built on request from bioconda `gtdbtk=2.8.0` and `skani=0.3.2`: skani 0.3.2, pplacer v1.1.alpha19, Prodigal 2.6.3, HMMER 3.4, FastTree 2.2.0, Python 3.13.17, and the shell tools GTDB_TK_BATCH calls. Its Singularity twin has no `find`, which GTDB_TK_BATCH calls, so the docker URI would be pinned for every engine (design doc Q20). |
 | GTDB-Tk 2.7.2 (current) | skani 0.3.2, the same pplacer. |
 
-**skani 0.4 reads the R232 reference sketches.** The plan required skani 0.3.x because 0.4 was expected not to read them. It did: `skani search` against the R232 sketch database found the same hit for a test bin with both versions (ANI 99.28), and the biocontainer gave the same classifications as the other two images on every genome below. So both 2.8.0 images work; they differ in packaging only.
+**skani 0.4 reads the R232 reference sketches.** The plan required skani 0.3.x because 0.4 was expected not to read them. It did: `skani search` against the R232 sketch database found the same hit for a test bin with both versions (ANI 99.28), and the biocontainer gave the same classifications as the other two images on every genome below. So both 2.8.0 images work and gave identical results here; they differ in skani version (0.3.2 vs 0.4.0) as well as packaging. Only the Seqera Singularity build was checked for the commands GTDB_TK_BATCH calls; the depot sif of the biocontainer was not, and 7b checks it and runs it once under apptainer before pinning it.
 
 ### Raw binners
 
@@ -211,7 +213,7 @@ The same pattern held for the other two co-assembly inputs (section (d)): Binett
 
 - **Forced placement changed no classification** (120 of 120 the same as the normal run).
 - **Memory rises steeply with the first few genomes in a class-level tree, then levels off.** One genome took 59–60 GB (trees 3 and 4); two to eight genomes in other trees 124–131 GB; 52–53 genomes 141–142 GB. Phase 5 measured 142.5 GB at `--pplacer_cpus 4` for its class-level step.
-- **A class-level tree takes 40–70 min for two genomes or for fifty, 18–20 min for one,** in the forced run, which placed genomes into six trees one after another (5 h 10 min of placement in all).
+- **A class-level tree took 38–69 min for two to fifty-three genomes, 18–20 min for one,** in the forced run, which placed genomes into six trees one after another (4 h 41 min in the six trees, 4 h 58 min with the backbone).
 - **For 7b:** GTDB_TK_BATCH's request (`process_high_memory`, 256 GB) covers this, with room. A run whose genomes all pass the ANI screen needs ~40 GB and one with a few genomes in a class-level tree ~60–130 GB, but neither is known in advance; 160 GB would cover every case measured here.
 
 ## (d) Co-assembly coverage: pooled BAM or one BAM per sample
@@ -228,7 +230,7 @@ A pre-trained SemiBin2 model takes only one coverage column ("can only be used f
 | **MetaBAT2 per-sample, SemiBin2 pre-trained on the pooled BAM** | 55 (23 / 14) | 64 (22 / 11) | 0.65 | **36 (25 / 11; 121.7)** | | |
 
 - **Per-sample coverage doubles MetaBAT2's high-quality bins** (11 → 23; 96 → 120 Mbp in passing bins), with fewer bins in all (55 vs 65).
-- **It barely moves SemiBin2** (23 / 12 vs 24 / 11), **or the refined set:** Binette gave 36 bins with 24–25 high in every case, and 1–6 Mbp more with per-sample coverage.
+- **It barely moves SemiBin2** (23 / 12 vs 24 / 11), **or the refined set:** Binette gave 36 bins with 23–25 high in every case, and 1–6 Mbp more with per-sample coverage.
 - **What it costs is the pre-trained model.** Per-sample coverage with SemiBin2 means `train_self`, 24.8 CPU-hours, against 0.65 for the pre-trained model on the pooled BAM.
 - **The combination keeps both.** MetaBAT2 on the per-sample depths and the pre-trained SemiBin2 on the pooled BAM, refined by Binette, gave 36 bins, 25 high and 11 medium, 121.7 Mbp: as many high-quality bins as the best self-trained run, with SemiBin2 at 0.65 CPU-hours instead of 24.8. Binette took 15 min, 1.9 CPU-hours and 11.9 GB. It was run outside Nextflow, with the harness's Binette command on the two runs' published bins.
 - Binette's own CheckM2 report and the separate CheckM2 run disagree on one or two bins near the 90 % line for these sets (for example 23 / 13 vs 25 / 11 for the pooled `train_self` run), so the four Binette results (23–25 high, 36 bins each) are within noise of each other. What separates them is cost.
@@ -269,9 +271,9 @@ BugBuster runs COMEBin on CPU only: the module has no GPU wiring, and this serve
 | SemiBin2 2.6.0, sample C (8 CPUs) | 4.8 min | 0.10 | 1.3 | 0.55 GB | 16 (1 / 5) |
 | MetaBAT2 2.18, sample C | 0.1 min | 0.01 | | 0.15 GB | 6 (1 / 2) |
 
-- **1.1.0 costs the same CPU time as 1.0.4** (38.2 vs 38.6 CPU-hours on sample C). Its shorter wall time came from more cores under a different load, not from less work. It needs less than half the memory.
+- **1.1.0 costs the same CPU time as 1.0.4** (38.2 vs 38.6 CPU-hours on sample C). Its shorter wall time came from more cores under a different load, not from less work. It needed less memory: 2.7 vs 7.2 GB on sample C, 2.7 vs 4.0 GB on sample D.
 - **On sample C, COMEBin costs ~370× SemiBin2's CPU time** for one more high-quality bin before refinement (2 vs 1) and the same number of medium ones.
-- It never used more than 6.4 of its 16 CPUs on average. If it is kept, 8 CPUs is the measured request.
+- It used at most 6.4 of its 16 CPUs on average in these runs, and 6.9 in Phase 5's run of sample C. If it is kept, 8 CPUs is the measured request.
 - Its CPU time grows with the assembly: 5.7–5.9 CPU-hours for sample D's 3.7 Mbp of contigs, 38 for sample C's 36.6 Mbp. At that rate sample A (118 Mbp) would take on the order of 100 CPU-hours; this was not measured.
 
 **What it adds after refinement** (sample C; SemiBin2 + MetaBAT2 against SemiBin2 + MetaBAT2 + COMEBin, all 2.6.0 / 2.18 / 1.1.0):
@@ -318,7 +320,7 @@ Four threads were the fastest, by 18 % over one, for 2.5× the CPU time. Eight a
 
 ## Recommendations
 
-For the owner's decision; Phase 7b applies what is approved.
+Approved by the owner on 2026-10-26 (see Decision, top); Phase 7b applies them.
 
 **L1, refiner: Binette 1.2.1, replacing MetaWRAP.** On both sets it gave as many or more bins, MIMAG high bins and sequence in passing bins as MetaWRAP, and every GTDB species MetaWRAP found, for an eighth of the CPU time and a third of the memory. It also reads only the first word of each contig header, which protects it from the MetaBAT2 2.18 and COMEBin 1.1.0 header changes. Keep its thresholds at the current `--metawrap_completeness 50` and `--metawrap_contamination 10` (renamed or aliased in 7b). The new module must keep the refined-bin directory contract (CHECKM2_BATCH, GTDB_TK_BATCH, the BIN_* reports, Bakta, ARG bin clustering, `SKIPPED.txt`); GTDB_TK_BATCH finds refined bins by MetaWRAP's directory suffix today. DAS Tool is the cheaper alternative, but it lost bins and kept one 36.8 %-complete bin; if it were chosen, 7b would have to add a completeness and contamination filter.
 
@@ -329,12 +331,12 @@ For the owner's decision; Phase 7b applies what is approved.
 - SemiBin2 2.6.0. 7b: use `model.pt` in co-assembly mode; pass `--random-seed` (a fixed default) so reruns give the same bins.
 - MetaBAT2 2.18. 7b: cut bin headers to the first word in METABAT2.
 - MMseqs2 18.8cc5c.
-- GTDB-Tk 2.8.0. The owner chooses the image: the Seqera build with skani 0.3.2 (docker URI for every engine, as its sif lacks `find`) or the biocontainer with skani 0.4.0 (a depot sif exists). They gave identical results here.
+- GTDB-Tk 2.8.0, from one of two images that gave identical results here: the Seqera build with skani 0.3.2 (docker URI for every engine, as its sif lacks `find`) or the biocontainer with skani 0.4.0 (a depot sif exists but was not checked here). The owner chose the biocontainer; 7b checks its depot sif for every command GTDB_TK_BATCH calls and runs it once under apptainer before pinning it.
 - COMEBin 1.1.0 only if COMEBin stays, and only with all of: a `realpath` that supports `-e` (or a patched `run_comebin.sh`), `-d cpu`, and bin headers cut to the first word. Its PyTorch is the CPU build, so `-d cpu` loses nothing. Otherwise keep 1.0.4.
 
-**COMEBin: keep as an option, not a default (it is not one today), with a cost warning.** After Binette it added a genome and upgraded a bin on sample C, and gave the only passing bin on sample D. It costs 1–1.6 CPU-hours per Mbp of contigs (38 CPU-hours for sample C, ~370× SemiBin2) and used at most 6.4 of 16 CPUs on average: request 8 CPUs, and say in README and `docs/manual.md` what it costs. Removing it is the alternative if that cost is judged too high for one or two bins per sample. Either way, 7b fixes its failure handling: fail the task (so Nextflow retries with the smaller batch settings) and write `FAILED.txt` only after the last attempt.
+**COMEBin: keep as an option, not a default (it is not one today), with a cost warning.** After Binette it added a genome and upgraded a bin on sample C, and gave the only passing bin on sample D. It costs 1–1.6 CPU-hours per Mbp of contigs (38 CPU-hours for sample C, ~370× SemiBin2) and used at most 6.4–6.9 of 16 CPUs on average (here and in Phase 5): request 8 CPUs, and say in README and `docs/manual.md` what it costs. Removing it is the alternative if that cost is judged too high for one or two bins per sample. Either way, 7b fixes its failure handling: fail the task (so Nextflow retries with the smaller batch settings) and write `FAILED.txt` only after the last attempt.
 
-**M10, `--gtdbtk_pplacer_cpus` default 4 (already decided).** Keep GTDB_TK_BATCH's 256 GB request (or lower it to 160 GB): one genome in a class-level tree took 60 GB, a few 124–131 GB, fifty 142 GB.
+**M10, pplacer threads 4 (decided after Phase 5).** GTDB_TK_BATCH passes `--pplacer_cpus 1` today; 7b adds a parameter for it with default 4. Every GTDB-Tk run here used 4. Keep GTDB_TK_BATCH's 256 GB request (160 GB would cover every case measured, with little margin): one genome in a class-level tree took 60 GB, a few 124–131 GB, fifty 142 GB.
 
 **SemiBin2 in co-assembly mode: use a pre-trained model by default** (`single_easy_bin --environment` on the pooled BAM). It saves ~24 CPU-hours per co-assembly, more than MEGAHIT costs, for no loss after Binette when MetaBAT2 gets per-sample depths. `train_self` stays available behind a parameter. If self-training is kept anywhere, give it 4 CPUs, not 8: more threads made it slower.
 
@@ -343,7 +345,7 @@ For the owner's decision; Phase 7b applies what is approved.
 ## Caveats
 
 - Two small sets: four per-sample assemblies and one co-assembly. COMEBin ran on two samples. Each variant ran once; the seeded SemiBin2 runs are reproducible, but MetaBAT2 2.15 vs 2.18 and every refiner were single runs.
-- Bin classes are CheckM2's. Binette selects bins with CheckM2, so it is judged here by its own criterion; GTDB-Tk species give a check that does not depend on CheckM2. Bins near the 90 % line move between high and medium between CheckM2 runs (Binette's own CheckM2 report and the separate run differ by up to 1.6 points per bin), so differences of one or two high-quality bins are within noise.
+- Bin classes are CheckM2's. Binette selects bins with CheckM2, so it is judged here by its own criterion; GTDB-Tk species give a check that does not depend on CheckM2. Bins near the 90 % line move between high and medium between CheckM2 runs (Binette's own CheckM2 report and the separate run differ by up to 2.6 points per bin), so differences of one or two high-quality bins are within noise.
 - SemiBin2's pre-trained model was `global`, not the pipeline's default `human_gut`.
 - The machine was loaded by other users throughout (load 60–180 on 80 threads); wall times are inflated and CPU-hours carry some contention.
 - The co-assembly is the full-depth co-assembly of a five-sample set, not a large one; SemiBin2's training cost and the per-sample coverage gain may scale differently with more samples.
