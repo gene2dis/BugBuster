@@ -443,6 +443,10 @@ next release is tagged.
     the bin depth step match contigs by name. Bins change slightly with the
     same `--seed 3` (raw MIMAG high quality bins 11 → 14 on four per-sample
     assemblies, 11 → 11 on a co-assembly)
+  - MMseqs2 15.6f452 → 18.8cc5c (`quay.io/biocontainers/mmseqs2:18.8cc5c--hd6d6fdc_0`,
+    and its depot.galaxyproject.org image under singularity, which `CLUSTERING`
+    did not have) for `CLUSTERING`: the ARG clusters of 456 proteins were
+    identical at all four identity levels
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of
