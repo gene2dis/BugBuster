@@ -752,6 +752,12 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: SemiBin environment model for binning
 - **Example**: `--semibin_env_model ocean`
 
+#### `--semibin_random_seed`
+- **Type**: Integer
+- **Default**: `11`
+- **Description**: SemiBin2 `--random-seed`. With a fixed seed, reruns on the same input give the same bins; without one, SemiBin2 2.6.0 gave one bin more or less between reruns of the same sample
+- **Example**: `--semibin_random_seed 42`
+
 ### Advanced MetaBAT2 Parameters
 
 #### `--metabat_maxP`

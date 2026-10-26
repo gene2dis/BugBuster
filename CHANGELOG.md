@@ -430,6 +430,13 @@ next release is tagged.
   `Average_Gene_Length` come from Binette's gene calls on the whole assembly
   (within ~2 % of CheckM2's per-bin counts on a real bin), and
   `Translation_Table_Used` and `Additional_Notes` are empty
+- **Binning tool updates** (Phase 7a benchmark, `docs/benchmarks/binning_2026.md`)
+  - SemiBin2 2.1.0 → 2.6.0 (`quay.io/biocontainers/semibin:2.6.0--pyhdfd78af_0`)
+    for `SEMIBIN`, with a fixed `--random-seed` (new `--semibin_random_seed`,
+    default 11): unseeded runs gave one bin more or less between reruns of a
+    sample. Bins change: on four per-sample assemblies the raw MIMAG high
+    quality bins went from 18 to 23, on a five-sample co-assembly from 17 to
+    24. The co-assembly mode reads 2.6.0's `model.pt` (2.1.0: `model.h5`)
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of

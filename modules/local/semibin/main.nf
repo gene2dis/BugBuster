@@ -22,8 +22,8 @@ process SEMIBIN {
     label 'process_medium'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/semibin:2.1.0--pyhdfd78af_0' :
-        'quay.io/biocontainers/semibin:2.1.0--pyhdfd78af_0' }"
+        'https://depot.galaxyproject.org/singularity/semibin:2.6.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/semibin:2.6.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta), path(contigs), path(bam)
@@ -38,6 +38,8 @@ process SEMIBIN {
     script:
     prefix = meta.id
     def env_model = params.semibin_env_model
+    // A fixed seed: unseeded SemiBin2 gives a bin more or less between reruns
+    def seed = params.semibin_random_seed
     def is_coassembly = (meta.id == 'coassembly')
     
     // Input validation
@@ -92,12 +94,16 @@ process SEMIBIN {
                      --data contig_output/data.csv \\
                      --data-split contig_output/data_split.csv \\
                      -o contig_output \\
+                     --random-seed ${seed} \\
                      --threads ${task.cpus}
             
+            # SemiBin2 2.6.0 saves the model as model.pt (2.1.0: model.h5)
+            model=\$(ls contig_output/model.pt contig_output/model.h5 2>/dev/null | head -n 1)
             status=0
             SemiBin2 bin_short \\
                      -i ${contigs} \\
-                     --model contig_output/model.h5 \\
+                     --model "\$model" \\
+                     --random-seed ${seed} \\
                      --data contig_output/data.csv \\
                      -o output \\
                      --compression none \\
@@ -151,6 +157,7 @@ process SEMIBIN {
                      -b ${bam} \\
                      -o ${prefix}_semibin_bins \\
                      --environment ${env_model} \\
+                     --random-seed ${seed} \\
                      --compression none \\
                      --threads ${task.cpus} \\
                      > semibin.log 2>&1 || status=\$?
@@ -188,7 +195,7 @@ process SEMIBIN {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        semibin: 2.1.0
+        semibin: 2.6.0
     END_VERSIONS
     """
 }

@@ -684,6 +684,13 @@
                     ],
                     "description": "SemiBin environment model for binning.",
                     "fa_icon": "fas fa-globe"
+                },
+                "semibin_random_seed": {
+                    "type": "integer",
+                    "default": 11,
+                    "minimum": 0,
+                    "description": "SemiBin2 --random-seed. A fixed seed makes reruns on the same input give the same bins (unseeded runs differ by about one bin).",
+                    "fa_icon": "fas fa-dice"
                 }
             }
         },
