@@ -437,6 +437,12 @@ next release is tagged.
     sample. Bins change: on four per-sample assemblies the raw MIMAG high
     quality bins went from 18 to 23, on a five-sample co-assembly from 17 to
     24. The co-assembly mode reads 2.6.0's `model.pt` (2.1.0: `model.h5`)
+  - MetaBAT2 2.15 → 2.18 (`quay.io/biocontainers/metabat2:2.18--h38e344b_2`)
+    for `METABAT2` and `CALCULATE_DEPTH`. 2.18 writes depth fields after the
+    contig name in bin FASTA headers; `METABAT2` cuts them, as the refiner and
+    the bin depth step match contigs by name. Bins change slightly with the
+    same `--seed 3` (raw MIMAG high quality bins 11 → 14 on four per-sample
+    assemblies, 11 → 11 on a co-assembly)
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of

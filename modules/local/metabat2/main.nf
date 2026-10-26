@@ -20,8 +20,8 @@ process METABAT2 {
     label 'process_medium'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/metabat2:2.15--h4da6f23_2' :
-        'quay.io/biocontainers/metabat2:2.15--h4da6f23_2' }"
+        'https://depot.galaxyproject.org/singularity/metabat2:2.18--h38e344b_2' :
+        'quay.io/biocontainers/metabat2:2.18--h38e344b_2' }"
 
     input:
     tuple val(meta), path(contigs), path(depth)
@@ -68,11 +68,16 @@ process METABAT2 {
              -o ${prefix}_metabat_bins/${prefix}_metabat_bin \\
              ${args} \\
              -t ${task.cpus}
+
+    # MetaBAT2 2.18 writes depth fields after the contig name in bin FASTA
+    # headers; refiners and the bin depth step match contigs by the whole
+    # header, so keep the name only (2.15 wrote the bare name)
+    find ${prefix}_metabat_bins -name '*.fa' -exec sed -i '/^>/s/[[:space:]].*//' {} +
     
     # Generate version file
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: \$(metabat2 --help 2>&1 | grep 'version' | sed 's/.*version //; s/ .*//')
+        metabat2: \$(metabat2 --help 2>&1 | grep -o 'version [0-9:]*[0-9]\.[0-9.]*' | head -n 1 | sed 's/.*[ :]//')
     END_VERSIONS
     """
     
@@ -101,7 +106,7 @@ process METABAT2 {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: 2.15
+        metabat2: 2.18
     END_VERSIONS
     """
 }

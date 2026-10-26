@@ -20,8 +20,8 @@ process CALCULATE_DEPTH {
     label 'process_single'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/metabat2:2.15--h4da6f23_2' :
-        'quay.io/biocontainers/metabat2:2.15--h4da6f23_2' }"
+        'https://depot.galaxyproject.org/singularity/metabat2:2.18--h38e344b_2' :
+        'quay.io/biocontainers/metabat2:2.18--h38e344b_2' }"
 
     input:
     tuple val(meta), path(contigs), path(bam)
@@ -68,7 +68,7 @@ process CALCULATE_DEPTH {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: 2.15
+        metabat2: 2.18
     END_VERSIONS
     """
 }
