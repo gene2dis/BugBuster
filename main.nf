@@ -241,15 +241,15 @@ workflow {
     }
 
     // --metawrap_completeness / --metawrap_contamination name MetaWRAP's
-    // cutoffs, which Binette took over: still accepted, with a warning.
-    // BINETTE reads the alias (config/modules.config) unless the new param is
-    // set to another value, which is a contradiction
+    // cutoffs, which Binette took over: still accepted, with a warning (BINETTE
+    // reads them when the new param is not given). Both given with different
+    // values is a contradiction
     [
-        [params.metawrap_completeness, 'metawrap_completeness', params.bin_min_completeness, 'bin_min_completeness', 50],
-        [params.metawrap_contamination, 'metawrap_contamination', params.bin_max_contamination, 'bin_max_contamination', 10],
-    ].each { old_value, old_name, new_value, new_name, default_value ->
+        [params.metawrap_completeness, 'metawrap_completeness', params.bin_min_completeness, 'bin_min_completeness'],
+        [params.metawrap_contamination, 'metawrap_contamination', params.bin_max_contamination, 'bin_max_contamination'],
+    ].each { old_value, old_name, new_value, new_name ->
         if (old_value != null) {
-            if ((new_value as Integer) != default_value && (new_value as Integer) != (old_value as Integer)) {
+            if (new_value != null && (new_value as Integer) != (old_value as Integer)) {
                 error("--${old_name} ${old_value} and --${new_name} ${new_value} disagree: --${old_name} is a deprecated alias of --${new_name}; pass only --${new_name}")
             }
             log.warn "--${old_name} is deprecated (MetaWRAP was replaced by Binette): using ${old_value} as --${new_name}. Pass --${new_name} instead"

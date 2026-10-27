@@ -635,18 +635,16 @@
                 },
                 "bin_min_completeness": {
                     "type": "integer",
-                    "default": 50,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Minimum CheckM2 completeness (%) of a refined bin (Binette, with >= 2 binners).",
+                    "description": "Minimum CheckM2 completeness (%) of a refined bin (Binette, with >= 2 binners). Default 50.",
                     "fa_icon": "fas fa-percentage"
                 },
                 "bin_max_contamination": {
                     "type": "integer",
-                    "default": 10,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Maximum CheckM2 contamination (%) of a refined bin (Binette, with >= 2 binners).",
+                    "description": "Maximum CheckM2 contamination (%) of a refined bin (Binette, with >= 2 binners). Default 10.",
                     "fa_icon": "fas fa-percentage"
                 },
                 "metawrap_completeness": {
@@ -704,6 +702,13 @@
                     "default": 11,
                     "minimum": 0,
                     "description": "SemiBin2 --random-seed. A fixed seed makes reruns on the same input give the same bins (unseeded runs differ by about one bin).",
+                    "fa_icon": "fas fa-dice"
+                },
+                "comebin_random_seed": {
+                    "type": "integer",
+                    "default": 11,
+                    "minimum": 0,
+                    "description": "COMEBin -s random seed, so reruns on the same input give the same bins.",
                     "fa_icon": "fas fa-dice"
                 },
                 "gtdbtk_pplacer_cpus": {

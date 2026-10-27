@@ -443,6 +443,9 @@ nextflow_pipeline {
 
             // BINETTE refined bins published to the numbered binning layout
             assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_binette_bins").exists()
+            // Unset cutoffs reach Binette as 50 / 10 (the stub records them)
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_binette_bins/binette_args.txt")
+                .text.contains("--min_completeness 50 --max_contamination 10")
 
             // Audit #14: the single METABAT2 selector must deliver the FULL
             // arg set; the previously winning selector dropped these three.
@@ -1446,6 +1449,57 @@ nextflow_pipeline {
             assert workflow.failed
             def console_out = (workflow.stdout + workflow.stderr).join('\n')
             assert console_out.contains("--mag_level_functional requires --include_binning")
+        }
+    }
+
+    test("Deprecated --metawrap_* cutoffs reach Binette, with a warning") {
+        // Phase 7b: Binette replaced MetaWRAP; the old cutoff names stay as
+        // aliases. An alias is used when its new param is not given, and the
+        // new param is used when only it is given
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode          = "assembly"
+                include_binning        = true
+                binners                = "semibin,metabat2"
+                taxonomic_profiler     = "none"
+                metawrap_completeness  = 70
+                bin_max_contamination  = 5
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("--metawrap_completeness is deprecated")
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_binette_bins/binette_args.txt")
+                .text.contains("--min_completeness 70 --max_contamination 5")
+        }
+    }
+
+    test("Rejects a deprecated cutoff alias that contradicts its new param") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode         = "assembly"
+                include_binning       = true
+                binners               = "semibin,metabat2"
+                metawrap_completeness = 70
+                bin_min_completeness  = 60
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--metawrap_completeness 70 and --bin_min_completeness 60 disagree")
         }
     }
 
