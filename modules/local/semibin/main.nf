@@ -104,7 +104,8 @@ process SEMIBIN {
                      --threads ${task.cpus}
             
             # SemiBin2 2.6.0 saves the model as model.pt (2.1.0: model.h5)
-            model=\$(ls contig_output/model.pt contig_output/model.h5 2>/dev/null | head -n 1)
+            model=contig_output/model.pt
+            [ -f "\$model" ] || model=contig_output/model.h5
             status=0
             SemiBin2 bin_short \\
                      -i ${contigs} \\
