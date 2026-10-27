@@ -21,7 +21,7 @@ flowchart TD
     CleanReads -->|if taxonomic_profiler != none| Taxonomy[TAXONOMY SUBWORKFLOW<br/>Kraken2, Sourmash or Sylph]
     
     %% Read-level ARG Branch
-    CleanReads -->|if args_oap_prediction| ReadARG[ARGS_OAP<br/>stage one]
+    CleanReads -->|if args_oap_prediction| ReadARG[ARGS_OAP<br/>stage one + two → ARGS_OAP_REPORT]
 
     %% RGI Branch
     CleanReads -->|if rgi_prediction| RGI[RGI AMR Prediction<br/>RGI_BWT → RGI_KMER]
@@ -370,7 +370,7 @@ flowchart LR
 - **Quality Assessment**: CHECKM2, GTDB-TK
 
 ### ARG Prediction Modules
-- **Read-level**: ARGS_OAP, RGI_BWT, RGI_KMER, RGI_REPORT, KMARVEL, KMARVEL_REPORT
+- **Read-level**: ARGS_OAP, ARGS_OAP_REPORT, RGI_BWT, RGI_KMER, RGI_REPORT, KMARVEL, KMARVEL_REPORT
 - **Contig-level**: DEEPARG_CONTIGS
 - **Bin-level**: DEEPARG_BINS
 
@@ -438,7 +438,7 @@ flowchart LR
 ### ARG / AMR Prediction
 | Module | Description |
 |--------|-------------|
-| `ARGS_OAP` | ARGs-OAP stage one: read, 16S and cell-number estimates |
+| `ARGS_OAP` / `ARGS_OAP_REPORT` | ARGs-OAP read-level ARGs against SARG (copies per cell, per 16S, ppm) and its run-level tables |
 | `RGI_BWT` / `RGI_KMER` / `RGI_REPORT` | CARD-based AMR prediction with pathogen-of-origin |
 | `KMARVEL` / `KMARVEL_REPORT` | K-MARVEL read-level CARD ARG assembly (blastp-confirmed) and its summary matrices |
 | `DEEPARG_CONTIGS` / `DEEPARG_BINS` | ARG prediction on contigs / bins |

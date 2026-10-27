@@ -102,7 +102,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) at read level (read, 16S and cell-number estimates). Results in `05_arg_prediction/read_level/args_oap/`
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 6.12)
 - **Example**: `--args_oap_prediction true`
 - **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
 
@@ -568,7 +568,7 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI,
 ARGs-OAP), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
 self-contained HTML report, a README (`README.md`, `README.docx`) and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
-clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.16, for how the results are reported.
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.17, for how the results are reported.
 
 ### `--results_summary`
 - **Type**: Boolean
