@@ -49,11 +49,29 @@ plot fixes (top-k union, natural order, scaled labels), and `results_summary.py`
 
 Example data needed: a kraken2 + Bracken run and a sourmash run on the same samples as a sylph run.
 
-## Read-level ARGs: ARGs-OAP
+## Read-level ARGs: ARGs-OAP (verified on a 3-sample, 2 M-pair fixture, 2026-10-27)
 
-KARGA and KARGVA were removed on 2026-10-27 (roadmap Phase 8), with `bin/arg_norm_report.py`, its
-`KARGA_norm.csv` / `KARGVA_norm.csv` and the summary's MEGARes tables. ARGs-OAP stage one is what remains of that
-bundle; it writes read, 16S and cell-number estimates (`metadata.txt`) and is not summarised yet.
+ARGS_OAP runs ARGs-OAP 4.0.0 stages one and two; `bin/args_oap_report.py` (ARGS_OAP_REPORT) publishes
+`05_arg_prediction/read_level/args_oap_summary/args_oap_long.tsv` and `args_oap_cells.tsv`, and
+`results_summary.py` reads them (`bin/summary_sarg.py`). KARGA and KARGVA were removed the same day (roadmap Phase
+8), with `bin/arg_norm_report.py` and the summary's MEGARes tables.
+
+- **Units: SARG copies.** A copy is a read weighted by aligned length / reference length (and 1/2 or 1/3 on a two-
+  or three-component reference); copies per cell divides by ARGs-OAP's nCell. The summary reports copies per cell as
+  the primary unit, plus copies per 16S and ppm (single reads) in `arg_sarg_long`, apart from the read-pair RPKM of
+  K-MARVEL and RGI.
+- **Singletons are added to the pairs.** ARGs-OAP treats `<id>_tmp_reads_S` as a separate sample; the report sums a
+  sample's rows and recomputes stage two's formulas. On a sample without singletons the report equals stage two's
+  own `normalized_cell`, `normalized_16S` and `ppm` tables at every level (checked).
+- **Nothing to normalise is not a failure.** Stage two exits 2 when no row has reads, 16S and cells, or no read
+  survives the SARG search; the module accepts those three messages, the report marks the sample `not_normalised` or
+  `no_sarg_hit`, and the summary leaves a not-normalised sample blank rather than 0.
+- **Not compared with CARD methods.** SARG names differ from CARD's; ARGs-OAP has its own section without tiers, as
+  KARGA had. A SARG-to-tier map remains possible later.
+- **Fixture numbers.** 14-17 SARG types and 64-74 subtypes per sample, 0.21-0.31 copies per cell in total; cell and
+  16S estimates identical to the stage-one-only runs before Phase 8.
+- **Open: `extracted.fa` and `blastout.txt`** (the stage-one candidate reads and the raw BLASTX hits, ~90 MB per
+  full-depth sample) are published but only the filtered files are read.
 
 ## Read functional (Woltka) and MicrobeCensus (verified on Pudahuel, 2026-10-17)
 
