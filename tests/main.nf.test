@@ -296,9 +296,10 @@ nextflow_pipeline {
     }
 
     test("Stub run wires --read_aligner bwamem3 under co-assembly") {
-        // The co-assembly index is built ONCE and shared by the pooled
-        // alignment and the per-sample counting alignments; bin depth maps
-        // each sample once against all bins (BINS_REFERENCE + one index)
+        // The co-assembly index is built ONCE and shared by the per-sample
+        // alignments (one per sample, issue #28), whose merge is the pooled
+        // BAM; bin depth maps each sample once against all bins
+        // (BINS_REFERENCE + one index)
         options "-stub"
 
         when {
@@ -325,8 +326,8 @@ nextflow_pipeline {
             assert workflow.success
             assert !workflow.trace.tasks().any { task -> task.name.contains("BOWTIE2") }
             assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_INDEX (") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("BINS_REFERENCE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BINS_INDEX") } == 1
@@ -400,8 +401,8 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert !workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3") || task.name.contains("BINS_REFERENCE") }
-            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_DEPTH") } == 2
             assert path("${outputDir}/04_binning/coassembly/summary").exists()
@@ -633,10 +634,10 @@ nextflow_pipeline {
     }
 
     test("Stub run wires the contig functional annotation branch (coassembly mode)") {
-        // Wiring test for design doc T3/Q1 coassembly handling: the pooled
-        // binning BAM has no read groups, so the branch adds per-sample
-        // alignments against the co-assembly (BWAMEM3_SAMTOOLS_PER_SAMPLE)
-        // and counts each sample against the single shared co-assembly GFF.
+        // Wiring test for design doc T3/Q1 coassembly handling: the branch
+        // counts each sample's alignment against the co-assembly
+        // (BWAMEM3_SAMTOOLS, one per sample) against the single shared
+        // co-assembly GFF; without binning no pooled BAM is merged.
         options "-stub"
 
         when {
@@ -667,7 +668,8 @@ nextflow_pipeline {
             assert workflow.success
             // One per-sample alignment and one counting task per sample,
             // against the single co-assembly gene set
-            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS_PER_SAMPLE") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("PYRODIGAL") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("AGGREGATE_FUNCTIONS") } == 1

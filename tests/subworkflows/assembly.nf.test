@@ -88,16 +88,17 @@ nextflow_workflow {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("BBNORM") } == 1
-            // Pooled alignment for binning: every sample's full reads
-            assert workflow.out.bam.size() == 1
-            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == [
-                "test_sample1_R1.fastq.gz", "test_sample1_R2.fastq.gz",
-                "test_sample2_R1.fastq.gz", "test_sample2_R2.fastq.gz"
-            ]
-            // Per-sample alignments for gene counting: each sample's full reads
+            // One alignment per sample (issue #28), with each sample's full reads
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS") } == 2
             ['test_sample1', 'test_sample2'].each { id ->
                 def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
                 assert TaskInputs.stagedReads(counting[1]) == ["${id}_R1.fastq.gz", "${id}_R2.fastq.gz"]
+            }
+            // The pooled BAM for binning merges those BAMs, in sample order
+            assert workflow.out.bam.size() == 1
+            assert workflow.out.bam[0][2].toString().endsWith("/coassembly_all_reads.bam")
+            assert TaskInputs.stagedBams(workflow.out.bam[0][2]) == ['test_sample1', 'test_sample2'].collect { id ->
+                workflow.out.counting_bam.find { item -> item[0].id == id }[1].toString()
             }
             // MEGAHIT got one normalized set of the pooled reads
             assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "coassembly_contigs.fa") ==
@@ -160,16 +161,46 @@ nextflow_workflow {
 
         then {
             assert workflow.success
-            assert TaskInputs.stagedReads(workflow.out.bam[0][2]) == [
-                "test_sample1_R1.fastq.gz", "test_sample1_R2.fastq.gz",
-                "test_sample2_R1.fastq.gz", "test_sample2_R2.fastq.gz"
-            ]
+            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS") } == 2
             ['test_sample1', 'test_sample2'].each { id ->
                 def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
                 assert TaskInputs.stagedReads(counting[1]) == ["${id}_R1.fastq.gz", "${id}_R2.fastq.gz"]
             }
+            assert TaskInputs.stagedBams(workflow.out.bam[0][2]) == ['test_sample1', 'test_sample2'].collect { id ->
+                workflow.out.counting_bam.find { item -> item[0].id == id }[1].toString()
+            }
             assert TaskInputs.upstreamStagedReads(workflow.out.contigs_meta[0][1], "coassembly_contigs.fa") ==
                 ["coassembly_norm_R1.fastq.gz", "coassembly_norm_R2.fastq.gz"]
+        }
+    }
+
+    test("co-assembly without binning or contig taxonomy maps each sample once and merges nothing") {
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "coassembly"
+                read_aligner            = "bwamem3"
+                contig_level_functional = true
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def reads = "${projectDir}/tests/data/reads"
+                input[0] = channel.of(
+                    [ [ id: 'test_sample1' ], [ file("\${reads}/test_sample1_R1.fastq.gz"), file("\${reads}/test_sample1_R2.fastq.gz") ] ],
+                    [ [ id: 'test_sample2' ], [ file("\${reads}/test_sample2_R1.fastq.gz"), file("\${reads}/test_sample2_R2.fastq.gz") ] ]
+                )
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS") } == 2
+            assert !workflow.trace.tasks().any { task -> task.name.contains("SAMTOOLS_MERGE") }
+            assert workflow.out.counting_bam.collect { item -> item[0].id }.sort() == ['test_sample1', 'test_sample2']
+            assert workflow.out.bam.size() == 0
         }
     }
 

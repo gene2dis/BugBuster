@@ -1,7 +1,7 @@
 name: bwamem3_samtools
 description: |
   bwa-mem3 read mapping with samtools sorting (--read_aligner bwamem3) - reads against assembled contigs
-  (BWAMEM3_SAMTOOLS, aliased BWAMEM3_SAMTOOLS_PER_SAMPLE) and, under co-assembly binning, each sample's
+  (BWAMEM3_SAMTOOLS) and, under co-assembly binning, each sample's
   reads against all refined bins at once (BINS_REFERENCE + BWAMEM3_INDEX + BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH)
 keywords:
   - alignment
@@ -52,18 +52,16 @@ processes:
       Maps each library's paired reads (and singletons when present) with bwa-mem3, drops secondary and
       supplementary records, turns alignments below ext.min_identity / ext.min_aligned_length into
       unmapped reads (bin/filter_alignments.sh, then samtools fixmate), coordinate-sorts and merges into
-      one BAM. When meta.id is 'coassembly' the
-      collected reads are split into R1/R2/singleton lists by file name. A contig file with no sequences
-      yields a header-only BAM plus an empty-contig report instead of failing.
+      one BAM. One sample per task, against its own contigs or the co-assembly (the co-assembly's pooled
+      BAM is a samtools merge of these). A contig file with no sequences yields a header-only BAM plus an
+      empty-contig report instead of failing.
     input:
       - meta:
           type: map
-          description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+          description: Sample metadata (meta.id is the sample name)
       - reads:
           type: file
-          description: |
-            Host-removed reads - R1, R2 and optional singleton for one sample, or all samples' reads
-            under co-assembly (classified by _R1_/_1., _R2_/_2. and singleton/unpaired in the file name)
+          description: Host-removed reads of one sample - R1, R2 and optional singleton, by position
           pattern: "*.fastq.gz"
       - contigs:
           type: file

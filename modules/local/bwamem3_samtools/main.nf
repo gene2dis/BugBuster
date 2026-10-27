@@ -6,8 +6,7 @@
     and write one coordinate-sorted BAM per sample.
 
     The index is its own task (BWAMEM3_INDEX), so one co-assembly index serves
-    the pooled alignment and every per-sample alignment instead of being
-    rebuilt in each of them. BINS_REFERENCE concatenates the refined bins into
+    every per-sample alignment instead of being rebuilt in each of them. BINS_REFERENCE concatenates the refined bins into
     one reference plus a contig -> bin table, so co-assembly bin depth maps
     each sample once: bwa mem aligns locally, and mapping against one bin at
     a time would let reads from other bins pile up as clipped partial hits.
@@ -126,30 +125,16 @@ process BWAMEM3_SAMTOOLS {
         error "BWAMEM3_SAMTOOLS: paired reads are required for sample ${meta.id}"
     }
 
-    // Co-assembly pools every sample's reads (sorted by sample, each sample
-    // R1, R2[, singleton]); bin/read_role.sh sorts them by file name, as in
-    // MEGAHIT and BOWTIE2_SAMTOOLS, so all three agree on the pairs. bwa mem
-    // takes one file per mate, not bowtie2's comma lists, so each library is
-    // mapped on its own and the BAMs are merged; that also keeps bwa's
-    // insert-size estimate per library. A single sample's reads arrive
-    // positionally (raw input names when QC is off).
-    def classify_reads = meta.id == 'coassembly'
-        ? """for f in ${reads.join(' ')}; do
-        role=\$(read_role.sh "\$f") || exit 1
-        case "\$role" in
-            R1) R1+=("\$f") ;;
-            R2) R2+=("\$f") ;;
-            S)  S+=("\$f") ;;
-        esac
-    done"""
-        : "R1=(${reads[0]}); R2=(${reads[1]})${reads.size() > 2 ? "; S=(${reads[2]})" : ''}"
+    // One sample per task, reads positional (raw input names when QC is
+    // off). Under co-assembly each sample is mapped on its own against the
+    // co-assembly and the pooled BAM is a samtools merge of these (issue
+    // #28); bwa's insert-size estimate stays per library.
     def stage = task.process.tokenize(':')[-1]
 
     """
     set -euo pipefail
 
-    R1=(); R2=(); S=()
-    ${classify_reads}
+    R1=(${reads[0]}); R2=(${reads[1]}); S=(${reads.size() > 2 ? reads[2] : ''})
     if [ \${#R1[@]} -eq 0 ] || [ \${#R1[@]} -ne \${#R2[@]} ]; then
         echo "ERROR: could not pair R1/R2 files for ${prefix}: ${reads.join(' ')}" >&2
         exit 1
