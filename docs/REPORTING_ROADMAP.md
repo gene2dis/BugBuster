@@ -63,9 +63,11 @@ ARGS_OAP runs ARGs-OAP 4.0.0 stages one and two; `bin/args_oap_report.py` (ARGS_
 - **Singletons are added to the pairs.** ARGs-OAP treats `<id>_tmp_reads_S` as a separate sample; the report sums a
   sample's rows and recomputes stage two's formulas. On a sample without singletons the report equals stage two's
   own `normalized_cell`, `normalized_16S` and `ppm` tables at every level (checked).
-- **Nothing to normalise is not a failure.** Stage two exits 2 when no row has reads, 16S and cells, or no read
-  survives the SARG search; the module accepts those three messages, the report marks the sample `not_normalised` or
-  `no_sarg_hit`, and the summary leaves a not-normalised sample blank rather than 0.
+- **Nothing to normalise is not a failure.** ARGS_OAP skips stage two when no metadata row has reads, 16S and cells,
+  and accepts stage two's exit 2 when no read survives the SARG search; it writes the outcome to
+  `stage_two_status.txt` (`ok`, `no_sarg_hit`, `not_normalised`), which the report carries, and the summary leaves a
+  not-normalised sample blank rather than 0. A file stage one drops after an error (logged only as a warning) fails
+  the task.
 - **Not compared with CARD methods.** SARG names differ from CARD's; ARGs-OAP has its own section without tiers, as
   KARGA had. A SARG-to-tier map remains possible later.
 - **Fixture numbers.** 14-17 SARG types and 64-74 subtypes per sample, 0.21-0.31 copies per cell in total; cell and

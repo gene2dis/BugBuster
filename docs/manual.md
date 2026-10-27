@@ -848,9 +848,12 @@ read count, copies, copies per cell, per 16S copy, ppm) and `args_oap_cells.tsv`
   its own cells; `args_oap_summary/` adds each sample's singletons to its pairs
   and recomputes the normalisation over both, so its numbers differ slightly
   from ARGs-OAP's own per-sample tables when a sample has singletons.
-- A sample where stage two finds nothing to normalise (no 16S or cell estimate,
-  or no read left after the SARG search) keeps `metadata.txt` only; the report
-  marks it `not_normalised` or `no_sarg_hit` instead of failing.
+- A sample where stage two has nothing to normalise (no 16S or cell estimate:
+  stage two is skipped; or no read left after the SARG search) keeps
+  `metadata.txt` only, and `stage_two_status.txt` says `not_normalised` or
+  `no_sarg_hit` (else `ok`); the report carries that status instead of failing.
+  If stage one drops an input file after an error (ARGs-OAP only logs a
+  warning), the task fails.
 - The image indexes its bundled databases on first use; the task runs a copy
   of the `args_oap` package from its work directory so this also works on a
   read-only singularity/apptainer image (~12 s per task).

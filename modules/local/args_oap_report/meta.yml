@@ -15,7 +15,7 @@ tools:
 input:
   - args_oap_dirs:
       type: directory
-      description: Collected per-sample ARGs-OAP directories (<sample>_args_oap, with metadata.txt and, when stage two found SARG hits, blastout.filtered.txt); the sample name is the directory name without _args_oap
+      description: Collected per-sample ARGs-OAP directories (<sample>_args_oap, with metadata.txt, stage_two_status.txt and, when stage two found SARG hits, blastout.filtered.txt); the sample name is the directory name without _args_oap
       pattern: "*_args_oap"
 
 output:
