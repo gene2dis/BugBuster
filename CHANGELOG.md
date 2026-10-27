@@ -426,7 +426,9 @@ next release is tagged.
   with `stage_two_status.txt` (`ok`, `no_sarg_hit` when no read is left after
   the SARG search, `not_normalised` when no 16S or cell estimate, so stage two
   is skipped); a sample whose input file stage one drops after an error now
-  fails the task (ARGs-OAP only logs a warning)
+  fails the task (ARGs-OAP only logs a warning; exit 137, so retried with
+  more memory, when a stage one process was killed for memory); an empty
+  singleton file is skipped
 - **Breaking (bin refinement)**: Binette 1.2.1 replaces MetaWRAP 1.2 for bin
   refinement with two or more `--binners` (Phase 7a benchmark,
   `docs/benchmarks/binning_2026.md`). On four per-sample assemblies it kept 45

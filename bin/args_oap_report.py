@@ -78,11 +78,10 @@ def per_sample(path):
                                 "count": "read_count", "copy": "copies"})
     long.insert(0, "sample", sample)
 
-    def ratio(num, den, scale=1.0):
-        return num / den * scale if den else float("nan")
-    long["copies_per_cell"] = long["copies"].map(lambda v: ratio(v, cells["nCell"]))
-    long["copies_per_16S"] = long["copies"].map(lambda v: ratio(v, cells["n16S"]))
-    long["ppm"] = long["read_count"].map(lambda v: ratio(v, cells["nRead"], 1e6))
+    nan = float("nan")
+    long["copies_per_cell"] = long["copies"] / cells["nCell"] if cells["nCell"] else nan
+    long["copies_per_16S"] = long["copies"] / cells["n16S"] if cells["n16S"] else nan
+    long["ppm"] = long["read_count"] / cells["nRead"] * 1e6 if cells["nRead"] else nan
     cell_row = {"sample": sample, **cells, "sarg_read_count": float(hits["count"].sum()) if not hits.empty else 0.0,
                 "status": status}
     return cell_row, long.reindex(columns=LONG_COLUMNS)

@@ -853,7 +853,8 @@ read count, copies, copies per cell, per 16S copy, ppm) and `args_oap_cells.tsv`
   `metadata.txt` only, and `stage_two_status.txt` says `not_normalised` or
   `no_sarg_hit` (else `ok`); the report carries that status instead of failing.
   If stage one drops an input file after an error (ARGs-OAP only logs a
-  warning), the task fails.
+  warning), the task fails (exit 137, retried with more memory, when a stage
+  one process was killed for memory). An empty singleton file is skipped.
 - The image indexes its bundled databases on first use; the task runs a copy
   of the `args_oap` package from its work directory so this also works on a
   read-only singularity/apptainer image (~12 s per task).

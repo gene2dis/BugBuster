@@ -12,7 +12,7 @@ section, not matched gene by gene with the CARD methods, and has no tiers.
 import numpy as np
 import pandas as pd
 
-from summary_common import NA_NOT_RUN, die, fill_columns
+from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, fill_columns
 
 LONG_NEEDED = {"sample", "level", "sarg_type", "sarg_subtype", "sarg_gene", "read_count", "copies",
                "copies_per_cell", "copies_per_16S", "ppm"}
@@ -41,10 +41,11 @@ def load_args_oap(root):
 
 
 def sarg_status(status, cells):
-    """sample_status() plus not_normalised: ARGs-OAP found no 16S or no cells, so nothing could be normalised."""
+    """sample_status() plus not_normalised: ARGs-OAP found no 16S or no cells, so nothing could be normalised
+    (low-depth samples included: their SARG figures are blank, not 0)."""
     out = dict(status)
     for s in cells.loc[cells["status"] == NOT_NORMALISED, "sample"]:
-        if out.get(s) == "ok":
+        if out.get(s) in ("ok", NA_LOW_DEPTH):
             out[s] = NOT_NORMALISED
     return out
 

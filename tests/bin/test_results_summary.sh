@@ -645,6 +645,18 @@ qc = pd.read_csv("nonorm_out/tables/samples_qc.tsv", sep="\t").set_index("sample
 assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"]) and qc.at["sampleB", "args_oap_ncell"] == 0
 assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_out/results_summary.html").read()
 PYEOF
+# the same sample at low depth (--min-clean-pairs 10000): still blank, not 0 or NA_low_depth
+check "low-depth ARGs-OAP sample without a cell estimate" \
+    py "${SUMMARY}" --results nonorm/results --outdir nonorm_low --min-clean-pairs 10000 --no-excel
+check "not normalised at low depth: blank SARG cells and counts" py - <<'PYEOF'
+import pandas as pd
+typ = pd.read_csv("nonorm_low/tables/arg_sarg_type_cpc.tsv", sep="\t", index_col=0)
+assert typ["sampleB"].isna().all(), typ
+qc = pd.read_csv("nonorm_low/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleB", "low_depth"] and pd.isna(qc.at["sampleB", "sarg_copies_per_cell"])
+assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"])
+assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_low/results_summary.html").read()
+PYEOF
 
 # a 0 cutoff is recorded in the README's inputs, not dropped as if it were unset
 check "--rgi-min-coverage 0 --min-clean-pairs 0" \

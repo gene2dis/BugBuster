@@ -23,6 +23,13 @@ process ARGS_OAP {
     def args2   = task.ext.args2 ?: ''
     def prefix  = "${meta.id}"
     def singles = reads instanceof List && reads.size() > 2 ? reads[2] : null
+    def link_singles = !singles ? '' : """\
+    if [ -n "\$(gzip -cd ${singles} 2>/dev/null | head -c1)" ]; then
+            ln -s ../${singles} tmp_reads/${prefix}_tmp_reads_S.fastq.gz
+        else
+            gzip -t ${singles}
+            echo "ARGs-OAP: the singleton file of ${prefix} has no reads, skipped" >&2
+        fi"""
     """
     # args_oap globs its input folder, so the reads get a folder of their own;
     # links instead of copies (it reads through them, performance review E6).
@@ -31,7 +38,10 @@ process ARGS_OAP {
     mkdir tmp_reads
     ln -s ../${reads[0]} tmp_reads/${prefix}_tmp_reads_R1.fastq.gz
     ln -s ../${reads[1]} tmp_reads/${prefix}_tmp_reads_R2.fastq.gz
-    ${singles ? "ln -s ../${singles} tmp_reads/${prefix}_tmp_reads_S.fastq.gz" : ''}
+    # An empty singleton file (all singletons removed in QC) makes stage one's
+    # DIAMOND fail and the file be dropped: skip it (gzip -t still fails a
+    # corrupt one)
+    ${link_singles}
 
     # The image ships SARG, KO30 and GG85 as FASTA and stage one indexes them
     # inside its own package directory on first use, which a read-only image
@@ -47,16 +57,27 @@ process ARGS_OAP {
         *) echo "ERROR: args_oap is not imported from the task directory's copy" >&2; exit 1 ;;
     esac
 
+    # cgroup v2 OOM-kill counter (empty where there is none)
+    oom_kills() { awk '\$1 == "oom_kill" { print \$2 }' /sys/fs/cgroup/memory.events 2>/dev/null || true; }
+    oom_before=\$(oom_kills)
+    status=0
     args_oap stage_one \\
         -i tmp_reads \\
         -o ${prefix}_args_oap \\
         -f fastq.gz \\
         -t ${task.cpus} \\
-        ${args} > stage_one.log 2>&1 || { cat stage_one.log >&2; exit 1; }
+        ${args} > stage_one.log 2>&1 || status=\$?
     cat stage_one.log >&2
-    # stage one reports a failure on an input file as a warning and drops the file
+    [ "\$status" -eq 0 ] || exit "\$status"
+    # stage one reports a failure on an input file as a warning and drops the
+    # file; a child killed for memory (DIAMOND, BLAST) ends up there too, and
+    # exits 137 so the task is retried with more memory
     if grep -q 'Something is wrong with' stage_one.log; then
         echo "ERROR: ARGs-OAP stage one dropped an input file of ${prefix} (see the log above)" >&2
+        if [ -n "\$oom_before" ] && [ "\$(oom_kills)" != "\$oom_before" ]; then
+            echo "ERROR: a stage one process was killed for memory" >&2
+            exit 137
+        fi
         exit 1
     fi
 
