@@ -19,9 +19,15 @@ GC content and the longest contig from the bin FASTA. Translation table and
 notes are left empty. A binner without bins, or a sample Binette did not run
 on, gets a header-only report.
 
+The binner directories are passed under their binner's name (metabat,
+semibin, comebin), as BINETTE stages them for Binette. Binette merges bins
+with the same contigs across binners and lists the merged bin under one
+binner's name in every binner's report, so each row is matched to the
+binner's own bin by contig set.
+
 Usage:
     binette_quality_reports.py --sample ID --final-bins DIR \
-        [--binette-out DIR] BIN_DIR [BIN_DIR ...]
+        [--binette-out DIR] BINNER_DIR [BINNER_DIR ...]
 """
 
 import argparse
@@ -38,21 +44,15 @@ HEADER = [
     'Additional_Notes',
 ]
 FASTA_EXTENSIONS = ('.fa', '.fasta', '.fna')
-# Staged binner directory names (identify_bin_dir.sh recognizes the same)
-BINNER_SUFFIXES = (
-    ('_metabat_bins', 'metabat'),
-    ('_semibin_output_bins', 'semibin'),
-    ('_comebin_bins', 'comebin'),
-)
+# BINETTE stages each binner's directory under the binner's name (the name
+# bin/identify_bin_dir.sh reports)
+BINNERS = ('metabat', 'semibin', 'comebin')
 
 
 def binner_of(dir_name):
-    if dir_name == 'comebin_res_bins':
-        return 'comebin'
-    for suffix, binner in BINNER_SUFFIXES:
-        if dir_name.endswith(suffix):
-            return binner
-    sys.exit(f"ERROR: unrecognized binner directory '{dir_name}'")
+    if dir_name not in BINNERS:
+        sys.exit(f"ERROR: unrecognized binner directory '{dir_name}' (expected one of {', '.join(BINNERS)})")
+    return dir_name
 
 
 def fasta_bins(bin_dir):
@@ -110,7 +110,12 @@ def read_binette(report):
         return list(csv.DictReader(f, delimiter='\t'))
 
 
-def checkm2_row(binette_row, fasta, genes):
+def contig_set(fasta):
+    with open(fasta) as f:
+        return frozenset(line[1:].split()[0] for line in f if line.startswith('>'))
+
+
+def checkm2_row(binette_row, fasta, genes, name=None):
     contigs, gc, longest = fasta_stats(fasta)
     n_genes = total_len = ''
     if genes is not None:
@@ -119,7 +124,7 @@ def checkm2_row(binette_row, fasta, genes):
         n_genes = str(n)
         total_len = str(sum(c[1] for c in counts) / n) if n else '0'
     return [
-        binette_row['name'], binette_row['completeness'], binette_row['contamination'],
+        name or binette_row['name'], binette_row['completeness'], binette_row['contamination'],
         binette_row['checkm2_model'], '', binette_row['coding_density'], binette_row['N50'],
         total_len, binette_row['size'], f"{gc:.2f}", n_genes,
         binette_row['contig_count'], str(longest), '',
@@ -149,20 +154,36 @@ def main():
 
     input_reports = {}
     if ran:
-        # input_bins_<n>.<binner dir name>.tsv
+        # input_bins_<n>.<set name>.tsv; a single set is named after its path
+        # (sets/metabat -> sets_metabat)
         for report in (out_dir / 'input_bins_quality_reports').glob('input_bins_*.tsv'):
-            input_reports[report.name[:-4].split('.', 1)[1]] = report
+            set_name = report.name[:-4].split('.', 1)[1]
+            input_reports[set_name.split('_')[-1]] = report
+
+    # Every binner's bins, to find the FASTA of a bin Binette reports under
+    # another binner's name
+    all_fastas = {}
+    for bin_dir in args.bin_dirs:
+        for bin_name, fasta in fasta_bins(bin_dir).items():
+            all_fastas.setdefault(bin_name, fasta)
 
     for bin_dir in args.bin_dirs:
-        name = Path(bin_dir).name
+        binner = binner_of(Path(bin_dir).name)
+        fastas = fasta_bins(bin_dir)
         rows = []
-        if name in input_reports:
-            fastas = fasta_bins(bin_dir)
-            for row in read_binette(input_reports[name]):
-                if row['name'] not in fastas:
-                    sys.exit(f"ERROR: Binette reports bin '{row['name']}' that is not in {bin_dir}")
-                rows.append(checkm2_row(row, fastas[row['name']], genes))
-        write_report(f"{args.sample}_{binner_of(name)}_quality_report.tsv", rows)
+        if ran and fastas:
+            if binner not in input_reports:
+                sys.exit(f"ERROR: Binette wrote no report for the {binner} bins in {bin_dir}")
+            own = {contig_set(fasta): name for name, fasta in fastas.items()}
+            for row in read_binette(input_reports[binner]):
+                fasta = fastas.get(row['name']) or all_fastas.get(row['name'])
+                if fasta is None:
+                    sys.exit(f"ERROR: Binette reports bin '{row['name']}' that is not in any binner directory")
+                name = own.get(contig_set(fasta))
+                if name is None:
+                    sys.exit(f"ERROR: Binette reports bin '{row['name']}' for {binner}, but no {binner} bin has its contigs")
+                rows.append(checkm2_row(row, fastas[name], genes, name))
+        write_report(f"{args.sample}_{binner}_quality_report.tsv", rows)
 
     rows = []
     if ran:

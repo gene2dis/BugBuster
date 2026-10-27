@@ -50,8 +50,11 @@ process BINETTE {
     script:
     prefix = meta.id
     def args = task.ext.args ?: ''
-    def completeness = task.ext.min_completeness != null ? task.ext.min_completeness : params.bin_min_completeness
-    def contamination = task.ext.max_contamination != null ? task.ext.max_contamination : params.bin_max_contamination
+    // --bin_min_completeness / --bin_max_contamination, else their deprecated
+    // --metawrap_* aliases (main.nf stops the run when both are given with
+    // different values), else 50 / 10
+    def completeness = [params.bin_min_completeness, params.metawrap_completeness, 50].find { v -> v != null }
+    def contamination = [params.bin_max_contamination, params.metawrap_contamination, 10].find { v -> v != null }
 
     // Input validation
     if (!meta || !meta.id) {
@@ -63,23 +66,38 @@ process BINETTE {
 
     out_dir=${prefix}_binette_bins
 
-    # Only the binners that found bins go to Binette: a binner directory
-    # holding only a note (SKIPPED.txt, FAILED.txt) is left out
-    sets=()
+    # Directory holds at least one FASTA bin. find stops at the first match:
+    # 'find | grep -q' let find die of SIGPIPE under pipefail on a directory
+    # with many bins, which read as "no bins"
+    has_bins() {
+        [[ -n "\$(find -L "\$1" -maxdepth 1 -type f \\( -name '*.fa' -o -name '*.fasta' -o -name '*.fna' \\) -print -quit)" ]]
+    }
+
+    # Each binner's directory is staged as sets/<binner> (metabat, semibin,
+    # comebin): Binette names bin sets after their paths, and sample ids with
+    # dots made two binners' sets collide. Only the binners that found bins go
+    # to Binette: a directory holding only a note (SKIPPED.txt, FAILED.txt) is
+    # left out
+    mkdir -p sets
     for bin_dir in ${bin_dirs}; do
-        if find -L "\$bin_dir" -maxdepth 1 -type f \\( -name '*.fa' -o -name '*.fasta' -o -name '*.fna' \\) | grep -q .; then
-            sets+=("\$bin_dir")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        ln -s "../\$bin_dir" "sets/\${id_line##*\$'\\t'}"
+    done
+    with_bins=()
+    for set_dir in sets/*; do
+        if has_bins "\$set_dir"; then
+            with_bins+=("\$set_dir")
         fi
     done
 
-    if [[ \${#sets[@]} -eq 0 ]]; then
+    if [[ \${#with_bins[@]} -eq 0 ]]; then
         echo "WARNING: No bins found from any binner. Skipping Binette refinement for ${prefix}." >&2
         mkdir -p "\$out_dir"
         echo "No bins available for refinement" > "\$out_dir/SKIPPED.txt"
     else
-        echo "Found \${#sets[@]} bin sets. Running Binette refinement..."
+        echo "Found \${#with_bins[@]} bin sets. Running Binette refinement..."
         binette \\
-            --bin_dirs "\${sets[@]}" \\
+            --bin_dirs "\${with_bins[@]}" \\
             --contigs ${contigs} \\
             --outdir binette_out \\
             --threads ${task.cpus} \\
@@ -90,7 +108,7 @@ process BINETTE {
             --no-progress \\
             ${args}
         mv binette_out/final_bins "\$out_dir"
-        if ! find "\$out_dir" -maxdepth 1 -name '*.fa' | grep -q .; then
+        if ! has_bins "\$out_dir"; then
             echo "WARNING: No bin reached ${completeness}% completeness and ${contamination}% contamination for ${prefix}." >&2
             echo "No bin reached ${completeness}% completeness and ${contamination}% contamination" > "\$out_dir/SKIPPED.txt"
         fi
@@ -104,7 +122,7 @@ process BINETTE {
         --sample ${prefix} \\
         \$binette_out_arg \\
         --final-bins "\$out_dir" \\
-        ${bin_dirs}
+        sets/*
     rm -rf binette_out/temporary_files
 
     cat <<-END_VERSIONS > versions.yml
@@ -116,8 +134,11 @@ process BINETTE {
 
     stub:
     prefix = meta.id
-    def completeness = task.ext.min_completeness != null ? task.ext.min_completeness : params.bin_min_completeness
-    def contamination = task.ext.max_contamination != null ? task.ext.max_contamination : params.bin_max_contamination
+    // --bin_min_completeness / --bin_max_contamination, else their deprecated
+    // --metawrap_* aliases (main.nf stops the run when both are given with
+    // different values), else 50 / 10
+    def completeness = [params.bin_min_completeness, params.metawrap_completeness, 50].find { v -> v != null }
+    def contamination = [params.bin_max_contamination, params.metawrap_contamination, 10].find { v -> v != null }
     """
     mkdir -p ${prefix}_binette_bins
 
@@ -139,8 +160,13 @@ process BINETTE {
     GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
     EOF
 
-    # Header-only CheckM2 reports, one per staged binner directory
-    binette_quality_reports.py --sample ${prefix} --final-bins ${prefix}_binette_bins ${bin_dirs}
+    # Header-only CheckM2 reports, one per binner
+    mkdir -p sets
+    for bin_dir in ${bin_dirs}; do
+        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        ln -s "../\$bin_dir" "sets/\${id_line##*\$'\\t'}"
+    done
+    binette_quality_reports.py --sample ${prefix} --final-bins ${prefix}_binette_bins sets/*
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
