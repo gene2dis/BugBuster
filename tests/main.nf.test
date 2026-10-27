@@ -723,8 +723,35 @@ nextflow_pipeline {
     }
 
     test("Stub run wires the read-level ARGs-OAP path") {
-        // --read_arg_prediction runs ARGs-OAP (KARGA and KARGVA were removed
-        // in roadmap Phase 8): ARGS_OAP runs and publishes its directory.
+        // --args_oap_prediction alone: ARGS_OAP runs, the other read-level ARG
+        // tools (own switches, roadmap M3) stay off, and no deprecation warning
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = true
+                assembly_mode       = "none"
+                taxonomic_profiler  = "none"
+                args_oap_prediction = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap_s1_out").exists()
+            assert !path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
+        }
+    }
+
+    test("Stub run: deprecated --read_arg_prediction runs ARGs-OAP with a warning") {
         options "-stub"
 
         when {
@@ -745,8 +772,37 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("KARG") } == 0
-            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap_s1_out").exists()
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
+        }
+    }
+
+    test("Stub run wires ARGs-OAP, RGI and K-MARVEL together into the summary") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = true
+                assembly_mode       = "none"
+                taxonomic_profiler  = "none"
+                args_oap_prediction = true
+                rgi_prediction      = true
+                kmarvel_prediction  = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            ["ARGS_OAP", "RGI_BWT", "RGI_KMER", "KMARVEL"].each { name ->
+                assert workflow.trace.tasks().count { task -> task.name.contains("${name} (") } == 2
+            }
+            assert workflow.trace.tasks().count { task -> task.name.contains("RESULTS_SUMMARY") } == 1
         }
     }
 
@@ -1093,6 +1149,7 @@ nextflow_pipeline {
                 contig_tax_and_arg      = "false"
                 contig_level_functional = "false"
                 mag_level_functional    = "false"
+                args_oap_prediction     = "false"
                 read_arg_prediction     = "false"
                 rgi_prediction          = "false"
                 kmarvel_prediction      = "false"

@@ -33,7 +33,7 @@ STAGES = [
     },
     {
         "key": "args_oap", "title": "Read-level ARGs: ARGs-OAP (SARG)",
-        "params": "--read_arg_prediction",
+        "params": "--args_oap_prediction (deprecated alias --read_arg_prediction)",
         "processes": ["ARGS_OAP"],
         "summary": "not summarised yet",
     },

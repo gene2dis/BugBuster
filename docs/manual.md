@@ -471,7 +471,7 @@ breaks `-resume`.
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
-| `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP |
+| `--args_oap_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP (`--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
@@ -1131,7 +1131,7 @@ results/
 │           └── *.png                           # Taxonomy plots
 ├── 05_arg_prediction/                          # ARG predictions
 │   ├── read_level/                             # Read-level ARG
-│   │   ├── args_oap/                           # ARGs-OAP stage one (if read_arg_prediction=true)
+│   │   ├── args_oap/                           # ARGs-OAP stage one (if args_oap_prediction=true)
 │   │   │   └── {sample}_args_oap_s1_out/
 │   │   ├── rgi/                                # RGI per-sample results (if rgi_prediction=true)
 │   │   │   └── {sample}/
@@ -1431,7 +1431,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
-| `05_arg_prediction/read_level/args_oap/` | `read_arg_prediction=true` | ARGs-OAP read, 16S and cell estimates |
+| `05_arg_prediction/read_level/args_oap/` | `args_oap_prediction=true` | ARGs-OAP read, 16S and cell estimates |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
@@ -1545,7 +1545,7 @@ nextflow run main.nf \
     --quality_control true \
     --assembly_mode assembly \
     --taxonomic_profiler sourmash \
-    --read_arg_prediction true \
+    --args_oap_prediction true \
     --rgi_prediction true \
     --contig_tax_and_arg true \
     --include_binning true \

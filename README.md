@@ -29,7 +29,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 3. Remove host contaminant reads. [`bwa-mem3`](https://github.com/fg-labs/bwa-mem3) (default) or [`Bowtie2`](https://github.com/BenLangmead/bowtie2) (`--read_aligner bowtie2`)
 4. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
    - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
-5. If requested (`--read_arg_prediction`), read, 16S and cell-number estimates with ARGs-OAP stage one. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+5. If requested (`--args_oap_prediction`), read, 16S and cell-number estimates with ARGs-OAP stage one. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
 6. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
    - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
@@ -213,7 +213,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--read_arg_prediction` | `false` | Read-level ARG prediction with ARGs-OAP |
+| `--args_oap_prediction` | `false` | Read-level ARG prediction with ARGs-OAP (`--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
@@ -363,7 +363,7 @@ results/
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
 │   ├── read_level/             # Read-level predictions
-│   │   ├── args_oap/           # ARGs-OAP results (if read_arg_prediction=true)
+│   │   ├── args_oap/           # ARGs-OAP results (if args_oap_prediction=true)
 │   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   ├── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)

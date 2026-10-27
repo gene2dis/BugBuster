@@ -186,7 +186,7 @@ assembly_mode: "assembly"
 taxonomic_profiler: "sourmash"
 
 # Feature toggles
-read_arg_prediction: false
+args_oap_prediction: false
 rgi_prediction: false
 kmarvel_prediction: false
 contig_tax_and_arg: false

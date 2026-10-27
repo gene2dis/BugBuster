@@ -76,11 +76,19 @@
                     "description": "Enable metagenomic binning and refinement steps.",
                     "fa_icon": "fas fa-th"
                 },
+                "args_oap_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable ARGs-OAP read-level ARG prediction against SARG.",
+                    "fa_icon": "fas fa-dna"
+                },
                 "read_arg_prediction": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable read-level ARG prediction with ARGs-OAP (cell and 16S counts).",
-                    "fa_icon": "fas fa-dna"
+                    "description": "Deprecated alias of --args_oap_prediction (it used to run KARGA, KARGVA and ARGs-OAP together).",
+                    "help_text": "KARGA and KARGVA were removed. When true, ARGs-OAP runs and a warning is logged at launch.",
+                    "fa_icon": "fas fa-dna",
+                    "hidden": true
                 },
                 "contig_tax_and_arg": {
                     "type": "boolean",

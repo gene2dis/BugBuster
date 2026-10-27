@@ -21,7 +21,7 @@ flowchart TD
     CleanReads -->|if taxonomic_profiler != none| Taxonomy[TAXONOMY SUBWORKFLOW<br/>Kraken2, Sourmash or Sylph]
     
     %% Read-level ARG Branch
-    CleanReads -->|if read_arg_prediction| ReadARG[ARGS_OAP<br/>stage one]
+    CleanReads -->|if args_oap_prediction| ReadARG[ARGS_OAP<br/>stage one]
 
     %% RGI Branch
     CleanReads -->|if rgi_prediction| RGI[RGI AMR Prediction<br/>RGI_BWT → RGI_KMER]
@@ -319,7 +319,7 @@ flowchart TD
 | `taxonomic_profiler` | `'sylph'` | Profiler: 'kraken2', 'sourmash', 'sylph', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
 | `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables Binette |
-| `read_arg_prediction` | `false` | Enable read-level ARG prediction (ARGs-OAP) |
+| `args_oap_prediction` | `false` | Enable ARGs-OAP read-level ARG prediction (`read_arg_prediction` is a deprecated alias) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `kmarvel_prediction` | `false` | Enable K-MARVEL read-level ARG assembly against CARD |
 | `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
@@ -501,7 +501,7 @@ results/
 - QC → Taxonomy (Sylph) → per-sample Assembly (MEGAHIT + BBMap contig filter)
 - Binning, ARG prediction and functional annotation are off by default; the
   full pipeline needs their flags, e.g.
-  `--include_binning true --binners semibin,metabat2 --read_arg_prediction true --contig_tax_and_arg true --contig_level_functional true`
+  `--include_binning true --binners semibin,metabat2 --args_oap_prediction true --contig_tax_and_arg true --contig_level_functional true`
 
 ### Mode 2: QC + Taxonomy Only
 ```bash

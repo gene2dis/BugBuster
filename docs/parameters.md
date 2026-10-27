@@ -99,11 +99,15 @@ Complete reference for all BugBuster pipeline parameters.
   - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
 - **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
-### `--read_arg_prediction`
+### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run ARGs-OAP stage one at read level (read, 16S and cell-number estimates)
-- **Example**: `--read_arg_prediction true`
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) at read level (read, 16S and cell-number estimates). Results in `05_arg_prediction/read_level/args_oap/`
+- **Example**: `--args_oap_prediction true`
+- **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
+
+#### `--read_arg_prediction`
+- **Deprecated** alias of `--args_oap_prediction`. It used to run KARGA, KARGVA and ARGs-OAP together; KARGA and KARGVA were removed, so `true` now runs ARGs-OAP only, with a warning at launch
 
 ### `--rgi_prediction`
 - **Type**: Boolean
@@ -117,7 +121,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `false`
 - **Description**: Enable read-level ARG detection with [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel): CARD protein ARGs are assembled from each sample's host-removed reads (R1, R2 and singletons pooled), chimeric assemblies are removed, variant models are kept only with a CARD resistance SNP, and every ARG is confirmed with blastp. Needs no assembly. Results in `05_arg_prediction/read_level/kmarvel/` and `kmarvel_summary/`
 - **Example**: `--kmarvel_prediction true`
-- **Note**: Runs from the pipeline-built image `ghcr.io/gene2dis/bugbuster-kmarvel` (no bioconda package). Independent of `--read_arg_prediction` and `--rgi_prediction`
+- **Note**: Runs from the pipeline-built image `ghcr.io/gene2dis/bugbuster-kmarvel` (no bioconda package). Independent of `--args_oap_prediction` and `--rgi_prediction`
 
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
@@ -1171,7 +1175,7 @@ nextflow run main.nf \
     --taxonomic_profiler kraken2 \
     --include_binning true \
     --binners semibin,metabat2 \
-    --read_arg_prediction true \
+    --args_oap_prediction true \
     --contig_tax_and_arg true \
     --bin_min_completeness 70 \
     --bin_max_contamination 5 \

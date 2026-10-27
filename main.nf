@@ -64,7 +64,7 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
-      --read_arg_prediction         Enable read-level ARG prediction with ARGs-OAP (default: ${params.read_arg_prediction})
+      --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
@@ -253,6 +253,15 @@ workflow {
         }
     }
 
+    // --read_arg_prediction switched on KARGA, KARGVA and ARGs-OAP together; KARGA
+    // and KARGVA were removed, so it is now a deprecated alias of
+    // --args_oap_prediction (a false boolean default cannot be told apart from an
+    // explicit false, so the two are OR-ed instead of checked for a conflict)
+    def run_args_oap = flagOn(params.args_oap_prediction) || flagOn(params.read_arg_prediction)
+    if (flagOn(params.read_arg_prediction)) {
+        log.warn "--read_arg_prediction is deprecated (KARGA and KARGVA were removed): it now runs ARGs-OAP only. Pass --args_oap_prediction instead"
+    }
+
     // Reject contradictory feature combinations instead of silently skipping stages
     if (flagOn(params.include_binning) && params.assembly_mode == 'none') {
         error("--include_binning requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
@@ -369,7 +378,7 @@ workflow {
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
-    log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
+    log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
@@ -442,7 +451,7 @@ workflow {
     //
     // ARG PREDICTION IN READS
     //
-    if ( flagOn(params.read_arg_prediction) ) {
+    if ( run_args_oap ) {
         ARGS_OAP(ch_clean_reads)
         ch_versions = ch_versions.mix(ARGS_OAP.out.versions.first())
     }
