@@ -34,7 +34,7 @@ class TaskInputs {
                 .forEach { p -> links << p }
         }
         return links
-            .sort { p -> dir.relativize(p).toString() }
+            .sort { p -> dir.relativize(p).getName(0).toString().toInteger() }
             .collect { p -> Files.readSymbolicLink(p).toString() }
     }
 

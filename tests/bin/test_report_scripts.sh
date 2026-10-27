@@ -258,7 +258,7 @@ expect_fail "bin_tax: no GTDB-Tk file still fails" bin_tax_report.py
 echo "--- bin_summary.py ---"
 BS_WORK="${WORK}/bin_summary_happy"
 mkdir -p "${BS_WORK}"
-# Depth files as produced by BEDTOOLS (one per read sample in co-assembly mode)
+# Depth files as produced by BEDTOOLS_BIN_DEPTH (one per read sample in co-assembly mode)
 printf 'sample\tbin_id\tTotal_contigs\taverage_cov\ns1\tbin.1\t10\t12.5\ns1\tbin.2\t8\t3.0\ns1\tbin.3\t5\t7.5\n' \
     > "${BS_WORK}/s1_bin_depth.tsv"
 printf 'sample\tbin_id\tTotal_contigs\taverage_cov\ns2\tbin.1\t10\t2.5\ns2\tbin.2\t8\t9.0\ns2\tbin.3\t5\t1.5\n' \

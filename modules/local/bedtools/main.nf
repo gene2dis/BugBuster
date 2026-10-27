@@ -101,17 +101,19 @@ process BEDTOOLS_BIN_DEPTH {
         def prefix = "${meta.id}"
 
         """
+        set -euo pipefail
+
         printf "sample\\tbin_id\\tTotal_contigs\\taverage_cov\\n" > ${prefix}_bin_depth.tsv
-        genomeCoverageBed -ibam ${bam} > ${prefix}_cov.tsv
-        # Skip the whole-genome histogram rows (chrom = "genome"): they are a
-        # summary of the contig rows, not another contig
-        awk -F '\\t' -v sample="${prefix}" '
+        # The histogram streams into awk (the co-assembly BAM's header holds
+        # every contig) and only binned contigs are kept, which also skips
+        # the whole-genome summary rows (chrom = "genome")
+        genomeCoverageBed -ibam ${bam} | awk -F '\\t' -v sample="${prefix}" '
             FILENAME == ARGV[1] {
                 if (!(\$2 in n_contigs)) { order[++n_bins] = \$2; n_contigs[\$2] = 0 }
                 if (\$1 != "") contig_bin[\$1] = \$2
                 next
             }
-            \$1 != "genome" { depth_sum[\$1] += \$2 * \$3; contig_length[\$1] = \$4 }
+            \$1 in contig_bin { depth_sum[\$1] += \$2 * \$3; contig_length[\$1] = \$4 }
             END {
                 for (contig in contig_length) {
                     if (contig in contig_bin) {
@@ -126,8 +128,7 @@ process BEDTOOLS_BIN_DEPTH {
                     print sample "\\t" bin "\\t", n_contigs[bin], "\\t", promedio
                 }
             }
-        ' ${contig_to_bin} ${prefix}_cov.tsv >> ${prefix}_bin_depth.tsv
-        rm -f ${prefix}_cov.tsv
+        ' ${contig_to_bin} - >> ${prefix}_bin_depth.tsv
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

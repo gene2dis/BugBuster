@@ -180,7 +180,6 @@ workflow ASSEMBLY {
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
             ch_per_sample_input = reads
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
-                .map { meta, reads_files, contigs -> [meta, reads_files, contigs] }
 
             if ( params.read_aligner == 'bwamem3' ) {
                 // One index of the co-assembly, shared by every sample (bowtie2

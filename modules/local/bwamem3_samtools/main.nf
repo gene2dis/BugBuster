@@ -121,19 +121,19 @@ process BWAMEM3_SAMTOOLS {
     }
 
     // One sample per task, reads positional (raw input names when QC is
-    // off). Under co-assembly each sample is mapped on its own against the
-    // co-assembly and the pooled BAM is a samtools merge of these (issue
-    // #28); bwa's insert-size estimate stays per library.
+    // off): R1, R2[, singleton]. Under co-assembly each sample is mapped on
+    // its own against the co-assembly and the pooled BAM is a samtools merge
+    // of these (issue #28). The intermediate BAM names keep the header's @PG
+    // lines as they were.
+    def map_singletons = reads.size() > 2
+        ? """map_reads ${prefix}_lib0_singleton.bam ${reads[2]}
+        samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam ${prefix}_lib0_paired.bam ${prefix}_lib0_singleton.bam
+        rm -f ${prefix}_lib0_paired.bam ${prefix}_lib0_singleton.bam"""
+        : "mv ${prefix}_lib0_paired.bam ${prefix}_all_reads.bam"
     def stage = task.process.tokenize(':')[-1]
 
     """
     set -euo pipefail
-
-    R1=(${reads[0]}); R2=(${reads[1]}); S=(${reads.size() > 2 ? reads[2] : ''})
-    if [ \${#R1[@]} -eq 0 ] || [ \${#R1[@]} -ne \${#R2[@]} ]; then
-        echo "ERROR: could not pair R1/R2 files for ${prefix}: ${reads.join(' ')}" >&2
-        exit 1
-    fi
 
     # Contig set empty after filtering (BWAMEM3_INDEX left the index empty)
     if ! grep -q '^>' "${contigs}"; then
@@ -171,23 +171,8 @@ process BWAMEM3_SAMTOOLS {
                 | samtools sort ${args2} -@ ${task.cpus} -o "\${out}" -
         }
 
-        bams=()
-        for i in "\${!R1[@]}"; do
-            bam="${prefix}_lib\${i}_paired.bam"
-            map_reads "\${bam}" "\${R1[i]}" "\${R2[i]}"
-            bams+=("\${bam}")
-        done
-        for i in "\${!S[@]}"; do
-            bam="${prefix}_lib\${i}_singleton.bam"
-            map_reads "\${bam}" "\${S[i]}"
-            bams+=("\${bam}")
-        done
-        if [ \${#bams[@]} -eq 1 ]; then
-            mv "\${bams[0]}" ${prefix}_all_reads.bam
-        else
-            samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam "\${bams[@]}"
-            rm -f "\${bams[@]}"
-        fi
+        map_reads ${prefix}_lib0_paired.bam ${reads[0]} ${reads[1]}
+        ${map_singletons}
     fi
 
     cat <<-END_VERSIONS > versions.yml
