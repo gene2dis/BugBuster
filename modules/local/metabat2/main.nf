@@ -77,7 +77,7 @@ process METABAT2 {
     # Generate version file
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        metabat2: \$(metabat2 --help 2>&1 | grep -o 'version [0-9:]*[0-9]\.[0-9.]*' | head -n 1 | sed 's/.*[ :]//')
+        metabat2: \$(metabat2 --help 2>&1 | grep -o 'version [0-9:]*[0-9]\\.[0-9.]*' | head -n 1 | sed 's/.*[ :]//')
     END_VERSIONS
     """
     
