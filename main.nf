@@ -78,7 +78,7 @@ def printHelp() {
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
 
     \u001B[1;33mResults summary (00_summary/):\u001B[0m
-      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI), read functional and MicrobeCensus results (default: ${params.results_summary})
+      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus results (default: ${params.results_summary})
       --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
       --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)
@@ -149,6 +149,7 @@ include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
 include { ARGS_OAP         } from './modules/local/args_oap/main'
+include { ARGS_OAP_REPORT  } from './modules/local/args_oap_report/main'
 
 	// RGI AMR PREDICTION
 include { RGI_BWT          } from './modules/local/rgi_bwt/main'
@@ -453,7 +454,16 @@ workflow {
     //
     if ( run_args_oap ) {
         ARGS_OAP(ch_clean_reads)
-        ch_versions = ch_versions.mix(ARGS_OAP.out.versions.first())
+        // the SARG long table and the per-sample read, 16S and cell estimates
+        ARGS_OAP_REPORT(
+            ARGS_OAP.out.args_oap.map { _meta, dir -> dir }.collect(sort: true)
+        )
+        ch_versions = ch_versions.mix(
+            ARGS_OAP.out.versions.first(),
+            ARGS_OAP_REPORT.out.versions
+        )
+        // args_oap_long.tsv and args_oap_cells.tsv
+        ch_summary_reports = ch_summary_reports.mix(ARGS_OAP_REPORT.out.reports.flatten())
     }
 
     //
@@ -778,7 +788,7 @@ workflow {
 
     //
     // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG
-    // (K-MARVEL, RGI), read functional and MicrobeCensus tables,
+    // (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus tables,
     // Excel workbook, figures, HTML report, README (MD/DOCX) and LLM guide.
     // It reads the aggregated software_versions.yml, so its own versions.yml
     // is not part of that file.

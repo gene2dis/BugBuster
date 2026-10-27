@@ -93,6 +93,8 @@ process RESULTS_SUMMARY {
         [ -e "\$f" ] || continue
         name=\$(basename "\$f")
         case "\$name" in
+            args_oap_long.tsv|args_oap_cells.tsv)
+                dest=${run_dir}/05_arg_prediction/read_level/args_oap_summary ;;
             read_function_abundance.tsv|read_annotated_fraction.tsv|read_sample_summary.tsv)
                 dest=${run_dir}/07_functional_annotation/summary ;;
             *.ags.tsv)

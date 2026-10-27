@@ -354,6 +354,45 @@ NEXT_WORKDIR="${KM_BAD}"
 expect_fail "kmarvel_report: table without the K-MARVEL columns fails" kmarvel_report.py s1_kmarvel.tsv
 
 #
+# args_oap_report.py — ARGs-OAP 4.0.0 stage two rows (tests/data/args_oap:
+# sampleA with 12 SARG hits, two from its singletons; sampleB metadata.txt
+# only). A sample is its pairs plus singletons, normalised over both: tetA(48)
+# 4 reads, 0.548105 copies / 16 cells. Runs in the mulled image ARGS_OAP_REPORT
+# pins (MULLED_IMG).
+#
+echo "--- args_oap_report.py ---"
+AO_WORK="${WORK}/args_oap_report"
+mkdir -p "${AO_WORK}"
+cp -r "${REPO_DIR}"/tests/data/args_oap/sample{A,B}_args_oap "${AO_WORK}/"
+mkdir -p "${AO_WORK}/sampleC_args_oap"
+# stage two stops without tables when a sample has no 16S or cells
+printf 'sample\tnRead\tn16S\tnCell\nsampleC_tmp_reads\t2000\t0.0\t0.0\n' > "${AO_WORK}/sampleC_args_oap/metadata.txt"
+NEXT_WORKDIR="${AO_WORK}"
+expect_pass "args_oap_report: samples with, without and with unnormalisable SARG hits" args_oap_report.py \
+    sampleA_args_oap sampleB_args_oap sampleC_args_oap
+check_grep "args_oap_report: pairs and singletons summed per sample" \
+    "args_oap_cells.tsv" "^sampleA	120000	32.0	16.0	9.0	ok$"
+check_grep "args_oap_report: no SARG hit" "args_oap_cells.tsv" "^sampleB	4000	1.0	0.5	0.0	no_sarg_hit$"
+check_grep "args_oap_report: no 16S or cells" "args_oap_cells.tsv" "^sampleC	2000	0.0	0.0	0.0	not_normalised$"
+check_grep "args_oap_report: type level over pairs and singletons" \
+    "args_oap_long.tsv" "^sampleA	type	tetracycline			4.0	0.548104956268221[0-9]*	0.03425655976676[0-9]*	0.0171282798833[0-9]*	33.33333"
+check_grep "args_oap_report: 1/3-weighted reads of a multi-component reference" \
+    "args_oap_long.tsv" "^sampleA	subtype	multidrug	multidrug__adeF		1.0	"
+check_grep "args_oap_report: gene level keeps type and subtype" \
+    "args_oap_long.tsv" "^sampleA	gene	polymyxin	polymyxin__rosB	ZP_04612557	0.5	"
+if grep -q "^sample[BC]	" "${AO_WORK}/args_oap_long.tsv"; then
+    echo "✗ args_oap_report: samples without hits have no SARG rows"; FAIL=$((FAIL + 1))
+else
+    echo "✓ args_oap_report: samples without hits have no SARG rows"; PASS=$((PASS + 1))
+fi
+AO_BAD="${WORK}/args_oap_report_bad"
+mkdir -p "${AO_BAD}/sampleD_args_oap" "${AO_BAD}/sampleE_out"
+NEXT_WORKDIR="${AO_BAD}"
+expect_fail "args_oap_report: a directory without metadata.txt fails" args_oap_report.py sampleD_args_oap
+NEXT_WORKDIR="${AO_BAD}"
+expect_fail "args_oap_report: a directory not named <sample>_args_oap fails" args_oap_report.py sampleE_out
+
+#
 # blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the
 # figure is also pickled, and lambda tick formatters made pickle.dump fail
 # after the PNG was written. Fixtures are cut from a real T9 run (BlobTools

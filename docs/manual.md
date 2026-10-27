@@ -898,7 +898,7 @@ By default, databases are published to a `databases/` directory at the same leve
 
 ### 6.16 Results Summary Options
 
-The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI),
+The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP),
 read functional and MicrobeCensus results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
 README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
 network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only

@@ -1,0 +1,32 @@
+name: args_oap_report
+description: Run-level ARGs-OAP report that merges the per-sample ARGs-OAP directories into a long table of SARG types, subtypes and genes (read count, copies, copies per cell, copies per 16S, ppm) and a per-sample table of read, 16S and cell estimates (bin/args_oap_report.py); a sample's singletons are added to its pairs, and its normalisation recomputes stage two's formulas over both
+keywords:
+  - antimicrobial resistance
+  - args-oap
+  - sarg
+  - report
+tools:
+  - pandas:
+      description: Python data analysis library used by the report script
+      homepage: https://pandas.pydata.org
+      documentation: https://pandas.pydata.org/docs/
+      licence: ["BSD-3-Clause"]
+
+input:
+  - args_oap_dirs:
+      type: directory
+      description: Collected per-sample ARGs-OAP directories (<sample>_args_oap, with metadata.txt and, when stage two found SARG hits, blastout.filtered.txt); the sample name is the directory name without _args_oap
+      pattern: "*_args_oap"
+
+output:
+  - reports:
+      type: file
+      description: args_oap_long.tsv (one row per sample and SARG type, subtype or gene found; copies_per_cell = copies / nCell, copies_per_16S = copies / n16S, ppm = reads per million single reads; blank when the denominator is 0) and args_oap_cells.tsv (nRead, n16S, nCell, SARG reads and a status - ok, no_sarg_hit or not_normalised - per sample)
+      pattern: "args_oap_*.tsv"
+  - versions:
+      type: file
+      description: Software versions (python, pandas)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

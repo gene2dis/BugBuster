@@ -57,9 +57,16 @@ TABLE_DOCS = {
                                               "gene RPKM"),
             ("n_genes_kmarvel, n_genes_rgi, n_genes_all_methods", "distinct genes per CARD-based ARG method (K-MARVEL, "
                                                                   "RGI at the coverage cutoff) and found by both"),
+            ("args_oap_n16S, args_oap_ncell", "ARGs-OAP stage one estimates of 16S copies and of cells (from "
+                                              "essential single-copy genes), pairs and singletons summed; nCell is "
+                                              "the copies_per_cell denominator of the SARG tables"),
+            ("sarg_n_subtypes, sarg_copies_per_cell", "ARGs-OAP: distinct SARG subtypes found and their summed copies "
+                                                      "per cell; blank when ARGs-OAP did not run or had no 16S or cell "
+                                                      "estimate"),
             ("mc_avg_genome_size_bp, mc_genome_equivalents", "MicrobeCensus average genome size (bp) and genome "
                                                              "equivalents (total bases / AGS), the CPGE denominator; "
-                                                             "an estimate of cells"),
+                                                             "an estimate of cells, like args_oap_ncell but from "
+                                                             "other marker genes, so the two differ"),
             ("func_reads_assigned, func_fraction_annotated", "read functional profile: reads the backend assigned "
                                                              "(Woltka: to WoL ORFs, mates counted separately) and "
                                                              "the share of them with any functional term"),
@@ -234,6 +241,33 @@ TABLE_DOCS = {
                     ("re:.+ (only|\\+ .+)$", "count found by that combination of methods only"),
                     ("re:K-MARVEL only, RGI below cutoff", "of the K-MARVEL-only count: RGI saw reads below its cutoff"),
                     ("total", "all genes / detections of the row")],
+    },
+    "arg_sarg_long": {
+        "title": "ARGs-OAP (SARG) subtypes, long format",
+        "description": "ARGS_OAP_REPORT's SARG subtypes, one row per sample and subtype found. A sample's singletons "
+                       "are added to its pairs. Gene-level rows are in the run's "
+                       "args_oap_summary/args_oap_long.tsv.",
+        "columns": SAMPLE_KEY + [
+            ("sarg_type, sarg_subtype", "SARG type (antibiotic class, e.g. tetracycline) and subtype (type__gene "
+                                        "group, e.g. tetracycline__tetQ)"),
+            ("read_count", "reads assigned to the subtype (single reads; a read on a two- or three-component "
+                           "reference counts 1/2 or 1/3)"),
+            ("copies_per_cell", "SARG copies (each read weighted by aligned length / reference length) / ARGs-OAP "
+                                "nCell (samples_qc args_oap_ncell); blank when nCell is 0"),
+            ("copies_per_16S", "SARG copies / ARGs-OAP 16S copies (args_oap_n16S)"),
+            ("ppm", "read_count per million single reads (ARGs-OAP nRead)"),
+        ],
+    },
+    "arg_sarg_type_cpc": {
+        "title": "ARGs-OAP SARG types x samples (copies per cell)",
+        "description": "Copies per cell summed over each SARG type's subtypes. Blank: the sample had no 16S or cell "
+                       "estimate, so nothing was normalised.",
+        "columns": [("sarg_type", "SARG type"), WIDE_CELL],
+    },
+    "arg_sarg_subtype_cpc": {
+        "title": "ARGs-OAP SARG subtypes x samples (copies per cell)",
+        "description": "Copies per cell of each SARG subtype. Blank as in arg_sarg_type_cpc.",
+        "columns": [("sarg_type, sarg_subtype", "SARG type and subtype"), WIDE_CELL],
     },
     "function_read_long": {
         "title": "Read-level functional profile, long format",
@@ -543,12 +577,15 @@ def render_docx(blocks, path, title):
 # ---------------------------------------------------------------------------------------------------------------
 
 UNITS = [
-    ("read pairs", "every count in the summary tables; Reads_report.csv and ARGs-OAP nRead count single reads "
-                   "(both mates), RGI and Woltka count mates separately"),
+    ("read pairs", "every count in the summary tables except ARGs-OAP's read_count and ppm (single reads, as ARGs-OAP "
+                   "counts them); Reads_report.csv and ARGs-OAP nRead count single reads (both mates), RGI and Woltka "
+                   "count mates separately"),
     ("RPM, RPKM", "K-MARVEL / RGI: supporting read pairs per million clean read pairs; RPM per kb of reference gene. "
                   "Comparable between samples of different depth; not copies per cell"),
     ("CPGE", "read functional profile: reads per kb per MicrobeCensus genome equivalent (RPK / GE)"),
     ("relative abundance", "taxonomy: % of the profiled (classified) community; each sample sums to 100"),
+    ("copies per cell", "ARGs-OAP: SARG copies (reads weighted by the share of the reference they cover) / "
+                        "ARGs-OAP cell estimate (nCell)"),
     ("NA_low_depth", "not detected in a sample below --min-clean-pairs: unknown, not absent"),
     ("NA_not_run", "the method did not run on the sample (its output is missing)"),
     ("NA_no_ags", "CPGE table: the sample has no MicrobeCensus estimate"),
@@ -556,7 +593,13 @@ UNITS = [
 
 PITFALLS = [
     "Single reads vs pairs: Reads_report.csv, ARGs-OAP nRead, RGI mapped reads and Woltka counts are single reads "
-    "(both mates); the summary's counts are read pairs (reads / 2).",
+    "(both mates); the summary's counts are read pairs (reads / 2), except ARGs-OAP's read_count and ppm.",
+    "ARG units are not interchangeable: K-MARVEL / RGI RPKM (read pairs) and ARGs-OAP copies per cell (SARG copies "
+    "over the ARGs-OAP cell estimate) measure different things. Compare samples within one unit only.",
+    "Two cell estimates: ARGs-OAP nCell and MicrobeCensus genome equivalents (CPGE) come from different marker genes "
+    "and differ by tens of percent; they are not interchangeable denominators.",
+    "SARG (ARGs-OAP) and CARD (K-MARVEL/RGI) name genes differently; their calls are reported separately, not "
+    "matched gene by gene.",
     "Alleles share reads (K-MARVEL): a gene is represented by one allele (gene_representative); never sum allele "
     "rows.",
     "RGI bwt lists every reference with at least one mapped read: the summary counts an RGI gene only at >= "
@@ -628,7 +671,7 @@ def readme_blocks(ctx):
                    ("table", ["File", "Figure", "How to read it"],
                     [[f"`figures/{r['key']}.*`", r["title"], r["caption"]] for r in figs.records])]
     blocks += [("h", 2, "Units and missing values"), ("table", ["Term", "Meaning"], [list(u) for u in UNITS])]
-    if s.get("arg_methods"):
+    if s.get("arg_methods") or ctx.get("sarg"):
         tier_rows = []
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
@@ -636,7 +679,7 @@ def readme_blocks(ctx):
         blocks += [("h", 2, "ARG reporting tiers"),
                    ("p", "CARD-based calls (K-MARVEL, RGI) get a tier from an editable rule table "
                          f"(`{ctx.get('arg_priority_name', 'arg_priority_tiers.tsv')}`): rules match CARD gene names or "
-                         "families, top to bottom, first match wins."),
+                         "families, top to bottom, first match wins. ARGs-OAP (SARG) has no tiers."),
                    ("table", ["Tier", "Meaning", "Categories (rule notes)"], tier_rows)]
     methods = ctx.get("method_notes", [])
     if methods:
@@ -736,7 +779,8 @@ def llm_guide(ctx):
             "- Clinically relevant ARGs: `tables/arg_long.tsv` with `tier == 1` and `gene_representative == True`; check "
             "`tables/arg_method_comparison.tsv` (`detected_by`) for agreement between K-MARVEL and RGI, and "
             "`rgi_host_check` for the likely host.",
-            "- ARG load per sample: `tables/samples_qc.tsv` `acquired_rpkm` (CARD methods).",
+            "- ARG load per sample in one unit: `tables/samples_qc.tsv` `acquired_rpkm` (CARD methods) or "
+            "`sarg_copies_per_cell` (ARGs-OAP, SARG); never add the two.",
             "- A functional term across samples: `tables/function_read_<ontology>.tsv` (CPGE when available), or "
             "`tables/function_read_long.tsv` filtered by `ontology` and `accession`.",
             "- Software versions: `README.md`, section Software versions (per batch when several were merged).", ""]

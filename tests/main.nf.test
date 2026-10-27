@@ -744,9 +744,11 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
-            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap_s1_out").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap/metadata.txt").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap_summary/args_oap_long.tsv").exists()
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap_summary/args_oap_cells.tsv").exists()
             assert !path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
         }
     }
@@ -771,7 +773,7 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
             assert path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
         }
@@ -802,6 +804,7 @@ nextflow_pipeline {
             ["ARGS_OAP", "RGI_BWT", "RGI_KMER", "KMARVEL"].each { name ->
                 assert workflow.trace.tasks().count { task -> task.name.contains("${name} (") } == 2
             }
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP_REPORT") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("RESULTS_SUMMARY") } == 1
         }
     }

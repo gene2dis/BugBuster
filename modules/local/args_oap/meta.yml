@@ -1,13 +1,14 @@
 name: args_oap
-description: ARGs-OAP stage one on the host-removed reads of one sample, which writes its read, 16S and cell-number estimates (metadata.txt) and the ARG-like reads it extracted
+description: ARGs-OAP 4.0.0 stage one and stage two on the host-removed reads of one sample. Stage one estimates reads, 16S copies and cells (metadata.txt) and extracts ARG-like reads; stage two searches them against SARG and normalises the hits by type, subtype and gene. The package is run from a copy in the task directory, which builds the SARG/KO30/GG85 indexes there (the image is read-only under singularity/apptainer); stage two exiting with no sample to normalise or no SARG hit is not an error
 keywords:
   - antimicrobial resistance
+  - sarg
   - cell number
   - normalization
   - metagenomics
 tools:
   - args_oap:
-      description: Online Analysis Pipeline for antibiotic resistance gene detection from metagenomic data using the SARG database (ARGs-OAP 3.2.4)
+      description: Online Analysis Pipeline for antibiotic resistance gene detection from metagenomic data using the SARG database (ARGs-OAP 4.0.0)
       homepage: https://github.com/xinehc/args_oap
       documentation: https://github.com/xinehc/args_oap/blob/main/README.md
       doi: "10.1016/j.eng.2022.10.011"
@@ -19,17 +20,17 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - reads:
       type: file
-      description: Host-removed reads [R1, R2, optional singleton]; linked (not copied) into a temporary input directory as <sample>_tmp_reads_{R1,R2,S}.fastq.gz
+      description: Host-removed reads [R1, R2, optional singleton]; linked (not copied) into a temporary input directory as <sample>_tmp_reads_{R1,R2,S}.fastq.gz (the singletons are a separate ARGs-OAP sample, <sample>_tmp_reads_S)
       pattern: "*.fastq.gz"
 
 output:
-  - args_oap_s1:
+  - args_oap:
       type: directory
-      description: ARGs-OAP stage-one output directory (<sample>_args_oap_s1_out), including metadata.txt with per-file nRead, n16S and nCell
-      pattern: "*args_oap_s1_out"
+      description: ARGs-OAP output directory (<sample>_args_oap) - metadata.txt (nRead, n16S, nCell per ARGs-OAP sample), extracted.fa, blastout.txt and, when stage two found SARG hits, blastout.filtered.txt, extracted.filtered.fa and the normalized_cell / normalized_16S / ppm / rpkm / tpm / unnormalized_copy / unnormalized_count tables by type, subtype and gene
+      pattern: "*_args_oap"
   - versions:
       type: file
-      description: Software versions (args_oap from pip show, falling back to 3.2.4)
+      description: Software versions (args_oap, diamond)
       pattern: "versions.yml"
 
 authors:

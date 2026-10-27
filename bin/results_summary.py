@@ -16,6 +16,7 @@ rerunning any tool, and merges any number of results directories (one per batch)
   02_taxonomy/sylph/*_sylph_<db>.tsv              sylph ANI / coverage (optional)
   05_arg_prediction/read_level/kmarvel/*/*_kmarvel.tsv   K-MARVEL ARG calls
   05_arg_prediction/read_level/rgi/*/*_rgi_bwt.allele_mapping_data.txt  RGI bwt (+ rgi_kmer/ pathogen of origin)
+  05_arg_prediction/read_level/args_oap_summary/args_oap_{long,cells}.tsv  ARGs-OAP SARG (ARGS_OAP_REPORT)
   07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
   07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
   pipeline_info/software_versions.yml             tool and database versions; which stages ran
@@ -71,7 +72,8 @@ from summary_functional import (cog_matrix, function_long, function_sample_colum
                                 function_tables, load_microbecensus, load_read_functional,
                                 merge_read_functional)
 from summary_catalog import stage_status  # noqa: E402
-from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category,  # noqa: E402
+from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
+from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category, fig_sarg,  # noqa: E402
                              fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
@@ -178,7 +180,8 @@ RESERVED_COLUMNS = {
     "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref", "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check",
     "tier_note", "mutation_data",
     "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
-    "rgi_gene_read_pairs", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
+    "rgi_gene_read_pairs", "args_oap_n16S", "args_oap_ncell", "sarg_n_subtypes", "sarg_copies_per_cell",
+    "sarg_type", "sarg_subtype", "read_count", "copies_per_cell", "copies_per_16S", "ppm", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
     "func_fraction_annotated", "n_samples_evaluable", "backend",
     "ontology", "accession", "term_description",
     "abundance_cpge", "abundance_native", "native_unit",
@@ -304,6 +307,11 @@ def method_notes(ctx):
         notes.append(f"RGI bwt maps the reads to CARD and WildCARD and lists every gene with a mapped read; the summary "
                      f"counts a gene when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference sequence. "
                      "RGI k-mer assigns a gene's reads to species (pathogen of origin, rgi_kmer_hosts).")
+    if ctx.get("sarg"):
+        notes.append("ARGs-OAP searches ARG-like reads against SARG and divides their copies (reads weighted by the "
+                     "share of the reference they cover) by its own cell estimate (copies per cell, also per 16S copy "
+                     "and per million reads). SARG names differ from CARD's, so it is not compared gene by gene with "
+                     "K-MARVEL and RGI.")
     if ctx.get("functional"):
         f = ctx["functional"]
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
@@ -384,6 +392,7 @@ def main(argv=None):
         taxonomy = load_taxonomy(root)
         kmarvel, kran = load_kmarvel(root)
         rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
+        sarg, sarg_cells, sarg_ran = load_args_oap(root)
         func = load_read_functional(root)
         mc = load_microbecensus(root)
         names = set()
@@ -391,7 +400,7 @@ def main(argv=None):
             names |= set(reads["sample"])
         if taxonomy is not None:
             names |= set(taxonomy["otu"].columns)
-        names |= kran | rgi_ran | (func["ran"] if func else set()) | set(mc["sample"])
+        names |= kran | rgi_ran | sarg_ran | (func["ran"] if func else set()) | set(mc["sample"])
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
@@ -400,11 +409,12 @@ def main(argv=None):
             seen[s] = str(root)
         versions = load_versions(root)
         found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
-                                ("rgi", rgi_ran), ("read_functional", func is not None),
+                                ("rgi", rgi_ran), ("args_oap", sarg_ran), ("read_functional", func is not None),
                                 ("microbecensus", not mc.empty)) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
-                        "rgi_kmer_ran": rgi_kmer_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
+                        "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
+                        "sarg_ran": sarg_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
@@ -610,7 +620,27 @@ def main(argv=None):
                 fig_method_upset(figs, comp, gene_sets, comparison["methods"])
                 fig_method_by_category(figs, comp, comparison["methods"])
 
+    # ---- ARGs-OAP (SARG): its own tables, not matched to CARD genes
     table_units = {}
+    sarg_ctx = None
+    sarg_ran = set().union(*[b["sarg_ran"] for b in batches])
+    if sarg_ran:
+        cells = pd.concat([b["sarg_cells"] for b in batches if b["sarg_cells"] is not None])
+        sstatus = sarg_status(order, sample_status(order, sarg_ran, low), cells)
+        sarg = pd.concat([b["sarg"] for b in batches if b["sarg"] is not None], ignore_index=True)
+        counts = sarg_sample_counts(sarg, cells, order, sstatus)
+        for c in counts.columns:
+            samples[c] = counts[c]
+        sub = sarg.loc[sarg["level"] == "subtype", ["sample", "sarg_type", "sarg_subtype", "read_count",
+                                                     "copies_per_cell", "copies_per_16S", "ppm"]]
+        tables["arg_sarg_long"] = (with_meta(sub, samples, meta_cols, order, ["sarg_type", "sarg_subtype"]), False)
+        for name, df in sarg_tables(sarg, order, sstatus).items():
+            tables[name] = (df, True)
+        fig_sarg(figs, tables.get("arg_sarg_type_cpc", (None,))[0], order, groups, low,
+                 {s for s in order if sstatus[s] != "ok"})
+        sarg_ctx = {"n_samples": len(sarg_ran & set(order)), "n_types": int(sub["sarg_type"].nunique()),
+                    "n_subtypes": int(sub["sarg_subtype"].nunique()),
+                    "not_normalised": sorted(s for s in order if sstatus[s] == "not_normalised")}
 
     # ---- read-level functional profile and MicrobeCensus
     func = merge_read_functional([b["func"] for b in batches])
@@ -687,7 +717,7 @@ def main(argv=None):
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
         "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
         "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
-        "functional": func_ctx, "table_units": table_units, "title": args.title,
+        "sarg": sarg_ctx, "functional": func_ctx, "table_units": table_units, "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
     }
     ctx["method_notes"] = method_notes(ctx)

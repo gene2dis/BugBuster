@@ -29,6 +29,14 @@
 #                        TEM-1 -> E. coli, poxtA -> B. producta, cfrE none
 #   rgi/sampleB_rgi_bwt.allele_mapping_data.txt
 #                        bin/rgi_bwt_lowcov_fallback.sh placeholder (no hits)
+#   args_oap/args_oap_{long,cells}.tsv
+#                        bin/args_oap_report.py (ARGS_OAP_REPORT) on
+#                        tests/data/args_oap/sample{A,B}_args_oap: sampleA's
+#                        12 SARG hits (tetA(48), two of them from the
+#                        singletons; novA; adeF at 1/3 and rosB at 1/2 per read)
+#                        are rows of a real ARGs-OAP 4.0.0 stage two output,
+#                        renamed (read names synthetic) with metadata written
+#                        for them; sampleB has metadata.txt only (no SARG hit)
 #   functional/read_{function_abundance,annotated_fraction,sample_summary}.tsv
 #                        bin/aggregate_read_functions.py (Woltka) on the
 #                        tests/data/woltka/ tables as sampleA (with MicrobeCensus)
@@ -95,6 +103,11 @@ row() {  # row <ref> <term> <aro> <db> <pathogen> <reads> <cov> <len> <family> <
 } > "${OUT}/rgi/sampleA_rgi_kmer_61mer_analysis.gene.txt"
 (cd "${WORK}" && bash "${REPO_DIR}/bin/rgi_bwt_lowcov_fallback.sh" sampleB_rgi_bwt > /dev/null)
 cp "${WORK}/sampleB_rgi_bwt.allele_mapping_data.txt" "${OUT}/rgi/"
+
+# ARGs-OAP through ARGS_OAP_REPORT
+mkdir -p "${OUT}/args_oap"
+python3 "${REPO_DIR}/bin/args_oap_report.py" --outdir "${OUT}/args_oap" \
+    "${REPO_DIR}"/tests/data/args_oap/sample{A,B}_args_oap > /dev/null
 
 # Read functional (Woltka) through AGGREGATE_READ_FUNCTIONS
 WOL="${REPO_DIR}/tests/data/woltka"
