@@ -225,10 +225,10 @@ flowchart TD
     Mode -->|coassembly| CoAssembly[Co-Assembly Mode]
     CoAssembly --> MEGAHIT2[MEGAHIT<br/>Assemble All Reads Together]
     MEGAHIT2 --> BBMAP2[BBMAP<br/>Filter Contigs ≥1000bp]
-    BBMAP2 --> Align2{Binning or<br/>Contig Analysis?}
-    Align2 -->|Yes| Bowtie2["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Align All Reads to Contigs<br/>one pooled BAM"]
-    BBMAP2 --> AlignFunc{Functional<br/>enabled?}
-    AlignFunc -->|Yes| BowtiePS["BWAMEM3_SAMTOOLS_PER_SAMPLE<br/>(or BOWTIE2_SAMTOOLS_PER_SAMPLE)<br/>Per-sample alignments vs co-assembly<br/>for gene counting"]
+    BBMAP2 --> Align2{Binning, contig<br/>analysis or functional?}
+    Align2 -->|Yes| Bowtie2["BWAMEM3_INDEX + BWAMEM3_SAMTOOLS<br/>(or BOWTIE2_SAMTOOLS)<br/>Each sample once vs co-assembly<br/>(gene counting, MetaBAT2 depths, bin depth)"]
+    Bowtie2 --> Merge{Binning or<br/>contig taxonomy?}
+    Merge -->|Yes| Pooled["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM<br/>(SemiBin2, COMEBin, BlobTools)"]
     BBMAP2 -->|filter reports| Summary2[CONTIG_FILTER_SUMMARY]
     Bowtie2 -->|empty-contig reports| Summary2
 ```
@@ -239,8 +239,8 @@ flowchart TD
 - `bam`: `[meta, contigs, bam]` for depth analysis
 - `bam_meta`: `[meta, bam]` for indexing
 - `counting_bam`: `[meta, bam]` per sample in both modes, for featureCounts gene
-  quantification (the pooled co-assembly BAM has no read groups, so the
-  functional branch gets dedicated per-sample alignments under co-assembly)
+  quantification and, under co-assembly, MetaBAT2 depths and bin depth; the
+  co-assembly's pooled `bam` is their `samtools merge` (issue #28)
 
 ---
 
@@ -279,8 +279,8 @@ flowchart TD
     AssemblyReports --> TaxReport[BIN_TAX_REPORT]
 
     ModeCheck -->|coassembly| CoassemblyReports[Co-assembly Reports]
-    CoassemblyReports --> BinCov["BINS_REFERENCE + BWAMEM3_BINS_INDEX<br/>+ BWAMEM3_BIN_DEPTH: each sample vs all bins<br/>(or BOWTIE2_SAMTOOLS_DEPTH per bin)<br/>skipped when no refined bins"]
-    BinCov --> Bedtools["BEDTOOLS_BIN_DEPTH (or BEDTOOLS)<br/>Coverage Statistics"]
+    CoassemblyReports --> BinCov["BIN_CONTIG_TABLE<br/>contig -> bin table<br/>skipped when no refined bins"]
+    BinCov --> Bedtools["BEDTOOLS_BIN_DEPTH<br/>each sample's co-assembly BAM<br/>over each bin's contigs"]
     Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
     Quality --> Summary
     GTDBTK --> Summary
@@ -303,7 +303,7 @@ flowchart TD
 - `contigs_and_bam`: `[meta, contigs, bam]` - Contigs with aligned reads
 - `checkm2_db`: CheckM2 database path
 - `gtdbtk_db`: GTDB-Tk database path
-- `reads`: `[meta, reads]` - Original reads (for co-assembly bin coverage only)
+- `sample_bams`: `[meta, bam]` - One BAM per sample against the co-assembly (co-assembly only: MetaBAT2 depths and bin coverage)
 
 **Outputs:**
 - `refined_bins`: `[meta, bins]` - High-quality refined bins with quality and taxonomy annotations
@@ -429,7 +429,7 @@ flowchart LR
 ### Binning (BINNING Subworkflow - Mode-Agnostic)
 | Module | Condition | Description |
 |--------|-----------|-------------|
-| `CALCULATE_DEPTH` | if `metabat2` selected | Calculate contig depth from BAM files |
+| `CALCULATE_DEPTH` | if `metabat2` selected | Calculate contig depth from BAM files (one column per sample under co-assembly) |
 | `METABAT2` | if `metabat2` in `--binners` | Binning by coverage and composition |
 | `SEMIBIN` | if `semibin` in `--binners` | Semi-supervised binning |
 | `COMEBIN` | if `comebin` in `--binners` | Contrastive learning binning |
@@ -437,7 +437,7 @@ flowchart LR
 | `CHECKM2_BATCH` | with a single binner (Binette reports CheckM2 quality otherwise) | Bin completeness and contamination |
 | `GTDB_TK_BATCH` | always | Bin taxonomic classification |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | assembly mode | Per-sample quality/taxonomy reports |
-| `BINS_REFERENCE` + `BWAMEM3_BINS_INDEX` + `BWAMEM3_BIN_DEPTH` + `BEDTOOLS_BIN_DEPTH` (or `BOWTIE2_SAMTOOLS_DEPTH` + `BEDTOOLS`) / `BIN_SUMMARY` | co-assembly mode | Bin coverage (skipped when no refined bins) and comprehensive summary |
+| `BIN_CONTIG_TABLE` + `BEDTOOLS_BIN_DEPTH` / `BIN_SUMMARY` | co-assembly mode | Bin coverage from the per-sample co-assembly BAMs (skipped when no refined bins) and comprehensive summary |
 
 ### ARG / AMR Prediction
 | Module | Description |

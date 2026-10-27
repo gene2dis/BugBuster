@@ -440,6 +440,35 @@ next release is tagged.
   `--semibin_coassembly_mode train_self` keeps the previous method, now at 4
   CPUs (more threads made training slower). Per-sample assemblies keep
   `--semibin_env_model` (`human_gut`)
+- **Co-assembly: one alignment per sample** (issue #28, performance review
+  M1). Each sample is mapped once against the co-assembly, whenever binning,
+  contig taxonomy or contig-level functional annotation needs a BAM. These
+  per-sample BAMs count genes (as before) and now also give MetaBAT2 its
+  depths and the bins their per-sample coverage; the pooled BAM that
+  SemiBin2, COMEBin and BlobTools read is their `samtools merge`
+  (`NFCORE_SAMTOOLS_MERGE`, nf-core `samtools/merge`, samtools 1.24), with
+  the same records as the pooled alignment task wrote. A sample used to be
+  mapped up to three times (pooled, per sample for gene counting, and again
+  against the refined bins for bin depth). Output changes:
+  - MetaBAT2 gets one depth column per sample instead of one pooled column
+    (owner decision on `docs/benchmarks/binning_2026.md`). On a five-sample
+    co-assembly its MIMAG high-quality bins went from 11 to 22-23 (55 bins
+    instead of 65), and Binette from 36 bins with 23 high quality to 36 with
+    25. SemiBin2's bins are unchanged
+  - Bin coverage (`04_binning/coassembly/coverage/<sample>_bin_depth.tsv`)
+    counts each sample's co-assembly alignment over each bin's contigs,
+    instead of mapping the sample again against the bins only, where reads
+    from contigs in no bin could land on a bin. On the same 36 bins values
+    are equal or lower: median 0.97 of the old value, 0.23-1.00 per bin,
+    rank correlation 0.998, contig counts unchanged. Under
+    `--read_aligner bowtie2` bin depth no longer maps each sample once per
+    bin
+  - Removed processes: `BWAMEM3_SAMTOOLS_PER_SAMPLE`,
+    `BOWTIE2_SAMTOOLS_PER_SAMPLE`, `BWAMEM3_BINS_INDEX`, `BWAMEM3_BIN_DEPTH`,
+    `BOWTIE2_SAMTOOLS_DEPTH`, `BEDTOOLS` and `BINS_REFERENCE` (now
+    `BIN_CONTIG_TABLE`, the contig -> bin table only). The empty-contig
+    report of `CONTIG_FILTER_SUMMARY` lists the samples, no longer a
+    `coassembly` row
 - **GTDB-Tk places genomes with 4 pplacer threads** (performance review
   M10; new `--gtdbtk_pplacer_cpus`, default 4, was a fixed 1): on 119 genomes
   forced through pplacer the backbone tree took 17.9 instead of 36.2 min and a
