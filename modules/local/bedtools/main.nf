@@ -116,11 +116,9 @@ process BEDTOOLS_BIN_DEPTH {
             \$1 in contig_bin { depth_sum[\$1] += \$2 * \$3; contig_length[\$1] = \$4 }
             END {
                 for (contig in contig_length) {
-                    if (contig in contig_bin) {
-                        bin = contig_bin[contig]
-                        cov_sum[bin] += depth_sum[contig] / contig_length[contig]
-                        n_contigs[bin]++
-                    }
+                    bin = contig_bin[contig]
+                    cov_sum[bin] += depth_sum[contig] / contig_length[contig]
+                    n_contigs[bin]++
                 }
                 for (i = 1; i <= n_bins; i++) {
                     bin = order[i]

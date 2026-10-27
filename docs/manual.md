@@ -826,8 +826,8 @@ extension (9) sizes are fixed by the tool and not exposed.
 
 ### 6.12 Read Aligner Options
 
-`--read_aligner` picks the aligner for host/phiX removal, reads-to-contigs
-mapping (contig depth, binning, gene counting) and co-assembly bin depth.
+`--read_aligner` picks the aligner for host/phiX removal and reads-to-contigs
+mapping (contig depth, binning, gene counting, co-assembly bin depth).
 Woltka and HUMAnN always use bowtie2 with their own databases.
 
 | Parameter | Default | Description |
