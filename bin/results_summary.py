@@ -16,7 +16,6 @@ rerunning any tool, and merges any number of results directories (one per batch)
   02_taxonomy/sylph/*_sylph_<db>.tsv              sylph ANI / coverage (optional)
   05_arg_prediction/read_level/kmarvel/*/*_kmarvel.tsv   K-MARVEL ARG calls
   05_arg_prediction/read_level/rgi/*/*_rgi_bwt.allele_mapping_data.txt  RGI bwt (+ rgi_kmer/ pathogen of origin)
-  05_arg_prediction/read_level/summary/KARGA_norm.csv, KARGVA_norm.csv   KARGA / KARGVA (ARG_NORM_REPORT)
   07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
   07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
   pipeline_info/software_versions.yml             tool and database versions; which stages ran
@@ -68,13 +67,11 @@ from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mar
 from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_tables,  # noqa: E402
                           card_families, compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules,
                           load_snps, unify_gene_tiers)
-from summary_megares import (karga_representatives, karga_sample_counts, karga_tables,  # noqa: E402
-                             load_karga)
 from summary_functional import (cog_matrix, function_long, function_sample_columns,  # noqa: E402
                                 function_tables, load_microbecensus, load_read_functional,
                                 merge_read_functional)
 from summary_catalog import stage_status  # noqa: E402
-from summary_figures import (FigureWriter, fig_args, fig_cog, fig_karga, fig_method_by_category,  # noqa: E402
+from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category,  # noqa: E402
                              fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
@@ -181,12 +178,8 @@ RESERVED_COLUMNS = {
     "candidate_hosts", "rgi_mapped_reads", "rgi_best_ref", "rgi_gene_coverage", "rgi_kmer_hosts", "rgi_host_check",
     "tier_note", "mutation_data",
     "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
-    "rgi_gene_read_pairs", "args_oap_n16S", "args_oap_ncell", "karga_n_groups", "karga_copies_per_cell",
-    "kargva_n_variants", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
-    "func_fraction_annotated", "n_samples_evaluable", "megares_id", "megares_type", "megares_class",
-    "megares_mechanism", "megares_group",
-    "snp_confirmation_required", "percent_covered", "kmer_depth", "copies_per_cell", "cpm_kmer",
-    "group_representative", "kargva_id", "kargva_mutation", "kargva_description", "kargva_drug", "backend",
+    "rgi_gene_read_pairs", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
+    "func_fraction_annotated", "n_samples_evaluable", "backend",
     "ontology", "accession", "term_description",
     "abundance_cpge", "abundance_native", "native_unit",
 }
@@ -311,11 +304,6 @@ def method_notes(ctx):
         notes.append(f"RGI bwt maps the reads to CARD and WildCARD and lists every gene with a mapped read; the summary "
                      f"counts a gene when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference sequence. "
                      "RGI k-mer assigns a gene's reads to species (pathogen of origin, rgi_kmer_hosts).")
-    if ctx.get("karga"):
-        notes.append("KARGA and KARGVA find MEGARes genes and resistance variants from read k-mers; ARG_NORM_REPORT "
-                     "keeps genes with >= 90% k-mer coverage (variants: >= 2 SNP k-mers, >= 80%) and divides their "
-                     "k-mer depth by the ARGs-OAP cell estimate (copies per cell). MEGARes names differ from CARD's, "
-                     "so they are not compared gene by gene with K-MARVEL and RGI.")
     if ctx.get("functional"):
         f = ctx["functional"]
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
@@ -396,7 +384,6 @@ def main(argv=None):
         taxonomy = load_taxonomy(root)
         kmarvel, kran = load_kmarvel(root)
         rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
-        karga, kargva, args_oap, karga_ran = load_karga(root)
         func = load_read_functional(root)
         mc = load_microbecensus(root)
         names = set()
@@ -404,7 +391,7 @@ def main(argv=None):
             names |= set(reads["sample"])
         if taxonomy is not None:
             names |= set(taxonomy["otu"].columns)
-        names |= kran | rgi_ran | karga_ran | (func["ran"] if func else set()) | set(mc["sample"])
+        names |= kran | rgi_ran | (func["ran"] if func else set()) | set(mc["sample"])
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
@@ -413,12 +400,11 @@ def main(argv=None):
             seen[s] = str(root)
         versions = load_versions(root)
         found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
-                                ("rgi", rgi_ran), ("karga", karga_ran), ("read_functional", func is not None),
+                                ("rgi", rgi_ran), ("read_functional", func is not None),
                                 ("microbecensus", not mc.empty)) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
-                        "rgi_kmer_ran": rgi_kmer_ran, "karga": karga, "kargva": kargva, "args_oap": args_oap,
-                        "karga_ran": karga_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
+                        "rgi_kmer_ran": rgi_kmer_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
@@ -624,37 +610,7 @@ def main(argv=None):
                 fig_method_upset(figs, comp, gene_sets, comparison["methods"])
                 fig_method_by_category(figs, comp, comparison["methods"])
 
-    # ---- KARGA / KARGVA (MEGARes, ARG_NORM_REPORT): their own tables, not matched to CARD genes
     table_units = {}
-    karga_ctx = None
-    karga_ran = set().union(*[b["karga_ran"] for b in batches])
-    if karga_ran:
-        kstatus = sample_status(order, karga_ran, low)
-        kparts = [b["karga"] for b in batches if b["karga"] is not None]
-        vparts = [b["kargva"] for b in batches if b["kargva"] is not None]
-        karga = karga_representatives(pd.concat(kparts, ignore_index=True)) if kparts else None
-        kargva = pd.concat(vparts, ignore_index=True) if vparts else None
-        cells = pd.concat([b["args_oap"] for b in batches if b["args_oap"] is not None]).drop_duplicates("sample")
-        cells = cells.set_index("sample").reindex(order)
-        samples["args_oap_n16S"] = cells["args_oap_n16S"]
-        samples["args_oap_ncell"] = cells["args_oap_ncell"]
-        counts = karga_sample_counts(karga, kargva, order, kstatus)
-        for c in counts.columns:
-            samples[c] = counts[c]
-        if karga is not None:
-            tables["arg_karga_long"] = (with_meta(karga, samples, meta_cols, order,
-                                                  ["megares_class", "megares_group", "kmer_depth"]), False)
-            for name, df in karga_tables(karga, order, kstatus).items():
-                tables[name] = (df, True)
-            fig_karga(figs, tables.get("arg_karga_class_cpc", (None,))[0], order, groups, low,
-                      {s for s in order if kstatus[s] != "ok"})
-        if kargva is not None and not kargva.empty:
-            tables["arg_kargva_long"] = (with_meta(kargva, samples, meta_cols, order,
-                                                   ["megares_class", "megares_group"]), False)
-        karga_ctx = {"n_samples": len(karga_ran & set(order)),
-                     "n_groups": int(karga.loc[karga["group_representative"], "megares_group"].nunique())
-                     if karga is not None else 0,
-                     "n_variants": 0 if kargva is None else len(kargva)}
 
     # ---- read-level functional profile and MicrobeCensus
     func = merge_read_functional([b["func"] for b in batches])
@@ -731,7 +687,7 @@ def main(argv=None):
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
         "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
         "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
-        "karga": karga_ctx, "functional": func_ctx, "table_units": table_units, "title": args.title,
+        "functional": func_ctx, "table_units": table_units, "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
     }
     ctx["method_notes"] = method_notes(ctx)

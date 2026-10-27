@@ -79,7 +79,7 @@
                 "read_arg_prediction": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA.",
+                    "description": "Enable read-level ARG prediction with ARGs-OAP (cell and 16S counts).",
                     "fa_icon": "fas fa-dna"
                 },
                 "contig_tax_and_arg": {
@@ -330,30 +330,6 @@
                     "format": "directory-path",
                     "description": "Path to custom NCBI taxdump directory.",
                     "fa_icon": "fas fa-folder"
-                },
-                "custom_karga_db": {
-                    "type": "string",
-                    "format": "file-path",
-                    "description": "Path to custom KARGA database FASTA file.",
-                    "fa_icon": "fas fa-file"
-                },
-                "custom_kargva_db": {
-                    "type": "string",
-                    "format": "file-path",
-                    "description": "Path to custom KARGVA database FASTA file.",
-                    "fa_icon": "fas fa-file"
-                },
-                "karga_db": {
-                    "type": "string",
-                    "default": "megares",
-                    "description": "Built-in KARGA reference database key (see config/databases.config).",
-                    "fa_icon": "fas fa-database"
-                },
-                "kargva_db": {
-                    "type": "string",
-                    "default": "kargva",
-                    "description": "Built-in KARGVA reference database key (see config/databases.config).",
-                    "fa_icon": "fas fa-database"
                 },
                 "blast_db": {
                     "type": "string",
@@ -1109,7 +1085,7 @@
             "title": "Results summary options",
             "type": "object",
             "fa_icon": "fas fa-clipboard-list",
-            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md of the QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
+            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md of the QC, taxonomy, read-level ARG (K-MARVEL, RGI), read functional and MicrobeCensus results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
             "properties": {
                 "results_summary": {
                     "type": "boolean",

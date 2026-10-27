@@ -1,3 +1,0 @@
-sample,nRead,n16S,nCell,GeneIdx,Drug_resistance,Gen,PercentGeneCovered,AverageKMerDepth,CPM_ARGs,copies_per_cell
-sampleB,4000,2.0,1.0,,,,,,,
-sampleA,120000,40.0,20.0,>1|S83L|ARO:3003294|Escherichia coli gyrA conferring resistance to fluoroquinolones|MEG_3176|Drugs|Fluoroquinolones|Fluoroquinolone-resistant_DNA_topoisomerases|GYRA|RequiresSNPConfirmation|NA|NA|NA|NA|NA|NA|NA|wt_coherence=TRUE,Fluoroquinolones,gyrA,85.0,6.0,50.0,0.3

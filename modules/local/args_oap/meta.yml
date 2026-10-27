@@ -1,5 +1,5 @@
 name: args_oap
-description: ARGs-OAP stage one on the host-removed reads of one sample, used here for its read, 16S and cell-number estimates that normalize the KARGA/KARGVA abundances
+description: ARGs-OAP stage one on the host-removed reads of one sample, which writes its read, 16S and cell-number estimates (metadata.txt) and the ARG-like reads it extracted
 keywords:
   - antimicrobial resistance
   - cell number

@@ -38,8 +38,6 @@ workflow PREPARE_DATABASES {
     ch_sourmash_db      = channel.empty()
     ch_sylph_db         = channel.empty()
     ch_sylph_taxonomy   = channel.empty()
-    ch_karga_db         = channel.empty()
-    ch_kargva_db        = channel.empty()
     ch_deeparg_db       = channel.empty()
     ch_blast_db         = channel.empty()
     ch_taxdump          = channel.empty()
@@ -115,25 +113,6 @@ workflow PREPARE_DATABASES {
             FORMAT_SYLPH_TAXONOMY(params.sylph_ref_db[params.sylph_db]["url"][1])
             ch_sylph_db       = FORMAT_SYLPH_DB.out.db
             ch_sylph_taxonomy = FORMAT_SYLPH_TAXONOMY.out.taxonomy
-        }
-    }
-
-    //
-    // KARGA/KARGVA databases for read-level ARG prediction
-    //
-    if ( flagOn(params.read_arg_prediction) ) {
-        if ( params.custom_karga_db ) {
-            ch_karga_db = channel.of(file(params.custom_karga_db, checkIfExists: true))
-        } else {
-            ch_karga_db = channel.fromList(params.karga_ref_db[params.karga_db]["url"])
-                .map { filepath -> file(filepath) }
-        }
-
-        if ( params.custom_kargva_db ) {
-            ch_kargva_db = channel.of(file(params.custom_kargva_db, checkIfExists: true))
-        } else {
-            ch_kargva_db = channel.fromList(params.kargva_ref_db[params.kargva_db]["url"])
-                .map { filepath -> file(filepath) }
         }
     }
 
@@ -376,8 +355,6 @@ workflow PREPARE_DATABASES {
     sourmash_db            = ch_sourmash_db
     sylph_db               = ch_sylph_db
     sylph_taxonomy         = ch_sylph_taxonomy
-    karga_db               = ch_karga_db
-    kargva_db              = ch_kargva_db
     decontamination_index  = ch_decontamination_index  // Combined phiX + host index
     deeparg_db             = ch_deeparg_db
     blast_db               = ch_blast_db

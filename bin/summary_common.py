@@ -17,8 +17,8 @@ VERSION_TOOL = re.compile(r"^\s+([A-Za-z0-9_.+\-]+):\s*(\S.*)?$")
 def parse_versions(text):
     """software_versions.yml text -> {process: {tool: version}}, line by line.
 
-    Not YAML parsing on purpose: published files are not always valid YAML (KARGVA's tab-indented
-    heredoc leaves its terminator in the file; RGI_BWT/RGI_KMER write multi-line junk). A process is a
+    Not YAML parsing on purpose: published files are not always valid YAML (the removed KARGVA's
+    tab-indented heredoc left its terminator in older results; RGI_BWT/RGI_KMER write multi-line junk). A process is a
     quoted key ending in ':' ("QC:FASTP": -> FASTP, the name after the last ':'); its tools are the
     indented 'tool: version' lines below it. A tool with no version, or an error message for one,
     is 'unknown'.

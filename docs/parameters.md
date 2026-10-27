@@ -102,7 +102,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--read_arg_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA
+- **Description**: Run ARGs-OAP stage one at read level (read, 16S and cell-number estimates)
 - **Example**: `--read_arg_prediction true`
 
 ### `--rgi_prediction`
@@ -201,20 +201,6 @@ Complete reference for all BugBuster pipeline parameters.
 - **Options**: `gtdb_r232` (two-stage `.syl2db`, 19 GB), `gtdb_r226` (`.syldb`, 18 GB), `gtdb_r220` (`.syldb`, 13.1 GB)
 - **Description**: Sylph database selection: GTDB representative genomes (c200 builds), downloaded together with the sylph-tax taxonomy metadata of the same release (~5-13 MB) into `<databases_dir>/sylph/`
 - **Example**: `--sylph_db gtdb_r226`
-
-### `--karga_db`
-- **Type**: String
-- **Default**: `megares`
-- **Description**: KARGA reference database selection (MEGARes)
-- **Size**: 9.2 MB
-- **Example**: `--karga_db megares`
-
-### `--kargva_db`
-- **Type**: String
-- **Default**: `kargva`
-- **Description**: KARGVA reference database selection
-- **Size**: 1.5 MB
-- **Example**: `--kargva_db kargva`
 
 ### `--kmarvel_db`
 - **Type**: String
@@ -392,16 +378,6 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to custom NCBI taxdump directory
 - **Example**: `--custom_taxdump_files /path/to/taxdump`
-
-### `--custom_karga_db`
-- **Type**: String (file path)
-- **Description**: Path to custom KARGA database FASTA file
-- **Example**: `--custom_karga_db /path/to/megares.fasta`
-
-### `--custom_kargva_db`
-- **Type**: String (file path)
-- **Description**: Path to custom KARGVA database FASTA file
-- **Example**: `--custom_kargva_db /path/to/kargva.fasta`
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)
@@ -585,8 +561,8 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 
 ## Results Summary Parameters
 
-The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI,
-KARGA/KARGVA), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
+The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI),
+read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
 self-contained HTML report, a README (`README.md`, `README.docx`) and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
 clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.16, for how the results are reported.
 

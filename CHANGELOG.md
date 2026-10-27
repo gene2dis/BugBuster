@@ -799,6 +799,17 @@ next release is tagged.
 
 ### Removed
 
+- **Breaking**: KARGA and KARGVA (read-level MEGARes genes and variants) are
+  removed, with `ARG_NORM_REPORT` (`bin/arg_norm_report.py`) and its
+  `05_arg_prediction/read_level/summary/KARGA_norm.csv` / `KARGVA_norm.csv`,
+  the `karga/` and `kargva/` outputs, and the summary's `arg_karga_*` /
+  `arg_kargva_long` tables, `karga_*` / `kargva_*` columns and
+  `arg_karga_class_heatmap`. Each took ~4 h of single-threaded Java per
+  full-depth sample, KARGA's coverage was not reproducible run to run, and
+  CARD is covered by K-MARVEL and RGI. `--karga_db`, `--kargva_db`,
+  `--custom_karga_db` and `--custom_kargva_db` are gone: passing one aborts
+  the run at startup, so remove them from params files. The summary no longer
+  reads `KARGA_norm.csv` from older results directories
 - **Breaking**: the MetaCerberus contig annotation path —
   `--contig_level_metacerberus`, `--metacerberus_hmm`,
   `--metacerberus_minscore`, `--metacerberus_evalue` and its

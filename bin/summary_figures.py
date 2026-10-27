@@ -563,24 +563,6 @@ def fig_method_by_category(fw, comp, methods):
             "absence). Category labels are coloured by tier.")
 
 
-def fig_karga(fw, mat, cols, groups, low, hatch):
-    """KARGA copies per cell per MEGARes class (type in brackets), samples as columns."""
-    if mat is None or mat.empty:
-        return
-    num = mat[cols].apply(pd.to_numeric, errors="coerce")
-    num = num[num.fillna(0).gt(0).any(axis=1)]
-    if num.empty:
-        return
-    num = num.loc[num.max(axis=1).sort_values(ascending=False).index]
-    labels = [f"{cls.replace('_', ' ')}  [{typ}]" for typ, cls in num.index]
-    heatmap(fw, "arg_karga_class_heatmap", "KARGA (MEGARes): resistance gene copies per cell by class",
-            "log10 copies per cell: KARGA k-mer depth of each MEGARes group's deepest allele, summed per class, divided "
-            "by the ARGs-OAP cell estimate. MEGARes classes (drugs, metals, biocides) are not CARD drug classes, and "
-            "copies per cell is not RPKM: do not compare with the K-MARVEL / RGI figures. Grey = not detected; "
-            "hatched = low depth or KARGA not run. Red labels mark low-depth samples.",
-            num, labels, cols, groups, low, hatch, "log10 copies per cell", cmap="magma_r")
-
-
 def fig_cog(fw, mat, unit, cols, groups, low, hatch, backend):
     """COG functional categories x samples from the read functional profile."""
     unit_txt = "copies per genome equivalent (CPGE)" if unit == "cpge" else unit

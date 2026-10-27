@@ -27,32 +27,31 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Optionally remove samples that fall below a minimum read count after quality filtering (`--min_read_sample`, default `0` = filter disabled).
 3. Remove host contaminant reads. [`bwa-mem3`](https://github.com/fg-labs/bwa-mem3) (default) or [`Bowtie2`](https://github.com/BenLangmead/bowtie2) (`--read_aligner bowtie2`)
-4. If requested Antibiotic resistance prediction at read level using KARGA and KARGVA [`KARGA`](https://github.com/DataIntellSystLab/KARGA), [`KARGVA`](https://github.com/DataIntellSystLab/KARGVA)
-5. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
+4. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
    - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
-6. If requested (`--read_arg_prediction`), normalization of predicted genes by estimating cell number with ARGs-OAP. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
-7. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
+5. If requested (`--read_arg_prediction`), read, 16S and cell-number estimates with ARGs-OAP stage one. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
+6. If requested read-level functional profiling with Woltka against the Web of Life (WoLr2) genomes: Bowtie2 alignment, ORF classification and KO / EC / COG / Pfam / MetaCyc pathway read counts with copies per genome equivalent, reported separately from the assembly-based tables (needs no assembly). [`Woltka`](https://github.com/qiyunzhu/woltka), [`Web of Life`](https://biocore.github.io/wol/)
    - Or, as the alternative read-level backend, SUPER-FOCUS against its DB_90 SEED subsystem database (DIAMOND or MMseqs2): SEED subsystem levels 1-3 read counts, reported separately as well (no copies per genome equivalent: a SEED hit has no gene length). [`SUPER-FOCUS`](https://github.com/metageni/SUPER-FOCUS)
    - Or HUMAnN 4 (alpha 4.0.0a2) with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent, reported separately as well. [`HUMAnN`](https://github.com/biobakery/humann), [`MetaPhlAn`](https://github.com/biobakery/MetaPhlAn)
-8. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/), [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html) or [`Sylph`](https://github.com/bluenote-1577/sylph) (+ [`sylph-tax`](https://github.com/bluenote-1577/sylph-tax))
-9. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
-10. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
-11. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
-12. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-13. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
-14. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
-15. If requested contig-level functional annotation with eggNOG-mapper, CAZy annotation with run_dbcan, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — with the eggNOG and dbCAN CAZy calls reported separately). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`run_dbcan`](https://github.com/bcb-unl/run_dbcan), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
-16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
-17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
-18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
-19. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
-20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2) (with ≥2 binners, taken from Binette's own CheckM2 run on the raw and refined bins)
-21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
-22. Bin reports.
-23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only Binette quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
-24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-25. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
-26. Assembly modes: "coassembly", "assembly", "none"
+7. Taxonomic profile [`Kraken2`](https://ccb.jhu.edu/software/kraken2/), [`Sourmash`](https://sourmash.readthedocs.io/en/latest/index.html) or [`Sylph`](https://github.com/bluenote-1577/sylph) (+ [`sylph-tax`](https://github.com/bluenote-1577/sylph-tax))
+8. Abundance estimation [`Bracken`](https://github.com/jenniferlu717/Bracken)
+9. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
+10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
+11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
+12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+13. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
+14. If requested contig-level functional annotation with eggNOG-mapper, CAZy annotation with run_dbcan, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — with the eggNOG and dbCAN CAZy calls reported separately). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`run_dbcan`](https://github.com/bcb-unl/run_dbcan), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
+15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
+17. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+18. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
+19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2) (with ≥2 binners, taken from Binette's own CheckM2 run on the raw and refined bins)
+20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+21. Bin reports.
+22. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only Binette quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
+23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
+24. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
+25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
 
@@ -144,8 +143,6 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
 | **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` | `--custom_deeparg_db` |
-| **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` | `--custom_karga_db` |
-| **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` | `--custom_kargva_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
@@ -168,8 +165,6 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
 - **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
 - **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
-- **karga_db**: [`megares`](https://www.meglab.org/megares/download/)
-- **kargva_db**: [`kargva_db`](https://github.com/DataIntellSystLab/KARGVA/tree/main)
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
@@ -218,7 +213,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--read_arg_prediction` | `false` | Read-level ARG prediction (KARGA, KARGVA and ARGs-OAP, which run together) |
+| `--read_arg_prediction` | `false` | Read-level ARG prediction with ARGs-OAP |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
@@ -368,10 +363,7 @@ results/
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
 │   ├── read_level/             # Read-level predictions
-│   │   ├── karga/              # KARGA results (if read_arg_prediction=true)
-│   │   ├── kargva/             # KARGVA results (if read_arg_prediction=true)
 │   │   ├── args_oap/           # ARGs-OAP results (if read_arg_prediction=true)
-│   │   ├── summary/            # Normalized ARG report (if read_arg_prediction=true)
 │   │   ├── rgi/                # RGI per-sample results (if rgi_prediction=true)
 │   │   ├── rgi_kmer/           # RGI pathogen-of-origin (if rgi_prediction=true)
 │   │   ├── rgi_summary/        # RGI aggregated reports (if rgi_prediction=true)

@@ -722,11 +722,9 @@ nextflow_pipeline {
         }
     }
 
-    test("Stub run wires the read-level KARGA/KARGVA/ARGs-OAP path") {
-        // First test coverage of --read_arg_prediction (added with audit #18's
-        // KARGVA heap / KARGA containerOptions fixes): pins that the
-        // ARGS_OAP + KARGVA -> KARGA -> ARG_NORM_REPORT chain composes and
-        // the mapped-genes reports publish to the documented layout.
+    test("Stub run wires the read-level ARGs-OAP path") {
+        // --read_arg_prediction runs ARGs-OAP (KARGA and KARGVA were removed
+        // in roadmap Phase 8): ARGS_OAP runs and publishes its directory.
         options "-stub"
 
         when {
@@ -746,13 +744,9 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert workflow.trace.tasks().any { task -> task.name.contains("ARGS_OAP") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("KARGVA") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("KARGA") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("ARG_NORM_REPORT") }
-
-            assert path("${outputDir}/05_arg_prediction/read_level/karga/test_sample1_all_reads_KARGA_mappedGenes.csv").exists()
-            assert path("${outputDir}/05_arg_prediction/read_level/kargva/test_sample1_all_reads_KARGVA_mappedGenes.csv").exists()
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("KARG") } == 0
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap_s1_out").exists()
         }
     }
 
@@ -1120,7 +1114,7 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_CLASSIFY") } == 2
             // "false": every disabled branch stays off
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
-            assert workflow.trace.tasks().count { task -> task.name.contains("KARGA") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_CHECKM2_DB") } == 0

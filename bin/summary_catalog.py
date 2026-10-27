@@ -32,11 +32,10 @@ STAGES = [
                    "rgi_kmer_hosts / rgi_host_check",
     },
     {
-        "key": "karga", "title": "Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP",
+        "key": "args_oap", "title": "Read-level ARGs: ARGs-OAP (SARG)",
         "params": "--read_arg_prediction",
-        "processes": ["KARGA", "KARGVA", "ARGS_OAP", "ARG_NORM_REPORT"],
-        "summary": "arg_karga_long, arg_karga_group_cpc, arg_karga_class_cpc, arg_kargva_long; samples_qc "
-                   "args_oap_n16S / args_oap_ncell / karga_*; figure arg_karga_class_heatmap",
+        "processes": ["ARGS_OAP"],
+        "summary": "not summarised yet",
     },
     {
         "key": "read_functional", "title": "Read-level functional profile",
