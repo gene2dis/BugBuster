@@ -181,7 +181,8 @@ RESERVED_COLUMNS = {
     "tier_note", "mutation_data",
     "detected_by", "detected_kmarvel", "detected_rgi", "kmarvel_read_pairs", "rgi_read_pairs", "rgi_below_cutoff",
     "rgi_gene_read_pairs", "args_oap_n16S", "args_oap_ncell", "sarg_n_subtypes", "sarg_copies_per_cell",
-    "sarg_type", "sarg_subtype", "read_count", "copies_per_cell", "copies_per_16S", "ppm", "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
+    "sarg_type", "sarg_subtype", "read_count", "copies_per_cell", "copies_per_16S", "ppm",
+    "mc_avg_genome_size_bp", "mc_genome_equivalents", "func_reads_assigned",
     "func_fraction_annotated", "n_samples_evaluable", "backend",
     "ontology", "accession", "term_description",
     "abundance_cpge", "abundance_native", "native_unit",
@@ -626,7 +627,7 @@ def main(argv=None):
     sarg_ran = set().union(*[b["sarg_ran"] for b in batches])
     if sarg_ran:
         cells = pd.concat([b["sarg_cells"] for b in batches if b["sarg_cells"] is not None])
-        sstatus = sarg_status(order, sample_status(order, sarg_ran, low), cells)
+        sstatus = sarg_status(sample_status(order, sarg_ran, low), cells)
         sarg = pd.concat([b["sarg"] for b in batches if b["sarg"] is not None], ignore_index=True)
         counts = sarg_sample_counts(sarg, cells, order, sstatus)
         for c in counts.columns:

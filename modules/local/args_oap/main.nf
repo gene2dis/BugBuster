@@ -52,24 +52,35 @@ process ARGS_OAP {
         -o ${prefix}_args_oap \\
         -f fastq.gz \\
         -t ${task.cpus} \\
-        ${args}
+        ${args} > stage_one.log 2>&1 || { cat stage_one.log >&2; exit 1; }
+    cat stage_one.log >&2
+    # stage one reports a failure on an input file as a warning and drops the file
+    if grep -q 'Something is wrong with' stage_one.log; then
+        echo "ERROR: ARGs-OAP stage one dropped an input file of ${prefix} (see the log above)" >&2
+        exit 1
+    fi
 
-    # Stage two exits 2 without tables when there is nothing to normalise: no
-    # sample with reads, 16S and cells, or no read left after the SARG search.
-    # The sample then keeps metadata.txt (ARGS_OAP_REPORT reports it); any
-    # other failure fails the task
-    status=0
-    args_oap stage_two \\
-        -i ${prefix}_args_oap \\
-        -t ${task.cpus} \\
-        ${args2} > stage_two.log 2>&1 || status=\$?
-    cat stage_two.log >&2
-    if [ "\$status" -ne 0 ]; then
-        if [ "\$status" -eq 2 ] && grep -qE 'No valid sample in metadata file|No target sequence (detected|remained)' stage_two.log; then
-            echo "ARGs-OAP stage two: no SARG hit to normalise for ${prefix}" >&2
+    # Stage two normalises by the metadata rows with reads, 16S and cells all
+    # above 0; without one the sample keeps metadata.txt only. Its outcome goes
+    # to stage_two_status.txt for ARGS_OAP_REPORT: ok, no_sarg_hit (no read
+    # left after the SARG search: stage two exits 2) or not_normalised
+    if awk -F'\t' 'NR > 1 && \$2 > 0 && \$3 > 0 && \$4 > 0 { found = 1 } END { exit !found }' ${prefix}_args_oap/metadata.txt; then
+        status=0
+        args_oap stage_two \\
+            -i ${prefix}_args_oap \\
+            -t ${task.cpus} \\
+            ${args2} > stage_two.log 2>&1 || status=\$?
+        cat stage_two.log >&2
+        if [ "\$status" -eq 0 ]; then
+            echo ok > ${prefix}_args_oap/stage_two_status.txt
+        elif [ "\$status" -eq 2 ] && grep -qE 'No target sequence (detected|remained)' stage_two.log; then
+            echo no_sarg_hit > ${prefix}_args_oap/stage_two_status.txt
         else
             exit "\$status"
         fi
+    else
+        echo "ARGs-OAP: no 16S or cell estimate for ${prefix}, stage two skipped" >&2
+        echo not_normalised > ${prefix}_args_oap/stage_two_status.txt
     fi
 
     rm -rf tmp_reads pylib
@@ -88,6 +99,7 @@ process ARGS_OAP {
     printf 'sample\\tnRead\\tn16S\\tnCell\\n${prefix}_tmp_reads\\t2000\\t2.0\\t1.0\\n' > ${prefix}_args_oap/metadata.txt
     printf 'qseqid\\tsseqid\\tpident\\tlength\\tqlen\\tslen\\tevalue\\tbitscore\\tqcov\\tsample\\tscov\\tgene\\tsubtype\\ttype\\tcount\\tcopy\\trpk\\trpksum\\n' > ${prefix}_args_oap/blastout.filtered.txt
     touch ${prefix}_args_oap/extracted.fa ${prefix}_args_oap/normalized_cell.type.txt
+    echo no_sarg_hit > ${prefix}_args_oap/stage_two_status.txt
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

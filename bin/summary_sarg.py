@@ -40,7 +40,7 @@ def load_args_oap(root):
     return long, cells, set(cells["sample"])
 
 
-def sarg_status(order, status, cells):
+def sarg_status(status, cells):
     """sample_status() plus not_normalised: ARGs-OAP found no 16S or no cells, so nothing could be normalised."""
     out = dict(status)
     for s in cells.loc[cells["status"] == NOT_NORMALISED, "sample"]:
@@ -62,8 +62,11 @@ def sarg_tables(long, order, status):
         rows = long[long["level"] == level]
         if rows.empty:
             continue
-        mat = rows.groupby(keys + ["sample"])["copies_per_cell"].sum(min_count=1).unstack("sample")
-        out[name] = fill(mat).sort_index()
+        g = rows.groupby(keys + ["sample"])["copies_per_cell"]
+        mat = g.sum(min_count=1).unstack("sample")
+        # a hit without copies per cell (no cell estimate) is blank: neither 0 nor 'not detected'
+        blank = (g.size().unstack("sample").notna() & mat.isna()).reindex(columns=order, fill_value=False)
+        out[name] = fill(mat).mask(blank, "").sort_index()
     return out
 
 

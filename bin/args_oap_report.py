@@ -5,7 +5,8 @@ ARGs-OAP run-level report (ARGS_OAP_REPORT): the per-sample ARGs-OAP directories
 Usage: args_oap_report.py [--outdir DIR] <sample>_args_oap [...]
 
 Each <sample>_args_oap directory holds stage one's metadata.txt (nRead single reads, n16S and nCell per
-ARGs-OAP sample) and, when stage two found SARG hits, blastout.filtered.txt (one row per read and SARG
+ARGs-OAP sample), ARGS_OAP's stage_two_status.txt (ok, no_sarg_hit or not_normalised) and, when stage two
+found SARG hits, blastout.filtered.txt (one row per read and SARG
 reference: count, copy = count x aligned length / reference length, and the reference's gene, subtype and
 type). ARGs-OAP treats the singleton file as a sample of its own (<id>_tmp_reads_S) and normalises each by its
 own counts; here a BugBuster sample is the sum of its rows, so its normalisation recomputes stage two's
@@ -56,12 +57,15 @@ def per_sample(path):
     missing = HIT_COLUMNS - set(hits.columns)
     if missing:
         die(f"{hits_file} lacks columns: {', '.join(sorted(missing))}")
-    if not hits.empty:
+    status_file = path / "stage_two_status.txt"
+    if status_file.exists():
+        status = status_file.read_text().strip()
+        if status not in ("ok", "no_sarg_hit", "not_normalised"):
+            die(f"{status_file}: unknown status '{status}'")
+    elif not hits.empty:
         status = "ok"
-    elif cells["n16S"] == 0 or cells["nCell"] == 0 or cells["nRead"] == 0:
-        status = "not_normalised"
-    else:
-        status = "no_sarg_hit"
+    else:  # a directory written before ARGS_OAP recorded the outcome
+        status = "not_normalised" if 0 in (cells["nRead"], cells["n16S"], cells["nCell"]) else "no_sarg_hit"
     rows = []
     for level, keys in LEVELS:
         if hits.empty:

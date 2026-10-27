@@ -36,7 +36,8 @@
 #                        singletons; novA; adeF at 1/3 and rosB at 1/2 per read)
 #                        are rows of a real ARGs-OAP 4.0.0 stage two output,
 #                        renamed (read names synthetic) with metadata written
-#                        for them; sampleB has metadata.txt only (no SARG hit)
+#                        for them; sampleB has metadata.txt only (no SARG hit);
+#                        stage_two_status.txt as ARGS_OAP writes it
 #   functional/read_{function_abundance,annotated_fraction,sample_summary}.tsv
 #                        bin/aggregate_read_functions.py (Woltka) on the
 #                        tests/data/woltka/ tables as sampleA (with MicrobeCensus)

@@ -385,6 +385,19 @@ if grep -q "^sample[BC]	" "${AO_WORK}/args_oap_long.tsv"; then
 else
     echo "✓ args_oap_report: samples without hits have no SARG rows"; PASS=$((PASS + 1))
 fi
+# ARGS_OAP's stage_two_status.txt decides, not the summed counts: summed pairs + singletons can be non-zero
+# while no single ARGs-OAP row had reads, 16S and cells (stage two skipped)
+AO_MARK="${WORK}/args_oap_report_marker"
+mkdir -p "${AO_MARK}/sampleF_args_oap"
+printf 'sample\tnRead\tn16S\tnCell\nsampleF_tmp_reads\t2000\t0.0\t0.4\nsampleF_tmp_reads_S\t100\t0.1\t0.0\n' \
+    > "${AO_MARK}/sampleF_args_oap/metadata.txt"
+echo not_normalised > "${AO_MARK}/sampleF_args_oap/stage_two_status.txt"
+NEXT_WORKDIR="${AO_MARK}"
+expect_pass "args_oap_report: stage two status taken from ARGS_OAP" args_oap_report.py sampleF_args_oap
+check_grep "args_oap_report: marker overrides the summed counts" "args_oap_cells.tsv" "^sampleF	2100	0.1	0.4	0.0	not_normalised$"
+echo maybe > "${AO_MARK}/sampleF_args_oap/stage_two_status.txt"
+NEXT_WORKDIR="${AO_MARK}"
+expect_fail "args_oap_report: an unknown stage two status fails" args_oap_report.py sampleF_args_oap
 AO_BAD="${WORK}/args_oap_report_bad"
 mkdir -p "${AO_BAD}/sampleD_args_oap" "${AO_BAD}/sampleE_out"
 NEXT_WORKDIR="${AO_BAD}"
