@@ -3,13 +3,14 @@
     COMEBIN Binning Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Metagenomic binning using COMEBin
-    
-    Supports both per-sample and co-assembly modes
-    Includes retry logic with adjusted parameters on failure
-    
+
+    Supports both per-sample and co-assembly modes. Runs on CPU only (the
+    image's PyTorch has no CUDA). Each retry uses smaller batch settings; a
+    failure on the last attempt leaves FAILED.txt instead of failing the run
+
     Input:
         tuple val(meta), path(contigs), path(bam)
-    
+
     Output:
         bins: tuple val(meta), path(comebin_bins/comebin_res/comebin_res_bins)
         versions: path(versions.yml)
@@ -19,10 +20,10 @@
 process COMEBIN {
     tag "${meta.id}"
     label 'process_high'
-    
+
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/comebin:1.0.4--hdfd78af_0' :
-        'quay.io/biocontainers/comebin:1.0.4--hdfd78af_0' }"
+        'https://depot.galaxyproject.org/singularity/comebin:1.1.0--hdfd78af_2' :
+        'quay.io/biocontainers/comebin:1.1.0--hdfd78af_2' }"
 
     input:
     tuple val(meta), path(contigs), path(bam)
@@ -36,7 +37,14 @@ process COMEBIN {
 
     script:
     prefix = meta.id
-    
+    // Batch settings per attempt: -n views, -b batch size, -e/-c embedding sizes
+    def settings = task.attempt == 1 ? '-n 6 -b 512 -e 1024 -c 1024' :
+        task.attempt == 2 ? '-n 4 -b 256 -e 512 -c 512' :
+        '-n 4 -b 128 -e 256 -c 256'
+    // A failed attempt fails the task so the retry runs with smaller batches;
+    // only the last one writes FAILED.txt and lets the rest of the run go on
+    def last_attempt = task.attempt > (task.maxRetries ?: 0)
+
     // Input validation
     if (!meta || !meta.id) {
         error "COMEBIN: meta.id is required"
@@ -44,28 +52,29 @@ process COMEBIN {
     if (!contigs) {
         error "COMEBIN: No contig file provided for sample ${meta.id}"
     }
-    
+
     """
     set -euo pipefail
-    
+
     rm -rf ${prefix}_comebin_bins
     mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-    
+    bins_dir=${prefix}_comebin_bins/comebin_res/comebin_res_bins
+
+    write_versions() {
+        printf '"%s":\\n    comebin: %s\\n' "${task.process}" "\$(run_comebin.sh -V 2>&1 | sed 's/.*: //')" > versions.yml
+    }
+
     # Validate minimum contig count (awk always exits 0 and always prints a
     # number; 'grep -c ... || true' left the variable empty when grep failed)
     contig_count=\$(awk '/^>/{n++} END{print n+0}' ${contigs})
-    
+
     if [[ \$contig_count -lt 10 ]]; then
         echo "WARNING: Only \$contig_count contigs. Skipping COMEBIN (requires ≥10)." >&2
-        echo "COMEBIN skipped: insufficient contigs (\$contig_count < 10)" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/SKIPPED.txt
-        
-        cat <<-END_VERSIONS > versions.yml
-	"${task.process}":
-	    comebin: 1.0.4
-	END_VERSIONS
+        echo "COMEBIN skipped: insufficient contigs (\$contig_count < 10)" > "\$bins_dir/SKIPPED.txt"
+        write_versions
         exit 0
     fi
-    
+
     # Compute N50 and set contrastive loss temperature accordingly
     n50=\$(awk '/^>/{if(seq) print length(seq); seq=""} !/^>/{seq=seq\$0} END{if(seq) print length(seq)}' ${contigs} \\
         | sort -rn \\
@@ -77,67 +86,68 @@ process COMEBIN {
     else
         echo "INFO: N50=\$n50 >= 10000, using default temperature" >&2
     fi
-    
-    # Run COMEBIN with retry logic and adjusted parameters
-    set +e
+
+    # run_comebin.sh calls 'realpath -e --' and 'realpath -m --', which the
+    # image's busybox realpath does not support: a Python realpath written
+    # into the task directory comes first on PATH (nothing is written into
+    # the image)
+    mkdir -p realpath_shim
+    cat > realpath_shim/realpath <<'PYEOF'
+    #!/usr/bin/env python3
+    import os
+    import sys
+    args = sys.argv[1:]
+    must_exist = '-e' in args
+    status = 0
+    for arg in [a for a in args if a not in ('-e', '-m', '--')]:
+        path = os.path.realpath(arg)
+        if must_exist and not os.path.exists(path):
+            sys.stderr.write('realpath: ' + arg + ': No such file or directory\\n')
+            status = 1
+            continue
+        print(path)
+    sys.exit(status)
+    PYEOF
+    chmod +x realpath_shim/realpath
+    export PATH="\$PWD/realpath_shim:\$PATH"
+
+    # -d cpu: the default device is cuda, and the image's PyTorch has no CUDA.
+    # -s: a fixed seed, so reruns give the same bins
     exit_code=0
-    if [[ ${task.attempt} == 1 ]]; then
-        bash run_comebin.sh \\
-            -a ${contigs} \\
-            -p ./ \\
-            -o ${prefix}_comebin_bins \\
-            -n 6 \\
-            -t ${task.cpus} \\
-            -b 512 \\
-            -e 1024 \\
-            -c 1024 \\
-            \$temp_flag
-        exit_code=\$?
-    elif [[ ${task.attempt} == 2 ]]; then
-        bash run_comebin.sh \\
-            -a ${contigs} \\
-            -p ./ \\
-            -o ${prefix}_comebin_bins \\
-            -n 4 \\
-            -t ${task.cpus} \\
-            -b 256 \\
-            -e 512 \\
-            -c 512 \\
-            \$temp_flag
-        exit_code=\$?
-    elif [[ ${task.attempt} == 3 ]]; then
-        bash run_comebin.sh \\
-            -a ${contigs} \\
-            -p ./ \\
-            -o ${prefix}_comebin_bins \\
-            -n 4 \\
-            -t ${task.cpus} \\
-            -b 128 \\
-            -e 256 \\
-            -c 256 \\
-            \$temp_flag
-        exit_code=\$?
-    fi
-    set -e
-    
-    # Handle failure gracefully
+    bash run_comebin.sh \\
+        -a ${contigs} \\
+        -p ./ \\
+        -o ${prefix}_comebin_bins \\
+        -t ${task.cpus} \\
+        -d cpu \\
+        -s ${params.comebin_random_seed} \\
+        ${settings} \\
+        \$temp_flag || exit_code=\$?
+
     if [[ \$exit_code -ne 0 ]]; then
-        echo "WARNING: COMEBIN failed for ${prefix}. Creating empty directory." >&2
-        mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-        echo "COMEBIN failed - insufficient data or features" > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/FAILED.txt
+        if [[ "${last_attempt}" != "true" ]]; then
+            echo "ERROR: COMEBIN failed for ${prefix} (exit \$exit_code) on attempt ${task.attempt}; retrying with smaller batches." >&2
+            exit \$exit_code
+        fi
+        echo "WARNING: COMEBIN failed for ${prefix} on its last attempt. Creating empty directory." >&2
+        rm -rf ${prefix}_comebin_bins
+        mkdir -p "\$bins_dir"
+        echo "COMEBIN failed on every attempt (last exit status \$exit_code)" > "\$bins_dir/FAILED.txt"
+    else
+        # COMEBin 1.1.0 keeps the whole contig header (e.g. MEGAHIT's
+        # 'flag=... multi=... len=...') in its bins; refiners and the bin
+        # depth step match contigs by name, so keep the name only
+        find "\$bins_dir" -name '*.fa' -exec sed -i '/^>/s/[[:space:]].*//' {} +
     fi
-    
-    cat <<-END_VERSIONS > versions.yml
-	"${task.process}":
-	    comebin: \$(run_comebin.sh --version 2>&1 | head -n1 || echo "1.0.4")
-	END_VERSIONS
+
+    write_versions
     """
-    
+
     stub:
     prefix = meta.id
     """
     mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
-    
+
     # Create stub bin files
     cat > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/bin.1.fa << 'EOF'
     >contig_1
@@ -145,15 +155,15 @@ process COMEBIN {
     >contig_2
     TGCATGCATGCATGCATGCATGCATGCATGCA
     EOF
-    
+
     cat > ${prefix}_comebin_bins/comebin_res/comebin_res_bins/bin.2.fa << 'EOF'
     >contig_3
     GGCCGGCCGGCCGGCCGGCCGGCCGGCCGGCC
     EOF
-    
+
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        comebin: 1.0.4
+        comebin: 1.1.0
     END_VERSIONS
     """
 }

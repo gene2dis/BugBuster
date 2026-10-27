@@ -24,8 +24,8 @@ process GTDB_TK_BATCH {
     label 'process_high_memory'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/gtdbtk:2.7.2--pyhdfd78af_1' :
-        'quay.io/biocontainers/gtdbtk:2.7.2--pyhdfd78af_1' }"
+        'https://depot.galaxyproject.org/singularity/gtdbtk:2.8.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(gtdbtk_db)
@@ -40,7 +40,9 @@ process GTDB_TK_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
-    def metawrap_suffix = task.ext.metawrap_dir_suffix ?: "metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"
+    // pplacer threads (performance review M10): 4 placed genomes 1.5-2x
+    // faster than 1 for ~7 % more memory; never more than the task's CPUs
+    def pplacer_cpus = Math.min(params.gtdbtk_pplacer_cpus as Integer, task.cpus as Integer)
     """
     set -euo pipefail
 
@@ -52,7 +54,7 @@ process GTDB_TK_BATCH {
     # Process ALL staged bin directories - parse sample_id from directory names
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. The input channel
     # already carries exactly the dirs to classify (single-binner outputs, or
-    # MetaWRAP-refined dirs), so every dir must be recognized; identify_bin_dir.sh
+    # Binette-refined dirs), so every dir must be recognized; identify_bin_dir.sh
     # fails loudly on naming drift (audit #6).
     for staged_dir in bin_*/; do
         staged_dir=\${staged_dir%/}  # Remove trailing slash
@@ -61,7 +63,7 @@ process GTDB_TK_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${metawrap_suffix}")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir")
         sample_id=\${id_line%%\$'\\t'*}
 
         echo "Processing \$(basename "\$bin_dir") -> sample_id=\$sample_id"
@@ -100,7 +102,7 @@ process GTDB_TK_BATCH {
             --out_dir gtdbtk_output \\
             --cpus ${task.cpus} \\
             --extension .fa \\
-            --pplacer_cpus 1
+            --pplacer_cpus ${pplacer_cpus}
         
         # Split the combined reports by sample prefix
         if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ]; then
@@ -200,7 +202,7 @@ process GTDB_TK_BATCH {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        gtdbtk: 2.7.2
+        gtdbtk: 2.8.0
     END_VERSIONS
     """
 }

@@ -390,7 +390,7 @@ See the `examples/` directory for a complete YAML example:
 
 Use the `binners` parameter to choose which binning tools to run. Accepts a comma-separated string with any combination of `semibin`, `metabat2`, and `comebin`. At least one is required when `include_binning: true`.
 
-**Key rule:** MetaWRAP bin refinement is **only invoked when ≥2 binners are selected**.
+**Key rule:** Binette bin refinement is **only invoked when ≥2 binners are selected**.
 
 #### Single Binner (Fast, Default)
 
@@ -406,38 +406,38 @@ nextflow run main.nf --input samplesheet.csv --output results \
     -profile docker
 ```
 
-#### Two Binners + MetaWRAP Refinement
+#### Two Binners + Binette Refinement
 
 ```yaml
 include_binning: true
 binners: "semibin,metabat2"
 semibin_env_model: "human_gut"
-metawrap_completeness: 50
-metawrap_contamination: 10
+bin_min_completeness: 50
+bin_max_contamination: 10
 ```
 
 ```bash
 nextflow run main.nf --input samplesheet.csv --output results \
     --include_binning true --binners semibin,metabat2 \
     --semibin_env_model human_gut \
-    --metawrap_completeness 50 --metawrap_contamination 10 \
+    --bin_min_completeness 50 --bin_max_contamination 10 \
     -profile docker
 ```
 
-#### All Three Binners + MetaWRAP Refinement
+#### All Three Binners + Binette Refinement
 
 ```yaml
 include_binning: true
 binners: "semibin,metabat2,comebin"
 semibin_env_model: "human_gut"
-metawrap_completeness: 50
-metawrap_contamination: 10
+bin_min_completeness: 50
+bin_max_contamination: 10
 ```
 
 ```bash
 nextflow run main.nf --input samplesheet.csv --output results \
     --include_binning true --binners semibin,metabat2,comebin \
-    --metawrap_completeness 50 --metawrap_contamination 10 \
+    --bin_min_completeness 50 --bin_max_contamination 10 \
     -profile docker
 ```
 
@@ -453,15 +453,15 @@ assembly_mode: "assembly"
 taxonomic_profiler: "sourmash"
 include_binning: true
 
-# Binner selection — ≥2 enables MetaWRAP refinement automatically
+# Binner selection — ≥2 enables Binette refinement automatically
 binners: "semibin,metabat2"
 
 # SemiBin
 semibin_env_model: "human_gut"
 
-# MetaWRAP thresholds (only used when ≥2 binners selected)
-metawrap_completeness: 50
-metawrap_contamination: 10
+# Refinement thresholds (only used when ≥2 binners selected)
+bin_min_completeness: 50
+bin_max_contamination: 10
 
 # MetaBAT2 contig filter (only used when metabat2 selected)
 metabat_minContig: 2500
@@ -473,13 +473,13 @@ metabat_minContig: 2500
 |-------|------|-------|
 | `semibin` | SemiBin2 | Fast; requires `--semibin_env_model` |
 | `metabat2` | MetaBAT2 | Requires contig depth calculation |
-| `comebin` | COMEBin | Slow on CPU; best with GPU |
+| `comebin` | COMEBin | CPU only and costly: ~38 CPU-hours on a 37 Mbp assembly (1-1.6 CPU-hours per Mbp) |
 
 ### Important Notes
 
 - `binners` accepts a **comma-separated string**: `"semibin,metabat2"`; spaces around the commas are ignored in YAML (on the command line, write it without spaces)
-- `metawrap_completeness` and `metawrap_contamination` are **ignored** when only one binner is selected
-- CheckM2 and GTDB-Tk **always run** regardless of binner selection
+- `bin_min_completeness` and `bin_max_contamination` are **ignored** when only one binner is selected (`metawrap_completeness` / `metawrap_contamination` are deprecated aliases)
+- CheckM2 and GTDB-Tk **always run** regardless of binner selection (with ≥2 binners CheckM2 runs inside Binette)
 
 ---
 

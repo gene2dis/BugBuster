@@ -253,7 +253,7 @@ process BINS_REFERENCE {
     # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order. Bin ids are
     # the FASTA basenames. A contig already placed in an earlier bin is
     # skipped with a warning, so the reference has unique names
-    # (MetaWRAP-refined bins should never share contigs; the old per-bin
+    # (refined bins should never share contigs; the old per-bin
     # mapping tolerated it silently). A bin that adds no contig (no
     # sequences, or only contigs of earlier bins) gets one row with an empty
     # contig field, so it still reports a 0-coverage row downstream. One awk

@@ -4,6 +4,8 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Batched bin quality assessment using CheckM2
     
+    Runs only with a single binner: with two or more, Binette's own CheckM2
+    reports replace it (performance review M7, modules/local/binette).
     One checkm2 predict over every bin of every sample and binner (bins renamed
     <sample>__<binner>__<bin>), so the DIAMOND database is searched and the
     models are loaded once per run instead of once per binner (performance
@@ -14,7 +16,6 @@
     
     Output:
         all_reports: tuple val(meta), path(quality_reports) - per sample
-        metawrap_report: tuple val(meta), path(metawrap_quality_report) - per sample (optional; only when MetaWRAP ran)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */
@@ -32,7 +33,6 @@ process CHECKM2_BATCH {
 
     output:
     tuple val(meta_list), path("*_*_quality_report.tsv"), emit: all_reports
-    tuple val(meta_list), path("*_metawrap_quality_report.tsv"), emit: metawrap_report, optional: true
     path "versions.yml", emit: versions
 
     when:
@@ -40,7 +40,6 @@ process CHECKM2_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
-    def metawrap_suffix = task.ext.metawrap_dir_suffix ?: "metawrap_${params.metawrap_completeness}_${params.metawrap_contamination}_bins"
     """
     set -euo pipefail
 
@@ -54,8 +53,7 @@ process CHECKM2_BATCH {
 
     # Process ALL staged bin directories - parse sample_id and binner from directory names
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. Every staged dir is a
-    # binner output, so identify_bin_dir.sh fails loudly on naming drift (audit #6);
-    # the MetaWRAP dir name depends on params.metawrap_* and is passed in via ext.
+    # binner output, so identify_bin_dir.sh fails loudly on naming drift (audit #6).
     for staged_dir in bin_*/; do
         staged_dir=\${staged_dir%/}  # Remove trailing slash
 
@@ -63,7 +61,7 @@ process CHECKM2_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${metawrap_suffix}")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir")
         sample_id=\${id_line%%\$'\\t'*}
         binner=\${id_line##*\$'\\t'}
 
@@ -158,7 +156,7 @@ process CHECKM2_BATCH {
     """
     # Create stub quality report files for each sample and binner
     for meta_id in ${meta_ids}; do
-        for binner in metabat semibin comebin metawrap; do
+        for binner in metabat semibin comebin; do
             cat > \${meta_id}_\${binner}_quality_report.tsv << 'EOF'
     Name	Completeness	Contamination
     bin.1	95.5	2.1

@@ -21,11 +21,11 @@ input:
   - all_bins:
       type: directory
       description: |
-        Bin directories to classify (staged as bin_?/) - single-binner outputs or MetaWRAP-refined
+        Bin directories to classify (staged as bin_?/) - single-binner outputs or Binette-refined
         directories, recognised by name with bin/identify_bin_dir.sh; bins are *.fa, *.fasta or *.fna files
   - gtdbtk_db:
       type: directory
-      description: GTDB-Tk reference data package (R232 for the pinned GTDB-Tk 2.7.2), exported as GTDBTK_DATA_PATH
+      description: GTDB-Tk reference data package (R232 for the pinned GTDB-Tk 2.8.0), exported as GTDBTK_DATA_PATH
 
 output:
   - gtdb_tk:

@@ -156,7 +156,7 @@ The binning reports are `bin/bin_quality_report.py`, `bin/bin_tax_report.py` and
 - **Coverage is an unweighted mean of per-contig mean depths, not normalised.** On the bowtie2 path, cross-bin reads also inflate it.
 - **Summary work.** Add a MAG table (sample, bin, quality tier, completeness, contamination, GTDB lineage, coverage per clean read pair) and a MAG × sample abundance heatmap.
 
-Example data needed: an assembly + binning run (≥2 binners for MetaWRAP refinement), and a co-assembly run.
+Example data needed: an assembly + binning run (≥2 binners for Binette refinement), and a co-assembly run.
 
 ## Bin-level ARG clustering (unverified)
 

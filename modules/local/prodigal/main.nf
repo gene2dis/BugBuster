@@ -5,7 +5,7 @@ process PRODIGAL_BINS {
     label 'process_medium'
 
     input:
-        tuple val(meta), path(metawrap)
+        tuple val(meta), path(bins)
 
     output:
         tuple val(meta), path("*_bins_proteins"), emit: prodigal_bins
@@ -17,11 +17,11 @@ process PRODIGAL_BINS {
         """
         #!/bin/bash
         set -euo pipefail
-        # A bins dir may hold only a SKIPPED/FAILED marker (see METAWRAP) —
+        # A bins dir may hold only a SKIPPED/FAILED marker (see BINETTE) —
         # without nullglob the *.fa loop would feed prodigal a literal '*.fa'
         shopt -s nullglob
 
-        cp -r ${metawrap} tmp_bins
+        cp -r ${bins} tmp_bins
         cd tmp_bins
 
         mkdir ${prefix}_bins_genes

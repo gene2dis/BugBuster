@@ -78,7 +78,7 @@ def main():
 
     bin_tax = pd.concat(tax_dfs, ignore_index=True) if tax_dfs else pd.DataFrame()
 
-    # No refined bin at all: MetaWRAP finished with an empty bin set, so the
+    # No refined bin at all: Binette finished with an empty bin set, so the
     # bin depth step was skipped (no depth files). Warn and write a
     # header-only summary so the run can finish. Bins without a quality or
     # taxonomy row are still an error below

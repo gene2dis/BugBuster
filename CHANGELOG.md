@@ -397,6 +397,90 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (bin refinement)**: Binette 1.2.1 replaces MetaWRAP 1.2 for bin
+  refinement with two or more `--binners` (Phase 7a benchmark,
+  `docs/benchmarks/binning_2026.md`). On four per-sample assemblies it kept 45
+  bins, 26 of them MIMAG high quality, where MetaWRAP kept 44 (23), for 3.0
+  instead of 23.0 CPU-hours and 11 instead of 35 GB, and it found every GTDB
+  species MetaWRAP found. What changes for an existing setup:
+  - refined bins are published as `refined_bins/<sample>_binette_bins/binette_binN.fa`
+    (was `<sample>_metawrap_<completeness>_<contamination>_bins/bin.N.fa`),
+    their CheckM2 report as `<sample>_binette_quality_report.tsv` (was
+    `_metawrap_`), and the bin reports label them `Binette` (was `Metawrap`);
+    Bakta and the ARG bin clustering name their outputs after the new bins
+  - `--bin_min_completeness` / `--bin_max_contamination` (defaults 50 / 10)
+    replace `--metawrap_completeness` / `--metawrap_contamination`, which still
+    work with a warning; an old name and its new one with different values stop
+    the run at launch. Binette applies the cutoffs with CheckM2 scores
+    (MetaWRAP used CheckM 1)
+  - `BINETTE` requests 8 CPUs and 36 GB (`process_medium`); `METAWRAP`
+    requested 16 CPUs and 80 GB
+  - a binner without bins is left out of the refinement, and a single bin set
+    is refined like any other (MetaWRAP 1.2 could not refine one set)
+- **CheckM2 taken from Binette when bins are refined** (performance review
+  M7): with two or more binners, Binette's own CheckM2 run on the raw and the
+  refined bins replaces `CHECKM2_BATCH`, which now runs only for a single
+  binner. On four per-sample assemblies the separate run took 4.5 CPU-hours
+  and 12 GB, and Binette's reports put every bin (176 raw, 45 refined) in the
+  same MIMAG class as it. The reports keep their names and place
+  (`quality/checkm2/<sample>_<binner>_quality_report.tsv`) and CheckM2 1.1.0's
+  columns (`bin/binette_quality_reports.py`). Small output changes: values come
+  from one CheckM2 run per sample, so completeness can differ from a separate
+  run by up to ~2.6 points near the thresholds; `Total_Coding_Sequences` and
+  `Average_Gene_Length` come from Binette's gene calls on the whole assembly
+  (within ~2 % of CheckM2's per-bin counts on a real bin), and
+  `Translation_Table_Used` and `Additional_Notes` are empty
+- **SemiBin2 bins a co-assembly with a pre-trained model** (new
+  `--semibin_coassembly_mode`, default `pretrained`, and
+  `--semibin_coassembly_env_model`, default `global`): `single_easy_bin` on
+  the pooled BAM instead of training a model on the co-assembly. On a
+  five-sample co-assembly training took 24.8 CPU-hours (8.5 h), more than the
+  MEGAHIT assembly, and the pre-trained model 0.65; after Binette both gave 36
+  bins (25 and 23 MIMAG high quality). Co-assembly bins change;
+  `--semibin_coassembly_mode train_self` keeps the previous method, now at 4
+  CPUs (more threads made training slower). Per-sample assemblies keep
+  `--semibin_env_model` (`human_gut`)
+- **GTDB-Tk places genomes with 4 pplacer threads** (performance review
+  M10; new `--gtdbtk_pplacer_cpus`, default 4, was a fixed 1): on 119 genomes
+  forced through pplacer the backbone tree took 17.9 instead of 36.2 min and a
+  class-level tree 72.9 instead of 108.9 min, for 142.5 instead of 133.3 GB.
+  Classifications identical. `GTDB_TK_BATCH` keeps its 256 GB request
+- **Binning tool updates** (Phase 7a benchmark, `docs/benchmarks/binning_2026.md`)
+  - SemiBin2 2.1.0 → 2.6.0 (`quay.io/biocontainers/semibin:2.6.0--pyhdfd78af_0`)
+    for `SEMIBIN`, with a fixed `--random-seed` (new `--semibin_random_seed`,
+    default 11): unseeded runs gave one bin more or less between reruns of a
+    sample. Bins change: on four per-sample assemblies the raw MIMAG high
+    quality bins went from 18 to 23, on a five-sample co-assembly from 17 to
+    24. The co-assembly mode reads 2.6.0's `model.pt` (2.1.0: `model.h5`)
+  - MetaBAT2 2.15 → 2.18 (`quay.io/biocontainers/metabat2:2.18--h38e344b_2`)
+    for `METABAT2` and `CALCULATE_DEPTH`. 2.18 writes depth fields after the
+    contig name in bin FASTA headers; `METABAT2` cuts them, as the refiner and
+    the bin depth step match contigs by name. Bins change slightly with the
+    same `--seed 3` (raw MIMAG high quality bins 11 → 14 on four per-sample
+    assemblies, 11 → 11 on a co-assembly)
+  - MMseqs2 15.6f452 → 18.8cc5c (`quay.io/biocontainers/mmseqs2:18.8cc5c--hd6d6fdc_0`,
+    and its depot.galaxyproject.org image under singularity, which `CLUSTERING`
+    did not have) for `CLUSTERING`: the ARG clusters of 456 proteins were
+    identical at all four identity levels
+  - COMEBin 1.0.4 → 1.1.0 (`quay.io/biocontainers/comebin:1.1.0--hdfd78af_2`)
+    for `COMEBIN`, which stays opt-in. The image needs three fixes, all in the
+    module: its `realpath` is BusyBox's, which lacks the `-e`/`-m`/`--` options
+    `run_comebin.sh` uses (a Python `realpath` is written into the task
+    directory), the default device is `cuda` on a CPU-only PyTorch (`-d cpu`),
+    and bins keep the whole contig header (cut to the name). It now gets a fixed
+    `-s` seed (new `--comebin_random_seed`, default 11). Same CPU time as
+    1.0.4 (38 CPU-hours on a 37 Mbp assembly) with less memory. `COMEBIN` now
+    requests 8 CPUs (was 16; it kept at most ~7 busy) and documents its cost.
+    **Fix**: a failed attempt now fails the task, so Nextflow retries it with the
+    smaller batch settings; before, the first failure (an out-of-memory kill
+    included) wrote `FAILED.txt` and exited 0, so the retries never ran and the
+    run went on with an empty COMEBin. `FAILED.txt` is now written only when the
+    last attempt fails
+  - GTDB-Tk 2.7.2 → 2.8.0 (`quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0`
+    and its depot.galaxyproject.org image, which has every command
+    `GTDB_TK_BATCH` calls) for `GTDB_TK_BATCH`, with the same R232 reference
+    data. It ships skani 0.4.0 (2.7.2: 0.3.2), which reads the R232 sketches;
+    classifications were identical on 120 and 219 genomes
 - **Breaking (default taxonomic profiler)**: `--taxonomic_profiler` defaults
   to `sylph` instead of `sourmash`: sylph profile + sylph-tax against GTDB
   r232. A run that keeps the default now downloads the sylph database (19 GB, plus 5.5 MB of
@@ -604,10 +688,6 @@ next release is tagged.
   (one block per process), so the file and `RESULTS_SUMMARY` are unchanged.
   No module emits the topic yet; the nf-core module updates (issue #35)
   will be the first to use it
-
-- **MetaWRAP requests 80 GB on the first attempt** (was 72 GB from
-  `process_high`): its peak RSS was 67-69 GB in every binning run, within 5 %
-  of the old request. Still doubled on retry and capped by `--max_memory`
 
 - **CPU requests sized to measured use** (`config/modules.config`):
   `SYLPH_PROFILE` 8 → 4, `MICROBECENSUS` 8 → 2 (4 since the parallel base count, above), `WOLTKA_CLASSIFY` 8 → 2,

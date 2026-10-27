@@ -92,12 +92,12 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String (comma-separated)
 - **Default**: `semibin`
 - **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
-- **Description**: Selects which binning tools to run. When ≥2 binners are specified, MetaWRAP bin refinement is automatically enabled. When only one binner is selected, MetaWRAP is skipped and the binner's output is used directly.
+- **Description**: Selects which binning tools to run. When ≥2 binners are specified, Binette bin refinement is automatically enabled. When only one binner is selected, refinement is skipped and the binner's output is used directly.
 - **Examples**:
-  - `--binners semibin` — single fast binner, no MetaWRAP (default)
-  - `--binners semibin,metabat2` — two binners + MetaWRAP refinement
-  - `--binners semibin,metabat2,comebin` — all three binners + MetaWRAP refinement
-- **Note**: Only takes effect when `--include_binning true` is set
+  - `--binners semibin` — single fast binner, no refinement (default)
+  - `--binners semibin,metabat2` — two binners + Binette refinement
+  - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
+- **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
 ### `--read_arg_prediction`
 - **Type**: Boolean
@@ -134,7 +134,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--mag_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable MAG-level functional annotation: Bakta annotates every refined bin, one task per bin, publishing GFF3, GBFF, FAA, FNA, TSV and a summary per bin to `07_functional_annotation/mags/<sample>/` (files named `<sample>_<bin>.*`). Requires `--include_binning` **and at least two `--binners`** — MetaWRAP refinement and its completeness/contamination quality filter only run with ≥2 binners, and only quality-filtered bins are annotated (both requirements are validated at launch). Downloads the Bakta database on first use (`--bakta_db`: full 31.9 GB or light 1.3 GB download). Bins are expected to be bacterial; the pipeline does not detect or exclude archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before interpreting annotations of non-bacterial bins. Independent of `--contig_level_functional`, and runs on any container engine (docker included)
+- **Description**: Enable MAG-level functional annotation: Bakta annotates every refined bin, one task per bin, publishing GFF3, GBFF, FAA, FNA, TSV and a summary per bin to `07_functional_annotation/mags/<sample>/` (files named `<sample>_<bin>.*`). Requires `--include_binning` **and at least two `--binners`** — Binette refinement and its completeness/contamination quality filter only run with ≥2 binners, and only quality-filtered bins are annotated (both requirements are validated at launch). Downloads the Bakta database on first use (`--bakta_db`: full 31.9 GB or light 1.3 GB download). Bins are expected to be bacterial; the pipeline does not detect or exclude archaeal/eukaryotic/viral bins — check the GTDB-Tk bin taxonomy report before interpreting annotations of non-bacterial bins. Independent of `--contig_level_functional`, and runs on any container engine (docker included)
 - **Example**: `--mag_level_functional true --include_binning --binners semibin,metabat2`
 
 ### `--read_level_functional`
@@ -248,7 +248,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--gtdbtk_db`
 - **Type**: String
 - **Default**: `release_232`
-- **Description**: GTDB-TK database release version. The pinned GTDB-Tk 2.7.2 accepts only GTDB R232 data (older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and no longer work)
+- **Description**: GTDB-TK database release version. The pinned GTDB-Tk 2.8.0 accepts only GTDB R232 data (older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and no longer work)
 - **Size**: ~61 GB download
 - **Example**: `--gtdbtk_db release_232`
 
@@ -375,7 +375,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_gtdbtk_db`
 - **Type**: String (directory path)
-- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.7.2, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
+- **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.8.0, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
 - **Example**: `--custom_gtdbtk_db /path/to/release232`
 
 ### `--custom_deeparg_db`
@@ -709,12 +709,12 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Type**: String (comma-separated list)
 - **Default**: `semibin`
 - **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
-- **Description**: Controls which binning tools are run. When ≥2 binners are selected, MetaWRAP bin refinement is automatically enabled. When only one binner is selected, its output is used directly (no MetaWRAP). Only takes effect when `--include_binning true`.
+- **Description**: Controls which binning tools are run. When ≥2 binners are selected, Binette bin refinement is automatically enabled. When only one binner is selected, its output is used directly (no refinement). Only takes effect when `--include_binning true`.
 - **CLI examples**:
   ```bash
-  --binners semibin                    # single binner, no MetaWRAP (default)
-  --binners semibin,metabat2           # two binners + MetaWRAP refinement
-  --binners semibin,metabat2,comebin   # all three binners + MetaWRAP refinement
+  --binners semibin                    # single binner, no refinement (default)
+  --binners semibin,metabat2           # two binners + Binette refinement
+  --binners semibin,metabat2,comebin   # all three binners + Binette refinement
   ```
 - **YAML example**:
   ```yaml
@@ -728,19 +728,22 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: Minimum contig length for MetaBAT2 binning
 - **Example**: `--metabat_minContig 3000`
 
-#### `--metawrap_completeness`
+#### `--bin_min_completeness`
 - **Type**: Integer
 - **Default**: `50`
 - **Range**: 0-100
-- **Description**: Minimum bin completeness threshold for MetaWRAP refinement
-- **Example**: `--metawrap_completeness 70`
+- **Description**: Minimum CheckM2 completeness (%) of a refined bin. Binette builds and keeps refined bins at or above it; used only when ≥2 binners are selected
+- **Example**: `--bin_min_completeness 70`
 
-#### `--metawrap_contamination`
+#### `--bin_max_contamination`
 - **Type**: Integer
 - **Default**: `10`
 - **Range**: 0-100
-- **Description**: Maximum bin contamination threshold for MetaWRAP refinement
-- **Example**: `--metawrap_contamination 5`
+- **Description**: Maximum CheckM2 contamination (%) of a refined bin (Binette; used only when ≥2 binners are selected)
+- **Example**: `--bin_max_contamination 5`
+
+#### `--metawrap_completeness`, `--metawrap_contamination`
+- **Deprecated** aliases of `--bin_min_completeness` and `--bin_max_contamination` (MetaWRAP was replaced by Binette). A value given this way is used, with a warning at launch; giving an alias and its new parameter with different values stops the run at launch
 
 #### `--semibin_env_model`
 - **Type**: String
@@ -748,6 +751,38 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Options**: `human_gut`, `dog_gut`, `ocean`, `soil`, `cat_gut`, `human_oral`, `mouse_gut`, `pig_gut`, `built_environment`, `wastewater`, `chicken_caecum`, `global`
 - **Description**: SemiBin environment model for binning
 - **Example**: `--semibin_env_model ocean`
+
+#### `--semibin_random_seed`
+- **Type**: Integer
+- **Default**: `11`
+- **Description**: SemiBin2 `--random-seed`. With a fixed seed, reruns on the same input give the same bins; without one, SemiBin2 2.6.0 gave one bin more or less between reruns of the same sample
+- **Example**: `--semibin_random_seed 42`
+
+#### `--comebin_random_seed`
+- **Type**: Integer
+- **Default**: `11`
+- **Description**: COMEBin `-s` random seed, so reruns on the same input give the same bins (COMEBin left unseeded gave 7 and 8 bins in two runs of the same sample)
+- **Example**: `--comebin_random_seed 42`
+
+#### `--semibin_coassembly_mode`
+- **Type**: String
+- **Default**: `pretrained`
+- **Options**: `pretrained`, `train_self`
+- **Description**: How SemiBin2 bins a co-assembly (`--assembly_mode coassembly`). `pretrained` runs `single_easy_bin` with the pre-trained model `--semibin_coassembly_env_model` on the pooled BAM; `train_self` trains a model on the co-assembly first (the pipeline's behaviour before 2.0.0). On a five-sample co-assembly `train_self` took 24.8 CPU-hours (8.5 h) against 0.65 for the pre-trained model, more than the MEGAHIT assembly itself; after Binette refinement both gave 36 bins (25 and 23 MIMAG high quality, within CheckM2's noise near the threshold). `train_self` runs at 4 CPUs: more threads made it slower
+- **Example**: `--semibin_coassembly_mode train_self`
+
+#### `--semibin_coassembly_env_model`
+- **Type**: String
+- **Default**: `global`
+- **Options**: as `--semibin_env_model`
+- **Description**: SemiBin2 pre-trained model for the co-assembly with `--semibin_coassembly_mode pretrained`. Per-sample assemblies use `--semibin_env_model` (default `human_gut`). The benchmark used `global`
+- **Example**: `--semibin_coassembly_env_model soil`
+
+#### `--gtdbtk_pplacer_cpus`
+- **Type**: Integer
+- **Default**: `4`
+- **Description**: Threads for GTDB-Tk's pplacer step (`--pplacer_cpus`), capped at the `GTDB_TK_BATCH` task's CPUs. pplacer places only the genomes the ANI screen does not classify; with 4 threads a class-level tree took 60 GB for one genome and up to 142 GB for about 50, and placement was 1.5-2x faster than with 1 thread for ~7 % more memory. `GTDB_TK_BATCH` requests 256 GB (`process_high_memory`); lower this before lowering `--max_memory` below that
+- **Example**: `--gtdbtk_pplacer_cpus 1`
 
 ### Advanced MetaBAT2 Parameters
 
@@ -1163,8 +1198,8 @@ nextflow run main.nf \
     --binners semibin,metabat2 \
     --read_arg_prediction true \
     --contig_tax_and_arg true \
-    --metawrap_completeness 70 \
-    --metawrap_contamination 5 \
+    --bin_min_completeness 70 \
+    --bin_max_contamination 5 \
     --semibin_env_model human_gut \
     --max_cpus 32 \
     --max_memory 256.GB \

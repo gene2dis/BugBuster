@@ -17,9 +17,9 @@ input:
   - meta:
       type: map
       description: Sample metadata (meta.id is the sample name, or 'coassembly')
-  - metawrap:
+  - bins:
       type: directory
-      description: Refined bins directory from MetaWRAP (*.fa bins; may hold only a SKIPPED/FAILED marker, in which case no bins are processed)
+      description: Refined bins directory from Binette (*.fa bins; may hold only a SKIPPED/FAILED marker, in which case no bins are processed)
 
 output:
   - prodigal_bins:

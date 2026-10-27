@@ -45,11 +45,11 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 16. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
 17. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
 18. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
-19. Binning refinement with [`MetaWrap`](https://github.com/bxlab/metaWRAP) (only when ≥2 binners are selected)
-20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2)
+19. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
+20. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2) (with ≥2 binners, taken from Binette's own CheckM2 run on the raw and refined bins)
 21. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
 22. Bin reports.
-23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only MetaWRAP quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
+23. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only Binette quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
 24. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
 25. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
 26. Assembly modes: "coassembly", "assembly", "none"
@@ -149,7 +149,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
-| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.8.0; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
 | **Bakta DB v6.0** | full 31.9 GB / light 1.3 GB download | MAG (bin) annotation with Bakta; flavor via `--bakta_db` (light is explicit and recorded in provenance) | `mag_level_functional=true` | `--custom_bakta_db` |
@@ -211,7 +211,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, or `none` (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | Enable binning and refinement |
-| `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables MetaWRAP) |
+| `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables Binette refinement) |
 | `--min_read_sample` | `0` | Minimum reads required after QC |
 
 ### Feature Toggles
@@ -265,25 +265,33 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--bbmap_length` | `1000` | Minimum contig length after filtering |
-| `--binners` | `semibin` | Binners to run (comma-separated). `≥2` selected → MetaWRAP refinement enabled |
+| `--binners` | `semibin` | Binners to run (comma-separated). `≥2` selected → Binette refinement enabled |
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
-| `--metawrap_completeness` | `50` | Minimum bin completeness (%) — used only when ≥2 binners |
-| `--metawrap_contamination` | `10` | Maximum bin contamination (%) — used only when ≥2 binners |
-| `--semibin_env_model` | `human_gut` | SemiBin environment model |
+| `--bin_min_completeness` | `50` | Minimum CheckM2 completeness (%) of a refined bin — used only when ≥2 binners (was `--metawrap_completeness`, still accepted) |
+| `--bin_max_contamination` | `10` | Maximum CheckM2 contamination (%) of a refined bin — used only when ≥2 binners (was `--metawrap_contamination`, still accepted) |
+| `--semibin_env_model` | `human_gut` | SemiBin environment model (per-sample assemblies) |
+| `--semibin_coassembly_mode` | `pretrained` | Co-assembly: pre-trained model on the pooled BAM, or `train_self` (~40× the CPU time) |
+| `--semibin_coassembly_env_model` | `global` | SemiBin pre-trained model for the co-assembly |
 
 **SemiBin Models**: `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`, `human_oral`, `chicken_caecum`, `ocean`, `soil`, `wastewater`, `built_environment`, `global`
 
 **Binner selection examples:**
 ```bash
-# Default: single fast binner, no MetaWRAP
+# Default: single fast binner, no refinement
 --include_binning true --binners semibin
 
-# Two binners + MetaWRAP refinement
+# Two binners + Binette refinement
 --include_binning true --binners semibin,metabat2
 
-# All three binners + MetaWRAP
+# All three binners + Binette refinement
 --include_binning true --binners semibin,metabat2,comebin
 ```
+
+> **COMEBin is costly.** It runs on CPU only (8 CPUs per sample) and took 38
+> CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (1-1.6 CPU-hours per
+> Mbp of contigs, so an estimated 100-160 CPU-hours for a 100 Mbp assembly). After refinement it
+> added one genome on one of two benchmarked samples
+> (`docs/benchmarks/binning_2026.md`). Leave it out unless that is worth the time.
 
 ### ARG Prediction Options
 

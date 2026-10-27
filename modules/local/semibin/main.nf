@@ -5,8 +5,13 @@
     Metagenomic binning using SemiBin2
     
     Supports both per-sample and co-assembly modes:
-    - Per-sample: Uses single_easy_bin workflow
-    - Co-assembly: Uses multi-step workflow (generate features → train → bin)
+    - Pre-trained model (single_easy_bin --environment): every per-sample
+      assembly (params.semibin_env_model) and, by default, the co-assembly
+      (params.semibin_coassembly_env_model) on its pooled BAM
+    - Self-trained model (generate features → train_self → bin_short): the
+      co-assembly with params.semibin_coassembly_mode = 'train_self' (Phase
+      7a: 24.8 CPU-hours against 0.65 for the pre-trained model; after
+      Binette both gave 36 bins, 25 and 23 of them high quality)
     
     Input:
         tuple val(meta), path(contigs), path(bam)
@@ -22,8 +27,8 @@ process SEMIBIN {
     label 'process_medium'
     
     container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/semibin:2.1.0--pyhdfd78af_0' :
-        'quay.io/biocontainers/semibin:2.1.0--pyhdfd78af_0' }"
+        'https://depot.galaxyproject.org/singularity/semibin:2.6.0--pyhdfd78af_0' :
+        'quay.io/biocontainers/semibin:2.6.0--pyhdfd78af_0' }"
 
     input:
     tuple val(meta), path(contigs), path(bam)
@@ -37,8 +42,11 @@ process SEMIBIN {
 
     script:
     prefix = meta.id
-    def env_model = params.semibin_env_model
     def is_coassembly = (meta.id == 'coassembly')
+    def train_self = is_coassembly && params.semibin_coassembly_mode == 'train_self'
+    def env_model = is_coassembly ? params.semibin_coassembly_env_model : params.semibin_env_model
+    // A fixed seed: unseeded SemiBin2 gives a bin more or less between reruns
+    def seed = params.semibin_random_seed
     
     // Input validation
     if (!meta || !meta.id) {
@@ -51,14 +59,14 @@ process SEMIBIN {
         error "SEMIBIN: No BAM file(s) provided for sample ${meta.id}"
     }
     
-    if (is_coassembly) {
-        // Co-assembly mode: multi-step workflow
+    if (train_self) {
+        // Co-assembly, self-trained model: multi-step workflow
         """
         set -euo pipefail
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
         # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets MetaWRAP and the rest of the sample go on; any
+        # with a note lets Binette and the rest of the sample go on; any
         # other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then
@@ -92,12 +100,17 @@ process SEMIBIN {
                      --data contig_output/data.csv \\
                      --data-split contig_output/data_split.csv \\
                      -o contig_output \\
+                     --random-seed ${seed} \\
                      --threads ${task.cpus}
             
+            # SemiBin2 2.6.0 saves the model as model.pt (2.1.0: model.h5)
+            model=contig_output/model.pt
+            [ -f "\$model" ] || model=contig_output/model.h5
             status=0
             SemiBin2 bin_short \\
                      -i ${contigs} \\
-                     --model contig_output/model.h5 \\
+                     --model "\$model" \\
+                     --random-seed ${seed} \\
                      --data contig_output/data.csv \\
                      -o output \\
                      --compression none \\
@@ -116,13 +129,13 @@ process SEMIBIN {
         END_VERSIONS
         """
     } else {
-        // Per-sample mode: single easy bin
+        // Pre-trained model: single easy bin
         """
         set -euo pipefail
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
         # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets MetaWRAP and the rest of the sample go on; any
+        # with a note lets Binette and the rest of the sample go on; any
         # other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then
@@ -151,6 +164,7 @@ process SEMIBIN {
                      -b ${bam} \\
                      -o ${prefix}_semibin_bins \\
                      --environment ${env_model} \\
+                     --random-seed ${seed} \\
                      --compression none \\
                      --threads ${task.cpus} \\
                      > semibin.log 2>&1 || status=\$?
@@ -188,7 +202,7 @@ process SEMIBIN {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        semibin: 2.1.0
+        semibin: 2.6.0
     END_VERSIONS
     """
 }

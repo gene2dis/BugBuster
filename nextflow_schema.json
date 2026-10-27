@@ -189,7 +189,7 @@
                 "gtdbtk_db": {
                     "type": "string",
                     "default": "release_232",
-                    "description": "GTDB-TK database release version. The pinned GTDB-Tk 2.7.x accepts only GTDB R232 data (R220/R226 require GTDB-Tk <= 2.6.1).",
+                    "description": "GTDB-TK database release version. The pinned GTDB-Tk 2.8.0 accepts only GTDB R232 data (R220/R226 require GTDB-Tk <= 2.6.1).",
                     "fa_icon": "fas fa-database"
                 },
                 "eggnog_db": {
@@ -633,21 +633,35 @@
                     "fa_icon": "fas fa-weight",
                     "hidden": true
                 },
-                "metawrap_completeness": {
+                "bin_min_completeness": {
                     "type": "integer",
-                    "default": 50,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Minimum bin completeness threshold for MetaWRAP.",
+                    "description": "Minimum CheckM2 completeness (%) of a refined bin (Binette, with >= 2 binners). Default 50.",
                     "fa_icon": "fas fa-percentage"
+                },
+                "bin_max_contamination": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Maximum CheckM2 contamination (%) of a refined bin (Binette, with >= 2 binners). Default 10.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "metawrap_completeness": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 100,
+                    "description": "Deprecated alias of --bin_min_completeness (MetaWRAP was replaced by Binette).",
+                    "fa_icon": "fas fa-percentage",
+                    "hidden": true
                 },
                 "metawrap_contamination": {
                     "type": "integer",
-                    "default": 10,
                     "minimum": 0,
                     "maximum": 100,
-                    "description": "Maximum bin contamination threshold for MetaWRAP.",
-                    "fa_icon": "fas fa-percentage"
+                    "description": "Deprecated alias of --bin_max_contamination (MetaWRAP was replaced by Binette).",
+                    "fa_icon": "fas fa-percentage",
+                    "hidden": true
                 },
                 "semibin_env_model": {
                     "type": "string",
@@ -668,6 +682,41 @@
                     ],
                     "description": "SemiBin environment model for binning.",
                     "fa_icon": "fas fa-globe"
+                },
+                "semibin_coassembly_mode": {
+                    "type": "string",
+                    "default": "pretrained",
+                    "enum": ["pretrained", "train_self"],
+                    "description": "SemiBin2 under --assembly_mode coassembly: a pre-trained model (--semibin_coassembly_env_model) on the pooled BAM, or a model trained on the co-assembly (train_self; ~40x the CPU time).",
+                    "fa_icon": "fas fa-brain"
+                },
+                "semibin_coassembly_env_model": {
+                    "type": "string",
+                    "default": "global",
+                    "enum": ["human_gut", "dog_gut", "ocean", "soil", "cat_gut", "human_oral", "mouse_gut", "pig_gut", "built_environment", "wastewater", "chicken_caecum", "global"],
+                    "description": "SemiBin2 pre-trained model for the co-assembly (--semibin_coassembly_mode pretrained). Per-sample assemblies use --semibin_env_model.",
+                    "fa_icon": "fas fa-globe"
+                },
+                "semibin_random_seed": {
+                    "type": "integer",
+                    "default": 11,
+                    "minimum": 0,
+                    "description": "SemiBin2 --random-seed. A fixed seed makes reruns on the same input give the same bins (unseeded runs differ by about one bin).",
+                    "fa_icon": "fas fa-dice"
+                },
+                "comebin_random_seed": {
+                    "type": "integer",
+                    "default": 11,
+                    "minimum": 0,
+                    "description": "COMEBin -s random seed, so reruns on the same input give the same bins.",
+                    "fa_icon": "fas fa-dice"
+                },
+                "gtdbtk_pplacer_cpus": {
+                    "type": "integer",
+                    "default": 4,
+                    "minimum": 1,
+                    "description": "Threads for GTDB-Tk's pplacer step (--pplacer_cpus), capped at the task's CPUs. Each thread adds memory: 4 threads place genomes 1.5-2x faster than 1 for ~7 % more.",
+                    "fa_icon": "fas fa-microchip"
                 }
             }
         },

@@ -57,9 +57,9 @@ STAGES = [
         "summary": "not summarised yet",
     },
     {
-        "key": "binning", "title": "Binning and MAGs (SemiBin2 / MetaBAT2 / COMEBin, MetaWRAP, CheckM2, GTDB-Tk)",
-        "params": "--include_binning, --binners (MetaWRAP refinement with >= 2 binners)",
-        "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "METAWRAP", "CHECKM2_BATCH", "GTDB_TK_BATCH"],
+        "key": "binning", "title": "Binning and MAGs (SemiBin2 / MetaBAT2 / COMEBin, Binette, CheckM2, GTDB-Tk)",
+        "params": "--include_binning, --binners (Binette refinement with >= 2 binners)",
+        "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "BINETTE", "CHECKM2_BATCH", "GTDB_TK_BATCH"],
         "summary": "not summarised yet",
     },
     {

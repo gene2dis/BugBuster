@@ -5,7 +5,7 @@
 #     (previously exit 0 with no output, hidden by the module's path("*")),
 #   - bin/bin_quality_report.py, bin/bin_tax_report.py and bin/bin_summary.py
 #     warn and write empty outputs when every input is header-only (SemiBin
-#     and MetaWRAP finish with empty bin sets, so a run without bins
+#     and Binette finish with empty bin sets, so a run without bins
 #     finishes), but still fail when no input file is staged,
 #   - bin/taxonomy_report.py exits non-zero on a missing reads report
 #     (previously it silently rebuilt a QC-column-less Reads_report.csv),
@@ -180,12 +180,12 @@ mkdir -p "${BQ_WORK}"
 printf 'Name\tCompleteness\tContamination\nbin.1\t95.0\t2.0\nbin.2\t60.0\t4.0\n' \
     > "${BQ_WORK}/sampleA_semibin_quality_report.tsv"
 printf 'Name\tCompleteness\tContamination\nbin.1\t96.0\t1.0\n' \
-    > "${BQ_WORK}/sampleA_metawrap_quality_report.tsv"
+    > "${BQ_WORK}/sampleA_binette_quality_report.tsv"
 NEXT_WORKDIR="${BQ_WORK}"
 expect_pass "bin_quality: real CheckM2 reports summarized" bin_quality_report.py
 check_grep "bin_quality: summary counts High semibin MAG" "Mag_quality_summary.csv" "^Semibin,High,1$"
 check_grep "bin_quality: all-MAGs table row" "All_Mag_quality_table.csv" "^sampleA,Semibin,bin.1,High,95.0,2.0$"
-check_grep "bin_quality: refined table has metawrap MAG" "Refined_Mag_quality_table.csv" "^sampleA,Metawrap,bin.1,High,96.0,1.0$"
+check_grep "bin_quality: refined table has Binette MAG" "Refined_Mag_quality_table.csv" "^sampleA,Binette,bin.1,High,96.0,1.0$"
 check_file "bin_quality: quality plot created" "Total_bins_quality_plot.png"
 
 BQ_EMPTY="${WORK}/bin_quality_empty"
@@ -211,7 +211,7 @@ expect_fail "bin_quality: no CheckM2 file still fails" bin_quality_report.py
 # bin_tax_report.py (GTDB-Tk batch summary format)
 #
 echo "--- bin_tax_report.py ---"
-# GTDB-Tk >= 2.7 (the pinned 2.7.2) names the reference column
+# GTDB-Tk >= 2.7 (the pinned 2.8.0) names the reference column
 # closest_genome_reference; the script's fallback also accepts the legacy
 # fastani_reference name (<= 2.6-era summaries). Both branches are pinned.
 BT_WORK="${WORK}/bin_tax_happy"
@@ -238,7 +238,7 @@ mkdir -p "${BT_EMPTY}"
 printf 'user_genome\tclassification\tclosest_genome_reference\n' > "${BT_EMPTY}/sampleA_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BT_EMPTY}"
 # No sample with a classified bin: warn and write empty outputs (SemiBin and
-# MetaWRAP finish with empty bin sets, so a binless run must finish too)
+# Binette finish with empty bin sets, so a binless run must finish too)
 expect_pass "bin_tax: all-header-only input warns and succeeds" bin_tax_report.py
 check_grep "bin_tax: warning names the empty input" "../bin_tax_empty.log" "WARNING: all GTDB-Tk summaries are empty"
 check_grep "bin_tax: header-only summary written" "MAGs_tax_summary.csv" \
@@ -304,7 +304,7 @@ expect_fail "bin_summary: header-only quality with classified bins fails" bin_su
 BS_NOBINS="${WORK}/bin_summary_nobins"
 mkdir -p "${BS_NOBINS}"
 printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\n' \
-    > "${BS_NOBINS}/coassembly_metawrap_quality_report.tsv"
+    > "${BS_NOBINS}/coassembly_binette_quality_report.tsv"
 printf 'user_genome\tclassification\n' > "${BS_NOBINS}/coassembly_gtdbtk_bac120.tsv"
 : > "${BS_NOBINS}/coassembly_gtdbtk_ar53.tsv"
 NEXT_WORKDIR="${BS_NOBINS}"

@@ -63,7 +63,7 @@ def main():
         all_reports.append(df)
     
     # No sample has a bin: binning found nothing on this data (SemiBin and
-    # MetaWRAP finish with empty bin sets). Warn and write header-only tables
+    # Binette finish with empty bin sets). Warn and write header-only tables
     # and a placeholder plot so the run can finish; a missing CheckM2 file
     # above still fails
     if not all_reports:
@@ -93,7 +93,7 @@ def main():
     
     # Determine bin type
     all_quality_reports['Bin_type'] = all_quality_reports['Binner'].apply(
-        lambda x: 'Refined MAGs' if x == 'Metawrap' else 'Raw MAGs'
+        lambda x: 'Refined MAGs' if x == 'Binette' else 'Raw MAGs'
     )
     
     # Select relevant columns
@@ -117,7 +117,7 @@ def main():
     all_data.columns = TABLE_COLUMNS
     assert list(mag_summary.columns) == SUMMARY_COLUMNS
     
-    refined_data = all_data[all_data['Binner'] == 'Metawrap'].copy()
+    refined_data = all_data[all_data['Binner'] == 'Binette'].copy()
     
     # Create the plot
     fig, axes = plt.subplots(1, 2, figsize=(16, 8), sharey=True)

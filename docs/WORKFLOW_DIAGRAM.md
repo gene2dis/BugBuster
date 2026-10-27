@@ -39,7 +39,7 @@ flowchart TD
     
     %% Binning Branch
     Contigs -->|if include_binning| Binning[BINNING SUBWORKFLOW<br/>Selected binners from:<br/>MetaBAT2, SemiBin, COMEBin]
-    Binning --> RefinedBins["Refined Bins<br/>MetaWRAP (if ≥2 binners) + CheckM2 + GTDB-TK"]
+    Binning --> RefinedBins["Refined Bins<br/>Binette (if ≥2 binners) + CheckM2 + GTDB-TK"]
     
     %% Contig-level Analysis Branch
     Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy<br/>NT_BLASTN + BLOBTOOLS]
@@ -255,23 +255,23 @@ flowchart TD
     BinnerSelect -->|if semibin selected| SemiBin[SEMIBIN<br/>Semi-supervised Binning]
     BinnerSelect -->|if comebin selected| COMEBin[COMEBIN<br/>Contrastive Learning Binning]
 
-    %% Conditional MetaWRAP
+    %% Conditional Binette
     MetaBAT --> BinCount{Number of<br/>binners selected}
     SemiBin --> BinCount
     COMEBin --> BinCount
 
-    BinCount -->|≥2 binners| MetaWRAP[METAWRAP<br/>Bin Refinement & Consolidation]
+    BinCount -->|≥2 binners| Binette[BINETTE<br/>Bin Refinement, CheckM2 on raw + refined bins]
     BinCount -->|1 binner| DirectOut[Use binner output directly]
 
     %% Quality and Taxonomy
-    MetaWRAP --> AllBins[All bins:<br/>individual + refined]
-    DirectOut --> AllBins
-    AllBins --> CheckM[CHECKM2<br/>Completeness & Contamination]
-    MetaWRAP --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
+    DirectOut --> CheckM[CHECKM2<br/>Completeness & Contamination<br/>single binner only]
+    Binette --> Quality[CheckM2 reports<br/>raw + refined bins]
+    CheckM --> Quality
+    Binette --> GTDBTK[GTDB-TK<br/>Taxonomic Classification]
     DirectOut --> GTDBTK
 
     %% Mode-specific reporting
-    CheckM --> ModeCheck{Assembly<br/>Mode?}
+    Quality --> ModeCheck{Assembly<br/>Mode?}
     GTDBTK --> ModeCheck
 
     ModeCheck -->|assembly| AssemblyReports[Per-Sample Reports]
@@ -282,19 +282,19 @@ flowchart TD
     CoassemblyReports --> BinCov["BINS_REFERENCE + BWAMEM3_BINS_INDEX<br/>+ BWAMEM3_BIN_DEPTH: each sample vs all bins<br/>(or BOWTIE2_SAMTOOLS_DEPTH per bin)<br/>skipped when no refined bins"]
     BinCov --> Bedtools["BEDTOOLS_BIN_DEPTH (or BEDTOOLS)<br/>Coverage Statistics"]
     Bedtools --> Summary[BIN_SUMMARY<br/>Comprehensive Report]
-    CheckM --> Summary
+    Quality --> Summary
     GTDBTK --> Summary
 
     %% Output
-    MetaWRAP --> Output["Output: refined_bins<br/>[meta, bins]"]
+    Binette --> Output["Output: refined_bins<br/>[meta, bins]"]
     DirectOut --> Output
 ```
 
 **Key Features:**
 - **Unified workflow**: Single implementation handles both assembly and co-assembly modes
 - **Selectable binners**: Run any combination of MetaBAT2, SemiBin, and COMEBin via `--binners`
-- **Conditional MetaWRAP**: Bin refinement only runs when ≥2 binners are selected
-- **Single-binner mode**: When only one binner is selected, its output is used directly (no MetaWRAP overhead)
+- **Conditional Binette**: Bin refinement only runs when ≥2 binners are selected; Binette then reports CheckM2 quality for the raw and the refined bins, so the separate CheckM2 step (CHECKM2_BATCH) runs only for a single binner
+- **Single-binner mode**: When only one binner is selected, its output is used directly (no refinement)
 - **Mode-specific reporting**:
   - Assembly mode: Simple quality and taxonomy reports
   - Co-assembly mode: Additional bin coverage analysis and comprehensive summary
@@ -322,7 +322,7 @@ flowchart TD
 | `assembly_mode` | `'assembly'` | Assembly mode: 'assembly', 'coassembly', 'none' |
 | `taxonomic_profiler` | `'sylph'` | Profiler: 'kraken2', 'sourmash', 'sylph', 'none' |
 | `include_binning` | `false` | Enable binning and refinement |
-| `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables MetaWRAP |
+| `binners` | `'semibin'` | Comma-separated binners: 'comebin', 'semibin', 'metabat2'. ≥2 enables Binette |
 | `read_arg_prediction` | `false` | Enable read-level ARG prediction (KARGA/KARGVA/ARGs-OAP) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `kmarvel_prediction` | `false` | Enable K-MARVEL read-level ARG assembly against CARD |
@@ -370,7 +370,7 @@ flowchart LR
 - **Quality Control**: FASTP, FASTP_SINGLETON, QFILTER, BWAMEM3_DECONTAMINATE or BOWTIE2_DECONTAMINATE (combined phiX + host removal, per `--read_aligner`), COUNT_READS
 - **Taxonomy**: KRAKEN2, BRACKEN, SOURMASH, SYLPH_PROFILE, SYLPH_TAXPROF
 - **Assembly**: MEGAHIT, BBMAP
-- **Binning**: METABAT2, SEMIBIN, COMEBIN, METAWRAP
+- **Binning**: METABAT2, SEMIBIN, COMEBIN, BINETTE
 - **Quality Assessment**: CHECKM2, GTDB-TK
 
 ### ARG Prediction Modules
@@ -433,8 +433,8 @@ flowchart LR
 | `METABAT2` | if `metabat2` in `--binners` | Binning by coverage and composition |
 | `SEMIBIN` | if `semibin` in `--binners` | Semi-supervised binning |
 | `COMEBIN` | if `comebin` in `--binners` | Contrastive learning binning |
-| `METAWRAP` | if ≥2 binners selected | Bin refinement and consolidation |
-| `CHECKM2_BATCH` | always | Bin completeness and contamination |
+| `BINETTE` | if ≥2 binners selected | Bin refinement; CheckM2 reports for the raw and refined bins |
+| `CHECKM2_BATCH` | with a single binner (Binette reports CheckM2 quality otherwise) | Bin completeness and contamination |
 | `GTDB_TK_BATCH` | always | Bin taxonomic classification |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | assembly mode | Per-sample quality/taxonomy reports |
 | `BINS_REFERENCE` + `BWAMEM3_BINS_INDEX` + `BWAMEM3_BIN_DEPTH` + `BEDTOOLS_BIN_DEPTH` (or `BOWTIE2_SAMTOOLS_DEPTH` + `BEDTOOLS`) / `BIN_SUMMARY` | co-assembly mode | Bin coverage (skipped when no refined bins) and comprehensive summary |
@@ -468,7 +468,7 @@ flowchart LR
 | `FEATURECOUNTS_GENES` | always in the branch | Per-gene read counts over the Pyrodigal gene coordinates (per sample in both assembly modes) |
 | `MICROBECENSUS` | if `microbecensus` (default; runs outside the subworkflow, on clean reads) | Average genome size / genome equivalents for CPGE; failure is non-fatal |
 | `AGGREGATE_FUNCTIONS` | always in the branch | Study-level tables: gene/function abundance with TPM and CPGE, wide matrices per ontology (eggNOG and dbCAN CAZy kept separate), annotated fraction, AGS summary |
-| `BAKTA_BAKTA` | if `mag_level_functional` (independent of the contig branch; needs binning with ≥2 binners) | Bakta annotation of every MetaWRAP-refined bin, one task per bin, published to `mags/<sample>/` (`mags/coassembly/` under co-assembly) |
+| `BAKTA_BAKTA` | if `mag_level_functional` (independent of the contig branch; needs binning with ≥2 binners) | Bakta annotation of every Binette-refined bin, one task per bin, published to `mags/<sample>/` (`mags/coassembly/` under co-assembly) |
 
 ### Read-level Functional Profiling (READ_FUNCTIONAL Subworkflow)
 | Module | Condition | Description |
@@ -530,7 +530,7 @@ results/
 --include_binning true --binners semibin
 ```
 
-### Mode 6: Binning with MetaWRAP Refinement (Multiple Binners)
+### Mode 6: Binning with Binette Refinement (Multiple Binners)
 ```bash
 --include_binning true --binners semibin,metabat2
 # or all three:

@@ -1,0 +1,52 @@
+name: binette
+description: Binette refinement of the bins from two or three binners (MetaBAT2, SemiBin, COMEBin) at params.bin_min_completeness / params.bin_max_contamination, scored with CheckM2; when no binner produced bins, or no bin reaches the cutoffs, the output directory holds only SKIPPED.txt
+keywords:
+  - binning
+  - bin refinement
+  - binette
+  - checkm2
+  - metagenomics
+tools:
+  - binette:
+      description: Fast and accurate binning refinement tool that builds intermediate bins with set operations on the input bins and keeps the best ones by CheckM2 score
+      homepage: https://github.com/genotoul-bioinfo/Binette
+      documentation: https://binette.readthedocs.io
+      doi: "10.21105/joss.06782"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+  - bin_dirs:
+      type: directory
+      description: Two or three binner output directories for this sample; those without FASTA bins (only SKIPPED.txt / FAILED.txt) are left out
+  - contigs:
+      type: file
+      description: The contigs the bins were made from
+      pattern: "*.{fa,fasta,fna}"
+  - checkm2_db:
+      type: file
+      description: CheckM2 DIAMOND database
+      pattern: "*.dmnd"
+
+output:
+  - bins:
+      type: tuple
+      description: Tuple of meta and the refined bin directory (binette_binN.fa)
+      pattern: "*_binette_bins"
+  - quality_reports:
+      type: tuple
+      description: Tuple of meta and the CheckM2 reports from Binette's own CheckM2 run, in CHECKM2_BATCH's format (<id>_<binner>_quality_report.tsv per staged binner directory, header-only for a binner without bins, plus <id>_binette_quality_report.tsv); gene counts come from Binette's gene calls on the whole assembly
+      pattern: "*_quality_report.tsv"
+  - refined_report:
+      type: tuple
+      description: Tuple of meta and the CheckM2 report of the refined bins
+      pattern: "*_binette_quality_report.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

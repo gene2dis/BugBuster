@@ -28,11 +28,11 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
 - **Genome Assembly**: Per-sample or co-assembly using MEGAHIT, with optional BBNorm normalization of the assembler input
 - **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
-- **Bin Refinement**: Quality improvement with MetaWRAP (when two or more binners run)
+- **Bin Refinement**: Quality improvement with Binette, scored with CheckM2 (when two or more binners run)
 - **Bin Quality Assessment**: Completeness and contamination with CheckM2
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
-- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; see the container note under the feature toggles); MAG-level with Bakta (per-bin annotation of MetaWRAP-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
+- **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; see the container note under the feature toggles); MAG-level with Bakta (per-bin annotation of Binette-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
 
@@ -49,7 +49,7 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
                       Binning (SemiBin;           Contig Analysis
                        + MetaBAT2/COMEBin)         (BlobTools, DeepARG)
                               ↓
-                      Refinement (MetaWRAP, ≥2 binners)
+                      Refinement (Binette, ≥2 binners)
                               ↓
                       Quality (CheckM2)
                               ↓
@@ -92,8 +92,8 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   ~150 GB). The request is capped by `--max_memory`, so **a large co-assembly
   needs `--max_memory` above its 128 GB default**; otherwise it gets 128 GB
   and may run out of memory (see
-  [Out of memory](troubleshooting.md#out-of-memory)). MetaWRAP bin refinement
-  requests 80 GB on the first attempt (peaks of 67-69 GB measured).
+  [Out of memory](troubleshooting.md#out-of-memory)). Binette bin refinement
+  requests 36 GB on the first attempt (peaks of 11-13 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
   every fresh run unless you pass the published index
@@ -207,7 +207,7 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
-| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.7.2; only R232 data works) | `include_binning=true` |
+| **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.8.0; only R232 data works) | `include_binning=true` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
 | **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` |
@@ -472,7 +472,7 @@ breaks `-resume`.
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
-| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables MetaWRAP |
+| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
 | `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
@@ -504,7 +504,7 @@ breaks `-resume`.
 > **Note for `--mag_level_functional`:** Bakta annotates the refined bins, one task
 > per bin, publishing per-bin GFF3/GBFF/FAA/FNA/TSV/summary files under
 > `07_functional_annotation/mags/<sample>/`. It requires `--include_binning` **and at
-> least two `--binners`**: MetaWRAP refinement and its completeness/contamination
+> least two `--binners`**: Binette refinement and its completeness/contamination
 > quality filter (defaults 50/10) only run when ≥2 binners are selected, and only
 > quality-filtered bins are annotated. Bins are expected to be **bacterial** — Bakta
 > is a bacterial annotator, and the pipeline does not detect or exclude
@@ -620,7 +620,7 @@ breaks `-resume`.
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
-| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.7.2) |
+| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.8.0) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
 | `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
@@ -642,7 +642,7 @@ breaks `-resume`.
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.7.2, R220/R226 does not (see `docs/parameters.md`) |
+| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.8.0, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
@@ -708,20 +708,35 @@ for the numbers behind each setting).
 
 | Parameter | Default | Options | Description |
 |-----------|---------|---------|-------------|
-| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated list of binners to run. At least one required. MetaWRAP is automatically used when ≥2 binners are selected. |
+| `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated list of binners to run. At least one required. Binette refinement runs when ≥2 binners are selected. |
 
 **Selection logic:**
-- **1 binner selected** → runs that binner only, MetaWRAP skipped, binner output used directly
-- **≥2 binners selected** → runs selected binners + MetaWRAP bin refinement
+- **1 binner selected** → runs that binner only, no refinement, binner output used directly; CheckM2 scores its bins in a separate step
+- **≥2 binners selected** → runs selected binners + Binette bin refinement; Binette's own CheckM2 run scores the raw and the refined bins, and the pipeline publishes those reports in `quality/checkm2/` (no separate CheckM2 step)
+
+> **COMEBin is costly.** It runs on CPU only (the pipeline has no GPU path; 8 CPUs
+> per sample) and took 38 CPU-hours (6 h wall) on a 37 Mbp per-sample assembly,
+> about 370 times SemiBin2; its cost grows with the assembly, about 1-1.6
+> CPU-hours per Mbp of contigs. In the Phase 7a benchmark
+> (`docs/benchmarks/binning_2026.md`) adding it to SemiBin2 + MetaBAT2 gave
+> Binette one more genome and one more high-quality bin on one sample, and the
+> only passing bin on a small one. A failed attempt is retried with smaller
+> batches; if the last attempt fails too, its bin folder holds `FAILED.txt` and
+> the run goes on without it.
 
 #### Basic Binning Parameters
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
-| `--metawrap_completeness` | `50` | Minimum bin completeness (%) for MetaWRAP (used when ≥2 binners) |
-| `--metawrap_contamination` | `10` | Maximum bin contamination (%) for MetaWRAP (used when ≥2 binners) |
+| `--bin_min_completeness` | `50` | Minimum CheckM2 completeness (%) of a refined bin (used when ≥2 binners; was `--metawrap_completeness`, still accepted with a warning) |
+| `--bin_max_contamination` | `10` | Maximum CheckM2 contamination (%) of a refined bin (used when ≥2 binners; was `--metawrap_contamination`, still accepted with a warning) |
 | `--semibin_env_model` | `human_gut` | SemiBin environment model |
+| `--semibin_coassembly_mode` | `pretrained` | Co-assembly: SemiBin2 pre-trained model on the pooled BAM (`pretrained`) or a model trained on the co-assembly (`train_self`, ~40× the CPU time) |
+| `--semibin_coassembly_env_model` | `global` | SemiBin2 pre-trained model for the co-assembly |
+| `--semibin_random_seed` | `11` | SemiBin2 `--random-seed`, so reruns give the same bins |
+| `--comebin_random_seed` | `11` | COMEBin `-s` seed, so reruns give the same bins |
+| `--gtdbtk_pplacer_cpus` | `4` | Threads for GTDB-Tk's pplacer step (capped at the task's CPUs) |
 
 **SemiBin Environment Models:**
 - `human_gut`, `dog_gut`, `cat_gut`, `mouse_gut`, `pig_gut`
@@ -1089,14 +1104,14 @@ results/
 │   │       │   ├── metabat2/                   # MetaBAT2 bins
 │   │       │   ├── semibin/                    # SemiBin bins
 │   │       │   └── comebin/                    # COMEBin bins
-│   │       ├── refined_bins/                   # MetaWRAP refined bins (if >= 2 binners)
+│   │       ├── refined_bins/                   # Binette refined bins (if >= 2 binners)
 │   │       ├── quality/                        # CheckM2 quality reports
 │   │       │   └── checkm2/
 │   │       └── taxonomy/                       # GTDB-TK taxonomy
 │   │           └── gtdbtk/
 │   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
 │   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
-│   │   ├── refined_bins/                       # MetaWRAP refined bins (if >= 2 binners)
+│   │   ├── refined_bins/                       # Binette refined bins (if >= 2 binners)
 │   │   ├── quality/                            # CheckM2 quality reports
 │   │   │   └── checkm2/
 │   │   ├── taxonomy/                           # GTDB-TK taxonomy
@@ -1475,7 +1490,7 @@ nextflow run main.nf \
 
 ### Example 3: Full Pipeline with Binning (Single Binner - Fast)
 
-Complete analysis using the default single binner (no MetaWRAP overhead):
+Complete analysis using the default single binner (no refinement):
 
 ```bash
 nextflow run main.nf \
@@ -1490,9 +1505,9 @@ nextflow run main.nf \
     -profile singularity
 ```
 
-### Example 3b: Full Pipeline with Binning + MetaWRAP Refinement
+### Example 3b: Full Pipeline with Binning + Binette Refinement
 
-Run multiple binners and combine results with MetaWRAP for higher quality MAGs:
+Run multiple binners and combine results with Binette for higher quality MAGs:
 
 ```bash
 nextflow run main.nf \
@@ -1504,8 +1519,8 @@ nextflow run main.nf \
     --include_binning true \
     --binners semibin,metabat2 \
     --semibin_env_model human_gut \
-    --metawrap_completeness 50 \
-    --metawrap_contamination 10 \
+    --bin_min_completeness 50 \
+    --bin_max_contamination 10 \
     -profile singularity
 ```
 
@@ -1519,8 +1534,8 @@ taxonomic_profiler: "sourmash"
 include_binning: true
 binners: "semibin,metabat2"
 semibin_env_model: "human_gut"
-metawrap_completeness: 50
-metawrap_contamination: 10
+bin_min_completeness: 50
+bin_max_contamination: 10
 ```
 ```bash
 nextflow run main.nf -params-file params.yaml -profile singularity

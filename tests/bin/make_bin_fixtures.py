@@ -3,8 +3,8 @@
 tests/modules/prodigal_bins.nf.test (regression tests for audit item #22).
 
 Creates, under tests/data/bins/:
-  - marker_only_bins/SKIPPED.txt  a MetaWRAP-style marker dir with no *.fa
-    (what METAWRAP emits when there is nothing to refine)
+  - marker_only_bins/SKIPPED.txt  a refiner-style marker dir with no *.fa
+    (what BINETTE emits when there is nothing to refine)
   - real_bins/bin.1.fa            one 25 kb deterministic pseudo-random contig
     (prodigal -p single refuses sequences under 20 kb)
 
