@@ -320,56 +320,6 @@ NEXT_WORKDIR="${BS_NONE}"
 expect_fail "bin_summary: no quality file still fails" bin_summary.py
 
 #
-# arg_norm_report.py — audit item #22: a sample where ARGs-OAP finds nothing
-# (nRead/nCell = 0) must yield empty normalization cells, not inf, in the
-# published CSVs.
-#
-echo "--- arg_norm_report.py ---"
-AN_WORK="${WORK}/arg_norm_zero_cells"
-mkdir -p "${AN_WORK}"
-KARGA_GENE='MEG_1|Drugs|Aminoglycosides|Aminoglycoside_resistance|APH3'
-KARGVA_GENE='ID0|K12A|x|Escherichia coli resistance to betalactams|x|BETALACTAM|Betalactams|multi|blaTEM|x|x|x|x|blaTEM_1|NA|x|E_coli_resistant|end'
-for s in s1 s2; do
-    printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n%s,95%%,10.0\n' "${KARGA_GENE}" \
-        > "${AN_WORK}/${s}_all_reads_KARGA_mappedGenes.csv"
-    printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n%s,3/10,85%%,10.0\n' "${KARGVA_GENE}" \
-        > "${AN_WORK}/${s}_all_reads_KARGVA_mappedGenes.csv"
-done
-mkdir -p "${AN_WORK}/s1_args_oap_s1_out" "${AN_WORK}/s2_args_oap_s1_out"
-printf 'sample\tnRead\tn16S\tnCell\ns1\t1000000\t50\t100\n' > "${AN_WORK}/s1_args_oap_s1_out/metadata.txt"
-# s2: ARGs-OAP found no reads/16S — the division-by-zero edge case
-printf 'sample\tnRead\tn16S\tnCell\ns2\t0\t0\t0\n' > "${AN_WORK}/s2_args_oap_s1_out/metadata.txt"
-NEXT_WORKDIR="${AN_WORK}"
-expect_pass "arg_norm: zero-count sample handled" arg_norm_report.py
-check_grep "arg_norm: KARGA normalization computed for s1" "KARGA_norm.csv" "^s1,1000000,50,100,.*,10.0,0.1$"
-check_file "arg_norm: KARGVA report created" "KARGVA_norm.csv"
-for f in KARGA_norm.csv KARGVA_norm.csv; do
-    if grep -qi "inf" "${AN_WORK}/${f}" 2>/dev/null; then
-        echo "✗ arg_norm: ${f} contains inf"
-        FAIL=$((FAIL + 1))
-    else
-        echo "✓ arg_norm: ${f} has no inf"
-        PASS=$((PASS + 1))
-    fi
-done
-
-# no gene or variant passes (KARGA at 50% coverage, KARGVA with 1 SNP k-mer): the CSVs keep the
-# normalisation columns, blank, so every KARGA_norm.csv / KARGVA_norm.csv has the same columns
-AN0="${WORK}/arg_norm_no_hits"
-mkdir -p "${AN0}/s1_args_oap_s1_out"
-printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n%s,50%%,10.0\n' "${KARGA_GENE}" \
-    > "${AN0}/s1_all_reads_KARGA_mappedGenes.csv"
-printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n%s,1/10,85%%,10.0\n' "${KARGVA_GENE}" \
-    > "${AN0}/s1_all_reads_KARGVA_mappedGenes.csv"
-printf 'sample\tnRead\tn16S\tnCell\ns1\t1000000\t50\t100\n' > "${AN0}/s1_args_oap_s1_out/metadata.txt"
-NEXT_WORKDIR="${AN0}"
-expect_pass "arg_norm: no gene or variant passes" arg_norm_report.py
-check_grep "arg_norm: KARGA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGA_norm.csv" \
-    "^sample,.*,CPM_ARGs,copies_per_cell$"
-check_grep "arg_norm: KARGVA_norm.csv without hits keeps CPM_ARGs, copies_per_cell" "KARGVA_norm.csv" \
-    "^sample,.*,CPM_ARGs,copies_per_cell$"
-
-#
 # kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
 # two ARGs, sampleB header-only); the zero-ARG sample must stay as an
 # all-zero column. Runs in the mulled image KMARVEL_REPORT pins (MULLED_IMG).
@@ -402,6 +352,58 @@ mkdir -p "${KM_BAD}"
 cut -f1-5 "${REPO_DIR}/tests/data/kmarvel/sampleA_kmarvel.tsv" > "${KM_BAD}/s1_kmarvel.tsv"
 NEXT_WORKDIR="${KM_BAD}"
 expect_fail "kmarvel_report: table without the K-MARVEL columns fails" kmarvel_report.py s1_kmarvel.tsv
+
+#
+# args_oap_report.py — ARGs-OAP 4.0.0 stage two rows (tests/data/args_oap:
+# sampleA with 12 SARG hits, two from its singletons; sampleB metadata.txt
+# only). A sample is its pairs plus singletons, normalised over both: tetA(48)
+# 4 reads, 0.548105 copies / 16 cells. Runs in the mulled image ARGS_OAP_REPORT
+# pins (MULLED_IMG).
+#
+echo "--- args_oap_report.py ---"
+AO_WORK="${WORK}/args_oap_report"
+mkdir -p "${AO_WORK}"
+cp -r "${REPO_DIR}"/tests/data/args_oap/sample{A,B}_args_oap "${AO_WORK}/"
+mkdir -p "${AO_WORK}/sampleC_args_oap"
+# stage two stops without tables when a sample has no 16S or cells
+printf 'sample\tnRead\tn16S\tnCell\nsampleC_tmp_reads\t2000\t0.0\t0.0\n' > "${AO_WORK}/sampleC_args_oap/metadata.txt"
+NEXT_WORKDIR="${AO_WORK}"
+expect_pass "args_oap_report: samples with, without and with unnormalisable SARG hits" args_oap_report.py \
+    sampleA_args_oap sampleB_args_oap sampleC_args_oap
+check_grep "args_oap_report: pairs and singletons summed per sample" \
+    "args_oap_cells.tsv" "^sampleA	120000	32.0	16.0	9.0	ok$"
+check_grep "args_oap_report: no SARG hit" "args_oap_cells.tsv" "^sampleB	4000	1.0	0.5	0.0	no_sarg_hit$"
+check_grep "args_oap_report: no 16S or cells" "args_oap_cells.tsv" "^sampleC	2000	0.0	0.0	0.0	not_normalised$"
+check_grep "args_oap_report: type level over pairs and singletons" \
+    "args_oap_long.tsv" "^sampleA	type	tetracycline			4.0	0.548104956268221[0-9]*	0.03425655976676[0-9]*	0.0171282798833[0-9]*	33.33333"
+check_grep "args_oap_report: 1/3-weighted reads of a multi-component reference" \
+    "args_oap_long.tsv" "^sampleA	subtype	multidrug	multidrug__adeF		1.0	"
+check_grep "args_oap_report: gene level keeps type and subtype" \
+    "args_oap_long.tsv" "^sampleA	gene	polymyxin	polymyxin__rosB	ZP_04612557	0.5	"
+if grep -q "^sample[BC]	" "${AO_WORK}/args_oap_long.tsv"; then
+    echo "✗ args_oap_report: samples without hits have no SARG rows"; FAIL=$((FAIL + 1))
+else
+    echo "✓ args_oap_report: samples without hits have no SARG rows"; PASS=$((PASS + 1))
+fi
+# ARGS_OAP's stage_two_status.txt decides, not the summed counts: summed pairs + singletons can be non-zero
+# while no single ARGs-OAP row had reads, 16S and cells (stage two skipped)
+AO_MARK="${WORK}/args_oap_report_marker"
+mkdir -p "${AO_MARK}/sampleF_args_oap"
+printf 'sample\tnRead\tn16S\tnCell\nsampleF_tmp_reads\t2000\t0.0\t0.4\nsampleF_tmp_reads_S\t100\t0.1\t0.0\n' \
+    > "${AO_MARK}/sampleF_args_oap/metadata.txt"
+echo not_normalised > "${AO_MARK}/sampleF_args_oap/stage_two_status.txt"
+NEXT_WORKDIR="${AO_MARK}"
+expect_pass "args_oap_report: stage two status taken from ARGS_OAP" args_oap_report.py sampleF_args_oap
+check_grep "args_oap_report: marker overrides the summed counts" "args_oap_cells.tsv" "^sampleF	2100	0.1	0.4	0.0	not_normalised$"
+echo maybe > "${AO_MARK}/sampleF_args_oap/stage_two_status.txt"
+NEXT_WORKDIR="${AO_MARK}"
+expect_fail "args_oap_report: an unknown stage two status fails" args_oap_report.py sampleF_args_oap
+AO_BAD="${WORK}/args_oap_report_bad"
+mkdir -p "${AO_BAD}/sampleD_args_oap" "${AO_BAD}/sampleE_out"
+NEXT_WORKDIR="${AO_BAD}"
+expect_fail "args_oap_report: a directory without metadata.txt fails" args_oap_report.py sampleD_args_oap
+NEXT_WORKDIR="${AO_BAD}"
+expect_fail "args_oap_report: a directory not named <sample>_args_oap fails" args_oap_report.py sampleE_out
 
 #
 # blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the

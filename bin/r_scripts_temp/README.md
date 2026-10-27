@@ -18,7 +18,7 @@ equivalent outputs — do not delete this folder until that verification is done
 | Module | Original script | Status | Replacement in `bin/` | Notes |
 |--------|-----------------|--------|-----------------------|-------|
 | reads_report | Report_unify.R | ✅ | `report_unify.py` | |
-| arg_norm_report | Read_arg_norm.R | ✅ | `arg_norm_report.py` | |
+| arg_norm_report | Read_arg_norm.R | ✅ | — | Module and `arg_norm_report.py` removed with KARGA/KARGVA (2026-10-27) |
 | taxonomy_report (kraken2 + sourmash) | Tax_unify_report.R | ✅ | `taxonomy_report.py` | One module handles both profilers |
 | blobplot | Blobplot.R | ✅ | `blobplot.py` | |
 | arg_blobplot | (TBD) | ✅ | `arg_blobplot.py` (+ `blobplot.py`) | |

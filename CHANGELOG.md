@@ -12,6 +12,20 @@ next release is tagged.
 
 ### Added
 
+- **ARGs-OAP as a read-level ARG method (`--args_oap_prediction`)**: `ARGS_OAP`
+  now runs stage two as well, which searches the ARG-like reads of stage one
+  against SARG and normalises them by type, subtype and gene (copies per cell,
+  per 16S copy, ppm). Until now only stage one ran, and its cell counts only
+  served the KARGA/KARGVA normalisation. New `ARGS_OAP_REPORT`
+  (`bin/args_oap_report.py`) writes `05_arg_prediction/read_level/args_oap_summary/`
+  `args_oap_long.tsv` and `args_oap_cells.tsv`, adding each sample's singletons
+  to its pairs (ARGs-OAP normalises them as a separate sample); the results
+  summary has an ARGs-OAP section (`arg_sarg_long`, `arg_sarg_type_cpc`,
+  `arg_sarg_subtype_cpc`, `samples_qc` `args_oap_n16S` / `args_oap_ncell` /
+  `sarg_*`, figure `arg_sarg_type_heatmap`), reported apart from the CARD
+  methods (SARG names differ) and without tiers. RGI, K-MARVEL and ARGs-OAP
+  each have their own switch; `--read_arg_prediction` is a deprecated alias
+  of `--args_oap_prediction` (with a launch warning)
 - **Run-level results summary (`00_summary/`, `--results_summary`, on by default)**
   - `RESULTS_SUMMARY` (`bin/results_summary.py` and its `summary_*.py`
     modules) consolidates the QC, taxonomy and read-level ARG (K-MARVEL, RGI)
@@ -397,6 +411,24 @@ next release is tagged.
 
 ### Changed
 
+- **ARGs-OAP 3.2.4 → 4.0.0, biocontainer** (`quay.io/biocontainers/args_oap:4.0.0--pyhdfd78af_0`
+  and its depot sif, replacing `quay.io/ffuentessantander/args_oap:3.2.4`, which
+  had no Dockerfile). 4.0.0 changes no database or pipeline step (it adds an
+  optional absolute quantification, not used here); on a 1.88 M-pair sample the
+  4.0.0 and 3.2.4 biocontainers gave identical outputs in both stages. Against
+  the old image (DIAMOND 2.1.8, now 2.1.13), stage one extracted 22 fewer of
+  9,569 reads and stage two kept 319.2 instead of 321.2 SARG reads (one novA
+  reference); read, 16S and cell counts were identical. The image indexes its
+  bundled databases inside its own package on first use, which a read-only
+  singularity/apptainer image refuses, so the task runs a copy of the package
+  from its work directory (indexes built in ~12 s). The published directory
+  is now `args_oap/<sample>_args_oap/` (was `<sample>_args_oap_s1_out/`),
+  with `stage_two_status.txt` (`ok`, `no_sarg_hit` when no read is left after
+  the SARG search, `not_normalised` when no 16S or cell estimate, so stage two
+  is skipped); a sample whose input file stage one drops after an error now
+  fails the task (ARGs-OAP only logs a warning; exit 137, so retried with
+  more memory, when a stage one process was killed for memory); an empty
+  singleton file is skipped
 - **Breaking (bin refinement)**: Binette 1.2.1 replaces MetaWRAP 1.2 for bin
   refinement with two or more `--binners` (Phase 7a benchmark,
   `docs/benchmarks/binning_2026.md`). On four per-sample assemblies it kept 45
@@ -799,6 +831,17 @@ next release is tagged.
 
 ### Removed
 
+- **Breaking**: KARGA and KARGVA (read-level MEGARes genes and variants) are
+  removed, with `ARG_NORM_REPORT` (`bin/arg_norm_report.py`) and its
+  `05_arg_prediction/read_level/summary/KARGA_norm.csv` / `KARGVA_norm.csv`,
+  the `karga/` and `kargva/` outputs, and the summary's `arg_karga_*` /
+  `arg_kargva_long` tables, `karga_*` / `kargva_*` columns and
+  `arg_karga_class_heatmap`. Each took ~4 h of single-threaded Java per
+  full-depth sample, KARGA's coverage was not reproducible run to run, and
+  CARD is covered by K-MARVEL and RGI. `--karga_db`, `--kargva_db`,
+  `--custom_karga_db` and `--custom_kargva_db` are gone: passing one aborts
+  the run at startup, so remove them from params files. The summary no longer
+  reads `KARGA_norm.csv` from older results directories
 - **Breaking**: the MetaCerberus contig annotation path —
   `--contig_level_metacerberus`, `--metacerberus_hmm`,
   `--metacerberus_minscore`, `--metacerberus_evalue` and its

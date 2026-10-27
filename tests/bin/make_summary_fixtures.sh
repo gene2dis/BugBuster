@@ -29,12 +29,15 @@
 #                        TEM-1 -> E. coli, poxtA -> B. producta, cfrE none
 #   rgi/sampleB_rgi_bwt.allele_mapping_data.txt
 #                        bin/rgi_bwt_lowcov_fallback.sh placeholder (no hits)
-#   arg_norm/KARGA_norm.csv, arg_norm/KARGVA_norm.csv
-#                        bin/arg_norm_report.py (ARG_NORM_REPORT) on KARGA /
-#                        KARGVA tables and ARGs-OAP counts written here:
-#                        sampleA ANT9, TETQ and a copper gene (a TEM hit below
-#                        90% is filtered), KARGVA gyrA S83L; sampleB TETQ and
-#                        no KARGVA hit (a row with blank ARG fields)
+#   args_oap/args_oap_{long,cells}.tsv
+#                        bin/args_oap_report.py (ARGS_OAP_REPORT) on
+#                        tests/data/args_oap/sample{A,B}_args_oap: sampleA's
+#                        12 SARG hits (tetA(48), two of them from the
+#                        singletons; novA; adeF at 1/3 and rosB at 1/2 per read)
+#                        are rows of a real ARGs-OAP 4.0.0 stage two output,
+#                        renamed (read names synthetic) with metadata written
+#                        for them; sampleB has metadata.txt only (no SARG hit);
+#                        stage_two_status.txt as ARGS_OAP writes it
 #   functional/read_{function_abundance,annotated_fraction,sample_summary}.tsv
 #                        bin/aggregate_read_functions.py (Woltka) on the
 #                        tests/data/woltka/ tables as sampleA (with MicrobeCensus)
@@ -102,27 +105,10 @@ row() {  # row <ref> <term> <aro> <db> <pathogen> <reads> <cov> <len> <family> <
 (cd "${WORK}" && bash "${REPO_DIR}/bin/rgi_bwt_lowcov_fallback.sh" sampleB_rgi_bwt > /dev/null)
 cp "${WORK}/sampleB_rgi_bwt.allele_mapping_data.txt" "${OUT}/rgi/"
 
-# KARGA / KARGVA through ARG_NORM_REPORT, with MEGARes headers as KARGA writes them
-mkdir -p "${WORK}/argnorm" "${OUT}/arg_norm"
-KV='|ARO:3003294|Escherichia coli gyrA conferring resistance to fluoroquinolones|MEG_3176|Drugs|Fluoroquinolones|Fluoroquinolone-resistant_DNA_topoisomerases|GYRA|RequiresSNPConfirmation|NA|NA|NA|NA|NA|NA|NA|wt_coherence=TRUE'
-{
-    echo 'GeneIdx,PercentGeneCovered,AverageKMerDepth'
-    echo '>MEG_1006|Drugs|Aminoglycosides|Aminoglycoside_O-nucleotidyltransferases|ANT9,99.6%,4.0'
-    echo '>MEG_7300|Drugs|Tetracyclines|Tetracycline_resistance_ribosomal_protection_proteins|TETQ,95.0%,10.0'
-    echo '>MEG_4001|Metals|Copper|Copper_resistance_protein|PCOA,92.0%,2.0'
-    echo '>MEG_5000|Drugs|betalactams|Class_A_betalactamases|TEM,40.0%,1.0'
-} > "${WORK}/argnorm/sampleA_all_reads_KARGA_mappedGenes.csv"
-printf 'GeneIdx,PercentGeneCovered,AverageKMerDepth\n>MEG_7300|Drugs|Tetracyclines|Tetracycline_resistance_ribosomal_protection_proteins|TETQ,91.0%%,1.0\n' \
-    > "${WORK}/argnorm/sampleB_all_reads_KARGA_mappedGenes.csv"
-printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n>1|S83L%s,3/10,85.0%%,6.0\n>2|D87N%s,1/10,90.0%%,3.0\n' "${KV}" "${KV}" \
-    > "${WORK}/argnorm/sampleA_all_reads_KARGVA_mappedGenes.csv"
-printf 'GeneIdx,KmerSNPHits,PercentGeneCovered,AverageKMerDepth\n>2|D87N%s,1/10,90.0%%,3.0\n' "${KV}" \
-    > "${WORK}/argnorm/sampleB_all_reads_KARGVA_mappedGenes.csv"
-for s in sampleA sampleB; do mkdir -p "${WORK}/argnorm/${s}_args_oap_s1_out"; done
-printf 'sample\tnRead\tn16S\tnCell\nsampleA_tmp_reads\t120000\t40.0\t20.0\n' > "${WORK}/argnorm/sampleA_args_oap_s1_out/metadata.txt"
-printf 'sample\tnRead\tn16S\tnCell\nsampleB_tmp_reads\t4000\t2.0\t1.0\n' > "${WORK}/argnorm/sampleB_args_oap_s1_out/metadata.txt"
-(cd "${WORK}/argnorm" && python3 "${REPO_DIR}/bin/arg_norm_report.py" > /dev/null)
-cp "${WORK}/argnorm/KARGA_norm.csv" "${WORK}/argnorm/KARGVA_norm.csv" "${OUT}/arg_norm/"
+# ARGs-OAP through ARGS_OAP_REPORT
+mkdir -p "${OUT}/args_oap"
+python3 "${REPO_DIR}/bin/args_oap_report.py" --outdir "${OUT}/args_oap" \
+    "${REPO_DIR}"/tests/data/args_oap/sample{A,B}_args_oap > /dev/null
 
 # Read functional (Woltka) through AGGREGATE_READ_FUNCTIONS
 WOL="${REPO_DIR}/tests/data/woltka"

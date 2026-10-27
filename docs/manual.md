@@ -202,8 +202,6 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
 | **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
 | **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` |
-| **KARGA (MEGARes)** | 9.2 MB | Read ARG prediction | `read_arg_prediction=true` |
-| **KARGVA** | 1.5 MB | Read ARG variant prediction | `read_arg_prediction=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
@@ -473,7 +471,7 @@ breaks `-resume`.
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
-| `--read_arg_prediction` | `false` | `true`, `false` | Read-level ARG prediction (KARGA/KARGVA) |
+| `--args_oap_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP against SARG (see 6.12; `--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
@@ -646,8 +644,6 @@ breaks `-resume`.
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_blast_db` | Path to BLAST NT database directory |
 | `--custom_taxdump_files` | Path to NCBI taxdump directory |
-| `--custom_karga_db` | Path to KARGA database FASTA file |
-| `--custom_kargva_db` | Path to KARGVA database FASTA file |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 | `--custom_kmarvel_db` | Path to a K-MARVEL database directory: `CARD_protein_all.fasta`, `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`); no BLAST index needed. Its `DB_VERSION`, or the FASTA's md5 without one, goes to `software_versions.yml` |
@@ -817,14 +813,56 @@ extension (9) sizes are fixed by the tool and not exposed.
   column in the summary matrices. If blastp fails for a sample with ARGs, the
   task fails instead of publishing unfiltered results.
 - Counts are K-MARVEL's supporting reads, which count read pairs (both mates
-  of a fragment count once). They are not normalised: K-MARVEL can run without
-  ARGs-OAP, which provides the cell counts used for KARGA/KARGVA.
+  of a fragment count once). They are not normalised here; the results summary
+  turns them into RPM and RPKM of clean read pairs.
 - The allele K-MARVEL reports among close variants of one gene is not stable
   (simulated TEM-1 reads were called TEM-117, TEM-192 or TEM-246 depending on
   the read subset). Compare samples with `KMARVEL_gene_family_matrix.tsv`;
   treat the per-ARO matrix as allele-level detail.
 
-### 6.12 Read Aligner Options
+### 6.12 ARGs-OAP Options
+
+[ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 (`--args_oap_prediction`)
+profiles ARGs against its structured SARG database. Stage one estimates each
+sample's 16S copies (GreenGenes) and cells (essential single-copy marker
+genes) and extracts ARG-like reads with DIAMOND; stage two searches those reads
+with BLASTX against SARG and normalises the hits by SARG type (antibiotic
+class), subtype and gene. Both stages run in one task per sample on the
+host-removed reads. SARG ships inside the image, so there is no database to
+download or point to.
+
+Outputs: `05_arg_prediction/read_level/args_oap/<sample>_args_oap/` holds
+ARGs-OAP's own files (`metadata.txt` with nRead, n16S and nCell,
+`normalized_cell.*`, `normalized_16S.*`, `ppm.*` and the other tables by type,
+subtype and gene). `args_oap_summary/` holds `ARGS_OAP_REPORT`'s run-level
+`args_oap_long.tsv` (one row per sample and SARG type, subtype or gene:
+read count, copies, copies per cell, per 16S copy, ppm) and `args_oap_cells.tsv`
+(nRead, n16S, nCell, SARG reads and a status per sample).
+
+**Notes**:
+- Copies per cell = SARG copies / nCell, where a copy is a read weighted by
+  the share of the reference it covers (a read on a two- or three-component
+  reference also counts 1/2 or 1/3). It is not RPKM: compare ARGs-OAP with
+  K-MARVEL / RGI only qualitatively. ppm counts single reads.
+- ARGs-OAP treats a singleton file as a separate sample and normalises it by
+  its own cells; `args_oap_summary/` adds each sample's singletons to its pairs
+  and recomputes the normalisation over both, so its numbers differ slightly
+  from ARGs-OAP's own per-sample tables when a sample has singletons.
+- A sample where stage two has nothing to normalise (no 16S or cell estimate:
+  stage two is skipped; or no read left after the SARG search) keeps
+  `metadata.txt` only, and `stage_two_status.txt` says `not_normalised` or
+  `no_sarg_hit` (else `ok`); the report carries that status instead of failing.
+  If stage one drops an input file after an error (ARGs-OAP only logs a
+  warning), the task fails (exit 137, retried with more memory, when a stage
+  one process was killed for memory). An empty singleton file is skipped.
+- The image indexes its bundled databases on first use; the task runs a copy
+  of the `args_oap` package from its work directory so this also works on a
+  read-only singularity/apptainer image (~12 s per task).
+- `--read_arg_prediction` is a deprecated alias of `--args_oap_prediction`
+  (it used to run KARGA, KARGVA and ARGs-OAP together; KARGA and KARGVA were
+  removed).
+
+### 6.13 Read Aligner Options
 
 `--read_aligner` picks the aligner for host/phiX removal and reads-to-contigs
 mapping (contig depth, binning, gene counting, co-assembly bin depth).
@@ -872,7 +910,7 @@ Advanced parameters for Bowtie2 read alignment during host filtering
 | `--bowtie_R` | `2` | Number of re-seeding attempts |
 | `--bowtie_i` | `S,1,0.75` | Interval function for seeding |
 
-### 6.13 Taxonomy Visualization Options
+### 6.14 Taxonomy Visualization Options
 
 Control taxonomic output visualization and formatting:
 
@@ -884,7 +922,7 @@ Control taxonomic output visualization and formatting:
 
 **Taxonomic Levels:** Domain (D), Phylum (P), Class (C), Order (O), Family (F), Genus (G), Species (S)
 
-### 6.14 Database Storage Options
+### 6.15 Database Storage Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -892,7 +930,7 @@ Control taxonomic output visualization and formatting:
 
 By default, databases are published to a `databases/` directory at the same level as your output directory. Later runs reuse them only through the `--custom_*` options (or `-resume` on the same work directory); see [Database Management](#4-database-management).
 
-### 6.15 Resource Limit Options
+### 6.16 Resource Limit Options
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -900,9 +938,9 @@ By default, databases are published to a `databases/` directory at the same leve
 | `--max_memory` | `128.GB` | Maximum memory per process |
 | `--max_time` | `240.h` | Maximum time per process |
 
-### 6.16 Results Summary Options
+### 6.17 Results Summary Options
 
-The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA),
+The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP),
 read functional and MicrobeCensus results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
 README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
 network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only
@@ -936,8 +974,8 @@ How the summary reports the results:
 - **RGI genes need a coverage cutoff.** `rgi bwt` lists every gene with at least one mapped read, fragments of related genes included (548 genes in one batch1 sample). The summary counts an RGI gene when reads cover at least `--rgi_summary_min_coverage` % (80) of its best-covered reference sequence; the raw RGI tables are unchanged. RGI counts mates separately, so its read pairs are mapped reads / 2.
 - **RGI pathogen of origin.** RGI's k-mer step assigns the gene's reads to species. `rgi_kmer_hosts` lists the top ones and `rgi_host_check` says whether the top host is a watchlist pathogen. WildCARD holds resistance-gene sequences from many species, gut commensals among them, so a tier 1 gene whose reads point to a commensal (poxtA from *Blautia*, vanD-type genes from *Enterocloster*) is flagged as a possible related gene rather than reported as a pathogen's resistance.
 - **Method comparison.** When K-MARVEL and RGI both ran, `arg_method_comparison.tsv`, `arg_method_overlap.tsv`, an UpSet plot and a per-category bar chart show, gene by gene (alleles collapsed), what each method found. A K-MARVEL gene RGI saw below its cutoff is marked `rgi_below_cutoff`, which is partial coverage, not absence. The ARG matrices and figures use one method (`--arg-primary` in the script; K-MARVEL when present); `arg_long.tsv` holds every method's calls.
+- **ARGs-OAP (SARG).** With `--args_oap_prediction`, the summary reads `ARGS_OAP_REPORT`'s tables into `arg_sarg_long` (one row per sample and SARG subtype), `arg_sarg_type_cpc` and `arg_sarg_subtype_cpc` (copies per cell, samples as columns), `samples_qc` `args_oap_n16S`, `args_oap_ncell`, `sarg_n_subtypes` and `sarg_copies_per_cell`, and a heatmap by SARG type. SARG names its types and subtypes differently from CARD, so ARGs-OAP is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only. A sample ARGs-OAP could not normalise (no 16S or cells) is blank, not 0.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
-- **KARGA / KARGVA (MEGARes).** With `--read_arg_prediction`, the summary reads ARG_NORM_REPORT's `KARGA_norm.csv` and `KARGVA_norm.csv` (KARGA genes with at least 90% k-mer coverage; KARGVA variants with at least 2 SNP k-mers and 80% coverage) into `arg_karga_long`, `arg_karga_group_cpc`, `arg_karga_class_cpc` and `arg_kargva_long`. Abundance is copies per cell: k-mer depth over the ARGs-OAP cell estimate (`args_oap_ncell` in `samples_qc`). Alleles of one MEGARes group share their k-mers, so each group is represented by its deepest allele. MEGARes names its genes differently from CARD, so KARGA is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only.
 - **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
 - **README and LLM guide.** `README.md` / `README.docx` (written with the Python standard library) list the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the summary folder for a language model or a script: run facts as YAML, the stages that ran, methods, every table column and figure, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. The summary folder is the part meant to be shared, so neither file names a local path: paths are relative to the folder, batches appear by label and input files by name. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
 - **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
@@ -1058,11 +1096,11 @@ results/
 │   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
 │   │                                           # arg_presence, arg_drug_class_rpkm, arg_priority_panel, group_arg_detection,
 │   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran),
-│   │                                           # arg_karga_long, arg_karga_group_cpc, arg_karga_class_cpc, arg_kargva_long
-│   │                                           # (KARGA/KARGVA), function_read_long, function_read_<ontology> (read functional)
+│   │                                           # arg_sarg_long, arg_sarg_type_cpc, arg_sarg_subtype_cpc (ARGs-OAP),
+│   │                                           # function_read_long, function_read_<ontology> (read functional)
 │   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
 │                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
-│                                               # arg_karga_class_heatmap, function_cog_heatmap (.png/.pdf/.svg)
+│                                               # arg_sarg_type_heatmap, function_cog_heatmap (.png/.pdf/.svg)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control
@@ -1137,12 +1175,11 @@ results/
 │           └── *.png                           # Taxonomy plots
 ├── 05_arg_prediction/                          # ARG predictions
 │   ├── read_level/                             # Read-level ARG
-│   │   ├── karga/                              # KARGA results (if read_arg_prediction=true)
-│   │   │   └── {sample}_KARGA_mappedGenes.csv
-│   │   ├── kargva/                             # KARGVA results (if read_arg_prediction=true)
-│   │   │   └── {sample}_KARGVA_mappedGenes.csv
-│   │   ├── args_oap/                           # ARGs-OAP normalization (if read_arg_prediction=true)
-│   │   │   └── {sample}_args_oap_s1_out/
+│   │   ├── args_oap/                           # ARGs-OAP per sample (if args_oap_prediction=true)
+│   │   │   └── {sample}_args_oap/              # metadata.txt (nRead, n16S, nCell), normalized_cell / normalized_16S / ppm tables by type, subtype, gene
+│   │   ├── args_oap_summary/                   # ARGs-OAP run-level tables (if args_oap_prediction=true)
+│   │   │   ├── args_oap_long.tsv               # One row per sample and SARG type, subtype or gene (copies per cell, per 16S, ppm)
+│   │   │   └── args_oap_cells.tsv              # nRead, n16S, nCell, SARG reads and status per sample
 │   │   ├── rgi/                                # RGI per-sample results (if rgi_prediction=true)
 │   │   │   └── {sample}/
 │   │   │       ├── {sample}_rgi_bwt.allele_mapping_data.txt
@@ -1167,13 +1204,11 @@ results/
 │   │   │       ├── {sample}_kmarvel.tsv        # One row per assembled ARG (CARD ARO, drug class, identity, coverage, supporting read pairs, blast_* columns); header-only when none
 │   │   │       ├── {sample}_kmarvel.json       # K-MARVEL JSON result
 │   │   │       └── {sample}_kmarvel.log        # K-MARVEL stdout
-│   │   ├── kmarvel_summary/                    # K-MARVEL aggregated reports (if kmarvel_prediction=true)
-│   │   │   ├── KMARVEL_summary_long.tsv        # One row per sample and ARG
-│   │   │   ├── KMARVEL_supporting_reads_matrix.tsv  # ARG (CARD ARO) x sample supporting read pairs
-│   │   │   ├── KMARVEL_gene_family_matrix.tsv  # AMR gene family x sample supporting read pairs (use this to compare samples)
-│   │   │   └── KMARVEL_drug_class_matrix.tsv   # Drug class x sample number of ARGs
-│   │   └── summary/                            # Normalized ARG summary (if read_arg_prediction=true)
-│   │       └── *.csv
+│   │   └── kmarvel_summary/                    # K-MARVEL aggregated reports (if kmarvel_prediction=true)
+│   │       ├── KMARVEL_summary_long.tsv        # One row per sample and ARG
+│   │       ├── KMARVEL_supporting_reads_matrix.tsv  # ARG (CARD ARO) x sample supporting read pairs
+│   │       ├── KMARVEL_gene_family_matrix.tsv  # AMR gene family x sample supporting read pairs (use this to compare samples)
+│   │       └── KMARVEL_drug_class_matrix.tsv   # Drug class x sample number of ARGs
 │   ├── contig_level/                           # Contig-level ARG (if contig_tax_and_arg=true)
 │   │   ├── deeparg/                            # DeepARG predictions per sample
 │   │   │   └── {sample}/                       # (coassembly/ under co-assembly)
@@ -1428,9 +1463,6 @@ databases/                            # Database storage (configurable via --dat
 └── humann/                           # HUMAnN 4 database root + MetaPhlAn vOct22 (~71 GB / ~33 GB EC-filtered)
 ```
 
-The KARGA and KARGVA reference FASTAs are small and staged directly into the work
-directory when needed; they are not stored under `databases/`.
-
 ### Conditional Outputs
 
 The following outputs are only generated when specific parameters are enabled:
@@ -1446,8 +1478,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
-| `05_arg_prediction/read_level/karga/` | `read_arg_prediction=true` | KARGA ARG predictions |
-| `05_arg_prediction/read_level/kargva/` | `read_arg_prediction=true` | KARGVA ARG variant predictions |
+| `05_arg_prediction/read_level/args_oap/`, `args_oap_summary/` | `args_oap_prediction=true` | ARGs-OAP (SARG) ARG profiles and read, 16S and cell estimates |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
@@ -1561,7 +1592,7 @@ nextflow run main.nf \
     --quality_control true \
     --assembly_mode assembly \
     --taxonomic_profiler sourmash \
-    --read_arg_prediction true \
+    --args_oap_prediction true \
     --rgi_prediction true \
     --contig_tax_and_arg true \
     --include_binning true \
@@ -1736,7 +1767,7 @@ python /path/to/BugBuster/bin/results_summary.py \
 parent's when it is called `results` (`batch1` above); `--batch-labels` sets the labels instead, one per
 `--results` directory in the same order. Without `--kmarvel-db`, mutation-dependent ARG hits
 are reported as `not_checked`. RGI results (`05_arg_prediction/read_level/rgi/` and `rgi_kmer/`) are read when
-present; `--rgi-min-coverage` sets their cutoff (default 80). KARGA/KARGVA (`05_arg_prediction/read_level/summary/`),
+present; `--rgi-min-coverage` sets their cutoff (default 80). ARGs-OAP (`05_arg_prediction/read_level/args_oap_summary/`),
 the read functional profile (`07_functional_annotation/summary/read_*.tsv`) and MicrobeCensus
 (`07_functional_annotation/microbecensus/`) are read when present; batches without them get `NA_not_run`. The
 README and `LLM_GUIDE.md` say which stages ran in each batch. `results_summary.py --help` lists every option.

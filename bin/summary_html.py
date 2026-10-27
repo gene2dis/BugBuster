@@ -190,11 +190,11 @@ def reading_guide(ctx):
                  "(<i>rgi_kmer_hosts</i>). <i>rgi_host_check</i> says whether the top species is a watchlist pathogen; "
                  "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point to a "
                  "commensal may be a related gene, not the clinical one.</li>")
-    if ctx.get("karga"):
-        m.append("<li><b>KARGA / KARGVA</b> find MEGARes resistance genes and variants from read k-mers. ARG_NORM_REPORT "
-                 "keeps genes with at least 90% k-mer coverage and divides their k-mer depth by the ARGs-OAP cell "
-                 "estimate: <i>copies per cell</i>. MEGARes names its genes differently from CARD, so KARGA is "
-                 "reported in its own section, not compared gene by gene, and has no tiers.</li>")
+    if ctx.get("sarg"):
+        m.append("<li><b>ARGs-OAP</b> searches ARG-like reads against SARG and divides their copies (reads weighted "
+                 "by the share of the reference they cover) by its own cell estimate: <i>copies per cell</i>. SARG "
+                 "names its types and subtypes differently from CARD, so ARGs-OAP is reported in its own section, "
+                 "not compared gene by gene, and has no tiers.</li>")
     method_html = ""
     if m:
         primary = s.get("arg_primary", "")
@@ -205,8 +205,8 @@ def reading_guide(ctx):
     units = ("<h3>Units</h3><ul><li>Counts are read pairs (Reads_report.csv counts single reads).</li>"
              "<li>K-MARVEL / RGI ARG abundance is RPKM: read pairs per kb of reference gene per million clean read "
              "pairs, comparable between samples of different depth.</li>"
-             + ("<li>KARGA / KARGVA abundance is copies per cell (k-mer depth / ARGs-OAP cells), a different unit: do "
-                "not add it to RPKM.</li>" if ctx.get("karga") else "")
+             + ("<li>ARGs-OAP abundance is copies per cell (SARG copies / ARGs-OAP cells), a different unit: do not add "
+                "it to RPKM.</li>" if ctx.get("sarg") else "")
              + ("<li>The functional profile is in copies per genome equivalent (CPGE: reads per kb / MicrobeCensus "
                 "genome equivalents).</li>" if (ctx.get("functional") or {}).get("unit") == "cpge" else "")
              + f"<li>Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
@@ -327,30 +327,26 @@ def write_html(outdir, title, ctx):
                 f"read, so an RGI gene counts when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference "
                 "sequence. 'RGI below cutoff' marks K-MARVEL genes RGI saw with partial coverage, which is not absence."
                 " Tier 4 (mutation-dependent) genes are mostly K-MARVEL calls: RGI bwt reports homolog matches and does "
-                "not test resistance mutations. KARGA and KARGVA use MEGARes, whose gene names differ from CARD's: they "
-                "are reported in their own section, not compared here.</p>"
+                "not test resistance mutations. ARGs-OAP uses SARG, whose names differ from CARD's: it is reported in "
+                "its own section, not compared here.</p>"
                 + figure("arg_method_upset") + figure("arg_method_by_category")
                 + "<h3>Overlap counts</h3>" + df_to_html(ov, table_id="t_ov")
                 + "<h3>Per sample and gene</h3>" + df_to_html(comp["comp"], max_rows=2000, table_id="t_cmp"))
         section("compare", "Comparison of ARG methods", body)
-    if ctx.get("karga"):
-        k = ctx["karga"]
-        body = (f"<p class='muted'>KARGA genes (MEGARes) with at least 90% k-mer coverage in {k['n_samples']} samples, "
-                f"{k['n_groups']} MEGARes groups; KARGVA resistance variants: {k['n_variants']}. Abundance is copies "
-                "per cell: k-mer depth of each group's deepest allele (alleles share k-mers) over the ARGs-OAP cell "
-                "estimate (samples_qc args_oap_ncell). It is not RPKM and MEGARes classes are not CARD drug classes: "
-                "compare samples within this section only.</p>" + figure("arg_karga_class_heatmap"))
-        if "arg_karga_class_cpc" in t:
-            body += "<h3>Copies per cell by MEGARes class</h3>" + df_to_html(t["arg_karga_class_cpc"][0], index=True,
-                                                                             table_id="t_kcls")
-        if "arg_kargva_long" in t:
-            kv = t["arg_kargva_long"][0]
-            body += ("<h3>KARGVA resistance variants</h3><p class='muted'>Variants with at least 2 SNP k-mers and 80% "
-                     "coverage. A variant from reads may come from a minority strain.</p>"
-                     + df_to_html(kv[[c for c in ("sample", "gene", "kargva_mutation", "kargva_description", "kargva_drug",
-                                                  "percent_covered", "kmer_depth", "copies_per_cell") if c in kv]],
-                                  table_id="t_kv"))
-        section("karga", "KARGA / KARGVA (MEGARes)", body)
+    if ctx.get("sarg"):
+        g = ctx["sarg"]
+        body = (f"<p class='muted'>ARGs-OAP (SARG) on {g['n_samples']} samples: {g['n_types']} types, "
+                f"{g['n_subtypes']} subtypes. Abundance is copies per cell: SARG copies (reads weighted by the share of "
+                "the reference they cover, singletons included) over the ARGs-OAP cell estimate (samples_qc "
+                "args_oap_ncell). It is not RPKM and SARG types are not CARD drug classes: compare samples within "
+                "this section only.</p>"
+                + (f"<p class='muted'>No 16S or cell estimate, so nothing normalised: "
+                   f"{html.escape(', '.join(g['not_normalised']))}.</p>" if g["not_normalised"] else "")
+                + figure("arg_sarg_type_heatmap"))
+        if "arg_sarg_type_cpc" in t:
+            body += "<h3>Copies per cell by SARG type</h3>" + df_to_html(t["arg_sarg_type_cpc"][0], index=True,
+                                                                         table_id="t_sarg")
+        section("sarg", "ARGs-OAP (SARG)", body)
     if ctx.get("functional"):
         f = ctx["functional"]
         unit = "copies per genome equivalent (CPGE)" if f["unit"] == "cpge" else f["unit"]

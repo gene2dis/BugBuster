@@ -16,8 +16,8 @@
 #     counts; an RGI-only directory makes RGI the primary ARG method
 #   - depth classes, --taxa-per-sample, heatmap rows by phylum then A-Z
 #   - HTML is self-contained (no external URLs)
-#   - KARGA / KARGVA (tests/data/summary/arg_norm/): filtered genes, the deepest
-#     allele per MEGARes group, copies per cell, low-depth cells
+#   - ARGs-OAP (tests/data/summary/args_oap/): SARG subtypes and types in copies
+#     per cell, the cell estimates in samples_qc, low-depth and not-normalised cells
 #   - read functional and MicrobeCensus (tests/data/summary/functional/): CPGE
 #     tables against the source, COG names, NA_no_ags without MicrobeCensus
 #   - README.md / README.docx (well-formed WordprocessingML) / LLM_GUIDE.md, the
@@ -92,12 +92,12 @@ make_results() {
     # the tables hold sampleA only (sampleB has no sylph genome, so a run of
     # sampleB alone has no taxonomy tables)
     case " $* " in *" sampleA "*) cp "${FIX}"/sylph_gtdb_*.tsv "${dir}/02_taxonomy/tables/" ;; esac
-    # run-level KARGA / KARGVA and read functional tables, with this directory's samples only
-    local norm="${dir}/05_arg_prediction/read_level/summary" func="${dir}/07_functional_annotation/summary"
-    mkdir -p "${norm}" "${func}"
-    for t in KARGA_norm KARGVA_norm; do
-        head -1 "${FIX}/arg_norm/${t}.csv" > "${norm}/${t}.csv"
-        for s in "$@"; do grep "^${s}," "${FIX}/arg_norm/${t}.csv" >> "${norm}/${t}.csv" || true; done
+    # run-level ARGs-OAP and read functional tables, with this directory's samples only
+    local oap="${dir}/05_arg_prediction/read_level/args_oap_summary" func="${dir}/07_functional_annotation/summary"
+    mkdir -p "${oap}" "${func}"
+    for t in args_oap_long args_oap_cells; do
+        head -1 "${FIX}/args_oap/${t}.tsv" > "${oap}/${t}.tsv"
+        for s in "$@"; do grep "^${s}"$'\t' "${FIX}/args_oap/${t}.tsv" >> "${oap}/${t}.tsv" || true; done
     done
     for t in read_function_abundance read_annotated_fraction read_sample_summary; do
         head -1 "${FIX}/functional/${t}.tsv" > "${func}/${t}.tsv"
@@ -109,10 +109,10 @@ make_results() {
             cp "${FIX}/functional/${s}.ags.tsv" "${dir}/07_functional_annotation/microbecensus/${s}/"
         fi
     done
-    # software_versions.yml as published: the KARGVA entry indented with its heredoc terminator left in
-    # (tab-indented module) and RGI's multi-line junk, so it is not valid YAML
+    # software_versions.yml as published by older runs: the (removed) KARGVA entry indented with its heredoc
+    # terminator left in (tab-indented module) and RGI's multi-line junk, so it is not valid YAML
     mkdir -p "${dir}/pipeline_info"
-    printf '       "KARGVA":\n           kargva: 1.0\n       END_VERSIONS\n"KARGA":\n    karga: 1.1\n"KMARVEL":\n    kmarvel: 1.0.0\n"RGI_BWT":\n    rgi:\n\n\nunknown\n    kma:  Invalid option:\t--version\n"QC:FASTP":\n    fastp: 1.0.1\n"READ_FUNCTIONAL:WOLTKA_CLASSIFY":\n    woltka: 0.1.7\n"TAXONOMY:SYLPH_PROFILE":\n    sylph: 1.0.0\n' \
+    printf '       "KARGVA":\n           kargva: 1.0\n       END_VERSIONS\n"KARGA":\n    karga: 1.1\n"KMARVEL":\n    kmarvel: 1.0.0\n"ARGS_OAP":\n    args_oap: 4.0.0\n"RGI_BWT":\n    rgi:\n\n\nunknown\n    kma:  Invalid option:\t--version\n"QC:FASTP":\n    fastp: 1.0.1\n"READ_FUNCTIONAL:WOLTKA_CLASSIFY":\n    woltka: 0.1.7\n"TAXONOMY:SYLPH_PROFILE":\n    sylph: 1.0.0\n' \
         > "${dir}/pipeline_info/software_versions.yml"
 }
 
@@ -167,28 +167,28 @@ grp = pd.read_csv("out/tables/group_arg_detection.tsv", sep="\t")
 assert set(grp["pattern"]) == {"V1:+ V2:NA"}, grp["pattern"]
 PYEOF
 
-check "KARGA / KARGVA tables: filtered genes, deepest allele per group, copies per cell" py - <<'PYEOF'
+check "ARGs-OAP tables: SARG subtypes and types in copies per cell, cell estimates" py - <<'PYEOF'
 import pandas as pd
-kl = pd.read_csv("out/tables/arg_karga_long.tsv", sep="\t")
-# TEM (40% coverage) was filtered by ARG_NORM_REPORT; sampleA ANT9, TETQ, PCOA; sampleB TETQ
-assert sorted(zip(kl["sample"], kl["megares_group"])) == [("sampleA", "ANT9"), ("sampleA", "PCOA"),
-                                                           ("sampleA", "TETQ"), ("sampleB", "TETQ")], kl
-assert kl["group_representative"].all() and kl.at[0, "megares_id"].startswith("MEG_")
-tet = kl[(kl["sample"] == "sampleA") & (kl["megares_group"] == "TETQ")].iloc[0]
-assert tet["copies_per_cell"] == 0.5 and tet["megares_type"] == "Drugs" and tet["megares_class"] == "Tetracyclines"
-cls = pd.read_csv("out/tables/arg_karga_class_cpc.tsv", sep="\t", index_col=[0, 1])
-assert cls.at[("Drugs", "Tetracyclines"), "sampleA"] == 0.5
-# sampleB is low depth (--min-clean-pairs 10000): its TETQ is kept, a class not found there is unknown
-assert float(cls.at[("Drugs", "Tetracyclines"), "sampleB"]) == 1.0
-assert cls.at[("Metals", "Copper"), "sampleB"] == "NA_low_depth"
-kv = pd.read_csv("out/tables/arg_kargva_long.tsv", sep="\t")
-assert list(kv["sample"]) == ["sampleA"] and kv.at[0, "kargva_mutation"] == "S83L" and kv.at[0, "gene"] == "gyrA"
+sl = pd.read_csv("out/tables/arg_sarg_long.tsv", sep="\t")
+assert sorted(sl["sarg_subtype"]) == ["multidrug__adeF", "novobiocin__novA", "polymyxin__rosB",
+                                      "tetracycline__tetA(48)"] and set(sl["sample"]) == {"sampleA"}, sl
+tet = sl[sl["sarg_subtype"] == "tetracycline__tetA(48)"].iloc[0]
+# 4 reads (2 from the singletons), 0.548105 copies over 16 cells (pairs + singletons)
+assert tet["read_count"] == 4 and abs(tet["copies_per_cell"] - 0.548104956 / 16) < 1e-9
+assert {"subject", "visit", "batch"} <= set(sl.columns)
+typ = pd.read_csv("out/tables/arg_sarg_type_cpc.tsv", sep="\t", index_col=0)
+assert abs(float(typ.at["tetracycline", "sampleA"]) - 0.548104956 / 16) < 1e-9
+# sampleB is low depth (--min-clean-pairs 10000) with no SARG hit: unknown, not absent
+assert typ.at["novobiocin", "sampleB"] == "NA_low_depth"
+sub = pd.read_csv("out/tables/arg_sarg_subtype_cpc.tsv", sep="\t", index_col=[0, 1])
+assert ("multidrug", "multidrug__adeF") in sub.index
 qc = pd.read_csv("out/tables/samples_qc.tsv", sep="\t").set_index("sample")
-assert qc.at["sampleA", "args_oap_ncell"] == 20 and qc.at["sampleA", "karga_n_groups"] == 3
-assert abs(qc.at["sampleA", "karga_copies_per_cell"] - 0.8) < 1e-9
-assert qc.at["sampleA", "kargva_n_variants"] == 1 and qc.at["sampleB", "kargva_n_variants"] == 0
+assert qc.at["sampleA", "args_oap_ncell"] == 16 and qc.at["sampleA", "args_oap_n16S"] == 32
+assert qc.at["sampleA", "sarg_n_subtypes"] == 4
+assert abs(qc.at["sampleA", "sarg_copies_per_cell"] - pd.to_numeric(typ["sampleA"]).sum()) < 1e-12
+assert abs(qc.at["sampleA", "sarg_copies_per_cell"] - 0.895062 / 16) < 1e-6
 PYEOF
-check "KARGA figure written" test -s out/figures/arg_karga_class_heatmap.svg
+check "ARGs-OAP figure written" test -s out/figures/arg_sarg_type_heatmap.svg
 
 check "read functional and MicrobeCensus: CPGE tables, COG names, samples_qc columns" py - "${FIX}" <<'PYEOF'
 import sys
@@ -225,10 +225,10 @@ import os, re, zipfile
 from xml.dom import minidom
 md = open("out/README.md").read()
 for text in ("## What ran", "## Tables", "## Figures", "## Units and missing values", "## ARG reporting tiers",
-             "`tables/arg_karga_long.tsv`", "## Software versions", "KARGA / KARGVA"):
+             "`tables/arg_long.tsv`", "`tables/arg_sarg_long.tsv`", "## Software versions", "ARGs-OAP"):
     assert text in md, text
-# stage table: the fixture's versions file lists KARGA, so KARGA ran; no assembly
-row = next(l for l in md.splitlines() if l.startswith("| Read-level ARGs: KARGA"))
+# stage table: the fixture's versions file lists RGI_BWT and the RGI table is there; no assembly
+row = next(l for l in md.splitlines() if l.startswith("| Read-level ARGs: RGI"))
 assert "| ran |" in row, row
 assert re.search(r"\| Assembly \(MEGAHIT\) \| not run \|", md)
 # versions read line by line from the invalid YAML
@@ -240,7 +240,7 @@ for name in z.namelist():
 doc = z.read("word/document.xml").decode()
 assert 'w:val="Heading2"' in doc and "What ran" in doc and "<w:tbl>" in doc
 guide = open("out/LLM_GUIDE.md").read()
-for text in ("## Run facts", "n_samples: 2", "## Pitfalls", "### arg_karga_long.tsv", "### samples_qc.tsv",
+for text in ("## Run facts", "n_samples: 2", "## Pitfalls", "### arg_long.tsv", "### arg_sarg_long.tsv", "### samples_qc.tsv",
              "`tables/samples_qc.tsv`", "## Figures (figures/)", "### Binning and MAGs", "## Recipes"):
     assert text in guide, text
 # the summary folder is what gets shared: paths relative to it, no local path, inputs by file name
@@ -340,8 +340,8 @@ check "those columns are not renamed" py - <<'PYEOF'
 import pandas as pd
 qc = pd.read_csv("commonmeta/tables/samples_qc.tsv", sep="\t")
 assert {"group", "type", "class", "description"} <= set(qc.columns), qc.columns
-kl = pd.read_csv("commonmeta/tables/arg_karga_long.tsv", sep="\t")
-assert {"group", "megares_group"} <= set(kl.columns)
+al = pd.read_csv("commonmeta/tables/arg_long.tsv", sep="\t")
+assert {"group", "gene"} <= set(al.columns), al.columns
 PYEOF
 
 # low depth in the taxonomy tables: sampleA below --min-clean-pairs
@@ -559,11 +559,11 @@ PYEOF
 
 # a stage that ran (software_versions.yml) without its table in the results directory is reported
 make_results notable/results sampleA
-rm -r notable/results/05_arg_prediction/read_level/summary
-check "KARGA in software_versions.yml without KARGA_norm.csv" \
+rm -r notable/results/05_arg_prediction/read_level/rgi notable/results/05_arg_prediction/read_level/rgi_kmer
+check "RGI_BWT in software_versions.yml without RGI tables" \
     py "${SUMMARY}" --results notable/results --outdir notab --min-clean-pairs 10000 --no-excel
 check "stage reported as 'ran, no table found'" \
-    grep -q "| Read-level ARGs: KARGA / KARGVA (MEGARes) normalised by ARGs-OAP | ran, no table found |" notab/README.md
+    grep -q "| Read-level ARGs: RGI bwt + k-mer pathogen of origin (CARD + WildCARD) | ran, no table found |" notab/README.md
 
 # with a profiler, TAXONOMY_REPORT publishes its copy (with the classified fraction) under its own name; the
 # summary reads it first, so the QC copy without those columns does not lose the classified fraction
@@ -631,23 +631,31 @@ p = named[named > 0] / named.sum()
 assert abs(qc.at["sampleA", "shannon"] - float(-(p * np.log(p)).sum())) < 1e-9
 PYEOF
 
-# KARGA / KARGVA files with no hit (one blank row per sample), with and without the normalisation columns
-# (older ARG_NORM_REPORT runs left them out): the summary runs and reports no MEGARes gene
-make_results nokarga/results sampleA sampleB
-norm=nokarga/results/05_arg_prediction/read_level/summary
-printf 'sample,nRead,n16S,nCell,GeneIdx,PercentGeneCovered,AverageKMerDepth\nsampleA,1000,1.0,2.0,,,\nsampleB,800,1.0,1.0,,,\n' \
-    > "${norm}/KARGVA_norm.csv"
-printf 'sample,nRead,n16S,nCell,GeneIdx,PercentGeneCovered,AverageKMerDepth,CPM_ARGs,copies_per_cell\nsampleA,1000,1.0,2.0,,,,,\nsampleB,800,1.0,1.0,,,,,\n' \
-    > "${norm}/KARGA_norm.csv"
-check "KARGA and KARGVA without any hit" \
-    py "${SUMMARY}" --results nokarga/results --outdir nokarga_out --min-clean-pairs 10000 --no-excel
-check "no MEGARes gene: zero counts, empty long table, cell estimates kept" py - <<'PYEOF'
+# ARGs-OAP had no 16S or cell estimate for a sample (stage two stopped): its SARG cells are blank, not 0
+make_results nonorm/results sampleA sampleB
+sed -i 's/^sampleB\t4000\t1.0\t0.5\t0.0\tno_sarg_hit$/sampleB\t4000\t0.0\t0.0\t0.0\tnot_normalised/' \
+    nonorm/results/05_arg_prediction/read_level/args_oap_summary/args_oap_cells.tsv
+check "ARGs-OAP sample without a cell estimate" \
+    py "${SUMMARY}" --results nonorm/results --outdir nonorm_out --min-clean-pairs 100 --no-excel
+check "not normalised: blank SARG cells and counts, cell estimates kept" py - <<'PYEOF'
 import pandas as pd
-qc = pd.read_csv("nokarga_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
-assert (qc["karga_n_groups"] == 0).all() and (qc["kargva_n_variants"] == 0).all()
-assert qc.at["sampleA", "args_oap_ncell"] == 2.0
-long = pd.read_csv("nokarga_out/tables/arg_karga_long.tsv", sep="\t")
-assert long.empty and "megares_group" in long.columns
+typ = pd.read_csv("nonorm_out/tables/arg_sarg_type_cpc.tsv", sep="\t", index_col=0)
+assert typ["sampleB"].isna().all() and (pd.to_numeric(typ["sampleA"]) > 0).all(), typ
+qc = pd.read_csv("nonorm_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"]) and qc.at["sampleB", "args_oap_ncell"] == 0
+assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_out/results_summary.html").read()
+PYEOF
+# the same sample at low depth (--min-clean-pairs 10000): still blank, not 0 or NA_low_depth
+check "low-depth ARGs-OAP sample without a cell estimate" \
+    py "${SUMMARY}" --results nonorm/results --outdir nonorm_low --min-clean-pairs 10000 --no-excel
+check "not normalised at low depth: blank SARG cells and counts" py - <<'PYEOF'
+import pandas as pd
+typ = pd.read_csv("nonorm_low/tables/arg_sarg_type_cpc.tsv", sep="\t", index_col=0)
+assert typ["sampleB"].isna().all(), typ
+qc = pd.read_csv("nonorm_low/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert qc.at["sampleB", "low_depth"] and pd.isna(qc.at["sampleB", "sarg_copies_per_cell"])
+assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"])
+assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_low/results_summary.html").read()
 PYEOF
 
 # a 0 cutoff is recorded in the README's inputs, not dropped as if it were unset

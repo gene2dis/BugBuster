@@ -563,8 +563,8 @@ def fig_method_by_category(fw, comp, methods):
             "absence). Category labels are coloured by tier.")
 
 
-def fig_karga(fw, mat, cols, groups, low, hatch):
-    """KARGA copies per cell per MEGARes class (type in brackets), samples as columns."""
+def fig_sarg(fw, mat, cols, groups, low, hatch):
+    """ARGs-OAP copies per cell per SARG type, samples as columns."""
     if mat is None or mat.empty:
         return
     num = mat[cols].apply(pd.to_numeric, errors="coerce")
@@ -572,12 +572,12 @@ def fig_karga(fw, mat, cols, groups, low, hatch):
     if num.empty:
         return
     num = num.loc[num.max(axis=1).sort_values(ascending=False).index]
-    labels = [f"{cls.replace('_', ' ')}  [{typ}]" for typ, cls in num.index]
-    heatmap(fw, "arg_karga_class_heatmap", "KARGA (MEGARes): resistance gene copies per cell by class",
-            "log10 copies per cell: KARGA k-mer depth of each MEGARes group's deepest allele, summed per class, divided "
-            "by the ARGs-OAP cell estimate. MEGARes classes (drugs, metals, biocides) are not CARD drug classes, and "
-            "copies per cell is not RPKM: do not compare with the K-MARVEL / RGI figures. Grey = not detected; "
-            "hatched = low depth or KARGA not run. Red labels mark low-depth samples.",
+    labels = [str(t).replace("_", " ") for t in num.index]
+    heatmap(fw, "arg_sarg_type_heatmap", "ARGs-OAP (SARG): resistance gene copies per cell by type",
+            "log10 copies per cell: SARG copies (reads weighted by the share of the reference they cover) summed per "
+            "type, divided by the ARGs-OAP cell estimate. SARG types are not CARD drug classes, and copies per cell "
+            "is not RPKM: do not compare with the K-MARVEL / RGI figures. Grey = not detected; hatched = low depth, "
+            "ARGs-OAP not run or no cell estimate. Red labels mark low-depth samples.",
             num, labels, cols, groups, low, hatch, "log10 copies per cell", cmap="magma_r")
 
 

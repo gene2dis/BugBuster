@@ -1,0 +1,2 @@
+sample	nRead	n16S	nCell
+sampleB_tmp_reads	4000	1.0	0.5

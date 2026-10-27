@@ -64,7 +64,7 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
-      --read_arg_prediction         Enable read-level ARG prediction (default: ${params.read_arg_prediction})
+      --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
@@ -78,7 +78,7 @@ def printHelp() {
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
 
     \u001B[1;33mResults summary (00_summary/):\u001B[0m
-      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus results (default: ${params.results_summary})
+      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus results (default: ${params.results_summary})
       --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
       --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)
@@ -148,10 +148,8 @@ include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
 include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
-include { KARGVA           } from './modules/local/kargva/main'
-include { KARGA            } from './modules/local/karga/main'
 include { ARGS_OAP         } from './modules/local/args_oap/main'
-include { ARG_NORM_REPORT  } from './modules/local/arg_norm_report/main'
+include { ARGS_OAP_REPORT  } from './modules/local/args_oap_report/main'
 
 	// RGI AMR PREDICTION
 include { RGI_BWT          } from './modules/local/rgi_bwt/main'
@@ -254,6 +252,15 @@ workflow {
             }
             log.warn "--${old_name} is deprecated (MetaWRAP was replaced by Binette): using ${old_value} as --${new_name}. Pass --${new_name} instead"
         }
+    }
+
+    // --read_arg_prediction switched on KARGA, KARGVA and ARGs-OAP together; KARGA
+    // and KARGVA were removed, so it is now a deprecated alias of
+    // --args_oap_prediction (a false boolean default cannot be told apart from an
+    // explicit false, so the two are OR-ed instead of checked for a conflict)
+    def run_args_oap = flagOn(params.args_oap_prediction) || flagOn(params.read_arg_prediction)
+    if (flagOn(params.read_arg_prediction)) {
+        log.warn "--read_arg_prediction is deprecated (KARGA and KARGVA were removed): it now runs ARGs-OAP only. Pass --args_oap_prediction instead"
     }
 
     // Reject contradictory feature combinations instead of silently skipping stages
@@ -372,7 +379,7 @@ workflow {
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
-    log.info "  Read ARG prediction  : ${params.read_arg_prediction}"
+    log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
@@ -445,26 +452,18 @@ workflow {
     //
     // ARG PREDICTION IN READS
     //
-    if ( flagOn(params.read_arg_prediction) ) {
+    if ( run_args_oap ) {
         ARGS_OAP(ch_clean_reads)
-        ch_args_oap = ARGS_OAP.out.args_oap_s1
-        ch_argv_prediction = KARGVA(ch_clean_reads.combine(PREPARE_DATABASES.out.kargva_db))
-        KARGA(ch_argv_prediction.kargva_reads.combine(PREPARE_DATABASES.out.karga_db))
-        ch_arg_prediction = KARGA.out.kargva
-        ARG_NORM_REPORT(
-            ch_arg_prediction
-                .concat(ch_argv_prediction.kargva_reports)
-                .concat(ch_args_oap)
-                .collect(sort: true)
+        // the SARG long table and the per-sample read, 16S and cell estimates
+        ARGS_OAP_REPORT(
+            ARGS_OAP.out.args_oap.map { _meta, dir -> dir }.collect(sort: true)
         )
         ch_versions = ch_versions.mix(
             ARGS_OAP.out.versions.first(),
-            KARGVA.out.versions.first(),
-            KARGA.out.versions.first(),
-            ARG_NORM_REPORT.out.versions
+            ARGS_OAP_REPORT.out.versions
         )
-        // KARGA_norm.csv and KARGVA_norm.csv
-        ch_summary_reports = ch_summary_reports.mix(ARG_NORM_REPORT.out.arg_reports.flatten())
+        // args_oap_long.tsv and args_oap_cells.tsv
+        ch_summary_reports = ch_summary_reports.mix(ARGS_OAP_REPORT.out.reports.flatten())
     }
 
     //
@@ -789,7 +788,7 @@ workflow {
 
     //
     // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG
-    // (K-MARVEL, RGI, KARGA/KARGVA), read functional and MicrobeCensus tables,
+    // (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus tables,
     // Excel workbook, figures, HTML report, README (MD/DOCX) and LLM guide.
     // It reads the aggregated software_versions.yml, so its own versions.yml
     // is not part of that file.

@@ -99,11 +99,15 @@ Complete reference for all BugBuster pipeline parameters.
   - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
 - **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
-### `--read_arg_prediction`
+### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable ARG and ARGV gene prediction at read level using KARGA and KARGVA
-- **Example**: `--read_arg_prediction true`
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 6.12)
+- **Example**: `--args_oap_prediction true`
+- **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
+
+#### `--read_arg_prediction`
+- **Deprecated** alias of `--args_oap_prediction`. It used to run KARGA, KARGVA and ARGs-OAP together; KARGA and KARGVA were removed, so `true` now runs ARGs-OAP only, with a warning at launch
 
 ### `--rgi_prediction`
 - **Type**: Boolean
@@ -117,7 +121,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `false`
 - **Description**: Enable read-level ARG detection with [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel): CARD protein ARGs are assembled from each sample's host-removed reads (R1, R2 and singletons pooled), chimeric assemblies are removed, variant models are kept only with a CARD resistance SNP, and every ARG is confirmed with blastp. Needs no assembly. Results in `05_arg_prediction/read_level/kmarvel/` and `kmarvel_summary/`
 - **Example**: `--kmarvel_prediction true`
-- **Note**: Runs from the pipeline-built image `ghcr.io/gene2dis/bugbuster-kmarvel` (no bioconda package). Independent of `--read_arg_prediction` and `--rgi_prediction`
+- **Note**: Runs from the pipeline-built image `ghcr.io/gene2dis/bugbuster-kmarvel` (no bioconda package). Independent of `--args_oap_prediction` and `--rgi_prediction`
 
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
@@ -201,20 +205,6 @@ Complete reference for all BugBuster pipeline parameters.
 - **Options**: `gtdb_r232` (two-stage `.syl2db`, 19 GB), `gtdb_r226` (`.syldb`, 18 GB), `gtdb_r220` (`.syldb`, 13.1 GB)
 - **Description**: Sylph database selection: GTDB representative genomes (c200 builds), downloaded together with the sylph-tax taxonomy metadata of the same release (~5-13 MB) into `<databases_dir>/sylph/`
 - **Example**: `--sylph_db gtdb_r226`
-
-### `--karga_db`
-- **Type**: String
-- **Default**: `megares`
-- **Description**: KARGA reference database selection (MEGARes)
-- **Size**: 9.2 MB
-- **Example**: `--karga_db megares`
-
-### `--kargva_db`
-- **Type**: String
-- **Default**: `kargva`
-- **Description**: KARGVA reference database selection
-- **Size**: 1.5 MB
-- **Example**: `--kargva_db kargva`
 
 ### `--kmarvel_db`
 - **Type**: String
@@ -392,16 +382,6 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to custom NCBI taxdump directory
 - **Example**: `--custom_taxdump_files /path/to/taxdump`
-
-### `--custom_karga_db`
-- **Type**: String (file path)
-- **Description**: Path to custom KARGA database FASTA file
-- **Example**: `--custom_karga_db /path/to/megares.fasta`
-
-### `--custom_kargva_db`
-- **Type**: String (file path)
-- **Description**: Path to custom KARGVA database FASTA file
-- **Example**: `--custom_kargva_db /path/to/kargva.fasta`
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)
@@ -586,9 +566,9 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 ## Results Summary Parameters
 
 The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI,
-KARGA/KARGVA), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
+ARGs-OAP), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
 self-contained HTML report, a README (`README.md`, `README.docx`) and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
-clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.16, for how the results are reported.
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.17, for how the results are reported.
 
 ### `--results_summary`
 - **Type**: Boolean
@@ -1195,7 +1175,7 @@ nextflow run main.nf \
     --taxonomic_profiler kraken2 \
     --include_binning true \
     --binners semibin,metabat2 \
-    --read_arg_prediction true \
+    --args_oap_prediction true \
     --contig_tax_and_arg true \
     --bin_min_completeness 70 \
     --bin_max_contamination 5 \

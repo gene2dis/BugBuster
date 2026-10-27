@@ -1,3 +1,5 @@
+# Obsolete: KARGA and KARGVA were removed from BugBuster (roadmap Phase 8, 2026-10-27), and
+# bin/arg_norm_report.py, its Python port, with them. Kept for reference only.
 library(tidyverse)
 
 assign("File_name",

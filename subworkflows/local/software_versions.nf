@@ -17,7 +17,7 @@
     so the files are not indented. stripIndent() is Java's (JDK 15+): it
     trims trailing whitespace on each line, but it counts the empty line
     after the final newline, so it removes no indentation from a file ending
-    in a newline (a broken heredoc, e.g. KARGVA's, stays indented;
+    in a newline (a broken heredoc, e.g. the removed KARGVA's, stays indented;
     parse_versions in bin/summary_common.py copes with it).
 
     A topic tuple mixed into ch_versions by mistake (a module's
