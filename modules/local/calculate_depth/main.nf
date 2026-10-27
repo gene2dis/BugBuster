@@ -4,10 +4,11 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Calculate contig depth from BAM files using jgi_summarize_bam_contig_depths
     
-    Supports both per-sample and co-assembly modes
+    One BAM per sample assembly; under co-assembly one BAM per sample
+    (against the co-assembly), giving one depth column per sample
     
     Input:
-        tuple val(meta), path(contigs), path(bam)
+        tuple val(meta), path(contigs), path(bam) - bam: one BAM or a list
     
     Output:
         depth: tuple val(meta), path(contigs), path(depth_file)

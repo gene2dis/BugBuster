@@ -2,32 +2,26 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     BWAMEM3_SAMTOOLS Alignment Module (--read_aligner bwamem3)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Align reads to assembled contigs (or to all refined bins) with bwa-mem3
-    and write one coordinate-sorted BAM per sample.
+    Align reads to assembled contigs (a sample's own, or the co-assembly)
+    with bwa-mem3 and write one coordinate-sorted BAM per sample.
 
     The index is its own task (BWAMEM3_INDEX), so one co-assembly index serves
-    the pooled alignment and every per-sample alignment instead of being
-    rebuilt in each of them. BINS_REFERENCE concatenates the refined bins into
-    one reference plus a contig -> bin table, so co-assembly bin depth maps
-    each sample once: bwa mem aligns locally, and mapping against one bin at
-    a time would let reads from other bins pile up as clipped partial hits.
+    every per-sample alignment instead of being rebuilt in each of them.
 
     Alignments pass bin/filter_alignments.sh before sorting: a primary
     alignment needs >= ext.min_aligned_length aligned bases and an identity
     >= ext.min_identity, otherwise the read is kept as unmapped (samtools
     fixmate then updates its mate). bwa mem's local hits from genomes the
-    reference does not contain otherwise inflate gene counts and bin depth
+    reference does not contain otherwise inflate gene counts and depths
     in poorly covered samples (docs/benchmarks/bwamem3_vs_bowtie2.md).
 
     Input:
         BWAMEM3_INDEX:    tuple val(meta), path(fasta)
         BWAMEM3_SAMTOOLS: tuple val(meta), path(reads), path(contigs), path(index)
-        BINS_REFERENCE:   path(bins)
 
     Output:
         BWAMEM3_INDEX:    index: tuple val(meta), path(index dir)
         BWAMEM3_SAMTOOLS: contigs_and_bam, bam_only, empty_contig_report
-        BINS_REFERENCE:   reference: tuple path(all_bins.fa), path(contig_to_bin.tsv)
 ----------------------------------------------------------------------------------------
 */
 
@@ -126,34 +120,20 @@ process BWAMEM3_SAMTOOLS {
         error "BWAMEM3_SAMTOOLS: paired reads are required for sample ${meta.id}"
     }
 
-    // Co-assembly pools every sample's reads (sorted by sample, each sample
-    // R1, R2[, singleton]); bin/read_role.sh sorts them by file name, as in
-    // MEGAHIT and BOWTIE2_SAMTOOLS, so all three agree on the pairs. bwa mem
-    // takes one file per mate, not bowtie2's comma lists, so each library is
-    // mapped on its own and the BAMs are merged; that also keeps bwa's
-    // insert-size estimate per library. A single sample's reads arrive
-    // positionally (raw input names when QC is off).
-    def classify_reads = meta.id == 'coassembly'
-        ? """for f in ${reads.join(' ')}; do
-        role=\$(read_role.sh "\$f") || exit 1
-        case "\$role" in
-            R1) R1+=("\$f") ;;
-            R2) R2+=("\$f") ;;
-            S)  S+=("\$f") ;;
-        esac
-    done"""
-        : "R1=(${reads[0]}); R2=(${reads[1]})${reads.size() > 2 ? "; S=(${reads[2]})" : ''}"
+    // One sample per task, reads positional (raw input names when QC is
+    // off): R1, R2[, singleton]. Under co-assembly each sample is mapped on
+    // its own against the co-assembly and the pooled BAM is a samtools merge
+    // of these (issue #28). The intermediate BAM names keep the header's @PG
+    // lines as they were.
+    def map_singletons = reads.size() > 2
+        ? """map_reads ${prefix}_lib0_singleton.bam ${reads[2]}
+        samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam ${prefix}_lib0_paired.bam ${prefix}_lib0_singleton.bam
+        rm -f ${prefix}_lib0_paired.bam ${prefix}_lib0_singleton.bam"""
+        : "mv ${prefix}_lib0_paired.bam ${prefix}_all_reads.bam"
     def stage = task.process.tokenize(':')[-1]
 
     """
     set -euo pipefail
-
-    R1=(); R2=(); S=()
-    ${classify_reads}
-    if [ \${#R1[@]} -eq 0 ] || [ \${#R1[@]} -ne \${#R2[@]} ]; then
-        echo "ERROR: could not pair R1/R2 files for ${prefix}: ${reads.join(' ')}" >&2
-        exit 1
-    fi
 
     # Contig set empty after filtering (BWAMEM3_INDEX left the index empty)
     if ! grep -q '^>' "${contigs}"; then
@@ -191,23 +171,8 @@ process BWAMEM3_SAMTOOLS {
                 | samtools sort ${args2} -@ ${task.cpus} -o "\${out}" -
         }
 
-        bams=()
-        for i in "\${!R1[@]}"; do
-            bam="${prefix}_lib\${i}_paired.bam"
-            map_reads "\${bam}" "\${R1[i]}" "\${R2[i]}"
-            bams+=("\${bam}")
-        done
-        for i in "\${!S[@]}"; do
-            bam="${prefix}_lib\${i}_singleton.bam"
-            map_reads "\${bam}" "\${S[i]}"
-            bams+=("\${bam}")
-        done
-        if [ \${#bams[@]} -eq 1 ]; then
-            mv "\${bams[0]}" ${prefix}_all_reads.bam
-        else
-            samtools merge -@ ${task.cpus} -o ${prefix}_all_reads.bam "\${bams[@]}"
-            rm -f "\${bams[@]}"
-        fi
+        map_reads ${prefix}_lib0_paired.bam ${reads[0]} ${reads[1]}
+        ${map_singletons}
     fi
 
     cat <<-END_VERSIONS > versions.yml
@@ -227,88 +192,6 @@ process BWAMEM3_SAMTOOLS {
     "${task.process}":
         bwamem3: 0.15.0
         samtools: 1.24
-    END_VERSIONS
-    """
-}
-
-process BINS_REFERENCE {
-    tag "bins"
-    label 'process_single'
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
-
-    input:
-    path(bins)
-
-    output:
-    tuple path("all_bins.fa"), path("contig_to_bin.tsv"), emit: reference
-    path "versions.yml"                                 , emit: versions
-
-    when:
-    task.ext.when == null || task.ext.when
-
-    script:
-    """
-    set -euo pipefail
-
-    # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order. Bin ids are
-    # the FASTA basenames. A contig already placed in an earlier bin is
-    # skipped with a warning, so the reference has unique names
-    # (refined bins should never share contigs; the old per-bin
-    # mapping tolerated it silently). A bin that adds no contig (no
-    # sequences, or only contigs of earlier bins) gets one row with an empty
-    # contig field, so it still reports a 0-coverage row downstream. One awk
-    # reads every bin in order, keeping the placed contigs in memory.
-    : > all_bins.fa
-    : > contig_to_bin.tsv
-    bin_files=()
-    for bin in ${bins}/*.fa; do
-        [ -e "\${bin}" ] && bin_files+=("\${bin}")
-    done
-    awk '
-        BEGIN {
-            for (i = 1; i < ARGC; i++) {
-                file = ARGV[i]
-                bin = file
-                sub(/.*\\//, "", bin)
-                sub(/\\.fa\$/, "", bin)
-                kept = 0
-                keep = 0
-                while ((getline line < file) > 0) {
-                    if (substr(line, 1, 1) == ">") {
-                        split(substr(line, 2), words, /[ \\t]/)
-                        name = words[1]
-                        keep = !(name in seen)
-                        if (keep) {
-                            seen[name] = 1
-                            kept++
-                            print name "\\t" bin > "contig_to_bin.tsv"
-                        } else {
-                            print "WARNING: contig " name " of bin " bin " is already in another bin - skipped" > "/dev/stderr"
-                        }
-                    }
-                    if (keep) print line > "all_bins.fa"
-                }
-                close(file)
-                if (!kept) print "\\t" bin > "contig_to_bin.tsv"
-            }
-            exit
-        }
-    ' "\${bin_files[@]}"
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        mawk: \$(awk -W version 2>&1 | head -1 | cut -d' ' -f2)
-    END_VERSIONS
-    """
-
-    stub:
-    """
-    printf '>contig_1\\nACGT\\n' > all_bins.fa
-    printf 'contig_1\\tbin.1\\n' > contig_to_bin.tsv
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        mawk: 1.3.4
     END_VERSIONS
     """
 }

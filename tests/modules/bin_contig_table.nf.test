@@ -1,12 +1,12 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    BINS_REFERENCE Module Test
+    BIN_CONTIG_TABLE Module Test
 
-    Co-assembly bin depth under --read_aligner bwamem3 maps each sample once
-    against all bins, so the bins are concatenated into one reference with a
-    contig -> bin table. tests/data/bins/overlap_bins:
+    Co-assembly bin depth counts each sample's co-assembly alignment over the
+    contigs of each refined bin, through a contig -> bin table.
+    tests/data/bins/overlap_bins:
       - a.fa: c1 (header with a description), c2
-      - b.fa: c2 again (must be skipped, keeping the reference names unique)
+      - b.fa: c2 again (must be skipped, so each contig counts once)
               and c3
       - c.fa: empty bin (one table row with an empty contig field)
       - d.fa: only c1 again, so it adds no contig and gets the same
@@ -16,11 +16,11 @@
 
 nextflow_process {
 
-    name "Test BINS_REFERENCE Process"
-    script "../../modules/local/bwamem3_samtools/main.nf"
-    process "BINS_REFERENCE"
+    name "Test BIN_CONTIG_TABLE Process"
+    script "../../modules/local/bedtools/main.nf"
+    process "BIN_CONTIG_TABLE"
 
-    test("concatenates bins, skips duplicate contigs, keeps empty and fully duplicated bins") {
+    test("lists each contig once, keeps empty and fully duplicated bins") {
         when {
             process {
                 """
@@ -32,13 +32,9 @@ nextflow_process {
         then {
             assert process.success
 
-            def fasta = path(process.out.reference[0][0]).readLines()
-            assert fasta.findAll { line -> line.startsWith('>') } == ['>c1 len=8', '>c2', '>c3']
-            // c2's sequence is written once (two lines), from a.fa
-            assert fasta == ['>c1 len=8', 'ACGTACGT', '>c2', 'GGGGCCCC', 'AAAA', '>c3', 'TTTTAAAA']
-
-            def table = path(process.out.reference[0][1]).readLines()
+            def table = path(process.out.table[0]).readLines()
             assert table == ["c1\ta", "c2\ta", "c3\tb", "\tc", "\td"]
+            assert path(process.out.versions.get(0)).text.contains("busybox: 1.36.1")
         }
     }
 
@@ -53,7 +49,7 @@ nextflow_process {
 
         then {
             assert process.success
-            assert path(process.out.reference[0][1]).readLines() == ["bin1_contig_1\tbin.1"]
+            assert path(process.out.table[0]).readLines() == ["bin1_contig_1\tbin.1"]
         }
     }
 
@@ -68,8 +64,7 @@ nextflow_process {
 
         then {
             assert process.success
-            assert path(process.out.reference[0][0]).text == ''
-            assert path(process.out.reference[0][1]).text == ''
+            assert path(process.out.table[0]).text == ''
         }
     }
 }

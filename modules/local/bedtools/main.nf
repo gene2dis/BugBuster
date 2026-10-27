@@ -1,63 +1,88 @@
-process BEDTOOLS {
+/*
+    BIN_CONTIG_TABLE: contig -> bin table of the refined bins for
+    BEDTOOLS_BIN_DEPTH (co-assembly bin depth).
+*/
+process BIN_CONTIG_TABLE {
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_1'
 
-    tag "${meta.id}"
+    tag "bins"
     label 'process_single'
 
     input:
-        tuple val(meta), path(bam_files)
-
-    // Output channels for this process
+        path(bins)
 
     output:
-        path("*_bin_depth.tsv"), emit: bin_depth
+        path("contig_to_bin.tsv"), emit: table
         path "versions.yml", emit: versions
 
     script:
-        def prefix = "${meta.id}"
-
         """
-        printf "sample\\tbin_id\\tTotal_contigs\\taverage_cov\\n" > ${prefix}_bin_depth.tsv
-        for bam in *.bam; do
-            # BAMs are named <sample>_<bin>_all_reads.bam by
-            # BOWTIE2_SAMTOOLS_DEPTH; strip prefix and suffix instead of the
-            # old greedy-sed parse that only worked for bins named bin.N
-            bin_name=\${bam#${prefix}_}
-            bin_name=\${bin_name%_all_reads.bam}
-            genomeCoverageBed -ibam \${bam} > \${bin_name}_cov.tsv
-            # Skip the whole-genome histogram rows (chrom = "genome"): they are
-            # a summary of the contig rows, not another contig
-            cat \${bin_name}_cov.tsv | awk '\$1 != "genome" {print \$1, \$2*\$3, \$4, \$5}' | awk '{sum[\$1] += \$2; contig_length[\$1] = \$3} END { for (nombre in sum) { promedio = sum[nombre] / contig_length[nombre]; print nombre, promedio, sum[nombre], contig_length[nombre]; } }' | awk '{sum += \$2; count++; } END { if (count > 0) { promedio = sum / count } else { count = 0; promedio = 0 }; print "tmp1\ttmp2\t",count,"\t",promedio; }' > bin_depth_tmp.tsv
-            cat bin_depth_tmp.tsv | sed "s/tmp1/${prefix}/g" | sed "s/tmp2/\${bin_name}/g" >> ${prefix}_bin_depth.tsv
+        set -euo pipefail
+
+        # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order, contig =
+        # first word of the header, bin id = FASTA basename. A contig already
+        # placed in an earlier bin is skipped with a warning (refined bins
+        # should never share contigs), so each contig counts once. A bin that
+        # adds no contig (no sequences, or only contigs of earlier bins) gets
+        # one row with an empty contig field, so it still reports a
+        # 0-coverage row downstream.
+        : > contig_to_bin.tsv
+        bin_files=()
+        for bin in ${bins}/*.fa; do
+            [ -e "\${bin}" ] && bin_files+=("\${bin}")
         done
+        awk '
+            BEGIN {
+                for (i = 1; i < ARGC; i++) {
+                    file = ARGV[i]
+                    bin = file
+                    sub(/.*\\//, "", bin)
+                    sub(/\\.fa\$/, "", bin)
+                    kept = 0
+                    while ((getline line < file) > 0) {
+                        if (substr(line, 1, 1) != ">") continue
+                        split(substr(line, 2), words, /[ \\t]/)
+                        name = words[1]
+                        if (name in seen) {
+                            print "WARNING: contig " name " of bin " bin " is already in another bin - skipped" > "/dev/stderr"
+                            continue
+                        }
+                        seen[name] = 1
+                        kept++
+                        print name "\\t" bin > "contig_to_bin.tsv"
+                    }
+                    close(file)
+                    if (!kept) print "\\t" bin > "contig_to_bin.tsv"
+                }
+                exit
+            }
+        ' "\${bin_files[@]}"
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bedtools: \$(bedtools --version | sed 's/bedtools v//')
+            busybox: \$(busybox 2>&1 | head -1 | sed -E 's/BusyBox v([0-9.]+).*/\\1/')
         END_VERSIONS
-	"""
+        """
 
     stub:
-        def prefix = "${meta.id}"
-
         """
-        printf "sample\\tbin_id\\tTotal_contigs\\taverage_cov\\n" > ${prefix}_bin_depth.tsv
+        printf 'contig_1\\tbin.1\\n' > contig_to_bin.tsv
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":
-            bedtools: 2.31.1
+            busybox: 1.36.1
         END_VERSIONS
         """
 }
 
 /*
-    BEDTOOLS_BIN_DEPTH (--read_aligner bwamem3): same per-bin coverage table
-    as BEDTOOLS, from ONE BAM of the sample's reads mapped against all bins
-    at once (BINS_REFERENCE + BWAMEM3_SAMTOOLS). contig_to_bin.tsv assigns
-    each contig to its bin; a bin row with an empty contig field is a bin
-    without sequences and reports 0 contigs / 0 coverage, like an empty
-    per-bin BAM does in BEDTOOLS. Per-bin values keep BEDTOOLS' semantics:
-    the mean over the bin's contigs of each contig's mean depth.
+    BEDTOOLS_BIN_DEPTH: co-assembly bin coverage per sample, from the
+    sample's alignment against the whole co-assembly (the same BAM that
+    counts genes and gives MetaBAT2 its depths; issue #28). Only the contigs
+    in contig_to_bin.tsv (BIN_CONTIG_TABLE) count, each in its bin; a bin row
+    with an empty contig field is a bin without sequences and reports
+    0 contigs / 0 coverage. Per bin: the mean over its contigs of each
+    contig's mean depth.
 */
 process BEDTOOLS_BIN_DEPTH {
     container 'quay.io/biocontainers/bedtools:2.31.1--hf5e1c6e_1'
@@ -76,24 +101,24 @@ process BEDTOOLS_BIN_DEPTH {
         def prefix = "${meta.id}"
 
         """
+        set -euo pipefail
+
         printf "sample\\tbin_id\\tTotal_contigs\\taverage_cov\\n" > ${prefix}_bin_depth.tsv
-        genomeCoverageBed -ibam ${bam} > ${prefix}_cov.tsv
-        # Skip the whole-genome histogram rows (chrom = "genome"): they are a
-        # summary of the contig rows, not another contig
-        awk -F '\\t' -v sample="${prefix}" '
+        # The histogram streams into awk (the co-assembly BAM's header holds
+        # every contig) and only binned contigs are kept, which also skips
+        # the whole-genome summary rows (chrom = "genome")
+        genomeCoverageBed -ibam ${bam} | awk -F '\\t' -v sample="${prefix}" '
             FILENAME == ARGV[1] {
                 if (!(\$2 in n_contigs)) { order[++n_bins] = \$2; n_contigs[\$2] = 0 }
                 if (\$1 != "") contig_bin[\$1] = \$2
                 next
             }
-            \$1 != "genome" { depth_sum[\$1] += \$2 * \$3; contig_length[\$1] = \$4 }
+            \$1 in contig_bin { depth_sum[\$1] += \$2 * \$3; contig_length[\$1] = \$4 }
             END {
                 for (contig in contig_length) {
-                    if (contig in contig_bin) {
-                        bin = contig_bin[contig]
-                        cov_sum[bin] += depth_sum[contig] / contig_length[contig]
-                        n_contigs[bin]++
-                    }
+                    bin = contig_bin[contig]
+                    cov_sum[bin] += depth_sum[contig] / contig_length[contig]
+                    n_contigs[bin]++
                 }
                 for (i = 1; i <= n_bins; i++) {
                     bin = order[i]
@@ -101,8 +126,7 @@ process BEDTOOLS_BIN_DEPTH {
                     print sample "\\t" bin "\\t", n_contigs[bin], "\\t", promedio
                 }
             }
-        ' ${contig_to_bin} ${prefix}_cov.tsv >> ${prefix}_bin_depth.tsv
-        rm -f ${prefix}_cov.tsv
+        ' ${contig_to_bin} - >> ${prefix}_bin_depth.tsv
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

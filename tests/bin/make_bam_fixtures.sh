@@ -1,8 +1,9 @@
 #!/bin/bash
 #
-# Generate the committed BAM fixtures used by tests/modules/bedtools.nf.test
-# (regression test for audit item #22: BEDTOOLS awk division by zero for bins
-# with no aligned reads).
+# Generate the committed BAM fixtures (written for audit item #22, the old
+# per-bin BEDTOOLS awk division by zero for bins with no aligned reads; now
+# read by tests/modules/bedtools_bin_depth.nf.test and
+# tests/modules/featurecounts_genes.nf.test).
 #
 # Creates, under tests/data/bam/:
 #   - test_bin.1_all_reads.bam  two 50 bp reads aligned to a 1 kb contig
@@ -15,8 +16,8 @@
 #     none (per-contig mean 0.05); genomeCoverageBed's "genome" summary rows
 #     must not count as a third contig or enter the mean
 #
-# Filenames follow the BOWTIE2_SAMTOOLS_DEPTH per-bin naming that the BEDTOOLS
-# module's sed chain expects ({sample}_bin.N_all_reads.bam -> bin.N).
+# Filenames follow the per-bin naming of the removed BOWTIE2_SAMTOOLS_DEPTH
+# ({sample}_bin.N_all_reads.bam); no test parses them any more.
 #
 # Requirements: docker.
 #

@@ -23,6 +23,21 @@ class TaskInputs {
         return stagedReadsIn(Files.readSymbolicLink(link).parent)
     }
 
+    // Targets of the BAM links staged in the work directory of the task that
+    // wrote the given output, in staging order (nf-core modules stage a list
+    // as 1/<file>, 2/<file>, ...)
+    static List<String> stagedBams(output) {
+        def dir = Paths.get(output.toString()).parent
+        def links = []
+        Files.walk(dir, 2).withCloseable { paths ->
+            paths.filter { p -> Files.isSymbolicLink(p) && p.toString().endsWith('.bam') }
+                .forEach { p -> links << p }
+        }
+        return links
+            .sort { p -> dir.relativize(p).getName(0).toString().toInteger() }
+            .collect { p -> Files.readSymbolicLink(p).toString() }
+    }
+
     static List<String> stagedReadsIn(Path dir) {
         return dir.toFile().listFiles()
             .findAll { f -> Files.isSymbolicLink(f.toPath()) && (f.name =~ /\.f(ast)?q(\.gz)?$/) }

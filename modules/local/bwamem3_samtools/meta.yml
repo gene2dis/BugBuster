@@ -1,8 +1,7 @@
 name: bwamem3_samtools
 description: |
-  bwa-mem3 read mapping with samtools sorting (--read_aligner bwamem3) - reads against assembled contigs
-  (BWAMEM3_SAMTOOLS, aliased BWAMEM3_SAMTOOLS_PER_SAMPLE) and, under co-assembly binning, each sample's
-  reads against all refined bins at once (BINS_REFERENCE + BWAMEM3_INDEX + BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH)
+  bwa-mem3 read mapping with samtools sorting (--read_aligner bwamem3) - one sample's reads against its
+  own contigs or the co-assembly (BWAMEM3_INDEX + BWAMEM3_SAMTOOLS)
 keywords:
   - alignment
   - bwa-mem3
@@ -26,7 +25,7 @@ tools:
 processes:
   - name: BWAMEM3_INDEX
     description: |
-      Builds a bwa-mem3 index of a FASTA (filtered contigs, or the concatenated bins). Memory scales with
+      Builds a bwa-mem3 index of a FASTA (the filtered contigs). Memory scales with
       the FASTA size. A FASTA without sequences yields an empty index directory; the mapping task then
       writes a header-only BAM.
     input:
@@ -52,22 +51,20 @@ processes:
       Maps each library's paired reads (and singletons when present) with bwa-mem3, drops secondary and
       supplementary records, turns alignments below ext.min_identity / ext.min_aligned_length into
       unmapped reads (bin/filter_alignments.sh, then samtools fixmate), coordinate-sorts and merges into
-      one BAM. When meta.id is 'coassembly' the
-      collected reads are split into R1/R2/singleton lists by file name. A contig file with no sequences
-      yields a header-only BAM plus an empty-contig report instead of failing.
+      one BAM. One sample per task, against its own contigs or the co-assembly (the co-assembly's pooled
+      BAM is a samtools merge of these). A contig file with no sequences yields a header-only BAM plus an
+      empty-contig report instead of failing.
     input:
       - meta:
           type: map
-          description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+          description: Sample metadata (meta.id is the sample name)
       - reads:
           type: file
-          description: |
-            Host-removed reads - R1, R2 and optional singleton for one sample, or all samples' reads
-            under co-assembly (classified by _R1_/_1., _R2_/_2. and singleton/unpaired in the file name)
+          description: Host-removed reads of one sample - R1, R2 and optional singleton, by position
           pattern: "*.fastq.gz"
       - contigs:
           type: file
-          description: The FASTA the index was built from (filtered contigs or all_bins.fa)
+          description: The FASTA the index was built from (filtered contigs)
           pattern: "*.fa"
       - index:
           type: directory
@@ -85,25 +82,6 @@ processes:
           type: file
           description: Optional; written only when the contig file had no sequences (sample_id, stage, timestamp, action_taken); aggregated by CONTIG_FILTER_SUMMARY
           pattern: "*_empty_contig_report.txt"
-      - versions:
-          type: file
-          description: Software versions
-          pattern: "versions.yml"
-
-  - name: BINS_REFERENCE
-    description: |
-      Concatenates the refined bins into one reference and writes a contig -> bin table (bin id = FASTA
-      basename). Contigs already present in an earlier bin are skipped with a warning; a bin without
-      sequences gets a table row with an empty contig field.
-    input:
-      - bins:
-          type: directory
-          description: Refined bin directory (bins as *.fa)
-    output:
-      - reference:
-          type: tuple
-          description: Tuple of all_bins.fa and contig_to_bin.tsv (contig TAB bin)
-          pattern: "{all_bins.fa,contig_to_bin.tsv}"
       - versions:
           type: file
           description: Software versions

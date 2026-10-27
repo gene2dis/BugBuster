@@ -21,10 +21,10 @@
         contigs_meta: [meta, contigs] - Filtered contigs only for annotation
         bam: [meta, contigs, bam] - BAM files with contigs for depth analysis
         bam_meta: [meta, bam] - BAM files only for indexing
-        counting_bam: [meta, bam] - Per-sample BAMs for gene quantification
-                (assembly: the same per-sample BAM as bam_meta; coassembly:
-                dedicated per-sample alignments against the co-assembly, since
-                the pooled BAM has no read groups - design doc Q1/T3)
+        counting_bam: [meta, bam] - One BAM per sample, for gene quantification
+                and co-assembly binning depths (assembly: the same BAM as
+                bam_meta; coassembly: each sample against the co-assembly, whose
+                samtools merge is bam/bam_meta - issue #28)
         versions: Tool version information
     
     MODES:
@@ -38,16 +38,11 @@ include { BBNORM               } from '../../modules/local/bbnorm/main'
 include { MEGAHIT              } from '../../modules/local/megahit/main'
 include { BBMAP                } from '../../modules/local/bbmap/main'
 include { BOWTIE2_SAMTOOLS     } from '../../modules/local/bowtie2_samtools/main'
-// Aliased second instance: per-sample alignments against the co-assembly for
-// gene quantification (design doc Q1/T3). Per-sample meta.id selects the
-// module's per-sample script branch; the coassembly index is rebuilt in each
-// task (accepted trade-off, revisit at T9 if it dominates runtime).
-include { BOWTIE2_SAMTOOLS as BOWTIE2_SAMTOOLS_PER_SAMPLE } from '../../modules/local/bowtie2_samtools/main'
 // --read_aligner bwamem3: the contig index is its own task, so the co-assembly
-// index is built once and shared by the pooled and per-sample alignments
+// index is built once and shared by the per-sample alignments
 include { BWAMEM3_INDEX        } from '../../modules/local/bwamem3_samtools/main'
 include { BWAMEM3_SAMTOOLS     } from '../../modules/local/bwamem3_samtools/main'
-include { BWAMEM3_SAMTOOLS as BWAMEM3_SAMTOOLS_PER_SAMPLE } from '../../modules/local/bwamem3_samtools/main'
+include { SAMTOOLS_MERGE as NFCORE_SAMTOOLS_MERGE } from '../../modules/nf-core/samtools/merge/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
 include { flagOn                } from './utils_params'
 
@@ -61,7 +56,7 @@ workflow ASSEMBLY {
     ch_contigs_only = channel.empty()
     ch_bam_with_contigs = channel.empty()
     ch_bam_only = channel.empty()
-    ch_counting_bam = channel.empty()
+    ch_sample_bams = channel.empty()
     ch_filter_reports = channel.empty()
     ch_empty_reports = channel.empty()
     def reduce_reads = params.assembly_read_reduction == 'normalize'
@@ -111,7 +106,7 @@ workflow ASSEMBLY {
                 ch_bam_with_contigs = BWAMEM3_SAMTOOLS.out.contigs_and_bam
                 ch_bam_only = BWAMEM3_SAMTOOLS.out.bam_only
                 // Per-sample BAM is directly suitable for gene counting (Q1)
-                ch_counting_bam = BWAMEM3_SAMTOOLS.out.bam_only
+                ch_sample_bams = BWAMEM3_SAMTOOLS.out.bam_only
                 ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
             } else {
@@ -120,7 +115,7 @@ workflow ASSEMBLY {
                 ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
                 ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
                 // Per-sample BAM is directly suitable for gene counting (Q1)
-                ch_counting_bam = BOWTIE2_SAMTOOLS.out.bam_only
+                ch_sample_bams = BOWTIE2_SAMTOOLS.out.bam_only
                 ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
             }
@@ -136,7 +131,7 @@ workflow ASSEMBLY {
         // R1/R2 lists stay paired). Plain collect() followed task completion
         // order, which changed the MEGAHIT task hash between identical runs
         // and could re-run the whole co-assembly on -resume (design doc Q19).
-        // Built once and reused for the co-assembly alignment below.
+        // Built once for MEGAHIT (or BBNorm) and BBMAP.
         ch_pooled_reads = reads
             .toSortedList { a, b -> a[0].id <=> b[0].id }
             .map { items -> items.collect { item -> item[1] }.flatten() }
@@ -175,62 +170,53 @@ workflow ASSEMBLY {
         // Set output channels
         ch_contigs_only = BBMAP.out.contigs_only
 
-        // One bwa-mem3 index of the co-assembly, shared by the pooled and the
-        // per-sample alignments below (bowtie2 rebuilds it in each task)
-        ch_coassembly_index = channel.empty()
-        if ( params.read_aligner == 'bwamem3' && ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) ) {
-            BWAMEM3_INDEX(BBMAP.out.contigs_only)
-            ch_coassembly_index = BWAMEM3_INDEX.out.index.map { _meta, index -> index }
-            ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
-        }
-
-        // Generate BAM files for binning/contig analysis if needed
-        if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
-            // Prepare input: combine all original reads with filtered contigs
-            // More efficient: collect reads first, then combine with contigs
-            ch_alignment_input = ch_coassembly_reads
+        // One alignment per sample against the co-assembly (issue #28): the
+        // per-sample BAMs count genes (design doc Q1/T3), give MetaBAT2 one
+        // depth column per sample and bin depth per sample, and their samtools
+        // merge is the pooled BAM SemiBin2, COMEBin and BlobTools take. A merge
+        // of the per-sample BAMs holds the same records as mapping every
+        // sample in one task did. No read groups, as before: nothing
+        // downstream reads them.
+        if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
+            ch_per_sample_input = reads
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
-                .map { meta, reads_list, contigs -> [meta, reads_list, contigs] }
 
             if ( params.read_aligner == 'bwamem3' ) {
-                BWAMEM3_SAMTOOLS(ch_alignment_input.combine(ch_coassembly_index))
+                // One index of the co-assembly, shared by every sample (bowtie2
+                // builds it in each task)
+                BWAMEM3_INDEX(BBMAP.out.contigs_only)
+                ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
 
-                ch_bam_only = BWAMEM3_SAMTOOLS.out.bam_only
-                ch_bam_with_contigs = BWAMEM3_SAMTOOLS.out.contigs_and_bam
+                BWAMEM3_SAMTOOLS(ch_per_sample_input.combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index }))
+
+                ch_sample_bams = BWAMEM3_SAMTOOLS.out.bam_only
                 ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
             } else {
-                BOWTIE2_SAMTOOLS(ch_alignment_input)
+                BOWTIE2_SAMTOOLS(ch_per_sample_input)
 
-                ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
-                ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+                ch_sample_bams = BOWTIE2_SAMTOOLS.out.bam_only
                 ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS.out.versions.first())
             }
         }
 
-        // Per-sample alignments against the co-assembly for gene counting
-        // (design doc Q1/T3): the pooled BAM above has no read groups, so it
-        // cannot yield per-sample counts. Per-sample meta.id (!= 'coassembly')
-        // selects the module's per-sample script branch.
-        if ( flagOn(params.contig_level_functional) ) {
-            ch_per_sample_input = reads
+        // Pooled BAM for binning and contig taxonomy: the per-sample BAMs in
+        // sample order (a fixed task input, and the record order of the old
+        // pooled task), named coassembly_all_reads.bam (ext.prefix)
+        if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
+            NFCORE_SAMTOOLS_MERGE(
+                ch_sample_bams
+                    .toSortedList { a, b -> a[0].id <=> b[0].id }
+                    .map { items -> [[id: "coassembly"], items.collect { item -> item[1] }, []] },
+                [[], [], [], []],
+                ''
+            )
+
+            ch_bam_only = NFCORE_SAMTOOLS_MERGE.out.bam
+            ch_bam_with_contigs = NFCORE_SAMTOOLS_MERGE.out.bam
                 .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
-                .map { meta, reads_files, contigs -> [meta, reads_files, contigs] }
-
-            if ( params.read_aligner == 'bwamem3' ) {
-                BWAMEM3_SAMTOOLS_PER_SAMPLE(ch_per_sample_input.combine(ch_coassembly_index))
-
-                ch_counting_bam = BWAMEM3_SAMTOOLS_PER_SAMPLE.out.bam_only
-                ch_empty_reports = ch_empty_reports.mix(BWAMEM3_SAMTOOLS_PER_SAMPLE.out.empty_contig_report)
-                ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS_PER_SAMPLE.out.versions.first())
-            } else {
-                BOWTIE2_SAMTOOLS_PER_SAMPLE(ch_per_sample_input)
-
-                ch_counting_bam = BOWTIE2_SAMTOOLS_PER_SAMPLE.out.bam_only
-                ch_empty_reports = ch_empty_reports.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.empty_contig_report)
-                ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_PER_SAMPLE.out.versions.first())
-            }
+                .map { meta, bam, contigs -> [meta, contigs, bam] }
         }
     }
 
@@ -248,6 +234,6 @@ workflow ASSEMBLY {
     contigs_meta    = ch_contigs_only        // channel: [ val(meta), path(contigs) ] - for annotation
     bam             = ch_bam_with_contigs    // channel: [ val(meta), path(contigs), path(bam) ] - for depth analysis
     bam_meta        = ch_bam_only            // channel: [ val(meta), path(bam) ] - for indexing
-    counting_bam    = ch_counting_bam        // channel: [ val(meta), path(bam) ] - per-sample, for gene quantification
+    counting_bam    = ch_sample_bams         // channel: [ val(meta), path(bam) ] - per sample, against its assembly or the co-assembly
     versions        = ch_versions            // channel: path(versions.yml)
 }

@@ -714,6 +714,15 @@ for the numbers behind each setting).
 - **1 binner selected** → runs that binner only, no refinement, binner output used directly; CheckM2 scores its bins in a separate step
 - **≥2 binners selected** → runs selected binners + Binette bin refinement; Binette's own CheckM2 run scores the raw and the refined bins, and the pipeline publishes those reports in `quality/checkm2/` (no separate CheckM2 step)
 
+**Co-assembly coverage.** Under `--assembly_mode coassembly` each sample's reads
+are aligned once against the co-assembly. Those per-sample BAMs give MetaBAT2
+one depth column per sample, count genes for the functional branch and give
+each refined bin its per-sample coverage (`coverage/<sample>_bin_depth.tsv`);
+SemiBin2 (whose pre-trained models take one coverage column) and COMEBin get
+their `samtools merge`, the pooled BAM. On a five-sample co-assembly the
+per-sample depths raised MetaBAT2's MIMAG high-quality bins from 11 to 23
+(`docs/benchmarks/binning_2026.md`).
+
 > **COMEBin is costly.** It runs on CPU only (the pipeline has no GPU path; 8 CPUs
 > per sample) and took 38 CPU-hours (6 h wall) on a 37 Mbp per-sample assembly,
 > about 370 times SemiBin2; its cost grows with the assembly, about 1-1.6
@@ -817,8 +826,8 @@ extension (9) sizes are fixed by the tool and not exposed.
 
 ### 6.12 Read Aligner Options
 
-`--read_aligner` picks the aligner for host/phiX removal, reads-to-contigs
-mapping (contig depth, binning, gene counting) and co-assembly bin depth.
+`--read_aligner` picks the aligner for host/phiX removal and reads-to-contigs
+mapping (contig depth, binning, gene counting, co-assembly bin depth).
 Woltka and HUMAnN always use bowtie2 with their own databases.
 
 | Parameter | Default | Description |
@@ -1116,7 +1125,7 @@ results/
 │   │   │   └── checkm2/
 │   │   ├── taxonomy/                           # GTDB-TK taxonomy
 │   │   │   └── gtdbtk/
-│   │   ├── coverage/                           # Bin coverage information
+│   │   ├── coverage/                           # Bin coverage per sample (<sample>_bin_depth.tsv)
 │   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
 │   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')
 │   │   └── summary/
