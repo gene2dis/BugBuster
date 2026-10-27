@@ -1,5 +1,5 @@
 name: bedtools
-description: Per-bin read coverage under co-assembly binning - runs bedtools genomecov and reports each bin's contig count and the mean of its per-contig average depths
+description: Per-bin read coverage under co-assembly binning - a contig -> bin table, then bedtools genomecov on each sample's co-assembly BAM, reporting each bin's contig count and the mean of its per-contig average depths
 keywords:
   - coverage
   - depth
@@ -14,22 +14,20 @@ tools:
       licence: ["MIT"]
 
 processes:
-  - name: BEDTOOLS
+  - name: BIN_CONTIG_TABLE
     description: |
-      --read_aligner bowtie2: one BAM per bin (BOWTIE2_SAMTOOLS_DEPTH); the bin id is parsed from the file name.
+      Writes the contig -> bin table of the refined bins (contig = first header word, bin id = FASTA
+      basename). Contigs already present in an earlier bin are skipped with a warning; a bin without
+      sequences, or with only contigs of earlier bins, gets one row with an empty contig field.
     input:
-      - meta:
-          type: map
-          description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
-      - bam_files:
-          type: file
-          description: Per-bin BAMs from BOWTIE2_SAMTOOLS_DEPTH, named <sample>_<bin>_all_reads.bam (the bin id is parsed from the file name)
-          pattern: "*_all_reads.bam"
+      - bins:
+          type: directory
+          description: Refined bin directory (bins as *.fa)
     output:
-      - bin_depth:
+      - table:
           type: file
-          description: TSV with columns sample, bin_id, Total_contigs and average_cov, one row per bin
-          pattern: "*_bin_depth.tsv"
+          description: contig_to_bin.tsv (contig TAB bin)
+          pattern: "contig_to_bin.tsv"
       - versions:
           type: file
           description: Software versions
@@ -37,15 +35,15 @@ processes:
 
   - name: BEDTOOLS_BIN_DEPTH
     description: |
-      --read_aligner bwamem3: one BAM of the sample's reads mapped against all bins at once; contigs are
-      assigned to bins through contig_to_bin.tsv (BINS_REFERENCE). Same output table as BEDTOOLS.
+      Co-assembly bin coverage of one sample, from its alignment against the co-assembly (either aligner);
+      contigs are assigned to bins through contig_to_bin.tsv (BIN_CONTIG_TABLE), other contigs are ignored.
     input:
       - meta:
           type: map
           description: Sample metadata (meta.id is the sample whose reads were mapped to the bins)
       - bam:
           type: file
-          description: Sorted BAM of the sample's reads against all bins (BWAMEM3_BIN_DEPTH)
+          description: Sorted BAM of the sample's reads against the co-assembly (BWAMEM3_SAMTOOLS or BOWTIE2_SAMTOOLS)
           pattern: "*_all_reads.bam"
       - contig_to_bin:
           type: file

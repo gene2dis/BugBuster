@@ -13,14 +13,16 @@
         contigs_and_bam: [meta, contigs, bam] - Contigs with aligned reads (BAM)
         checkm2_db: CheckM2 database for quality assessment
         gtdbtk_db: GTDB-Tk database for taxonomic classification
-        reads: [meta, reads] - Original reads (optional, only for co-assembly bin coverage)
+        sample_bams: [meta, bam] - One BAM per sample against the co-assembly
+                (used only under co-assembly: MetaBAT2 depths and bin coverage)
     
     OUTPUTS:
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
         versions: Tool version information
     
     WORKFLOW:
-        1. Calculate contig depth from BAM files (if MetaBAT2 selected)
+        1. Calculate contig depth from BAM files (if MetaBAT2 selected; one
+           column per sample under co-assembly)
         2. Run selected binning tools in parallel (from: MetaBAT2, SemiBin, COMEBin)
         3. If >=2 binners selected, refine bins with Binette
         4. Assess quality with CheckM2 (Binette's own run when refined)
@@ -38,12 +40,7 @@ include { COMEBIN                    } from '../../modules/local/comebin/main'
 include { BINETTE                    } from '../../modules/local/binette/main'
 include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/main'
 include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
-include { BOWTIE2_SAMTOOLS_DEPTH     } from '../../modules/local/bowtie2_samtools/main'
-include { BEDTOOLS                   } from '../../modules/local/bedtools/main'
-// --read_aligner bwamem3: each sample is mapped once against all bins
-include { BINS_REFERENCE             } from '../../modules/local/bwamem3_samtools/main'
-include { BWAMEM3_INDEX as BWAMEM3_BINS_INDEX } from '../../modules/local/bwamem3_samtools/main'
-include { BWAMEM3_SAMTOOLS as BWAMEM3_BIN_DEPTH } from '../../modules/local/bwamem3_samtools/main'
+include { BIN_CONTIG_TABLE           } from '../../modules/local/bedtools/main'
 include { BEDTOOLS_BIN_DEPTH         } from '../../modules/local/bedtools/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
@@ -54,7 +51,7 @@ workflow BINNING {
     contigs_and_bam // channel: [ val(meta), path(contigs), path(bam) ]
     checkm2_db      // channel: path(checkm2_db)
     gtdbtk_db       // channel: path(gtdbtk_db)
-    reads           // channel: [ val(meta), [ reads ] ] - optional, only for co-assembly bin coverage
+    sample_bams     // channel: [ val(meta), path(bam) ] - per sample vs the co-assembly; used only under co-assembly
 
     main:
     ch_versions = channel.empty()
@@ -71,9 +68,22 @@ workflow BINNING {
     // Unified binning workflow - mode-agnostic
     //
     
-    // Calculate depth from BAM files (required for MetaBAT2)
+    // Calculate depth from BAM files (required for MetaBAT2). Under
+    // co-assembly MetaBAT2 gets one depth column per sample, from the
+    // per-sample BAMs in sample order (docs/benchmarks/binning_2026.md: MIMAG
+    // high-quality MetaBAT2 bins 11 -> 23); SemiBin2 and COMEBin keep the
+    // pooled BAM (SemiBin2's pre-trained models take one coverage column)
     if (use_metabat2) {
-        CALCULATE_DEPTH(contigs_and_bam)
+        ch_depth_input = params.assembly_mode == "coassembly"
+            ? contigs_and_bam
+                .map { meta, contigs, _bam -> [meta, contigs] }
+                .combine(
+                    sample_bams
+                        .toSortedList { a, b -> a[0].id <=> b[0].id }
+                        .map { items -> [items.collect { item -> item[1] }] }
+                )
+            : contigs_and_bam
+        CALCULATE_DEPTH(ch_depth_input)
         ch_versions = ch_versions.mix(CALCULATE_DEPTH.out.versions.first())
         METABAT2(CALCULATE_DEPTH.out.depth)
         ch_versions = ch_versions.mix(METABAT2.out.versions.first())
@@ -233,9 +243,9 @@ workflow BINNING {
     } else if ( params.assembly_mode == "coassembly" ) {
         // Co-assembly mode: additional bin coverage analysis and summary report
         // Bin depth needs at least one refined bin: a bin set can be empty
-        // (Binette or SemiBin write only SKIPPED.txt when nothing passes),
-        // and both depth paths fail on an empty reference. BIN_SUMMARY then
-        // writes a header-only table from the empty quality/taxonomy reports
+        // (Binette or SemiBin write only SKIPPED.txt when nothing passes).
+        // BIN_SUMMARY then writes a header-only table from the empty
+        // quality/taxonomy reports
         def ch_bins_for_depth = ch_refined_bins
             .filter { meta, bins ->
                 def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
@@ -244,39 +254,15 @@ workflow BINNING {
                 }
                 has_bins
             }
-        def ch_bin_cov
-        if ( params.read_aligner == 'bwamem3' ) {
-            // One reference of all refined bins (+ contig -> bin table), one
-            // index, one alignment per sample: bwa mem aligns locally, so
-            // mapping against a single bin at a time would let reads from the
-            // other bins inflate its coverage with clipped partial hits
-            BINS_REFERENCE(ch_bins_for_depth.map { _meta, bins -> bins })
-            ch_versions = ch_versions.mix(BINS_REFERENCE.out.versions)
-            ch_bins_fasta = BINS_REFERENCE.out.reference.map { fasta, _table -> fasta }
-            ch_contig_to_bin = BINS_REFERENCE.out.reference.map { _fasta, table -> table }
+        // Bin coverage per sample from its alignment against the co-assembly
+        // (the BAMs that give MetaBAT2 its depths and count genes; issue
+        // #28), over the contigs of each refined bin: no second alignment
+        BIN_CONTIG_TABLE(ch_bins_for_depth.map { _meta, bins -> bins })
+        ch_versions = ch_versions.mix(BIN_CONTIG_TABLE.out.versions)
 
-            BWAMEM3_BINS_INDEX(ch_bins_fasta.map { fasta -> [[id: "bins"], fasta] })
-            ch_versions = ch_versions.mix(BWAMEM3_BINS_INDEX.out.versions)
-
-            BWAMEM3_BIN_DEPTH(
-                reads
-                    .combine(ch_bins_fasta)
-                    .combine(BWAMEM3_BINS_INDEX.out.index.map { _meta, index -> index })
-            )
-            ch_versions = ch_versions.mix(BWAMEM3_BIN_DEPTH.out.versions.first())
-
-            BEDTOOLS_BIN_DEPTH(BWAMEM3_BIN_DEPTH.out.bam_only.combine(ch_contig_to_bin))
-            ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
-            ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
-        } else {
-            BOWTIE2_SAMTOOLS_DEPTH(
-                reads.combine(ch_bins_for_depth.map { _meta, bins -> bins })
-            )
-            ch_versions = ch_versions.mix(BOWTIE2_SAMTOOLS_DEPTH.out.versions.first())
-            BEDTOOLS(BOWTIE2_SAMTOOLS_DEPTH.out.reads)
-            ch_bin_cov = BEDTOOLS.out.bin_depth
-            ch_versions = ch_versions.mix(BEDTOOLS.out.versions.first())
-        }
+        BEDTOOLS_BIN_DEPTH(sample_bams.combine(BIN_CONTIG_TABLE.out.table))
+        def ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
+        ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
 
         BIN_SUMMARY(
             ch_bin_cov.collect(sort: true).ifEmpty([])

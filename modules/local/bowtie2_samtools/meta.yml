@@ -1,5 +1,10 @@
 name: bowtie2_samtools
-description: Bowtie2 read mapping with samtools sorting (--read_aligner bowtie2) - reads against assembled contigs (BOWTIE2_SAMTOOLS) and, under co-assembly binning, reads against each refined bin (BOWTIE2_SAMTOOLS_DEPTH)
+description: |
+  Bowtie2 read mapping with samtools sorting (--read_aligner bowtie2). Builds a Bowtie2 index of the filtered
+  contigs, maps one sample's paired reads (and singletons when present, merged into the same BAM) and
+  coordinate-sorts with samtools, against the sample's own contigs or the co-assembly (the co-assembly's
+  pooled BAM is a samtools merge of these). A contig file with no sequences yields a header-only BAM plus an
+  empty-contig report instead of failing.
 keywords:
   - alignment
   - bowtie2
@@ -20,67 +25,36 @@ tools:
       doi: "10.1093/bioinformatics/btp352"
       licence: ["MIT"]
 
-processes:
-  - name: BOWTIE2_SAMTOOLS
-    description: |
-      Builds a Bowtie2 index of the filtered contigs, maps paired reads (and singletons when present,
-      merged into the same BAM) and coordinate-sorts with samtools. One sample per task, against its own
-      contigs or the co-assembly (the co-assembly's pooled BAM is a samtools merge of these). A contig file
-      with no sequences yields a header-only BAM plus an empty-contig report instead of failing.
-    input:
-      - meta:
-          type: map
-          description: Sample metadata (meta.id is the sample name)
-      - reads:
-          type: file
-          description: Host-removed reads of one sample - R1, R2 and optional singleton, by position
-          pattern: "*.fastq.gz"
-      - contigs:
-          type: file
-          description: Length-filtered contigs from BBMAP (the sample's own, or the co-assembly)
-          pattern: "*_filtered_contigs.fa"
-    output:
-      - contigs_and_bam:
-          type: tuple
-          description: Tuple of meta, the input contigs and the sorted BAM
-          pattern: "*_all_reads.bam"
-      - bam_only:
-          type: tuple
-          description: Tuple of meta and the sorted BAM (header-only when the contig file was empty)
-          pattern: "*_all_reads.bam"
-      - empty_contig_report:
-          type: file
-          description: Optional; written only when the contig file had no sequences (sample_id, stage, timestamp, action_taken); aggregated by CONTIG_FILTER_SUMMARY
-          pattern: "*_empty_contig_report.txt"
-      - versions:
-          type: file
-          description: Software versions
-          pattern: "versions.yml"
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Host-removed reads of one sample - R1, R2 and optional singleton, by position
+      pattern: "*.fastq.gz"
+  - contigs:
+      type: file
+      description: Length-filtered contigs from BBMAP (the sample's own, or the co-assembly)
+      pattern: "*_filtered_contigs.fa"
 
-  - name: BOWTIE2_SAMTOOLS_DEPTH
-    description: |
-      Co-assembly bin coverage - for each bin FASTA in the refined bin directory, builds a Bowtie2 index,
-      maps one sample's paired reads (and singletons when present, merged) and writes one sorted BAM per bin.
-    input:
-      - meta:
-          type: map
-          description: Sample metadata (meta.id is the sample whose reads are mapped)
-      - reads:
-          type: file
-          description: Host-removed reads of one sample (R1, R2, optional singleton)
-          pattern: "*.fastq.gz"
-      - bins:
-          type: directory
-          description: Refined bin directory (bins as *.fa; the bin id is the FASTA basename)
-    output:
-      - reads:
-          type: tuple
-          description: Tuple of meta and the per-bin sorted BAMs, named <sample>_<bin>_all_reads.bam
-          pattern: "*_all_reads.bam"
-      - versions:
-          type: file
-          description: Software versions
-          pattern: "versions.yml"
+output:
+  - contigs_and_bam:
+      type: tuple
+      description: Tuple of meta, the input contigs and the sorted BAM
+      pattern: "*_all_reads.bam"
+  - bam_only:
+      type: tuple
+      description: Tuple of meta and the sorted BAM (header-only when the contig file was empty)
+      pattern: "*_all_reads.bam"
+  - empty_contig_report:
+      type: file
+      description: Optional; written only when the contig file had no sequences (sample_id, stage, timestamp, action_taken); aggregated by CONTIG_FILTER_SUMMARY
+      pattern: "*_empty_contig_report.txt"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
 
 authors:
   - "@juanu"

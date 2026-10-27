@@ -2,31 +2,26 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     BWAMEM3_SAMTOOLS Alignment Module (--read_aligner bwamem3)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Align reads to assembled contigs (or to all refined bins) with bwa-mem3
-    and write one coordinate-sorted BAM per sample.
+    Align reads to assembled contigs (a sample's own, or the co-assembly)
+    with bwa-mem3 and write one coordinate-sorted BAM per sample.
 
     The index is its own task (BWAMEM3_INDEX), so one co-assembly index serves
-    every per-sample alignment instead of being rebuilt in each of them. BINS_REFERENCE concatenates the refined bins into
-    one reference plus a contig -> bin table, so co-assembly bin depth maps
-    each sample once: bwa mem aligns locally, and mapping against one bin at
-    a time would let reads from other bins pile up as clipped partial hits.
+    every per-sample alignment instead of being rebuilt in each of them.
 
     Alignments pass bin/filter_alignments.sh before sorting: a primary
     alignment needs >= ext.min_aligned_length aligned bases and an identity
     >= ext.min_identity, otherwise the read is kept as unmapped (samtools
     fixmate then updates its mate). bwa mem's local hits from genomes the
-    reference does not contain otherwise inflate gene counts and bin depth
+    reference does not contain otherwise inflate gene counts and depths
     in poorly covered samples (docs/benchmarks/bwamem3_vs_bowtie2.md).
 
     Input:
         BWAMEM3_INDEX:    tuple val(meta), path(fasta)
         BWAMEM3_SAMTOOLS: tuple val(meta), path(reads), path(contigs), path(index)
-        BINS_REFERENCE:   path(bins)
 
     Output:
         BWAMEM3_INDEX:    index: tuple val(meta), path(index dir)
         BWAMEM3_SAMTOOLS: contigs_and_bam, bam_only, empty_contig_report
-        BINS_REFERENCE:   reference: tuple path(all_bins.fa), path(contig_to_bin.tsv)
 ----------------------------------------------------------------------------------------
 */
 
@@ -212,88 +207,6 @@ process BWAMEM3_SAMTOOLS {
     "${task.process}":
         bwamem3: 0.15.0
         samtools: 1.24
-    END_VERSIONS
-    """
-}
-
-process BINS_REFERENCE {
-    tag "bins"
-    label 'process_single'
-    container 'community.wave.seqera.io/library/bwa-mem3_samtools:96d089551af9e9c3'
-
-    input:
-    path(bins)
-
-    output:
-    tuple path("all_bins.fa"), path("contig_to_bin.tsv"), emit: reference
-    path "versions.yml"                                 , emit: versions
-
-    when:
-    task.ext.when == null || task.ext.when
-
-    script:
-    """
-    set -euo pipefail
-
-    # contig_to_bin.tsv: <contig> TAB <bin>, bins in glob order. Bin ids are
-    # the FASTA basenames. A contig already placed in an earlier bin is
-    # skipped with a warning, so the reference has unique names
-    # (refined bins should never share contigs; the old per-bin
-    # mapping tolerated it silently). A bin that adds no contig (no
-    # sequences, or only contigs of earlier bins) gets one row with an empty
-    # contig field, so it still reports a 0-coverage row downstream. One awk
-    # reads every bin in order, keeping the placed contigs in memory.
-    : > all_bins.fa
-    : > contig_to_bin.tsv
-    bin_files=()
-    for bin in ${bins}/*.fa; do
-        [ -e "\${bin}" ] && bin_files+=("\${bin}")
-    done
-    awk '
-        BEGIN {
-            for (i = 1; i < ARGC; i++) {
-                file = ARGV[i]
-                bin = file
-                sub(/.*\\//, "", bin)
-                sub(/\\.fa\$/, "", bin)
-                kept = 0
-                keep = 0
-                while ((getline line < file) > 0) {
-                    if (substr(line, 1, 1) == ">") {
-                        split(substr(line, 2), words, /[ \\t]/)
-                        name = words[1]
-                        keep = !(name in seen)
-                        if (keep) {
-                            seen[name] = 1
-                            kept++
-                            print name "\\t" bin > "contig_to_bin.tsv"
-                        } else {
-                            print "WARNING: contig " name " of bin " bin " is already in another bin - skipped" > "/dev/stderr"
-                        }
-                    }
-                    if (keep) print line > "all_bins.fa"
-                }
-                close(file)
-                if (!kept) print "\\t" bin > "contig_to_bin.tsv"
-            }
-            exit
-        }
-    ' "\${bin_files[@]}"
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        mawk: \$(awk -W version 2>&1 | head -1 | cut -d' ' -f2)
-    END_VERSIONS
-    """
-
-    stub:
-    """
-    printf '>contig_1\\nACGT\\n' > all_bins.fa
-    printf 'contig_1\\tbin.1\\n' > contig_to_bin.tsv
-
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        mawk: 1.3.4
     END_VERSIONS
     """
 }

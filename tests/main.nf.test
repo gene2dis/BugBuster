@@ -297,9 +297,9 @@ nextflow_pipeline {
 
     test("Stub run wires --read_aligner bwamem3 under co-assembly") {
         // The co-assembly index is built ONCE and shared by the per-sample
-        // alignments (one per sample, issue #28), whose merge is the pooled
-        // BAM; bin depth maps each sample once against all bins
-        // (BINS_REFERENCE + one index)
+        // alignments (one per sample, issue #28): their merge is the pooled
+        // BAM, and the same BAMs give MetaBAT2 its depths, count genes and
+        // give bin depth (BIN_CONTIG_TABLE + BEDTOOLS_BIN_DEPTH, no remap)
         options "-stub"
 
         when {
@@ -329,10 +329,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("BINS_REFERENCE") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BINS_INDEX") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_BIN_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_CONTIG_TABLE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("BEDTOOLS_BIN_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 1
             assert path("${outputDir}/04_binning/coassembly/summary").exists()
         }
     }
@@ -374,8 +373,8 @@ nextflow_pipeline {
     }
 
     test("Stub run wires the bowtie2 fallback under co-assembly") {
-        // --read_aligner bowtie2: pooled and per-sample alignments, and bin
-        // depth mapped per sample against each refined bin
+        // --read_aligner bowtie2: the same single alignment per sample as
+        // bwa-mem3 (merged into the pooled BAM), and bin depth from those BAMs
         options "-stub"
 
         when {
@@ -400,11 +399,12 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert !workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3") || task.name.contains("BINS_REFERENCE") }
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BWAMEM3") }
             assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS_DEPTH") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_CONTIG_TABLE") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("BEDTOOLS_BIN_DEPTH") } == 2
             assert path("${outputDir}/04_binning/coassembly/summary").exists()
         }
     }

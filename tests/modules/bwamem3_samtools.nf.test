@@ -6,9 +6,8 @@
     setup (BWAMEM3_INDEX of tests/data/bins/real_bins/bin.1.fa, whose contig
     is assembled from the non-host fixture reads):
       - one sample, paired + singletons: per-library BAMs merged into one
-      - co-assembly: the pooled reads of two samples are classified by file
-        name and each library is mapped on its own (bwa mem takes no
-        bowtie2-style comma lists)
+        (under co-assembly too: each sample is mapped on its own and the
+        pooled BAM is a samtools merge of these, issue #28)
       - empty contig set: header-only BAM plus the empty-contig report
         consumed by CONTIG_FILTER_SUMMARY
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -61,82 +60,6 @@ nextflow_process {
             def versions = path(process.out.versions.get(0)).text
             assert versions.contains("bwamem3: 0.15.0")
             assert versions.contains("samtools: 1.24")
-        }
-    }
-
-    test("maps the pooled co-assembly reads library by library") {
-        when {
-            process {
-                """
-                // Post-QC co-assembly names: <sample>_{R1,R2,Singleton}_clean.fastq.gz
-                def pooled = file("${outputDir}/pooled")
-                pooled.mkdirs()
-                def reads_dir = "${projectDir}/tests/data/reads"
-                def pooled_reads = [
-                    ['s1_R1_clean.fastq.gz',        'singleton_test_R1.fastq.gz'],
-                    ['s1_R2_clean.fastq.gz',        'singleton_test_R2.fastq.gz'],
-                    ['s1_Singleton_clean.fastq.gz', 'singleton_test_S.fastq.gz'],
-                    // A sample id containing "unpaired" must still pair its R1/R2
-                    ['unpaired_s2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
-                    ['unpaired_s2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz'],
-                    // ... and so must one containing "_1.": a substring match
-                    // put S_1.2's R2 file into R1 and the pairing failed
-                    ['S_1.2_R1_clean.fastq.gz', 'singleton_test_R1.fastq.gz'],
-                    ['S_1.2_R2_clean.fastq.gz', 'singleton_test_R2.fastq.gz'],
-                    // ... and a chunk number after R1/R2 must not override it
-                    ['S3_R1_2.fastq.gz', 'singleton_test_R1.fastq.gz'],
-                    ['S3_R2_2.fastq.gz', 'singleton_test_R2.fastq.gz']
-                ].collect { names ->
-                    def target = pooled.resolve(names[0])
-                    file("\${reads_dir}/\${names[1]}").copyTo(target)
-                    target
-                }
-                input[0] = channel.of([
-                    [ id: 'coassembly' ],
-                    pooled_reads,
-                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
-                ]).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
-                """
-            }
-        }
-
-        then {
-            assert process.success
-            assert file(process.out.bam_only[0][1]).name == "coassembly_all_reads.bam"
-            assert file(process.out.bam_only[0][1]).size() > 0
-        }
-    }
-
-    test("fails on a pooled read file whose name has no read role") {
-        when {
-            process {
-                """
-                // Raw names (--quality_control false): s1_reads.fastq.gz has no
-                // R1/R2/singleton token and used to drop out without an error
-                def pooled = file("${outputDir}/pooled_norole")
-                pooled.mkdirs()
-                def reads_dir = "${projectDir}/tests/data/reads"
-                def pooled_reads = [
-                    ['s1_R1.fastq.gz',    'singleton_test_R1.fastq.gz'],
-                    ['s1_R2.fastq.gz',    'singleton_test_R2.fastq.gz'],
-                    ['s1_reads.fastq.gz', 'singleton_test_S.fastq.gz']
-                ].collect { names ->
-                    def target = pooled.resolve(names[0])
-                    file("\${reads_dir}/\${names[1]}").copyTo(target)
-                    target
-                }
-                input[0] = channel.of([
-                    [ id: 'coassembly' ],
-                    pooled_reads,
-                    file("${projectDir}/tests/data/bins/real_bins/bin.1.fa", checkIfExists: true)
-                ]).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
-                """
-            }
-        }
-
-        then {
-            assert process.failed
-            assert (process.stdout + process.stderr).any { line -> line.contains("cannot tell the read role of s1_reads.fastq.gz") }
         }
     }
 

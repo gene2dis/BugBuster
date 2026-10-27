@@ -578,7 +578,7 @@ workflow {
                     .ifEmpty { error "ERROR: CheckM2 database is empty. Ensure params.include_binning is enabled and a valid CheckM2 database is configured." },
                 PREPARE_DATABASES.out.gtdbtk_db
                     .ifEmpty { error "ERROR: GTDB-Tk database is empty. Ensure params.include_binning is enabled and a valid GTDB-Tk database is configured." },
-                ch_clean_reads
+                ch_counting_bam
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
