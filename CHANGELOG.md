@@ -422,7 +422,11 @@ next release is tagged.
   bundled databases inside its own package on first use, which a read-only
   singularity/apptainer image refuses, so the task runs a copy of the package
   from its work directory (indexes built in ~12 s). The published directory
-  is now `args_oap/<sample>_args_oap/` (was `<sample>_args_oap_s1_out/`)
+  is now `args_oap/<sample>_args_oap/` (was `<sample>_args_oap_s1_out/`),
+  with `stage_two_status.txt` (`ok`, `no_sarg_hit` when no read is left after
+  the SARG search, `not_normalised` when no 16S or cell estimate, so stage two
+  is skipped); a sample whose input file stage one drops after an error now
+  fails the task (ARGs-OAP only logs a warning)
 - **Breaking (bin refinement)**: Binette 1.2.1 replaces MetaWRAP 1.2 for bin
   refinement with two or more `--binners` (Phase 7a benchmark,
   `docs/benchmarks/binning_2026.md`). On four per-sample assemblies it kept 45
