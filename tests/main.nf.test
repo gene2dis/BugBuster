@@ -1420,9 +1420,9 @@ nextflow_pipeline {
 
             // Per-bin outputs under mags/<sample>/ with the <sample>_<bin>
             // prefix (Section 9.1 layout + the modules.config ext.prefix)
-            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_bin.1.tsv").exists()
-            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_bin.2.gff3").exists()
-            assert path("${outputDir}/07_functional_annotation/mags/test_sample2/test_sample2_bin.1.gff3").exists()
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_binette_bin1.tsv").exists()
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample1/test_sample1_binette_bin2.gff3").exists()
+            assert path("${outputDir}/07_functional_annotation/mags/test_sample2/test_sample2_binette_bin1.gff3").exists()
 
             // Provenance: the pinned container version reaches the aggregate
             def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
