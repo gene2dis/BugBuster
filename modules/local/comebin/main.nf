@@ -60,12 +60,8 @@ process COMEBIN {
     mkdir -p ${prefix}_comebin_bins/comebin_res/comebin_res_bins
     bins_dir=${prefix}_comebin_bins/comebin_res/comebin_res_bins
 
-    # run_comebin.sh has no --version: read the version of the image's conda
-    # package
     write_versions() {
-        local version
-        version=\$(ls /usr/local/conda-meta 2>/dev/null | sed -n 's/^comebin-\\([0-9][0-9.]*\\)-.*\\.json\$/\\1/p' | head -n 1)
-        printf '"%s":\\n    comebin: %s\\n' "${task.process}" "\$version" > versions.yml
+        printf '"%s":\\n    comebin: %s\\n' "${task.process}" "\$(run_comebin.sh -V 2>&1 | sed 's/.*: //')" > versions.yml
     }
 
     # Validate minimum contig count (awk always exits 0 and always prints a
@@ -115,7 +111,8 @@ process COMEBIN {
     chmod +x realpath_shim/realpath
     export PATH="\$PWD/realpath_shim:\$PATH"
 
-    # -d cpu: the default device is cuda, and the image's PyTorch has no CUDA
+    # -d cpu: the default device is cuda, and the image's PyTorch has no CUDA.
+    # -s: a fixed seed, so reruns give the same bins
     exit_code=0
     bash run_comebin.sh \\
         -a ${contigs} \\
@@ -123,6 +120,7 @@ process COMEBIN {
         -o ${prefix}_comebin_bins \\
         -t ${task.cpus} \\
         -d cpu \\
+        -s ${params.comebin_random_seed} \\
         ${settings} \\
         \$temp_flag || exit_code=\$?
 

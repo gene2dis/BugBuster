@@ -735,6 +735,7 @@ for the numbers behind each setting).
 | `--semibin_coassembly_mode` | `pretrained` | Co-assembly: SemiBin2 pre-trained model on the pooled BAM (`pretrained`) or a model trained on the co-assembly (`train_self`, ~40× the CPU time) |
 | `--semibin_coassembly_env_model` | `global` | SemiBin2 pre-trained model for the co-assembly |
 | `--semibin_random_seed` | `11` | SemiBin2 `--random-seed`, so reruns give the same bins |
+| `--comebin_random_seed` | `11` | COMEBin `-s` seed, so reruns give the same bins |
 | `--gtdbtk_pplacer_cpus` | `4` | Threads for GTDB-Tk's pplacer step (capped at the task's CPUs) |
 
 **SemiBin Environment Models:**

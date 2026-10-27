@@ -467,7 +467,8 @@ next release is tagged.
     module: its `realpath` is BusyBox's, which lacks the `-e`/`-m`/`--` options
     `run_comebin.sh` uses (a Python `realpath` is written into the task
     directory), the default device is `cuda` on a CPU-only PyTorch (`-d cpu`),
-    and bins keep the whole contig header (cut to the name). Same CPU time as
+    and bins keep the whole contig header (cut to the name). It now gets a fixed
+    `-s` seed (new `--comebin_random_seed`, default 11). Same CPU time as
     1.0.4 (38 CPU-hours on a 37 Mbp assembly) with less memory. `COMEBIN` now
     requests 8 CPUs (was 16; it kept at most ~7 busy) and documents its cost.
     **Fix**: a failed attempt now fails the task, so Nextflow retries it with the
