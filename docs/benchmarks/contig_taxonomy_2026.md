@@ -1,8 +1,9 @@
-# Contig taxonomy
+# Contig taxonomy and bin-level ARGs
 
-Benchmark run 2026-10-27 to 2026-10-28. It asks one question about the contig-level ARG branch (`--contig_tax_and_arg`):
+Benchmark run 2026-10-27 to 2026-10-28. It asks two questions about the contig-level ARG branch (`--contig_tax_and_arg`) and the bin-level ARG branch (`--arg_bin_clustering`):
 
 - **(L2) Contig taxonomy:** BLASTN of every contig against nt, then BlobTools (today's NT_BLASTN → BLOBTOOLS), against Kraken2 on the contigs. Runtime, peak memory, database size, contigs classified per rank, and agreement on the ARG-bearing contigs that `Contig_tax_and_arg_prediction.tsv` reports. MMseqs2 taxonomy and CAT need databases that are not on the server; their sizes are listed, and they were not run.
+- **(M8) Bin-level ARGs:** DEEPARG_BINS (Prodigal per bin, then DeepARG per bin) against the contig-level DeepARG hits (DEEPARG_CONTIGS on the shared Pyrodigal proteins) mapped to bins through bin membership.
 
 No pipeline code changed. Every run used dev's own modules (Setup).
 
@@ -11,6 +12,7 @@ No pipeline code changed. Every run used dev's own modules (Setup).
 **Outcome (recommendations):**
 
 - **L2: Kraken2 on the contigs instead of BLASTN against nt, keeping BlobTools for the tables and plots.** BLASTN is the most expensive step of the branch by far: 29,093 CPU-s (8.1 CPU-h) for the smallest assembly (3.7 Mbp) and 201,739 CPU-s (56 CPU-h, 4.7 h at 16 threads) for a 36.6 Mbp one: every ~5 Mbp of contigs adds another pass over the 434 GB of nt, so the two larger assemblies would take about 140 and 180 CPU-h. Kraken2 took 668 CPU-s on the 36.6 Mbp assembly, database load included, 300 times less. Kraken2 classified each assembly in 1–6 s once its database was loaded (1–5 min per task with the load). Where both tools assign a rank to an ARG-bearing contig, they agree on 99 % of superkingdoms, 97 % of phyla and orders, 95 % of families and genera and 89 % of species. Kraken2 assigns fewer contigs (78–84 % of the ARG-bearing contigs of samples A, B and C against 98 %; of all contigs, 80 % against 91 % in sample C and 45 % against 67 % in sample D), because it stops at the lowest common ancestor where BlobTools takes the best hit's species. Section (L2) lists the alternatives, two of which keep BLAST for the ARG-bearing contigs.
+- **M8: derive the bin-level ARGs from the contig-level DeepARG run, and drop PRODIGAL_BINS + DEEPARG_BINS.** The two routes agree on 228 of 247 hits (same ARG and class every time). 17 of the 19 that differ are on genes the two routes called identically. They differ because **DeepARG scales its features over the whole input file** (min-max), so one protein's probability depends on what else is in the file. A bin with few candidate genes gets unreliable probabilities: a class A β-lactamase scores 0.227 (dropped) when its bin is run alone and 0.994 when all bins of the sample are run together. A single DeepARG run on all bins' proteins reproduced the contig route's in-bin calls exactly (91 of 91, probabilities within 0.014). The bin route also costs about 1 CPU-hour and 4–5 GB per task for the three samples with bins, on top of the contig route.
 - **Fix whatever is decided (pipeline bug, live on dev today):** the default `--taxdump_files ncbi` downloads the current NCBI taxdump. NCBI replaced the `superkingdom` rank with `domain` in 2025, and with that taxdump BlobTools 1.1.1 writes `undef` as every contig's superkingdom. With the default settings, the `superkingdom` column of `Contig_tax_and_arg_prediction.tsv` is `undef` on every row that has a hit. The other ranks are unaffected.
 - **Fix if Kraken2 is used with the current standard database:** the 2026-06-26 k2_standard needs 103 GB of memory. KRAKEN2's `process_high` first attempt (72 GB) fails with it, and only the retry at 144 GB fits. The read-level KRAKEN2 has the same problem when `--custom_kraken_db` points at this database.
 
@@ -23,6 +25,7 @@ No pipeline code changed. Every run used dev's own modules (Setup).
 | MMseqs2 taxonomy, CAT (L2) | not run: no local database. GTDB R232 proteins 132 GB, UniRef90 32 GB, nr 200 GB (compressed downloads); CAT's prebuilt archives' sizes could not be read | not pursued unless the owner wants the download |
 | Taxdump (bug) | current NCBI taxdump → `superkingdom` = `undef` on every contig with a hit | fix in 9b |
 | Kraken2 memory | k2_standard 2026-06-26: 103 GB anon; `process_high` first attempt 72 GB | fix in 9b if Kraken2 is used |
+| Bin-level ARGs (M8) | 228 of 247 hits on both routes, all with the same ARG and class; 17 of the 19 others are DeepARG's input-dependent scaling, 2 differ in the gene call; bin route ≈ 1.0 CPU-h and 4.2–5.2 GB per task extra | derive from the contig route |
 
 The rest of this document gives the measurements behind each row.
 
@@ -172,3 +175,57 @@ Neither has a database on the server, and nothing was downloaded. Sizes of the d
 | CAT prebuilt `20240422_CAT_nr.tar.gz`, `20231120_CAT_gtdb.tar.gz` | CAT | not readable: the server's TLS certificate chain fails verification |
 
 Built databases are larger than the downloads: MMseqs2 builds its own index of each, and a CAT nr build has been reported to reach 350 GB. These are protein-level classifiers (they need gene calls, which PYRODIGAL already makes) that align every protein against the reference set, against Kraken2's k-mer lookup. They were left out.
+
+## (M8) Bin-level ARGs: DEEPARG_BINS against contig-level hits mapped to bins
+
+### The two routes
+
+- **Bin route** (today, `--arg_bin_clustering`): PRODIGAL_BINS calls genes in each bin with Prodigal 2.6.3 `-p single`; DEEPARG_BINS runs DeepARG once per bin.
+- **Contig route** (today, `--contig_tax_and_arg`): PYRODIGAL calls genes on the whole assembly with `-p meta`; DEEPARG_CONTIGS runs DeepARG once per assembly. Here its hits were mapped to bins by contig name, and a bin-route hit matched a contig-route hit on the same contig and strand when the two genes overlap by at least half the shorter one.
+
+### Results
+
+| Sample | Bins | Bin route hits | Contig route hits in bins | Both | Same ARG and class | Same gene coordinates | Bin route only | Contig route only | Bins with the same ARG set |
+|---|---|---|---|---|---|---|---|---|---|
+| A | 22 | 124 | 125 | 123 | 123 | 115 | 1 | 2 | 19 / 22 |
+| B | 17 | 102 | 91 | 89 | 89 | 80 | 13 | 2 | 10 / 17 |
+| C | 6 | 17 | 16 | 16 | 16 | 16 | 1 | 0 | 6 / 6 |
+| Total | 45 | 243 | 232 | 228 | 228 | 211 | 15 | 4 | 35 / 45 |
+
+Each sample had the same distinct ARGs on both routes (A 70, B 38, C 11).
+
+- **Where both routes call a hit, it is the same ARG and class** (228 of 228). 17 of them are on genes with different coordinates on the two routes (overlapping calls of the same gene).
+- **Two of the 19 single-route hits are gene-calling differences.** In C, Prodigal called a 372-bp *vanS* gene that Pyrodigal did not call. In A, a class A β-lactamase is called by both with different starts (GTG at 5,006 against ATG at 5,069), and only the Pyrodigal protein passed.
+- **The other 17 are on genes with identical coordinates on both routes**, with the same single DIAMOND hit on both (e.g. an *efrB* gene: 51.2 % identity, e-value 6.7e-89, bitscore 278 on both routes; probability 0.554 on the contig route, 0.859 on the bin route). Most bin-route-only hits are *efrA*/*efrB* at 50–53 % identity with probability 0.84–0.92. Two contig-route-only hits had high probabilities: *rosA* (0.999) and a class A β-lactamase (0.994, 79.7 % identity).
+
+### Why: DeepARG scales its features over the input file
+
+DeepARG 1.0.4 (`deepARG.py`, lines 70–72) applies scikit-learn's `MinMaxScaler().fit_transform` to the feature matrix of all proteins that pass its alignment filters in one run. Each protein's features are therefore scaled by the minimum and maximum over the other proteins in the same file, and its probability depends on them. To check, DeepARG was run on the proteins of the bin holding the class A β-lactamase above (sample B, 4,310 proteins):
+
+| Input | Proteins | Passing DeepARG's filters | Probability of the class A β-lactamase |
+|---|---|---|---|
+| This bin's Prodigal proteins (as DEEPARG_BINS runs it) | 4,310 | 1 | 0.227 (below 0.8: dropped) |
+| This bin's contigs, Pyrodigal proteins | 4,350 | 1 | 0.227 |
+| All of sample B's bins' Prodigal proteins in one file | 56,167 | 132 | 0.994 |
+| Sample B's whole assembly (DEEPARG_CONTIGS) | | | 0.994 |
+
+The gene caller made no difference, and the input set made all of it. Run on all bins' proteins at once, DeepARG reproduced the contig route's hits in bins exactly: 91 of 91 on the same contig with the same best hit, probabilities within 0.014. So the bin route's results are less reliable than the contig route's, not just different: a bin with one or a few candidate genes is scaled against itself. The `--deeparg_min_prob` threshold is also not comparable between runs with different inputs.
+
+### Cost
+
+From the harness trace (8 CPUs per task):
+
+| Task | A | B | C | D |
+|---|---|---|---|---|
+| PYRODIGAL (shared with the functional branch) | 4 min 34 s, 2.2 GB | 3 min 46 s, 1.8 GB | 1 min 17 s, 0.8 GB | 11 s, 0.1 GB |
+| DEEPARG_CONTIGS | 2 min 2 s, ~377 CPU-s, 0.9 GB | 2 min 2 s, ~326 CPU-s, 0.9 GB | 2 min 31 s, ~231 CPU-s, 0.9 GB | 1 min 50 s, ~130 CPU-s, 0.9 GB |
+| PRODIGAL_BINS | 2 min 26 s, ~533 CPU-s, 0.8 GB | 2 min 2 s, ~483 CPU-s, 0.8 GB | 37 s, ~141 CPU-s, 0.5 GB | (no bins) |
+| DEEPARG_BINS | 4 min 2 s, ~1,234 CPU-s, 5.2 GB | 2 min 56 s, ~832 CPU-s, 4.8 GB | 1 min 19 s, ~385 CPU-s, 4.2 GB | (no bins) |
+
+CPU-s is realtime × %CPU from the trace; memory is peak RSS. The bin route (PRODIGAL_BINS + DEEPARG_BINS) cost about 3,600 CPU-s (1.0 CPU-h) over the three samples with bins, and DEEPARG_BINS needs 4–5 GB against DEEPARG_CONTIGS' 0.9 GB.
+
+### What the derived route needs
+
+- PYRODIGAL and DEEPARG_CONTIGS would run whenever `--arg_bin_clustering` is on, not only under `--contig_tax_and_arg` or `--contig_level_functional`.
+- A small step maps DEEPARG_CONTIGS' hits to bins (contig name from the gene name, bin membership from the bin FASTA headers) and writes what ARG_FASTA_FORMATTER → CLUSTERING read today: per-bin `.mapping.ARG` files and per-bin protein FASTA (from Pyrodigal's proteins).
+- Gene names change from Prodigal's to Pyrodigal's (both `<contig>_<n>`, but numbered by each caller), and 17 of the 228 shared hits are on genes with different coordinates, so the bin-level protein sequences for those differ slightly.
