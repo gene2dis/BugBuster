@@ -7,7 +7,11 @@ Benchmark run 2026-10-27 to 2026-10-28. It asks two questions about the contig-l
 
 No pipeline code changed. Every run used dev's own modules (Setup).
 
-**Decision (owner):** pending.
+**Decision (owner, 2026-10-28):**
+
+- **L2:** Kraken2 on the contigs with `k2_standard`, replacing BLASTN against nt. A GTDB database for Kraken2 was considered and not taken: the local GTDB r220 build needs about 500 GB in memory and has no viruses, plasmid-only sequences or eukaryotes. sylph does not classify single contigs (it estimates how much of each reference genome is in a sample).
+- **M8:** derive the bin-level ARGs from the contig-level DeepARG run; drop PRODIGAL_BINS and DEEPARG_BINS.
+- **Taxdump bug:** fixed together with these changes, not as a separate fix on the development branch.
 
 **Outcome (recommendations):**
 
