@@ -238,7 +238,7 @@ class PhyloseqTableGenerator:
             columns='sample_id',
             values='n_unique_kmers',
             fill_value=0
-        )
+        ).astype(float)  # pandas < 3 pivot_table downcasts all-integral values to int64
         
         # Create taxonomy table
         tax_data = []
@@ -390,7 +390,7 @@ class PhyloseqTableGenerator:
         otu_table = combined.pivot_table(
             index='taxon_id', columns='sample_id',
             values='relative_abundance', fill_value=0
-        )
+        ).astype(float)  # pandas < 3 pivot_table downcasts all-integral values to int64
         read_counts = combined.pivot_table(
             index='taxon_id', columns='sample_id',
             values='read_pairs', fill_value=0, aggfunc='sum'

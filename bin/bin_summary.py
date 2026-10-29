@@ -120,7 +120,7 @@ def main():
         columns='sample',
         values='average_cov',
         aggfunc='first'
-    ).reset_index()
+    ).astype(float).reset_index()  # pandas < 3 pivot_table downcasts all-integral values to int64
 
     # Separate Total_contigs for later join
     bin_tmp = bin_depth_wide[['bin_id', 'Total_contigs']].copy()
