@@ -210,7 +210,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String
 - **Default**: `gtdb_r232`
 - **Options**: `gtdb_r232` (two-stage `.syl2db`, 19 GB), `gtdb_r226` (`.syldb`, 18 GB), `gtdb_r220` (`.syldb`, 13.1 GB)
-- **Description**: Sylph database selection: GTDB representative genomes (c200 builds), downloaded together with the sylph-tax taxonomy metadata of the same release (~5-13 MB) into `<databases_dir>/sylph/`
+- **Description**: Sylph database selection: GTDB representative genomes (c200 builds), downloaded together with the sylph-tax taxonomy metadata of the same release (~5-13 MB) into `<databases_dir>/sylph/<key>/sylph_db/`
 - **Example**: `--sylph_db gtdb_r226`
 
 ### `--kmarvel_db`
@@ -293,7 +293,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String
 - **Default**: `db90`
 - **Options**: `db90`
-- **Description**: SUPER-FOCUS database for the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`). Downloads the prebuilt DB_90 archive for the selected `--superfocus_aligner` only from figshare (open.flinders.edu.au, CC0): DIAMOND format 3 `90_clusters.db.dmnd` (zip ~0.74 GB, ~1.9 GB unpacked) or MMseqs2 `mmseqs_90.zip` (~0.9 GB, ~2.5 GB unpacked), plus `database_PKs.txt` (SEED subsystem levels per subsystem) from the SUPER-FOCUS v1.8 tag; both md5-verified. Stored as a database root at `<databases_dir>/superfocus/superfocus_db`. The cluster level is fixed at DB_90
+- **Description**: SUPER-FOCUS database for the SUPER-FOCUS read-level backend (`--read_level_functional superfocus`). Downloads the prebuilt DB_90 archive for the selected `--superfocus_aligner` only from figshare (open.flinders.edu.au, CC0): DIAMOND format 3 `90_clusters.db.dmnd` (zip ~0.74 GB, ~1.9 GB unpacked) or MMseqs2 `mmseqs_90.zip` (~0.9 GB, ~2.5 GB unpacked), plus `database_PKs.txt` (SEED subsystem levels per subsystem) from the SUPER-FOCUS v1.8 tag; both md5-verified. Stored as a database root at `<databases_dir>/superfocus/db90/<aligner>/superfocus_db`. The cluster level is fixed at DB_90
 - **Size**: ~0.74 GB (DIAMOND) / ~0.9 GB (MMseqs2) download
 - **Example**: `--superfocus_db db90`
 
@@ -301,14 +301,14 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String
 - **Default**: `v4_alpha-full`
 - **Options**: `v4_alpha-full`, `v4_alpha-ec_filtered`
-- **Description**: HUMAnN database set for the HUMAnN read-level backend (`--read_level_functional humann`). Both keys download the HUMAnN v4_alpha UniRef90 EC-filtered DIAMOND database (0.94 GB), the v4 utility mapping (2.8 GB; KO / EC maps and the MetaCyc pathway files) and the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` with its prebuilt Bowtie2 index (~22.5 GB, md5-verified); they differ in the ChocoPhlAn pangenome database: `v4_alpha-full` (44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB, only EC-annotated genes — fewer gene families and KOs). The choice is recorded in provenance (`read_sample_summary.tsv`, `software_versions.yml`). Stored as a database root at `<databases_dir>/humann/humann_db`; HUMAnN publishes no checksums for its own archives, so those are checked for layout only
+- **Description**: HUMAnN database set for the HUMAnN read-level backend (`--read_level_functional humann`). Both keys download the HUMAnN v4_alpha UniRef90 EC-filtered DIAMOND database (0.94 GB), the v4 utility mapping (2.8 GB; KO / EC maps and the MetaCyc pathway files) and the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` with its prebuilt Bowtie2 index (~22.5 GB, md5-verified); they differ in the ChocoPhlAn pangenome database: `v4_alpha-full` (44.8 GB) or `v4_alpha-ec_filtered` (6.9 GB, only EC-annotated genes — fewer gene families and KOs). The choice is recorded in provenance (`read_sample_summary.tsv`, `software_versions.yml`). Stored as a database root at `<databases_dir>/humann/<key>/humann_db`; HUMAnN publishes no checksums for its own archives, so those are checked for layout only
 - **Size**: ~71 GB (`v4_alpha-full`) / ~33 GB (`v4_alpha-ec_filtered`) download
 - **Example**: `--humann_db v4_alpha-ec_filtered`
 
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
-- **Description**: Directory for storing downloaded databases (separate from results output)
+- **Description**: Directory for storing downloaded databases (separate from results output). Each database is stored with Nextflow's `storeDir` in `<databases_dir>/<database>/<key>/`, the key being its registry key (`--kraken2_db`, `--sylph_db`, ...): a later run with the same directory skips the download, and another version goes into its own folder. Delete a folder to download that database again. `-stub` runs store their placeholder files under `<databases_dir>/stub/`. Builds from your own files (`--custom_host_fasta` / `--custom_phiX_fasta`, `--custom_rgi_wildcard`, a `--custom_sourmash_db` lineages file) are rebuilt every run and copied here for reuse through `--custom_*`. Layout: `docs/manual.md`, Database Storage Directory
 - **Example**: `--databases_dir /shared/databases/bugbuster`
 
 ---
@@ -331,7 +331,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_decontamination_index`
 - **Type**: String (directory path)
-- **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under the default `bwamem3`, or a Bowtie2 index under `--read_aligner bowtie2`. A Bowtie2 index under `bwamem3` is rejected at launch: add `--read_aligner bowtie2` to keep using an index built by an earlier release. Skips both the genome downloads and the index build. Pointing it at the index the pipeline published (`<databases_dir>/bwamem3_index/contaminants_index`, or `<databases_dir>/bowtie_index/contaminants_index` under `bowtie2`) avoids rebuilding it in later runs.
+- **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under the default `bwamem3`, or a Bowtie2 index under `--read_aligner bowtie2`. A Bowtie2 index under `bwamem3` is rejected at launch: add `--read_aligner bowtie2` to keep using an index built by an earlier release. Skips both the genome downloads and the index build. An index the pipeline builds from the registry genomes is stored in `<databases_dir>/bwamem3_index/phiX174_human/` (`bowtie_index/` under `bowtie2`) and reused automatically; one built from `--custom_host_fasta` / `--custom_phiX_fasta` is rebuilt every run and copied to `<databases_dir>/bwamem3_index/contaminants_index` (`bowtie_index/contaminants_index`), which you can pass here to skip the rebuild.
 - **Example**: `--custom_decontamination_index /path/to/bwamem3_index/contaminants_index`
 - **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
@@ -408,8 +408,8 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_kmarvel_db`
 - **Type**: String (directory path)
-- **Description**: Path to a K-MARVEL database directory; skips the download. A database published by an earlier run (`databases/kmarvel/kmarvel_db`) can be reused as is
-- **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/kmarvel_db`
+- **Description**: Path to a K-MARVEL database directory; skips the download. A database stored by an earlier run (`<databases_dir>/kmarvel/card_v4.0.1/kmarvel_db`) can be reused as is (with the same `--databases_dir` it is reused without this option)
+- **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/card_v4.0.1/kmarvel_db`
 - **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). No BLAST index is needed: each task indexes its own copy of the FASTA. An optional `DB_VERSION` file (its first line) is recorded as `card:` under `KMARVEL` in `pipeline_info/software_versions.yml`; without it the entry is `custom (CARD_protein_all.fasta md5 <md5>)`, so the reference can still be traced
 
 ### `--custom_dbcan_db`
@@ -998,7 +998,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Options**: `bwamem3`, `bowtie2`
 - **Description**: Short-read aligner for host/phiX removal and reads-to-contigs mapping (binning depth, contig coverage, gene counting; under co-assembly the same per-sample alignments also give bin depth). `bwamem3` uses [bwa-mem3](https://github.com/fg-labs/bwa-mem3) 0.15.0. It replaced `bowtie2` as the default after a benchmark on five real metagenomes ([docs/benchmarks](benchmarks/bwamem3_vs_bowtie2.md)): host removal 4.1× faster, reads→contigs mapping 3.9–6.2× faster with the alignment filter, and the same bins and GTDB species. `bowtie2` stays available as a fallback for CPUs without AVX2 and for nodes without ~75 GB RAM for the human index build. Woltka and HUMAnN always use bowtie2 with their own databases. Differences from `bowtie2`:
   - **Decontamination is strict.** A pair counts as clean only when both mates are unmapped. bowtie2 `--un-conc` kept every pair without a concordant alignment, so a pair with a single host mate survived. The `--bowtie_*` parameters do not apply; `--decontam_min_score` sets the threshold instead.
-  - **Decontamination index.** It is built from the same genome FASTA files and published to `<databases_dir>/bwamem3_index/contaminants_index`. Building it for a human host needs **~75 GB RAM** (a few minutes). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4× its size; ~90 GB for the default gzipped human genome), doubles on retry and is capped by `--max_memory`. Mapping against it peaked at ~16 GB per task in the benchmark, against ~4 GB for bowtie2 (the task requests 72 GB, `process_high`, capped by `--max_memory`).
+  - **Decontamination index.** It is built from the same genome FASTA files once per `--databases_dir` and stored in `<databases_dir>/bwamem3_index/phiX174_human/` (`_dense` appended with `--bwamem3_dense_sa`); later runs reuse it. Building it for a human host needs **~75 GB RAM** (a few minutes). The request is sized from the genome FASTA files (~24 bytes per base, a gzipped file counted at 4× its size; ~90 GB for the default gzipped human genome), doubles on retry and is capped by `--max_memory`. Mapping against it peaked at ~16 GB per task in the benchmark, against ~4 GB for bowtie2 (the task requests 72 GB, `process_high`, capped by `--max_memory`).
   - **Alignments to contigs.** Secondary and supplementary records are dropped, so every read keeps one record as with bowtie2. Short or divergent local hits are turned into unmapped reads (`--bwamem3_min_identity`, `--bwamem3_min_aligned_length`). The co-assembly contig index is built once and shared by the per-sample alignments (bowtie2 builds it in each one).
   - **CPU.** The bioconda bwa-mem3 build needs a CPU with AVX2 or newer (x86-64-v3, Haswell 2013+). On an older CPU the `BWAMEM3_*` tasks stop with "Illegal instruction" (exit status 132): use `--read_aligner bowtie2`.
 - **Example**: `--read_aligner bowtie2`

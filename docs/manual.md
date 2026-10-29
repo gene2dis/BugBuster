@@ -96,8 +96,11 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
   [Out of memory](troubleshooting.md#out-of-memory)). Binette bin refinement
   requests 36 GB on the first attempt (peaks of 11-13 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
-  ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs on
-  every fresh run unless you pass the published index
+  ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs
+  once per `--databases_dir`: later runs find the stored index
+  (`<databases_dir>/bwamem3_index/phiX174_human/contaminants_index`) and skip
+  the build. An index built from `--custom_host_fasta` / `--custom_phiX_fasta`
+  is rebuilt every run; pass its copy
   (`<databases_dir>/bwamem3_index/contaminants_index`) with
   `--custom_decontamination_index`. Below ~75 GB, pass a pre-built index or use
   `--read_aligner bowtie2` (~6 GB to build).
@@ -191,7 +194,15 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use. Databases are published to `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. The pipeline does not read that directory back: a fresh run downloads (and builds) them again, while `-resume` reuses them from the work directory's task cache. To reuse them across runs, pass the published paths with the `--custom_*` options.
+BugBuster automatically downloads required databases on first use and stores them in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Each one goes into a folder named after the database and its registry key (`<databases_dir>/<database>/<key>/`, e.g. `kraken/standard-8/k2_ref_db`; the full layout is under [Database Storage Directory](#database-storage-directory)). A later run with the same `--databases_dir` finds them there and skips the download or build (except the sourmash k-mer database, below) (Nextflow `storeDir`; the log shows `[skipping] Stored process`), whatever its work directory. Selecting another version (e.g. `--kraken2_db gtdb_220`) downloads it into its own folder. The files are moved out of the work directory, so each database is stored once.
+
+- **Refreshing a database**: delete its `<databases_dir>/<database>/<key>/` folder; the next run downloads it again. Do the same if a download was interrupted while being stored (a folder with missing files is taken as complete). RGI's default `--rgi_card_version latest` is stored as `rgi/latest_wildcard_k61`: the first run fixes which CARD release `latest` means for that `--databases_dir` (the stored `versions.yml` records the real version); delete the folder or pin `--rgi_card_version` to update it.
+- **Builds from your own files** (the decontamination index from `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with `--custom_rgi_wildcard`, the sourmash taxonomy from a `--custom_sourmash_db` lineages file) have no version to key a folder on: they run in every new run and are copied to `<databases_dir>` for reuse through the matching `--custom_*` option.
+- **`-stub` runs** store their placeholder files under `<databases_dir>/stub/`, never where a real run would take them for a database.
+- **`--custom_*` paths** are used in place and never copied.
+- **The sourmash k-mer database** (`gtdb-reps-rs220-k31.zip`, `--taxonomic_profiler sourmash`) is not downloaded by a pipeline task but staged by Nextflow from its URL into each work directory: a new work directory fetches it again. Download it once and pass it with `--custom_sourmash_db` to avoid that.
+- **One run at a time fills a new database folder.** Nextflow has no lock on these folders: two runs started together against an empty `--databases_dir` both download, and a run started while another is still moving a large database into place can take the half-moved folder as complete. Let the first run store its databases before starting others that share the directory.
+- **Earlier releases** published databases without the `<key>/` level (e.g. `kraken/k2_ref_db`); this release does not find them there. Pass them with the `--custom_*` options, or delete them and let the pipeline download again.
 
 ### Automatic Download Databases
 
@@ -964,7 +975,7 @@ Control taxonomic output visualization and formatting:
 |-----------|---------|-------------|
 | `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
 
-By default, databases are published to a `databases/` directory at the same level as your output directory. Later runs reuse them only through the `--custom_*` options (or `-resume` on the same work directory); see [Database Management](#4-database-management).
+By default, databases are stored in a `databases/` directory at the same level as your output directory. Later runs with the same `--databases_dir` reuse them without downloading again; see [Database Management](#4-database-management).
 
 ### 6.16 Resource Limit Options
 
@@ -1056,9 +1067,10 @@ nextflow run main.nf \
 | `test` | Run with minimal test data |
 
 > **`low_disk` with the functional branches:** the profile only cleans the work
-> directory. It does nothing about the functional annotation databases, which
-> are stored at `--databases_dir` (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta up to
-> ~31.9 GB download, WoLr2 ~94 GB, HUMAnN up to ~71 GB — see Section 4). And
+> directory. The functional annotation databases are stored at
+> `--databases_dir`, outside the work directory (eggNOG 7 ~44 GB, dbCAN ~7.4 GB,
+> Bakta up to ~31.9 GB download, WoLr2 ~94 GB, HUMAnN up to ~71 GB — see
+> Section 4): they survive the cleanup and later runs reuse them. And
 > because the work directory is deleted when a `low_disk` run succeeds, the run
 > cannot be resumed afterwards: re-running with a changed or added option
 > repeats the multi-hour eggNOG-mapper and read-level steps from scratch. The
@@ -1480,30 +1492,33 @@ results/
 
 ### Database Storage Directory
 
-By default, databases are stored separately from results at `<output_dir>/../databases/`:
+By default, databases are stored separately from results at `<output_dir>/../databases/`, one folder per database and registry key (the default keys are shown):
 
 ```
 databases/                            # Database storage (configurable via --databases_dir)
-├── bwamem3_index/                    # Combined bwa-mem3 decontamination index (host + phiX)
-├── bowtie_index/                     # Combined Bowtie2 index instead, under --read_aligner bowtie2
-├── kraken/                           # Kraken2 database (selected via --kraken2_db)
-├── sourmash/                         # Sourmash database
-├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
-├── metabuli_db/                      # Metabuli database for contig taxonomy (refseq_standard ~110 GB, with its taxdump)
-├── genomad_db/                       # geNomad database 1.9 (~2.2 GB)
-├── deeparg_db/                       # DeepARG database
-├── rgi/                              # CARD database for RGI
-├── kmarvel/                          # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
-├── checkm2/                          # CheckM2 database
-├── gtdbtk/                           # GTDB-TK database
-├── eggnog/                           # eggNOG 7 data for eggNOG-mapper v3 (~44 GB)
-├── dbcan/                            # dbCAN database for run_dbcan v5 (~7.4 GB)
-├── cog/                              # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
-├── bakta/                            # Bakta database v6.0 (full 31.9 GB / light 1.3 GB download)
-├── woltka/                           # Web of Life WoLr2 subset for Woltka (~94 GB)
-├── superfocus/                       # SUPER-FOCUS DB_90 root for the selected aligner (~1.9-2.5 GB unpacked)
-└── humann/                           # HUMAnN 4 database root + MetaPhlAn vOct22 (~71 GB / ~33 GB EC-filtered)
+├── bwamem3_index/phiX174_human/      # Combined bwa-mem3 decontamination index (host + phiX; _dense with --bwamem3_dense_sa)
+├── bowtie_index/phiX174_human/       # Combined Bowtie2 index instead, under --read_aligner bowtie2
+├── kraken/standard-8/                # Kraken2 database (--kraken2_db), k2_ref_db/
+├── sourmash/gtdb_220_k31/            # sourmash taxonomy (taxonomy.sqldb)
+├── sylph/gtdb_r232/                  # Sylph database (sylph_db/*.syl2db) + sylph-tax metadata (sylph_db/*.tsv.gz)
+├── metabuli/refseq_standard/         # Metabuli database for contig taxonomy (metabuli_db/, ~110 GB, with its taxdump)
+├── genomad/v1.9/                     # geNomad database 1.9 (genomad_db/, ~2.2 GB)
+├── deeparg/1.0.4/                    # DeepARG database (deeparg_db/; unversioned upstream, keyed by the deeparg version)
+├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, _wildcard_k<--rgi_kmer_size> with WildCARD)
+├── kmarvel/card_v4.0.1/              # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
+├── checkm2/v3/                       # CheckM2 database (*.dmnd)
+├── gtdbtk/release_232/               # GTDB-TK database (gtdbtk_db/)
+├── eggnog/emapper-3.0/               # eggNOG 7 data for eggNOG-mapper v3 (eggnog_db/, ~44 GB)
+├── dbcan/db_v5-2-9_5-5-2026/         # dbCAN database for run_dbcan v5 (dbcan_db/, ~7.4 GB)
+├── cog/cog-24/                       # NCBI COG definitions table (cog-24.def.tab, ~410 KB)
+├── bakta/v6.0-full/                  # Bakta database v6.0 (bakta_db/; full 31.9 GB / light 1.3 GB download)
+├── woltka/wolr2/                     # Web of Life WoLr2 subset for Woltka (woltka_db/, ~94 GB)
+├── superfocus/db90/diamond/          # SUPER-FOCUS DB_90 root for the selected aligner (superfocus_db/, ~1.9-2.5 GB unpacked)
+├── humann/v4_alpha-full/             # HUMAnN 4 database root + MetaPhlAn vOct22 (humann_db/, ~71 GB / ~33 GB EC-filtered)
+└── stub/                             # Placeholder databases of -stub runs (same layout)
 ```
+
+Copies of builds from your own files (not reused automatically, pass them with `--custom_*`): `bwamem3_index/contaminants_index` or `bowtie_index/contaminants_index` (from `--custom_host_fasta` / `--custom_phiX_fasta`), `rgi/card_db_with_wildcard` (from `--custom_rgi_wildcard`) and `sourmash/taxonomy.sqldb` (from a `--custom_sourmash_db` lineages file).
 
 ### Conditional Outputs
 

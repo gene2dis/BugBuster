@@ -439,7 +439,7 @@ because K-MARVEL 1.0.0 exits 0 even when its blastp step fails.
 - **"... has no CARD_protein_all.fasta (expected a FORMAT_KMARVEL_DB /
   --custom_kmarvel_db layout)":** `--custom_kmarvel_db` must point at the
   directory holding `CARD_protein_all.fasta`, `metadata.tsv` and `snps.txt`
-  (for example `databases/kmarvel/kmarvel_db` from an earlier run), not at its
+  (for example `<databases_dir>/kmarvel/card_v4.0.1/kmarvel_db` from an earlier run), not at its
   parent.
 - **No ARGs for any sample:** K-MARVEL ignores reads shorter than
   `--kmarvel_min_read_length` (100 bp), so heavily trimmed short reads can leave
@@ -540,8 +540,9 @@ fail rather than be silently "repaired".
 
 **Solution:** for the schema error, check that `--custom_bakta_db` points at
 an extracted v6.0 (schema 6) database, not an older release. For the
-amrfinderplus-db error, delete the partial `databases/bakta/` directory and
-re-run — the download resumes from the pinned Zenodo URL. The same checks
+amrfinderplus-db error, delete the `<databases_dir>/bakta/<key>/` directory
+(if a failed run left one) and re-run — the database is downloaded again from
+the pinned Zenodo URL. The same checks
 apply to a custom database directory.
 
 ### BAKTA_BAKTA fails mid-annotation with "amrfinder error! error code: 1"
@@ -773,6 +774,28 @@ ERROR: Failed to download database from URL
 
 3. Download manually and specify path
 
+### A stored database is incomplete, outdated or a placeholder
+
+**Symptom:** the log shows `[skipping] Stored process > FORMAT_...` (or
+`DOWNLOAD_...`, `RGI_LOAD`, `*_BUILD_COMBINED`), and the step that reads the
+database then fails on missing or empty files, or uses an older release than
+you expected.
+
+**Cause:** downloads are stored in `<databases_dir>/<database>/<key>/` and a
+run skips the download whenever the expected files or folder are there,
+without checking their contents. A folder left incomplete (for example by a
+copy to another filesystem that was interrupted while the database was being
+stored, a second run started while the first was still storing it, or files
+removed by hand) is taken as complete. RGI's default
+`--rgi_card_version latest` is fixed at the first download in that
+`--databases_dir`.
+
+**Solution:** delete that database's `<databases_dir>/<database>/<key>/`
+folder and re-run; only that database is downloaded again. For RGI, pin
+`--rgi_card_version` instead to get a specific release in its own folder.
+Placeholder files from `-stub` runs are kept apart under
+`<databases_dir>/stub/` and are never used by a real run.
+
 ### Database checksum mismatch
 
 **Error:**
@@ -809,12 +832,13 @@ MemoryError in GTDB-TK
 data version or missing files under `GTDBTK_DATA_PATH`.
 
 **Cause:** the pipeline pins GTDB-Tk 2.8.0, which accepts **only GTDB R232**
-reference data. Older R220/R226 packages — including a `databases/gtdbtk/`
-directory cached by a previous pipeline version — require GTDB-Tk ≤ 2.6.1 and
-no longer work.
+reference data. Older R220/R226 packages — for example a
+`databases/gtdbtk/release220` directory left by a previous pipeline version and
+passed with `--custom_gtdbtk_db` — require GTDB-Tk ≤ 2.6.1 and no longer work.
 
-**Solution:** delete the cached `<databases_dir>/gtdbtk/` directory and let the
-pipeline download the R232 package (~61 GB), or pass an R232 directory you
+**Solution:** drop `--custom_gtdbtk_db` and let the pipeline download the R232
+package (~61 GB, stored in `<databases_dir>/gtdbtk/release_232/`; delete
+the old R220/R226 directory to free its space), or pass an R232 directory you
 already have with `--custom_gtdbtk_db /path/to/release232` (the directory that
 directly contains `markers/`, `skani/`, `taxonomy/`, ...).
 
@@ -896,8 +920,8 @@ and run with `--read_aligner bowtie2` on nodes without it.
 **Exit status 3 / "needs more memory":** the human index build needs ~75 GB
 RAM; the pipeline warns at launch when `--max_memory` is lower. Either:
 
-- raise `--max_memory` (the build runs once; later runs reuse the index with
-  `--custom_decontamination_index <databases_dir>/bwamem3_index/contaminants_index`),
+- raise `--max_memory` (the build runs once per `--databases_dir`; later runs
+  reuse the stored index),
 - pass an index built elsewhere (`bwa-mem3 index -p contaminants_index/contaminants contaminants.fasta`,
   or a bwa-mem2 index), or
 - use `--read_aligner bowtie2` (~6 GB to build, about an hour).
@@ -936,9 +960,10 @@ index (`*.bwt.2bit.64`).
 
 1. Check the index files (under your databases directory, `<output>/../databases` by default):
    ```bash
-   ls -lh <databases_dir>/bowtie_index/contaminants_index/
+   ls -lh <databases_dir>/bowtie_index/phiX174_human/contaminants_index/
    # Should list contaminants.1.bt2 ... contaminants.rev.2.bt2 (.bt2l for a large index)
-   # (the default bwa-mem3 index is in bwamem3_index/contaminants_index/:
+   # (bowtie_index/contaminants_index/ for an index from --custom_host_fasta;
+   #  the default bwa-mem3 index is in bwamem3_index/phiX174_human/contaminants_index/:
    #  contaminants.amb .ann .bwt.2bit.64 .pac)
    ```
 2. Verify read files decompress cleanly: `zcat sample_R1.fastq.gz | head -n 4`

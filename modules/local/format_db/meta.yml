@@ -1,5 +1,5 @@
 name: format_db
-description: Downloads and formats the reference databases needed by the enabled pipeline options (PREPARE_DATABASES); each FORMAT_*/DOWNLOAD_* process runs the registry's fmtscript from config/databases.config, and SOURMASH_TAX_PREPARE builds the sourmash lineage database
+description: Downloads and formats the reference databases needed by the enabled pipeline options (PREPARE_DATABASES); each FORMAT_*/DOWNLOAD_* process runs the registry's fmtscript from config/databases.config, and SOURMASH_TAX_PREPARE builds the sourmash lineage database. Outputs are stored with storeDir under <databases_dir>/<database>/<registry key>/ (config/modules.config), so a run that finds them there skips the process
 keywords:
   - database
   - download
@@ -115,7 +115,7 @@ processes:
     output: []
 
   - name: DOWNLOAD_GTDBTK_DB
-    description: Runs bin/gtdb-tk_db_reformat.sh - downloads and extracts the GTDB-Tk reference data package and checks it is not empty
+    description: Runs bin/gtdb-tk_db_reformat.sh - downloads the GTDB-Tk reference data package, extracts its release directory as gtdbtk_db/ and checks it is not empty
     input:
       - db:
           type: value

@@ -264,10 +264,10 @@ nextflow run main.nf \
 | Full Pipeline | 256 GB | 32 | 500 GB |
 
 A run also builds the human decontamination index: ~75 GB RAM with the default
-aligner (bwa-mem3). It is rebuilt on every fresh run unless you pass the
-published one (`<databases_dir>/bwamem3_index/contaminants_index`) with
-`--custom_decontamination_index`; or use `--read_aligner bowtie2` (~6 GB, about
-an hour) on smaller nodes and on CPUs without AVX2. Set `--max_memory` to what a
+aligner (bwa-mem3). It is built once per `--databases_dir` and reused by later
+runs that share it (put `--databases_dir` on shared storage for a cluster); or
+use `--read_aligner bowtie2` (~6 GB, about an hour) on smaller nodes and on CPUs
+without AVX2. Set `--max_memory` to what a
 node offers: decontamination and MEGAHIT request 72 GB each on the first attempt
 (`process_high`), all capped by it.
 

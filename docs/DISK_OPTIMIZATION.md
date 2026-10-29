@@ -11,7 +11,12 @@ Disk use comes from three places, which behave differently:
    outputs. This is where peak usage happens, and it is also the `-resume` cache.
 2. **The results directory** (`--output`): copies of the published outputs.
 3. **The databases** (`--databases_dir`, default `<output>/../databases`): reference
-   databases, kept across runs.
+   databases, kept across runs. The download tasks store them there with Nextflow's
+   `storeDir`, one folder per database and version (`<databases_dir>/<database>/<key>/`):
+   the files are moved out of the work directory, so each database is on disk once, and a
+   later run with the same `--databases_dir` skips the download (see
+   [Database Management](manual.md#4-database-management)). Old versions are not removed
+   when you select a new one; delete their folders to free the space.
 
 BugBuster reduces disk use in two ways:
 
@@ -96,8 +101,10 @@ What this means in practice:
 > `cleanup = true` to a custom config passed with `-c`.
 
 > **Note: databases are unaffected.** Reference databases live at
-> `--databases_dir` (default `<output>/../databases`), outside the work dir,
-> and `low_disk` does nothing about them. The functional annotation branches in
+> `--databases_dir` (default `<output>/../databases`), outside the work dir:
+> `low_disk` neither deletes nor shrinks them, and a later run (including another
+> `low_disk` run, with a new work dir) reuses them without downloading again.
+> The functional annotation branches in
 > particular add large permanent databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB,
 > Bakta full ~31.9 GB / light ~1.3 GB download, WoLr2 ~94 GB for the
 > read-level Woltka branch, SUPER-FOCUS DB_90 ~0.7-0.9 GB download for the
@@ -315,8 +322,8 @@ before an interruption may not be recorded in any run.
 
 ## Version History
 
-- **v2.0.0dev** - Current: this document corrected to the measured behaviour (cleanup does not lower peak usage)
-- **v1.1** - `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir replaced by conditional publishDir
+- **v2.0.0dev** - Current: this document corrected to the measured behaviour (cleanup does not lower peak usage); databases stored with `storeDir` under `<databases_dir>/<database>/<key>/` (stored once, reused across runs)
+- **v1.1** - `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir on clean reads replaced by conditional publishDir
 - **v1.0.0** - Initial disk optimization implementation
   - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
   - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS

@@ -189,6 +189,47 @@ The tuples of one process become one block with its tools sorted, identical bloc
 from per-sample tasks collapse to one, and the file keeps its format.
 `tests/subworkflows/software_versions*.nf.test` cover both sources.
 
+### Databases
+
+A process that downloads or builds a reference database from the registry
+(`config/databases.config`) is stored with `storeDir`, not published. Each database
+lives in `<databases_dir>/<database>/<registry key>/`, and a run that finds the
+process's declared outputs there skips the process. Set this in `config/modules.config`,
+in the same form as the existing blocks:
+
+```groovy
+withName: 'FORMAT_TOOL_DB' {
+    storeDir = { params.databases_dir != null ? "${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}tool/${params.tool_db}" : null }
+}
+```
+
+- **The closure returns `null` without `databases_dir`**, which turns storeDir off
+  (module-level nf-tests run without `--output`). The `stub/` prefix keeps `-stub`
+  placeholders away from the folders real runs use.
+- **The key is the registry key**, plus anything else that changes the files: the
+  aligner for SUPER-FOCUS, `_dense` for the bwa-mem3 index, `_wildcard_k<kmer>` for RGI.
+  A database with no upstream version is keyed by the tool version that downloads it
+  (`deeparg/1.0.4`); change the key together with the image.
+- **Changing a registry `url` needs a new key.** Under the same key, every existing
+  `databases_dir` keeps the old download.
+- **Declare outputs with fixed names** (`path("k2_ref_db")`, not `path("*")`): storeDir
+  only checks that the declared outputs exist, so a glob would match anything left in
+  the folder. Make the stub create the same names.
+- **When a process starts producing new files** (for example an index built once),
+  declare them as their own output or change the key. Otherwise a store filled before
+  the change still passes the check and is reused without them.
+- **A `versions.yml` output is stored with the database** and re-emitted when the process
+  is skipped, so `software_versions.yml` reports the versions that built it.
+- **A build from the user's own files** (`--custom_host_fasta`, `--custom_rgi_wildcard`,
+  a `--custom_sourmash_db` lineages file) has no version to key on. It runs every time
+  and keeps a `publishDir` copy in `databases_dir`, for reuse through the matching
+  `--custom_*` option.
+- **Every database has a `--custom_*` parameter** that bypasses the process and uses the
+  path in place.
+
+`tests/main.nf.test` ("Stub run skips a database already stored in databases_dir")
+pre-fills a store and checks that the process is skipped.
+
 ### Process Structure
 
 ```groovy
