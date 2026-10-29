@@ -145,6 +145,11 @@ process DOWNLOAD_DEEPARG_DB {
 
     script:
         """
+        # Theano (imported by every deeparg command) creates its compile cache
+        # under \$HOME/.theano: '/' in a docker task without HOME (not
+        # writable). Keep it in the task directory (design doc Q21)
+        export THEANO_FLAGS="base_compiledir=\$PWD/theano_compiledir"
+
         deeparg \\
             download_data \\
             -o ./deeparg_db
