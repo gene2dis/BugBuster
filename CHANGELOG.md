@@ -429,6 +429,19 @@ next release is tagged.
 
 ### Changed
 
+- **One Python image for every report process**: the 17 report and
+  aggregation processes (READS_REPORT, TAXONOMY_REPORT, TAXONOMY_PHYLOSEQ,
+  KMARVEL_REPORT, RGI_REPORT, ARGS_OAP_REPORT, ARG_CONTIG_LEVEL_REPORT,
+  BLOBPLOT, ARG_BLOBPLOT, BIN_*, AGGREGATE_*, RESULTS_SUMMARY) ran on three
+  images (pandas 1.4.2, 2.0.3 and 2.2.3) and now share one Seqera Containers
+  image: Python 3.13, pandas 3.1.0, numpy 2.5.4, matplotlib 3.11.2, seaborn
+  0.13.2, h5py 3.16.0, openpyxl 3.1.5 and biopython 1.88
+  (`community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9`,
+  and its `oras://` build `cd89ac4e30745df7` under Singularity and
+  Apptainer). pandas 3 reads floats from the stage tables exactly, where
+  pandas 2 could be one unit off in the last place, so some values move in
+  their 16th-17th significant digit (e.g. ARGs-OAP copies per cell). Tables
+  are otherwise unchanged and figures look the same
 - **Databases are stored once and reused across runs (`storeDir`)**: the
   database download and build tasks (`FORMAT_*`, `DOWNLOAD_DEEPARG_DB`,
   `DOWNLOAD_GTDBTK_DB`, `RGI_LOAD`, `SOURMASH_TAX_PREPARE` and the
