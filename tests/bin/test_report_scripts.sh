@@ -30,6 +30,9 @@ MULLED_IMG=$(grep -o "'quay.io/biocontainers/mulled-v2-[^']*'" "${REPO_DIR}/modu
     | tr -d "'" | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# REPORT_TEST_IMG=<image>: run the scripts in that image instead of the pinned one (to try an image before pinning it)
+MULLED_IMG=${REPORT_TEST_IMG:-${MULLED_IMG}}
+REPORT_IMG=${REPORT_TEST_IMG:-${REPORT_IMG}}
 
 if [ -z "${MULLED_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"

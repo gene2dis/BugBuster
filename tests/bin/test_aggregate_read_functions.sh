@@ -54,6 +54,8 @@ WOLTKA_IMG=$(grep -o "'quay.io/biocontainers/woltka:[^']*'" "${REPO_DIR}/modules
     | tr -d "'" | head -1)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/aggregate_read_functions/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# REPORT_TEST_IMG=<image>: run the scripts in that image instead of the pinned one (to try an image before pinning it)
+REPORT_IMG=${REPORT_TEST_IMG:-${REPORT_IMG}}
 if [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
