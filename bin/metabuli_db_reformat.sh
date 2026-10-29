@@ -1,17 +1,16 @@
 #!/bin/bash
 #
 # Download and unpack a Metabuli database (refseq_standard: an 80 GB download
-# that unpacks to 110 GB; the tarball is deleted after extraction).
+# that unpacks to 110 GB). The tarball is streamed into tar, so only the
+# unpacked size is needed on disk; a retry starts in a new task directory
+# anyway, so a saved partial download could not be resumed.
 # Usage: metabuli_db_reformat.sh <database-tarball-url>
 #
 set -euo pipefail
 
-wget --tries=5 --continue --waitretry=10 -O metabuli_db.tar.gz \
-    "${1:?usage: metabuli_db_reformat.sh <database-tarball-url>}"
-
+url="${1:?usage: metabuli_db_reformat.sh <database-tarball-url>}"
 mkdir metabuli_extract
-tar -xzf metabuli_db.tar.gz -C metabuli_extract
-rm -f metabuli_db.tar.gz
+wget --tries=5 --waitretry=10 --no-verbose -O - "${url}" | tar -xzf - -C metabuli_extract
 
 # The tarball holds one database directory (or the files at its top level):
 # the directory with db.parameters is the database

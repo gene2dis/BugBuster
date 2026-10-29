@@ -7,7 +7,7 @@ process BIN_CONTIG_LABELS {
         'quay.io/biocontainers/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0' }"
 
     input:
-    tuple val(meta), path(bins), path(gtdbtk_reports)
+    tuple val(meta), path(bins)
 
     output:
     tuple val(meta), path("*_contig_bins.tsv"), emit: labels
@@ -18,7 +18,7 @@ process BIN_CONTIG_LABELS {
 
     script:
     """
-    bin_contig_labels.py ${meta.id} ${bins} ${gtdbtk_reports}
+    bin_contig_labels.py ${meta.id} ${bins}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -28,7 +28,7 @@ process BIN_CONTIG_LABELS {
 
     stub:
     """
-    printf 'contig\\tbin\\tbin_gtdb_classification\\n' > ${meta.id}_contig_bins.tsv
+    printf 'contig\\tbin\\n' > ${meta.id}_contig_bins.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

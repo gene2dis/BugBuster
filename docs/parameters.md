@@ -226,7 +226,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `refseq_standard`
 - **Options**: `refseq_standard`, `gtdb232`
 - **Description**: Metabuli database for contig taxonomy (`--contig_tax_and_arg`). `refseq_standard`: the Kraken2 PlusPF genome set (RefSeq archaea, bacteria, viruses, plasmids, protozoa, fungi and human) with NCBI taxonomy, built 2026-04-03. `gtdb232`: GTDB R232 species representatives with human and RefSeq viruses, GTDB names; not benchmarked in the pipeline. Each database ships the taxdump it was built with, which BlobTools reads
-- **Size**: `refseq_standard` 80 GB download, 110 GB unpacked (about 190 GB free disk while it unpacks); `gtdb232` 634 / 744 GB
+- **Size**: `refseq_standard` 80 GB download, 110 GB unpacked (streamed: no extra disk for the tarball); `gtdb232` 634 / 744 GB
 - **Example**: `--metabuli_db refseq_standard`
 
 ### `--genomad_db`

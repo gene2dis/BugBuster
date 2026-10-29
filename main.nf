@@ -137,7 +137,7 @@ include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { METABULI_CLASSIFY } from './modules/local/metabuli_classify/main'
-include { GENOMAD_ENDTOEND  } from './modules/nf-core/genomad/endtoend/main'
+include { GENOMAD_ENDTOEND as NFCORE_GENOMAD_ENDTOEND } from './modules/nf-core/genomad/endtoend/main'
 include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
@@ -563,6 +563,7 @@ workflow {
     ch_counting_bam  = channel.empty()
     ch_refined_bins  = channel.empty()
     ch_contig_bins   = channel.empty()   // [meta, <id>_contig_bins.tsv] when binning is on
+    ch_gtdbtk_reports = channel.empty()  // <id>_gtdbtk_{bac120,ar53}.tsv when binning is on
 
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
@@ -589,19 +590,16 @@ workflow {
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
 
+            ch_gtdbtk_reports = BINNING.out.gtdbtk.map { _meta, reports -> reports }.flatten()
+
             //
-            // MODULE: contig -> bin -> the bin's GTDB-Tk classification, for
-            // the bin columns of the contig report and the bin-level ARG
-            // split (Phase 9b, L5 a / M8). A sample GTDB-Tk has no report for
-            // gets an empty classification column
+            // MODULE: contig -> refined bin, for the bin columns of the
+            // contig report (which adds the bin's GTDB-Tk classification) and
+            // the bin-level ARG split (Phase 9b, L5 a / M8). From the bins
+            // alone, so the split does not wait for the batched GTDB-Tk
             //
             if ( flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering) ) {
-                BIN_CONTIG_LABELS(
-                    ch_refined_bins
-                        .join(BINNING.out.gtdbtk, remainder: true)
-                        .filter { _meta, bins, _reports -> bins != null }
-                        .map { meta, bins, reports -> [meta, bins, reports ?: []] }
-                )
+                BIN_CONTIG_LABELS(ch_refined_bins.filter { _meta, bins -> bins != null })
                 ch_contig_bins = BIN_CONTIG_LABELS.out.labels
                 ch_versions = ch_versions.mix(BIN_CONTIG_LABELS.out.versions.first())
             }
@@ -752,15 +750,23 @@ workflow {
     //
     ch_genomad_tables = channel.empty()
     if ( flagOn(params.genomad_prediction) && params.assembly_mode != "none" ) {
-        GENOMAD_ENDTOEND(
-            ch_contigs_meta,
+        // geNomad stops on a FASTA without sequences, which BBMAP writes when
+        // every contig of a sample is below --bbmap_length: skip those
+        NFCORE_GENOMAD_ENDTOEND(
+            ch_contigs_meta.filter { meta, contigs ->
+                def has_contigs = contigs.withReader { reader -> reader.readLine()?.startsWith('>') ?: false }
+                if ( !has_contigs ) {
+                    log.warn "No contigs for ${meta.id}: skipping geNomad"
+                }
+                has_contigs
+            },
             PREPARE_DATABASES.out.genomad_db
                 .ifEmpty { error "ERROR: geNomad database is empty. Ensure --genomad_prediction is enabled and a valid geNomad database is configured (--genomad_db, or --custom_genomad_db)." }
                 .map { db -> [[id: 'genomad_db'], db] }
                 .first()
         )
-        ch_genomad_tables = GENOMAD_ENDTOEND.out.aggregated_classification
-            .mix(GENOMAD_ENDTOEND.out.plasmid_summary, GENOMAD_ENDTOEND.out.virus_summary)
+        ch_genomad_tables = NFCORE_GENOMAD_ENDTOEND.out.aggregated_classification
+            .mix(NFCORE_GENOMAD_ENDTOEND.out.plasmid_summary, NFCORE_GENOMAD_ENDTOEND.out.virus_summary)
             .map { _meta, table -> table }
     }
 
@@ -807,6 +813,7 @@ workflow {
                     ch_blob_table.only_blob,
                     METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls },
                     ch_contig_bins.map { _meta, labels -> labels },
+                    ch_gtdbtk_reports,
                     // geNomad's tables, and the Pyrodigal GFF for the ARG
                     // genes' coordinates (proviruses)
                     ch_genomad_tables,

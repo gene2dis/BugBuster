@@ -649,7 +649,7 @@ def main(argv=None):
 
     # ---- contig-level ARGs on geNomad's plasmids, viruses and proviruses (per assembly: a co-assembly is one
     # row set, not a sample)
-    mobile = contig_mobile_table([b["contig_args"] for b in batches])
+    mobile = contig_mobile_table([(b["label"], b["contig_args"]) for b in batches])
     if mobile is not None:
         tables["arg_contig_mobile"] = (mobile, False)
 

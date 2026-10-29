@@ -868,13 +868,13 @@ parameters were removed; drop them and give `--custom_metabuli_db` instead.
 The ranks now come from Metabuli, and BlobTools gets a copy of `nodes.dmp` with
 the rank renamed back; rerun the contig step to fix old results.
 
-### GENOMAD_ENDTOEND or FORMAT_GENOMAD_DB fails
+### NFCORE_GENOMAD_ENDTOEND or FORMAT_GENOMAD_DB fails
 
 `FORMAT_GENOMAD_DB` checks the downloaded file's md5 and that its `version.txt`
 says 1.9; a mismatch means a corrupted or replaced Zenodo file. With
 `--custom_genomad_db`, the directory must hold the unpacked database
 (`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); geNomad
-1.13.0 takes database 1.9. `GENOMAD_ENDTOEND` requests 8 CPUs and 36 GB (about
+1.13.0 takes database 1.9. `NFCORE_GENOMAD_ENDTOEND` requests 8 CPUs and 36 GB (about
 18 GB used per assembly in the Phase 9c benchmark); an out-of-memory failure is
 retried with twice the memory.
 

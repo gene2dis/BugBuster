@@ -173,7 +173,9 @@ PYEOF
 
 check "contig ARGs on plasmids, viruses and proviruses (arg_contig_mobile)" py - <<'PYEOF'
 import pandas as pd
-mob = pd.read_csv("out/tables/arg_contig_mobile.tsv", sep="\t").set_index(["assembly", "arg_class"])
+mob = pd.read_csv("out/tables/arg_contig_mobile.tsv", sep="\t")
+assert list(mob.columns[:3]) == ["assembly", "batch", "arg_class"] and set(mob["batch"]) == {"run1"}, mob
+mob = mob.set_index(["assembly", "arg_class"])
 assert list(mob.index) == [("sampleA", "tetracycline"), ("sampleA", "bacitracin"), ("sampleA", "multidrug")], mob
 tet = mob.loc[("sampleA", "tetracycline")]
 assert (tet["arg_genes"], tet["arg_genes_on_plasmid"], tet["arg_genes_on_virus"], tet["arg_genes_in_provirus"]) \
@@ -185,6 +187,24 @@ assert "ICE" in md or "integrative conjugative" in md
 for stage in ("| Contig taxonomy and ARGs", "| Plasmid / virus classification of contigs (geNomad)"):
     row = next(l for l in md.splitlines() if l.startswith(stage))
     assert "| ran |" in row, row
+PYEOF
+
+# two merged co-assembly batches: both contig tables say 'coassembly', so the batch keeps them apart
+make_results co1/results sampleA
+make_results co2/results sampleB
+for b in co1 co2; do
+    mkdir -p "${b}/results/05_arg_prediction/contig_level/summary"
+    sed 's/^sampleA\t/coassembly\t/' "${FIX}/contig/Contig_tax_and_arg_prediction.tsv" \
+        > "${b}/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv"
+done
+check "merge of two co-assembly batches" \
+    py "${SUMMARY}" --results co1/results co2/results --outdir co_out --min-clean-pairs 10000 --no-excel
+check "arg_contig_mobile keeps the two co-assemblies apart (batch in the key)" py - <<'PYEOF'
+import pandas as pd
+mob = pd.read_csv("co_out/tables/arg_contig_mobile.tsv", sep="\t")
+tet = mob[mob["arg_class"] == "tetracycline"]
+assert sorted(tet["batch"]) == ["co1", "co2"] and set(tet["assembly"]) == {"coassembly"}, tet
+assert list(tet["arg_genes"]) == [2, 2], tet
 PYEOF
 
 check "ARGs-OAP tables: SARG subtypes and types in copies per cell, cell estimates" py - <<'PYEOF'

@@ -280,6 +280,8 @@ TABLE_DOCS = {
                        "virus_score, provirus).",
         "columns": [
             ("assembly", "the assembly the contigs come from: a sample name, or coassembly"),
+            ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with "
+                      "the assembly, the key: every co-assembly is called coassembly"),
             ("arg_class", "DeepARG predicted ARG class"),
             ("arg_genes", "ARG genes of the class on the assembly's contigs"),
             ("arg_genes_on_plasmid", "of those, genes on contigs geNomad calls plasmid"),

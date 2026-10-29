@@ -485,9 +485,10 @@ expect_fail "arg_contig_level_report: no Metabuli file fails" arg_contig_level_r
 
 #
 # bin_contig_labels.py + the report's bin columns (Phase 9b, L5 a): contig ->
-# refined bin -> the bin's GTDB-Tk string, untouched; a contig in two bins
-# counts once (first bin, warning); a bin GTDB-Tk has no row for keeps an
-# empty classification; a bins dir with only a marker gives a header.
+# refined bin (from the bins alone); a contig in two bins counts once (first
+# bin, warning); a bins dir with only a marker gives a header. The report adds
+# the bin's GTDB-Tk string, untouched, from <sample>_gtdbtk_*.tsv; a bin
+# GTDB-Tk has no row for keeps an empty classification.
 #
 echo "--- bin_contig_labels.py ---"
 BCL_WORK="${WORK}/bin_contig_labels"
@@ -499,13 +500,10 @@ printf "user_genome\tclassification\tclosest_genome_reference\nbinette_bin1\td__
     > "${BCL_WORK}/test_sample2_gtdbtk_bac120.tsv"
 printf "user_genome\tclassification\n" > "${BCL_WORK}/test_sample2_gtdbtk_ar53.tsv"
 NEXT_WORKDIR="${BCL_WORK}"
-expect_pass "bin_contig_labels: contig to bin to GTDB-Tk table" bin_contig_labels.py test_sample2 test_sample2_binette_bins \
-    test_sample2_gtdbtk_bac120.tsv test_sample2_gtdbtk_ar53.tsv
-check_grep "bin_contig_labels: header" "test_sample2_contig_bins.tsv" "^contig	bin	bin_gtdb_classification$"
-check_grep "bin_contig_labels: GTDB string untouched" "test_sample2_contig_bins.tsv" \
-    "^k141_0	binette_bin1	d__Bacteria;p__Pseudomonadota;.*;s__Acinetobacter baumannii$"
-check_grep "bin_contig_labels: bin without a GTDB-Tk row keeps an empty classification" "test_sample2_contig_bins.tsv" \
-    "^k141_231	binette_bin2	$"
+expect_pass "bin_contig_labels: contig to bin table" bin_contig_labels.py test_sample2 test_sample2_binette_bins
+check_grep "bin_contig_labels: header" "test_sample2_contig_bins.tsv" "^contig	bin$"
+check_grep "bin_contig_labels: contig in its bin" "test_sample2_contig_bins.tsv" "^k141_0	binette_bin1$"
+check_grep "bin_contig_labels: second bin" "test_sample2_contig_bins.tsv" "^k141_231	binette_bin2$"
 check_grep "bin_contig_labels: contig in two bins warned" "../bin_contig_labels.log" "contig k141_0 of bin binette_bin2 is already in bin binette_bin1"
 if [ "$(grep -c '^k141_0	' "${BCL_WORK}/test_sample2_contig_bins.tsv")" = "1" ]; then
     echo "✓ bin_contig_labels: a shared contig counts once"; PASS=$((PASS + 1))
@@ -514,17 +512,16 @@ else
 fi
 NEXT_WORKDIR="${BCL_WORK}"
 expect_pass "bin_contig_labels: marker-only bins dir" bin_contig_labels.py sampleempty empty_bins
-if [ "$(cat "${BCL_WORK}/sampleempty_contig_bins.tsv")" = "contig	bin	bin_gtdb_classification" ]; then
+if [ "$(cat "${BCL_WORK}/sampleempty_contig_bins.tsv")" = "contig	bin" ]; then
     echo "✓ bin_contig_labels: marker-only bins dir gives a header-only table"; PASS=$((PASS + 1))
 else
     echo "✗ bin_contig_labels: marker-only bins dir gives a header-only table"; FAIL=$((FAIL + 1))
 fi
 NEXT_WORKDIR="${BCL_WORK}"
-expect_fail "bin_contig_labels: a file that is not a GTDB-Tk summary fails" bin_contig_labels.py test_sample2 \
-    test_sample2_binette_bins test_sample2_binette_bins/binette_bin1.fa
+expect_fail "bin_contig_labels: missing bins dir argument fails" bin_contig_labels.py test_sample2
 ACB_WORK="${WORK}/arg_contig_level_report_bins"
 mkdir -p "${ACB_WORK}"
-cp "${ACR_WORK}"/test_sample2_* "${BCL_WORK}/test_sample2_contig_bins.tsv" "${ACB_WORK}/"
+cp "${ACR_WORK}"/test_sample2_* "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BCL_WORK}"/test_sample2_gtdbtk_*.tsv "${ACB_WORK}/"
 rm -f "${ACB_WORK}/Contig_tax_and_arg_prediction.tsv"
 NEXT_WORKDIR="${ACB_WORK}"
 expect_pass "arg_contig_level_report: with bin tables" arg_contig_level_report.py
@@ -534,6 +531,8 @@ check_grep "arg_contig_level_report: binned contig keeps its Metabuli ranks and 
     "^test_sample2	k141_0	.*	Acinetobacter baumannii	species	0.95811	binette_bin1	d__Bacteria;.*;s__Acinetobacter baumannii	ACRA	"
 check_grep "arg_contig_level_report: unbinned contig has empty bin columns" "Contig_tax_and_arg_prediction.tsv" \
     "^test_sample2	k141_456	.*	unclassified	0.0			"
+check_grep "arg_contig_level_report: bin without a GTDB-Tk row keeps an empty classification" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	.*	genus	0.334152	binette_bin2		"
 
 #
 # bin_arg_split.py (Phase 9b, M8): DEEPARG_CONTIGS' hits and the assembly's

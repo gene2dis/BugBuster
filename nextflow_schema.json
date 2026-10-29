@@ -353,14 +353,14 @@
                     "default": "refseq_standard",
                     "enum": ["refseq_standard", "gtdb232"],
                     "description": "Metabuli database for contig taxonomy (--contig_tax_and_arg; see config/databases.config).",
-                    "help_text": "'refseq_standard' (default): the Kraken2 PlusPF genome set (RefSeq archaea, bacteria, viruses, plasmids, protozoa, fungi, human) with NCBI taxonomy; an 80 GB download, 110 GB unpacked (about 190 GB free disk while it unpacks). 'gtdb232': GTDB R232 species representatives with GTDB names, 634 GB download / 744 GB unpacked; not measured in the pipeline's benchmarks.",
+                    "help_text": "'refseq_standard' (default): the Kraken2 PlusPF genome set (RefSeq archaea, bacteria, viruses, plasmids, protozoa, fungi, human) with NCBI taxonomy; an 80 GB download, 110 GB unpacked. 'gtdb232': GTDB R232 species representatives with GTDB names, 634 GB download / 744 GB unpacked; not measured in the pipeline's benchmarks.",
                     "fa_icon": "fas fa-database"
                 },
                 "custom_metabuli_db": {
                     "type": "string",
                     "format": "directory-path",
                     "description": "Path to a local Metabuli database directory (db.parameters, diffIdx, info, taxonomyDB and the taxdump it was built with: nodes.dmp and names.dmp, at most one directory down); skips the download.",
-                    "help_text": "BlobTools reads the database's own taxdump, so every taxid Metabuli reports resolves. e.g. /mds_data/dbs/metabuli/refseq_standard (taxdump in ncbi-taxdump/).",
+                    "help_text": "BlobTools reads the database's own taxdump, so every taxid Metabuli reports resolves (refseq_standard keeps it in ncbi-taxdump/).",
                     "fa_icon": "fas fa-folder"
                 },
                 "custom_decontamination_index": {

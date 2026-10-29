@@ -133,7 +133,7 @@ co-assemblies it may also need its retry.
 `refseq_standard` (`METABULI_CLASSIFY`, `process_medium`): in the Phase 9c
 benchmark it used 5-12 GB with `--max-ram 32` (the module passes 90 % of the
 task's memory) and 443-942 CPU-s per assembly at 16 threads. The database is
-110 GB on disk (an 80 GB download; about 190 GB of free disk while it unpacks).
+110 GB on disk (an 80 GB download, streamed into place: no extra disk for the tarball).
 `--genomad_prediction` (geNomad 1.13.0, `process_medium`) needed 17.4-18.4 GB
 and 1.1-5.5 CPU-h per assembly. Contig taxonomy no longer uses BLAST against nt
 (201,739 CPU-s for one 36.6 Mbp assembly in Phase 9a); see

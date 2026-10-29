@@ -42,7 +42,7 @@ flowchart TD
     
     %% Contig-level Analysis Branch
     Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy<br/>METABULI_CLASSIFY + BLOBTOOLS]
-    Contigs -->|if genomad_prediction| Genomad[GENOMAD_ENDTOEND<br/>plasmid / virus / provirus]
+    Contigs -->|if genomad_prediction| Genomad[NFCORE_GENOMAD_ENDTOEND<br/>plasmid / virus / provirus]
     Contigs -->|"if contig_tax_and_arg, arg_bin_clustering<br/>or contig_level_functional"| Pyrodigal[PYRODIGAL<br/>Shared Gene Calling]
     Pyrodigal -->|"if contig_tax_and_arg<br/>or arg_bin_clustering"| ContigARG[DEEPARG_CONTIGS]
     RefinedBins -->|"if contig_tax_and_arg<br/>or arg_bin_clustering"| BinLabels[BIN_CONTIG_LABELS<br/>contig → bin → GTDB-Tk]
@@ -383,7 +383,7 @@ flowchart LR
 
 ### Annotation & Reporting Modules
 - **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level)
-- **Taxonomy**: METABULI_CLASSIFY, BLOBTOOLS, GENOMAD_ENDTOEND (plasmid / virus)
+- **Taxonomy**: METABULI_CLASSIFY, BLOBTOOLS, NFCORE_GENOMAD_ENDTOEND (plasmid / virus)
 - **Reporting**: custom report generators
 
 ---
@@ -454,7 +454,7 @@ flowchart LR
 | Module | Description |
 |--------|-------------|
 | `METABULI_CLASSIFY` | Contig taxonomic classification with Metabuli (`refseq_standard`) |
-| `GENOMAD_ENDTOEND` | geNomad plasmid / virus / provirus calls on the contigs (`--genomad_prediction`) |
+| `NFCORE_GENOMAD_ENDTOEND` | geNomad plasmid / virus / provirus calls on the contigs (`--genomad_prediction`) |
 | `BIN_CONTIG_LABELS` | Contig → refined bin → GTDB-Tk classification |
 | `BIN_ARG_SPLIT` | DEEPARG_CONTIGS hits and Pyrodigal proteins split by bin |
 | `SAMTOOLS_INDEX` | Index BAM files for BLOBTOOLS |

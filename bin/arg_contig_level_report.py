@@ -4,8 +4,8 @@ ARG Contig Level Report Generator
 Joins, per contig, the BlobTools table (length, GC, coverage), Metabuli's
 classification (seven ranks from its lineage, the rank it called at and its
 score) and the DeepARG predictions. With binning, the contig's refined bin
-and that bin's GTDB-Tk classification (<sample>_contig_bins.tsv) come as two
-more columns, next to the NCBI ranks and never filling them. With geNomad
+(<sample>_contig_bins.tsv) and that bin's GTDB-Tk classification
+(<sample>_gtdbtk_{bac120,ar53}.tsv) come as two more columns, next to the NCBI ranks and never filling them. With geNomad
 (--genomad_prediction), each contig gets its mobile class (plasmid or virus
 call of geNomad's summaries, else chromosome), its aggregated plasmid and
 virus scores, virus taxonomy and plasmid conjugation genes, and each ARG gene
@@ -65,10 +65,11 @@ GENOMAD_SUFFIX = '_filtered_contigs_'
 
 
 def read_tsv(path):
-    """A TSV as strings; an empty file (a stub, or a table without rows) gives an empty frame."""
+    """A TSV as strings; a missing file (geNomad's aggregated classification is an optional output) or an empty
+    one (a stub, or a table without rows) gives an empty frame."""
     try:
         return pd.read_csv(path, sep='\t', dtype=str, keep_default_na=False)
-    except pd.errors.EmptyDataError:
+    except (FileNotFoundError, pd.errors.EmptyDataError):
         return pd.DataFrame()
 
 
@@ -159,14 +160,23 @@ def main():
         ignore_index=True)
     all_blob_reports = all_blob_reports.merge(all_tax, on=['Sample', 'contig_name'], how='left')
 
-    # Bin membership and the bin's GTDB-Tk classification (binning on)
+    # Bin membership (BIN_CONTIG_LABELS) and the bin's GTDB-Tk classification
+    # from the sample's <sample>_gtdbtk_{bac120,ar53}.tsv (binning on)
     bin_files = glob.glob('*_contig_bins.tsv')
     bin_cols = []
     if bin_files:
-        bins = pd.concat(
-            [pd.read_csv(f, sep='\t', dtype=str, keep_default_na=False).assign(Sample=f[:-len('_contig_bins.tsv')])
-             for f in bin_files],
-            ignore_index=True).rename(columns={'contig': 'contig_name'})
+        gtdb = {}
+        for f in glob.glob('*_gtdbtk_bac120.tsv') + glob.glob('*_gtdbtk_ar53.tsv'):
+            t = read_tsv(f)
+            if not t.empty:
+                gtdb.setdefault(f.rsplit('_gtdbtk_', 1)[0], {}).update(zip(t['user_genome'], t['classification']))
+        parts = []
+        for f in bin_files:
+            sample = f[:-len('_contig_bins.tsv')]
+            t = pd.read_csv(f, sep='\t', dtype=str, keep_default_na=False)
+            t['bin_gtdb_classification'] = t['bin'].map(gtdb.get(sample, {})).fillna('')
+            parts.append(t.assign(Sample=sample))
+        bins = pd.concat(parts, ignore_index=True).rename(columns={'contig': 'contig_name'})
         all_blob_reports = all_blob_reports.merge(
             bins[['Sample', 'contig_name', 'bin', 'bin_gtdb_classification']],
             on=['Sample', 'contig_name'], how='left')

@@ -575,7 +575,7 @@ nextflow_pipeline {
     }
 
     test("Stub run wires geNomad into the contig table and the summary") {
-        // Phase 9b (L6 d): --genomad_prediction runs nf-core GENOMAD_ENDTOEND
+        // Phase 9b (L6 d): --genomad_prediction runs nf-core genomad/endtoend (NFCORE_GENOMAD_ENDTOEND)
         // (1.13.0 image from config/modules.config) on each assembly with the
         // pinned database, publishes its output directory and feeds its
         // tables (plus the Pyrodigal GFF) to ARG_CONTIG_LEVEL_REPORT, whose
@@ -601,12 +601,12 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().any { task -> task.name.contains("FORMAT_GENOMAD_DB") }
-            assert workflow.trace.tasks().count { task -> task.name.contains("GENOMAD_ENDTOEND") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("NFCORE_GENOMAD_ENDTOEND") } == 2
             assert workflow.trace.tasks().any { task -> task.name.contains("ARG_CONTIG_LEVEL_REPORT") }
             assert workflow.trace.tasks().any { task -> task.name.contains("RESULTS_SUMMARY") }
             assert path("${outputDir}/06_contig_taxonomy/genomad/test_sample1/test_sample1_filtered_contigs_summary/test_sample1_filtered_contigs_plasmid_summary.tsv").exists()
             def versions = path("${outputDir}/pipeline_info/software_versions.yml").text
-            assert versions.contains("GENOMAD_ENDTOEND")
+            assert versions.contains("NFCORE_GENOMAD_ENDTOEND")
             assert versions.contains("genomad: 1.13.0")
         }
     }
