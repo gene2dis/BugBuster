@@ -951,6 +951,19 @@ next release is tagged.
 
 ### Fixed
 
+- **Order of tied rows in report tables and figures**: single-key sorts used
+  pandas' default quicksort, which does not keep the input order of equal
+  values, and numpy 2 orders such ties differently from numpy 1. The summary's
+  `taxonomy_*_wide.tsv` and `taxonomy_species_prevalence.tsv`, the summary
+  heatmaps, the blob and bin-taxonomy plots, READS_REPORT's column order and
+  the phyloseq plot taxa now sort stably (the phyloseq peak ranking also
+  followed Python set order). Tied rows may appear in a different order than
+  before; values are unchanged
+- **Whole-number matrices written as integers**: pandas < 3 `pivot_table`
+  turns all-integral floats into integers, so a TPM matrix whose values were
+  all whole numbers lost its `%.4f` format and the sourmash OTU table, sylph
+  abundances and bin depths could print as integers. They are now always
+  floats (only matrices of whole numbers change)
 - **BlobTools `undef` superkingdoms**: with an NCBI taxdump from 2025 on
   (the default `--taxdump_files ncbi` downloaded the current one), BlobTools
   1.1.1 wrote `undef` as every contig's superkingdom, because NCBI renamed the
