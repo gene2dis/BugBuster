@@ -73,6 +73,7 @@ from summary_functional import (cog_matrix, function_long, function_sample_colum
                                 merge_read_functional)
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
+from summary_contigs import contig_mobile_table, has_genomad, load_contig_args  # noqa: E402
 from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category, fig_sarg,  # noqa: E402
                              fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
@@ -396,6 +397,7 @@ def main(argv=None):
         sarg, sarg_cells, sarg_ran = load_args_oap(root)
         func = load_read_functional(root)
         mc = load_microbecensus(root)
+        contig_args = load_contig_args(root)
         names = set()
         if reads is not None:
             names |= set(reads["sample"])
@@ -411,11 +413,13 @@ def main(argv=None):
         versions = load_versions(root)
         found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
                                 ("rgi", rgi_ran), ("args_oap", sarg_ran), ("read_functional", func is not None),
-                                ("microbecensus", not mc.empty)) if v}
+                                ("microbecensus", not mc.empty), ("contig_arg", contig_args is not None),
+                                ("genomad", has_genomad(contig_args))) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
-                        "sarg_ran": sarg_ran, "func": func, "mc": mc, "samples": names, "versions": versions,
+                        "sarg_ran": sarg_ran, "func": func, "mc": mc, "contig_args": contig_args, "samples": names,
+                        "versions": versions,
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
@@ -642,6 +646,12 @@ def main(argv=None):
         sarg_ctx = {"n_samples": len(sarg_ran & set(order)), "n_types": int(sub["sarg_type"].nunique()),
                     "n_subtypes": int(sub["sarg_subtype"].nunique()),
                     "not_normalised": sorted(s for s in order if sstatus[s] == "not_normalised")}
+
+    # ---- contig-level ARGs on geNomad's plasmids, viruses and proviruses (per assembly: a co-assembly is one
+    # row set, not a sample)
+    mobile = contig_mobile_table([(b["label"], b["contig_args"]) for b in batches])
+    if mobile is not None:
+        tables["arg_contig_mobile"] = (mobile, False)
 
     # ---- read-level functional profile and MicrobeCensus
     func = merge_read_functional([b["func"] for b in batches])

@@ -11,7 +11,11 @@
 #   - the module's BLOBTOOLS script still carries `--db nodesDB.txt`,
 #   - create (with --db) + view succeed and write nodesDB.txt in the work dir,
 #   - create without --db fails with the read-only error (the test can see
-#     the defect).
+#     the defect),
+#   - with a 2025-style taxdump ('domain' top rank, Viruses an 'acellular
+#     root' with a realm below it) the superkingdom column is 'undef' as is,
+#     and Bacteria / Viruses after bin/blobtools_nodes_fix.sh (which the
+#     module runs).
 #
 # Requirements: docker (present on GitHub ubuntu-latest runners).
 #
@@ -22,7 +26,8 @@ REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
 MODULE="${REPO_DIR}/modules/local/blobtools/main.nf"
 
 # Use the exact image pinned in the module so the test cannot drift from it
-BLOB_IMG=$(grep -o "container '[^']*'" "${MODULE}" | head -1 | sed "s/container '//; s/'$//")
+# (the docker URI of the engine closure; the depot sif is the same build)
+BLOB_IMG=$(grep -o "'quay.io/biocontainers/blobtools:[^']*'" "${MODULE}" | tr -d "'" | head -1)
 if [ -z "${BLOB_IMG}" ]; then
     echo "ERROR: could not extract the pinned BLOBTOOLS image from ${MODULE}"
     exit 1
@@ -105,6 +110,52 @@ elif grep -q "Read-only file system" "${N}/create.log"; then
     pass "create without --db fails on a read-only image (negative control)"
 else
     fail "create without --db fails with the read-only error"; cat "${N}/create.log"
+fi
+
+#
+# 4. 2025 NCBI taxdump: 'domain' and the Viruses 'acellular root'
+#
+make_fixture_2025() {
+    local d="$1"
+    make_fixture "${d}"
+    printf "c1\t562\t200.0\nc2\t10760\t150.0\n" > "${d}/hits.tsv"
+    printf "1\t|\t1\t|\tno rank\t|\n131567\t|\t1\t|\tcellular root\t|\n2\t|\t131567\t|\tdomain\t|\n562\t|\t2\t|\tspecies\t|\n10239\t|\t1\t|\tacellular root\t|\n2731341\t|\t10239\t|\trealm\t|\n10760\t|\t2731341\t|\tspecies\t|\n" > "${d}/nodes.dmp"
+    printf "1\t|\troot\t|\t\t|\tscientific name\t|\n131567\t|\tcellular organisms\t|\t\t|\tscientific name\t|\n2\t|\tBacteria\t|\t\t|\tscientific name\t|\n562\t|\tEscherichia coli\t|\t\t|\tscientific name\t|\n10239\t|\tViruses\t|\t\t|\tscientific name\t|\n2731341\t|\tDuplodnaviria\t|\t\t|\tscientific name\t|\n10760\t|\tEscherichia phage T7\t|\t\t|\tscientific name\t|\n" > "${d}/names.dmp"
+}
+superkingdoms() {
+    # superkingdoms <blob table> — c1,c2 superkingdom.t column values
+    grep -v '^#' "$1" | sort | cut -f6 | paste -sd, -
+}
+if grep -q "blobtools_nodes_fix.sh" "${MODULE}"; then
+    pass "module: nodes.dmp passes through blobtools_nodes_fix.sh"
+else
+    fail "module: nodes.dmp passes through blobtools_nodes_fix.sh"
+fi
+R="${TMP_DIR}/taxdump_2025_raw"
+make_fixture_2025 "${R}"
+run_ro "${R}" "${R}/create.log" create --infile contigs.fa --hitsfile hits.tsv \
+    --nodes nodes.dmp --names names.dmp --db nodesDB.txt --cov reads.cov --out r \
+    && run_ro "${R}" "${R}/view.log" view --input r.blobDB.json --out r_Blob_table --rank all || true
+if [ "$(superkingdoms "${R}"/r_Blob_table*)" = "undef,undef" ]; then
+    pass "2025 taxdump as is: superkingdom undef (the defect is visible)"
+else
+    fail "2025 taxdump as is: superkingdom undef (got $(superkingdoms "${R}"/r_Blob_table* 2>/dev/null))"
+fi
+F="${TMP_DIR}/taxdump_2025_fixed"
+make_fixture_2025 "${F}"
+"${REPO_DIR}/bin/blobtools_nodes_fix.sh" "${F}/nodes.dmp" > "${F}/nodes_blobtools.dmp"
+if run_ro "${F}" "${F}/create.log" create --infile contigs.fa --hitsfile hits.tsv \
+        --nodes nodes_blobtools.dmp --names names.dmp --db nodesDB.txt --cov reads.cov --out f \
+        && run_ro "${F}" "${F}/view.log" view --input f.blobDB.json --out f_Blob_table --rank all \
+        && [ "$(superkingdoms "${F}"/f_Blob_table*)" = "Bacteria,Viruses" ]; then
+    pass "2025 taxdump after blobtools_nodes_fix.sh: superkingdom Bacteria, Viruses"
+else
+    fail "2025 taxdump after blobtools_nodes_fix.sh: superkingdom Bacteria, Viruses (got $(superkingdoms "${F}"/f_Blob_table* 2>/dev/null))"
+fi
+if cmp -s <("${REPO_DIR}/bin/blobtools_nodes_fix.sh" "${W}/nodes.dmp") "${W}/nodes.dmp"; then
+    pass "blobtools_nodes_fix.sh leaves a 'superkingdom' taxdump unchanged"
+else
+    fail "blobtools_nodes_fix.sh leaves a 'superkingdom' taxdump unchanged"
 fi
 
 echo ""

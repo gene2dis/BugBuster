@@ -75,55 +75,66 @@ process FORMAT_SYLPH_TAXONOMY {
         """
 }
 
-process FORMAT_NT_BLAST_DB {
-    tag "format_blast_db"
+process FORMAT_METABULI_DB {
+    tag "format_metabuli_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
+    // refseq_standard: an 80 GB download that unpacks to 110 GB
     label 'process_download_extensive'
 
     input:
         val(db)
 
     output:
-        path("*")
+        path("metabuli_db"), emit: metabuli_db
 
     script:
         """
-        ${params.blast_ref_db[params.blast_db]["fmtscript"]} $db
+        ${params.metabuli_ref_db[params.metabuli_db]["fmtscript"]} $db
         """
 
     stub:
         """
-        touch nt.00.nin nt.00.nhr nt.00.nsq nt.nal
+        mkdir -p metabuli_db/ncbi-taxdump
+        touch metabuli_db/db.parameters metabuli_db/diffIdx metabuli_db/info metabuli_db/taxonomyDB \
+            metabuli_db/ncbi-taxdump/nodes.dmp metabuli_db/ncbi-taxdump/names.dmp
         """
 }
 
-process FORMAT_TAXDUMP_FILES {
-    tag "format_taxdump"
+process FORMAT_GENOMAD_DB {
+    tag "format_genomad_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
     label 'process_download'
 
     input:
-        val(db)
+        val(key)
 
     output:
-        path("*")
+        path("genomad_db"), emit: genomad_db
 
     script:
+        def entry = params.genomad_ref_db[key]
         """
-        ${params.taxonomy_files[params.taxdump_files]["fmtscript"]} $db
+        ${entry["fmtscript"]} \
+            '${entry["url"]}' \
+            '${entry["md5"]}' \
+            '${entry["version"]}'
         """
 
     stub:
         """
-        touch nodes.dmp names.dmp nucl_gb.accession2taxid
+        mkdir genomad_db
+        touch genomad_db/genomad_db genomad_db/genomad_db.dbtype genomad_db/genomad_marker_metadata.tsv
+        echo 1.9 > genomad_db/version.txt
         """
 }
 
 process DOWNLOAD_DEEPARG_DB {
 
-    container 'quay.io/ffuentessantander/deeparg:1.0.4'
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
+        'https://depot.galaxyproject.org/singularity/deeparg:1.0.4--pyhdfd78af_0' :
+        'quay.io/biocontainers/deeparg:1.0.4--pyhdfd78af_0' }"
 
     tag "download_deeparg_db"
     label 'process_download'
@@ -134,6 +145,11 @@ process DOWNLOAD_DEEPARG_DB {
 
     script:
         """
+        # Theano (imported by every deeparg command) creates its compile cache
+        # under \$HOME/.theano: '/' in a docker task without HOME (not
+        # writable). Keep it in the task directory (design doc Q21)
+        export THEANO_FLAGS="base_compiledir=\$PWD/theano_compiledir"
+
         deeparg \\
             download_data \\
             -o ./deeparg_db

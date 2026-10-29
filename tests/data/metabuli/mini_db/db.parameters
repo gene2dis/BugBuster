@@ -1,0 +1,11 @@
+DB_name	bugbuster_test
+Creation_date	2026-10-29
+Metabuli commit used to create the DB	1.2.0
+Spaced_kmer_mask	
+Accession_level	0
+Mask_mode	1
+Mask_prob	0.900000
+Skip_redundancy	1
+Syncmer	0
+Kmer_format	2
+Total_seq_length	53888

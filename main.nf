@@ -67,7 +67,8 @@ def printHelp() {
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
-      --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
+      --contig_tax_and_arg          Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) (default: ${params.contig_tax_and_arg})
+      --genomad_prediction          Classify contigs as chromosome / plasmid / virus with geNomad (default: ${params.genomad_prediction})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
@@ -135,7 +136,8 @@ include { SOFTWARE_VERSIONS  } from './subworkflows/local/software_versions'
 include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
-include { NT_BLASTN        } from './modules/local/nt_blastn/main'
+include { METABULI_CLASSIFY } from './modules/local/metabuli_classify/main'
+include { GENOMAD_ENDTOEND as NFCORE_GENOMAD_ENDTOEND } from './modules/nf-core/genomad/endtoend/main'
 include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
@@ -144,7 +146,6 @@ include { BLOBPLOT         } from './modules/local/blobplot/main'
 	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
 	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
 	// (contig_level_functional)
-include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
 include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
@@ -164,10 +165,11 @@ include { KMARVEL_REPORT   } from './modules/local/kmarvel_report/main'
 include { RESULTS_SUMMARY  } from './modules/local/results_summary/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
-include { DEEPARG_BINS             } from './modules/local/deeparg/main'
 include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
+include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
+include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
@@ -269,6 +271,9 @@ workflow {
     }
     if (flagOn(params.contig_tax_and_arg) && params.assembly_mode == 'none') {
         error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
+    if (flagOn(params.genomad_prediction) && params.assembly_mode == 'none') {
+        error("--genomad_prediction requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
     if (flagOn(params.contig_level_functional) && params.assembly_mode == 'none') {
         error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
@@ -383,6 +388,7 @@ workflow {
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+    log.info "  geNomad (mobile)     : ${params.genomad_prediction}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
     log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : params.read_level_functional == 'humann' ? " (${params.custom_humann_db ? 'custom database' : params.humann_db})" : ''}"
@@ -556,6 +562,8 @@ workflow {
     ch_bam_meta      = channel.empty()
     ch_counting_bam  = channel.empty()
     ch_refined_bins  = channel.empty()
+    ch_contig_bins   = channel.empty()   // [meta, <id>_contig_bins.tsv] when binning is on
+    ch_gtdbtk_reports = channel.empty()  // <id>_gtdbtk_{bac120,ar53}.tsv when binning is on
 
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
@@ -581,18 +589,34 @@ workflow {
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
+
+            ch_gtdbtk_reports = BINNING.out.gtdbtk.map { _meta, reports -> reports }.flatten()
+
+            //
+            // MODULE: contig -> refined bin, for the bin columns of the
+            // contig report (which adds the bin's GTDB-Tk classification) and
+            // the bin-level ARG split (Phase 9b, L5 a / M8). From the bins
+            // alone, so the split does not wait for the batched GTDB-Tk
+            //
+            if ( flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering) ) {
+                BIN_CONTIG_LABELS(ch_refined_bins.filter { _meta, bins -> bins != null })
+                ch_contig_bins = BIN_CONTIG_LABELS.out.labels
+                ch_versions = ch_versions.mix(BIN_CONTIG_LABELS.out.versions.first())
+            }
         }
     }
 
     //
     // SHARED GENE CALLING ON CONTIGS
     // One Pyrodigal pass (metagenome mode, both assembly modes) whose FAA feeds
-    // DeepARG and whose FAA/GFF feed the functional annotation branch (Q9).
+    // DeepARG (contig and bin level, M8) and whose FAA/GFF feed the functional
+    // annotation branch (Q9).
     //
     ch_contig_proteins  = channel.empty()
     ch_contig_genes_gff = channel.empty()
 
-    if ( (flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
+    def run_contig_deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
+    if ( (run_contig_deeparg || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
         // Run nf-core PYRODIGAL for contig ORF prediction
         // nf-core PYRODIGAL signature:
@@ -703,16 +727,62 @@ workflow {
     }
 
     //
+    // MODULE: DeepARG on the assembly's Pyrodigal proteins, for the contig
+    // table and the bin-level ARGs (M8: one run per assembly; per-bin runs
+    // min-max scaled over the bin)
+    //
+    ch_contig_deeparg      = channel.empty()   // [meta, DeepARG outputs]
+    ch_contig_deeparg_only = channel.empty()   // DeepARG outputs, for the run-level report
+    if ( run_contig_deeparg ) {
+        DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
+            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg or params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
+        ch_contig_deeparg      = DEEPARG_CONTIGS.out.deeparg
+        ch_contig_deeparg_only = DEEPARG_CONTIGS.out.only_deeparg
+        ch_versions = ch_versions.mix(DEEPARG_CONTIGS.out.versions.first())
+    }
+
+    //
+    // MODULE: geNomad plasmid / virus / provirus classification of the
+    // contigs (Phase 9b, L6 d; nf-core genomad/endtoend, 1.13.0 image set in
+    // config/modules.config). Its summaries are published; with
+    // --contig_tax_and_arg they also add the mobile_class columns to the
+    // contig table. Versions come on the topic channel
+    //
+    ch_genomad_tables = channel.empty()
+    if ( flagOn(params.genomad_prediction) && params.assembly_mode != "none" ) {
+        // geNomad stops on a FASTA without sequences, which BBMAP writes when
+        // every contig of a sample is below --bbmap_length: skip those
+        NFCORE_GENOMAD_ENDTOEND(
+            ch_contigs_meta.filter { meta, contigs ->
+                def has_contigs = contigs.withReader { reader -> reader.readLine()?.startsWith('>') ?: false }
+                if ( !has_contigs ) {
+                    log.warn "No contigs for ${meta.id}: skipping geNomad"
+                }
+                has_contigs
+            },
+            PREPARE_DATABASES.out.genomad_db
+                .ifEmpty { error "ERROR: geNomad database is empty. Ensure --genomad_prediction is enabled and a valid geNomad database is configured (--genomad_db, or --custom_genomad_db)." }
+                .map { db -> [[id: 'genomad_db'], db] }
+                .first()
+        )
+        ch_genomad_tables = NFCORE_GENOMAD_ENDTOEND.out.aggregated_classification
+            .mix(NFCORE_GENOMAD_ENDTOEND.out.plasmid_summary, NFCORE_GENOMAD_ENDTOEND.out.virus_summary)
+            .map { _meta, table -> table }
+    }
+
+    //
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( flagOn(params.contig_tax_and_arg) && params.assembly_mode != "none" ) {
-        // The list wrap keeps a multi-file BLAST DB as ONE tuple element
-        // (path(nt_db)) instead of flattening it into the tuple, which staged
-        // only the first DB file into NT_BLASTN
-        NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
-            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }
-            .map { db_files -> [db_files] }))
-        ch_nt_blastn = NT_BLASTN.out.megablast_to_blob
+        // Metabuli classifies each contig (Phase 9b, replacing megablast
+        // against nt); its calls give the report's ranks and, as a hits file,
+        // BlobTools' tables and plots
+        METABULI_CLASSIFY(
+            ch_contigs_meta,
+            PREPARE_DATABASES.out.metabuli_db
+                .ifEmpty { error "ERROR: Metabuli database is empty. Ensure params.contig_tax_and_arg is enabled and a valid Metabuli database is configured (--metabuli_db, or --custom_metabuli_db)." }
+                .first()
+        )
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -726,31 +796,42 @@ workflow {
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
             .join(NFCORE_SAMTOOLS_INDEX.out.index)
-        // Wrap the collected taxdump files in a list so they arrive as ONE
-        // tuple element (path(tax_files)) instead of being flattened into the
-        // tuple — flattened, only the first file was staged into BLOBTOOLS
+        // The Metabuli database's [nodes.dmp, names.dmp], one value for every
+        // sample
         ch_blob_table = BLOBTOOLS(
-            ch_nt_blastn
-                .join(ch_index_bam)
-                .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
+            METABULI_CLASSIFY.out.hits
+                .join(ch_contigs_meta)
+                .map { meta, hits, contigs -> [meta, contigs, hits] }
+                .join(ch_index_bam),
+            PREPARE_DATABASES.out.metabuli_taxdump.first()
         )
         BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
-        // Contig proteins come from the shared PYRODIGAL step above
-        ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
-            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
-            ch_contig_args.only_deeparg
-                .concat(ch_blob_table.only_blob)
+            ch_contig_deeparg_only
+                .concat(
+                    ch_blob_table.only_blob,
+                    METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls },
+                    ch_contig_bins.map { _meta, labels -> labels },
+                    ch_gtdbtk_reports,
+                    // geNomad's tables, and the Pyrodigal GFF for the ARG
+                    // genes' coordinates (proviruses)
+                    ch_genomad_tables,
+                    flagOn(params.genomad_prediction)
+                        ? ch_contig_genes_gff.map { _meta, gff -> gff }
+                        : channel.empty()
+                )
                 .collect(sort: true)
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
+        // the summary's arg_contig_mobile (ARGs on geNomad's plasmids,
+        // viruses and proviruses) reads the contig table
+        ch_summary_reports = ch_summary_reports.mix(ch_arg_contig_data.arg_reports)
 
         ch_versions = ch_versions.mix(
-            NT_BLASTN.out.versions.first(),
+            METABULI_CLASSIFY.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
-            DEEPARG_CONTIGS.out.versions.first(),
             ARG_CONTIG_LEVEL_REPORT.out.versions,
             ARG_BLOBPLOT.out.versions
         )
@@ -760,18 +841,34 @@ workflow {
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
     if ( flagOn(params.arg_bin_clustering) && flagOn(params.include_binning) ) {
-        PRODIGAL_BINS(ch_refined_bins)
-        ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
-        DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
-            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
-        ch_deeparg = DEEPARG_BINS.out.deeparg_bins
-        ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
+        // DEEPARG_CONTIGS' hits and the Pyrodigal proteins split by bin (M8),
+        // in the per-bin layout ARG_FASTA_FORMATTER reads; a sample without
+        // refined bins has nothing to cluster
+        BIN_ARG_SPLIT(
+            ch_contig_bins
+                .join(ch_contig_proteins)
+                .join(ch_contig_deeparg.map { meta, files ->
+                    [meta, [files].flatten().find { f -> f.name.endsWith('.out.mapping.ARG') }]
+                })
+        )
+        // ARG_FASTA_FORMATTER writes nothing (a missing output) for a sample
+        // without a hit in any bin: keep the samples with at least one hit
+        // (a .mapping.ARG with more than its header line)
+        ARG_FASTA_FORMATTER(
+            BIN_ARG_SPLIT.out.bin_args
+                .filter { meta, _proteins, deeparg ->
+                    def has_hits = deeparg.listFiles().any { f -> f.withReader { reader -> reader.readLine() != null && reader.readLine() != null } }
+                    if ( !has_hits ) {
+                        log.info "No bin-level ARG hits for ${meta.id}: nothing to cluster"
+                    }
+                    has_hits
+                }
+        )
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
         CLUSTERING(ch_arg_fasta.collect(sort: true))
 
         ch_versions = ch_versions.mix(
-            PRODIGAL_BINS.out.versions.first(),
-            DEEPARG_BINS.out.versions.first(),
+            BIN_ARG_SPLIT.out.versions.first(),
             ARG_FASTA_FORMATTER.out.versions.first(),
             CLUSTERING.out.versions
         )

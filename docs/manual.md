@@ -47,7 +47,8 @@ Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/
                               ┌─────────────┴─────────────┐
                               ↓                           ↓
                       Binning (SemiBin;           Contig Analysis
-                       + MetaBAT2/COMEBin)         (BlobTools, DeepARG)
+                       + MetaBAT2/COMEBin)         (Metabuli, BlobTools, DeepARG;
+                                                    geNomad, optional)
                               ↓
                       Refinement (Binette, ≥2 binners)
                               ↓
@@ -126,15 +127,18 @@ available to it where memory is enforced (docker, SLURM, cloud batch). The annot
 the first attempt) peaked at 35.1 GB, close to that request, so on larger
 co-assemblies it may also need its retry.
 
-#### Contig taxonomy against NCBI nt
+#### Contig taxonomy (Metabuli) and geNomad
 
-The megablast search of `--contig_tax_and_arg` (`NT_BLASTN`) memory-maps the
-~434 GB NCBI nt database. How much memory it appears to use therefore depends
-on how much RAM the machine has: on a large machine the operating system keeps
-most of the database in memory, which counts toward the task's reported peak
-(close to 400 GB on a 2 TB machine), but those pages can be released again. It
-runs fastest when much of nt fits in RAM. No minimum has been measured; the task
-requests `process_high` resources (72 GB on the first attempt).
+`--contig_tax_and_arg` classifies the contigs with Metabuli against
+`refseq_standard` (`METABULI_CLASSIFY`, `process_medium`): in the Phase 9c
+benchmark it used 5-12 GB with `--max-ram 32` (the module passes 90 % of the
+task's memory) and 443-942 CPU-s per assembly at 16 threads. The database is
+110 GB on disk (an 80 GB download, streamed into place: no extra disk for the tarball).
+`--genomad_prediction` (geNomad 1.13.0, `process_medium`) needed 17.4-18.4 GB
+and 1.1-5.5 CPU-h per assembly. Contig taxonomy no longer uses BLAST against nt
+(201,739 CPU-s for one 36.6 Mbp assembly in Phase 9a); see
+`docs/benchmarks/contig_taxonomy_2026.md` and
+`docs/benchmarks/contig_classifiers_2026.md`.
 
 ---
 
@@ -199,8 +203,8 @@ BugBuster automatically downloads required databases on first use. Databases are
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
 | **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
-| **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` |
-| **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` |
+| **Metabuli refseq_standard** | 80 GB download, 110 GB unpacked | Contig taxonomy; its own NCBI taxdump (2026-04-03) feeds BlobTools | `contig_tax_and_arg=true` |
+| **geNomad 1.9** | 0.84 GB download, 2.2 GB unpacked | Plasmid / virus / provirus classification of contigs | `genomad_prediction=true` |
 | **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
@@ -474,7 +478,8 @@ breaks `-resume`.
 | `--args_oap_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP against SARG (see 6.12; `--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
-| `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy and ARG prediction |
+| `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy (Metabuli; BlobTools tables and plots) and ARG prediction (DeepARG); see 6.9 |
+| `--genomad_prediction` | `false` | `true`, `false` | Plasmid / virus / provirus classification of the contigs with geNomad (needs an assembly); see 6.9 |
 | `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
 | `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (with the contig or read functional branch; failure is non-fatal — affected samples get no CPGE: TPM-only in the contig tables, native read counts only in the read tables) |
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
@@ -483,7 +488,7 @@ breaks `-resume`.
 | `--read_level_functional` | `none` | `woltka`, `superfocus`, `humann`, `none` | Read-level functional profiling backend (needs no assembly; see the notes below) |
 | `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
-| `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference |
+| `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference: the assembly's DeepARG hits split by refined bin (no per-bin DeepARG run), then MMseqs2 |
 | `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
 | `--store_clean_reads` | `false` | `true`, `false` | Publish the decontaminated reads to `<output>/clean_reads/` (publishing only; `-resume` is the task cache) |
 | `--featurecounts_multimap` | `primary` | `primary`, `all`, `none` | featureCounts multi-mapping policy for gene counts: primary alignments only, every reported alignment (`-M`), or no multi-mapping reads |
@@ -627,6 +632,8 @@ breaks `-resume`.
 | `--humann_db` | `v4_alpha-full` | `v4_alpha-full`, `v4_alpha-ec_filtered` | HUMAnN 4 database set: full (44.8 GB) or EC-filtered (6.9 GB) ChocoPhlAn, plus UniRef90 EC-filtered, utility mapping and MetaPhlAn vOct22 (recorded in provenance) |
 | `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
 | `--kmarvel_db` | `card_v4.0.1` | `card_v4.0.1` | CARD release for K-MARVEL (CARD 4.0.1 data tarball, the release upstream's `get_ref_db.sh` fetches) |
+| `--metabuli_db` | `refseq_standard` | `refseq_standard`, `gtdb232` | Metabuli database for contig taxonomy (`gtdb232`: GTDB names, 634 GB download, not benchmarked) |
+| `--genomad_db` | `v1.9` | `v1.9` | geNomad database release (pinned Zenodo file) |
 
 ### 6.4 Custom Database Paths
 
@@ -642,8 +649,8 @@ breaks `-resume`.
 | `--custom_checkm2_db` | Path to CheckM2 database file |
 | `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.8.0, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
-| `--custom_blast_db` | Path to BLAST NT database directory |
-| `--custom_taxdump_files` | Path to NCBI taxdump directory |
+| `--custom_metabuli_db` | Path to a Metabuli database directory (`db.parameters`, `diffIdx`, `info`, `taxonomyDB`, and its taxdump `nodes.dmp`/`names.dmp` at most one directory down, e.g. `ncbi-taxdump/`) |
+| `--custom_genomad_db` | Path to a geNomad database directory (`genomad_db`, `version.txt`, ...; geNomad 1.13 takes database 1.9) |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 | `--custom_kmarvel_db` | Path to a K-MARVEL database directory: `CARD_protein_all.fasta`, `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`); no BLAST index needed. Its `DB_VERSION`, or the FASTA's md5 without one, goes to `software_versions.yml` |
@@ -761,7 +768,36 @@ per-sample depths raised MetaBAT2's MIMAG high-quality bins from 11 to 23
 | `--metabat_minCVSum` | `1` | Minimum sum of coefficient of variation |
 | `--metabat_minClsSize` | `200000` | Minimum cluster size (bp) |
 
-### 6.9 DeepARG Options
+### 6.9 Contig Taxonomy, geNomad and DeepARG Options
+
+`Contig_tax_and_arg_prediction.tsv` (`05_arg_prediction/contig_level/summary/`)
+has one row per contig, or per ARG gene on a contig with several:
+
+- `contig_length`, `GC`, `coverage`: from BlobTools.
+- `superkingdom` ... `species` (with `class`), `taxonomy_rank`, `taxonomy_score`:
+  Metabuli's lineage, the rank it called at and its score (`unclassified`, 0
+  for no call). `superkingdom` is NCBI's `domain` (renamed in 2025), or
+  Viruses. Calls below `--metabuli_min_score` are not made, and species calls
+  need `--metabuli_min_sp_score` (else genus or higher).
+- `bin`, `bin_gtdb_classification` (with `--include_binning`): the refined bin
+  and its GTDB-Tk string, never copied into the NCBI ranks.
+- `mobile_class` (`chromosome`, `plasmid`, `virus`), `plasmid_score`,
+  `virus_score`, `provirus` (geNomad provirus regions overlapping the ARG gene),
+  `virus_taxonomy`, `plasmid_conjugation_genes` (with `--genomad_prediction`).
+  geNomad's plasmid class also takes integrative conjugative elements and
+  transposon cargo. `00_summary/tables/arg_contig_mobile.tsv` counts the ARG
+  genes per class on plasmid and virus contigs and in proviruses.
+- `ARG_gene` ... `counts`: DeepARG.
+
+BlobTools' tables and phylum plot use Metabuli's calls and the database's own
+taxdump; its 2025 `domain` rank is renamed `superkingdom` for BlobTools 1.1.1,
+which otherwise wrote `undef` as every contig's superkingdom.
+
+| Parameter | Default | Description |
+|-----------|---------|-------------|
+| `--metabuli_min_score` | `0.2` | Metabuli `--min-score` (0-1) |
+| `--metabuli_min_sp_score` | `0.5` | Metabuli `--min-sp-score` (0-1): minimum score for a species call |
+
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1218,18 +1254,24 @@ results/
 │   │   └── figures/                            # ARG visualization
 │   │       └── *.png
 │   └── bin_level/                              # Bin-level ARG (if arg_bin_clustering=true)
-│       ├── proteins/                           # Prodigal ORF predictions
+│       ├── proteins/                           # Per-bin Pyrodigal proteins (shared gene calling, split by bin)
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
-│       ├── deeparg/                            # DeepARG predictions per bin
+│       ├── deeparg/                            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
+│   ├── metabuli/                               # Metabuli per contig
+│   │   └── {sample}/                           # (coassembly/ under co-assembly)
+│   │       ├── {sample}_classifications.tsv    # Per-contig call, score, rank and lineage
+│   │       └── {sample}_report.tsv             # Clade report
+│   ├── genomad/                                # geNomad (if genomad_prediction=true)
+│   │   └── {sample}/                           # *_summary/ (plasmid/virus summaries, genes, sequences), *_aggregated_classification/, *_find_proviruses/, ...
 │   └── figures/                                # BlobTools plots
 │       └── *.png
 └── 07_functional_annotation/                   # Functional annotation
     ├── gene_calling/                           # Pyrodigal ORF predictions on contigs
-    │   └── {sample}/ or coassembly/            # (if contig_tax_and_arg=true or contig_level_functional=true)
+    │   └── {sample}/ or coassembly/            # (if contig_tax_and_arg, arg_bin_clustering or contig_level_functional)
     │       ├── {sample}.faa.gz
     │       ├── {sample}.fna.gz
     │       ├── {sample}.gff.gz
@@ -1447,8 +1489,8 @@ databases/                            # Database storage (configurable via --dat
 ├── kraken/                           # Kraken2 database (selected via --kraken2_db)
 ├── sourmash/                         # Sourmash database
 ├── sylph/                            # Sylph database (.syl2db/.syldb) + sylph-tax metadata (*.tsv.gz)
-├── taxdump/                          # NCBI taxonomy dump
-├── blast/                            # NCBI NT BLAST database
+├── metabuli_db/                      # Metabuli database for contig taxonomy (refseq_standard ~110 GB, with its taxdump)
+├── genomad_db/                       # geNomad database 1.9 (~2.2 GB)
 ├── deeparg_db/                       # DeepARG database
 ├── rgi/                              # CARD database for RGI
 ├── kmarvel/                          # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)

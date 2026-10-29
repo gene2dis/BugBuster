@@ -1,0 +1,77 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    METABULI_CLASSIFY Module Test
+
+    metabuli classify on the REAL pinned Metabuli image with the committed
+    two-phage database and contigs (tests/data/metabuli/, made by
+    tests/bin/make_metabuli_fixtures.sh). Pins the module wrapper: the
+    classifications and report moved out of Metabuli's output directory, the
+    BlobTools hits file holding only the classified contigs (contig, taxid,
+    score), --max-ram from the task's memory and the database's creation date
+    in versions.yml.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test METABULI_CLASSIFY Process"
+    script "../../modules/local/metabuli_classify/main.nf"
+    process "METABULI_CLASSIFY"
+
+    test("classifies contigs and writes a BlobTools hits file") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "4.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'mbtest' ],
+                    file("${projectDir}/tests/data/metabuli/contigs.fa", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/metabuli/mini_db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def calls = path(process.out.classifications.get(0).get(1)).readLines()
+            assert path(process.out.classifications.get(0).get(1)).fileName.toString() == "mbtest_classifications.tsv"
+            assert calls[0].startsWith("#is_classified\tname\ttaxID")
+            assert calls.any { it.startsWith("1\tk141_1\t10710\t") && it.contains("s_Lambdavirus lambda") }
+            assert calls.any { it.startsWith("1\tk141_2\t10847\t") }
+            assert calls.any { it.startsWith("0\tk141_3\t0\t") }
+
+            def hits = path(process.out.hits.get(0).get(1)).readLines()
+            assert hits.size() == 2
+            assert hits.collect { it.split('\t')[0..1].join('\t') } == ["k141_1\t10710", "k141_2\t10847"]
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('metabuli: 1.2.0')
+            assert versions.contains('metabuli_db: created 2026-10-29')
+        }
+    }
+
+    test("stub") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'mbstub' ],
+                    file("${projectDir}/tests/data/metabuli/contigs.fa", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/metabuli/mini_db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.classifications.get(0).get(1)).readLines()[0].startsWith("#is_classified")
+            assert path(process.out.versions.get(0)).text.contains('metabuli: 1.2.0')
+        }
+    }
+}

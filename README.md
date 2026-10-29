@@ -38,10 +38,10 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 9. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
 10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
 11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-12. Taxonomic annotation of contigs using Blastn and BlobTools. [`BlobTools`](https://github.com/DRL/blobtools), [`Blast`](https://blast.ncbi.nlm.nih.gov/doc/blast-help/downloadblastdata.html)
+12. Taxonomic annotation of contigs with Metabuli (`refseq_standard`, NCBI taxonomy), tabulated and plotted with BlobTools; with binning, each contig's bin and the bin's GTDB-Tk classification as separate columns. If requested (`--genomad_prediction`), plasmid / virus / provirus classification of the contigs with geNomad. [`Metabuli`](https://github.com/steineggerlab/Metabuli), [`BlobTools`](https://github.com/DRL/blobtools), [`geNomad`](https://github.com/apcamargo/genomad)
 13. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
 14. If requested contig-level functional annotation with eggNOG-mapper, CAZy annotation with run_dbcan, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — with the eggNOG and dbCAN CAZy calls reported separately). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`run_dbcan`](https://github.com/bcb-unl/run_dbcan), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
-15. Prediction of resistance genes at the contig level with DeepARG. [`DeepARG`](https://github.com/gaarangoa/deeparg)
+15. Prediction of resistance genes at the contig level with DeepARG (one run per assembly; the bin-level ARGs are its hits split by bin). [`DeepARG`](https://github.com/gaarangoa/deeparg)
 16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
 17. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
 18. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
@@ -140,8 +140,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
 | **Sylph GTDB r232 (c200, two-stage .syl2db)** + sylph-tax metadata | 19 GB + 5.5 MB (`gtdb_r226` 18 GB, `gtdb_r220` 13.1 GB) | Taxonomic profiling | `taxonomic_profiler='sylph'` | `--custom_sylph_db`, `--custom_sylph_taxonomy` |
-| **NCBI Taxdump** | 448 MB | BlobTools taxonomy | `contig_tax_and_arg=true` | `--custom_taxdump_files` |
-| **NCBI NT** | 434 GB | Contig BLAST | `contig_tax_and_arg=true` | `--custom_blast_db` |
+| **Metabuli refseq_standard** | 80 GB download, 110 GB unpacked (`gtdb232`: 634 / 744 GB) | Contig taxonomy (its own NCBI taxdump also feeds BlobTools) | `contig_tax_and_arg=true` | `--custom_metabuli_db` |
+| **geNomad 1.9** | 0.84 GB download, 2.2 GB unpacked | Plasmid / virus / provirus classification of contigs | `genomad_prediction=true` | `--custom_genomad_db` |
 | **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` | `--custom_deeparg_db` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
@@ -162,8 +162,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
 - **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
 - **sylph_db**: [`sylph pre-built databases`](https://sylph-docs.github.io/pre%E2%80%90built-databases/) + [`sylph-tax metadata`](https://github.com/bluenote-1577/sylph-tax)
-- **taxdump_files**: [`taxdump.tar.gz`](https://ftp.ncbi.nlm.nih.gov/pub/taxonomy/taxdump.tar.gz)
-- **blast_db**: [`ncbi nt`](https://ftp.ncbi.nlm.nih.gov/blast/db/)
+- **metabuli_db**: [`Metabuli databases`](https://jaebeom-kim.github.io/metabuli-doc/databases/new-database/) (`refseq_standard`: the Kraken2 PlusPF genome set)
+- **genomad_db**: [`geNomad database 1.9`](https://zenodo.org/records/14886553) (pinned; `genomad download-database` would take the latest)
 - **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
@@ -216,13 +216,14 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--args_oap_prediction` | `false` | Read-level ARG prediction with ARGs-OAP against SARG (`--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | AMR gene prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
-| `--contig_tax_and_arg` | `false` | Contig taxonomy and ARG prediction |
+| `--contig_tax_and_arg` | `false` | Contig taxonomy (Metabuli, BlobTools tables/plots) and ARG prediction (DeepARG) |
+| `--genomad_prediction` | `false` | Plasmid / virus / provirus classification of contigs with geNomad (needs an assembly; ARG columns and `00_summary/tables/arg_contig_mobile.tsv` with `--contig_tax_and_arg`) |
 | `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
 | `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
 | `--read_level_functional` | `none` | Read-level functional profiling: `woltka`, `superfocus`, `humann` or `none` (needs no assembly) |
 | `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |
 | `--functional_cazy` | `true` | run_dbcan CAZy annotation in the contig functional branch |
-| `--arg_bin_clustering` | `false` | Bin-level ARG prediction and clustering |
+| `--arg_bin_clustering` | `false` | Bin-level ARGs (DEEPARG_CONTIGS hits split by bin) and clustering |
 | `--results_summary` | `true` | Run-level summary in `00_summary/` (tables, Excel, figures, HTML report) |
 
 ### Database Selection
@@ -232,6 +233,8 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
+| `--metabuli_db` | `refseq_standard` | `refseq_standard`, `gtdb232` | Metabuli database for contig taxonomy (`gtdb232` not benchmarked) |
+| `--genomad_db` | `v1.9` | `v1.9` | geNomad database release |
 | `--databases_dir` | `<output>/../databases` | Path | Database storage location |
 
 ### Quality Control Options
@@ -375,13 +378,15 @@ results/
 │   │   ├── summary/            # Combined tax + ARG report
 │   │   └── figures/            # ARG scatter plots
 │   └── bin_level/              # Bin-level ARG (if arg_bin_clustering=true)
-│       ├── proteins/           # Per-bin ORFs (Prodigal)
-│       ├── deeparg/            # Per-bin DeepARG predictions
+│       ├── proteins/           # Per-bin Pyrodigal proteins (from the shared gene calling)
+│       ├── deeparg/            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
 │       └── clustering/         # MMseqs2 ARG clusters
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
+│   ├── metabuli/{sample}/      # Metabuli per-contig calls (with lineage) and clade report
+│   ├── genomad/{sample}/       # geNomad summaries, scores and proviruses (if genomad_prediction=true)
 │   └── figures/                # BlobTools plots
 └── 07_functional_annotation/   # Functional annotation
-    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg or contig_level_functional; coassembly/ under co-assembly)
+    ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg, arg_bin_clustering or contig_level_functional; coassembly/ under co-assembly)
     ├── eggnog/{sample}/        # eggNOG-mapper annotations (if contig_level_functional=true; coassembly/ under co-assembly)
     ├── dbcan/{sample}/         # run_dbcan CAZy calls + substrates (if contig_level_functional=true and functional_cazy=true; coassembly/ under co-assembly)
     ├── gene_abundance/{sample}/# featureCounts per-gene counts (if contig_level_functional=true; per sample in both assembly modes)

@@ -76,8 +76,8 @@ input:
       pattern: "*.tsv"
   - stage_reports:
       type: file
-      description: Run-level tables of other stages, laid out at their published paths by file name - ARGS_OAP_REPORT's args_oap_long.tsv and args_oap_cells.tsv, AGGREGATE_READ_FUNCTIONS' read_function_abundance.tsv, read_annotated_fraction.tsv and read_sample_summary.tsv, and MicrobeCensus <sample>.ags.tsv; [] when none ran
-      pattern: "{args_oap_*.tsv,read_*.tsv,*.ags.tsv}"
+      description: Run-level tables of other stages, laid out at their published paths by file name - ARGS_OAP_REPORT's args_oap_long.tsv and args_oap_cells.tsv, AGGREGATE_READ_FUNCTIONS' read_function_abundance.tsv, read_annotated_fraction.tsv and read_sample_summary.tsv, MicrobeCensus <sample>.ags.tsv, and ARG_CONTIG_LEVEL_REPORT's Contig_tax_and_arg_prediction.tsv (arg_contig_mobile); [] when none ran
+      pattern: "{args_oap_*.tsv,read_*.tsv,*.ags.tsv,Contig_tax_and_arg_prediction.tsv}"
 
 output:
   - html:

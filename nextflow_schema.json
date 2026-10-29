@@ -121,6 +121,13 @@
                     "description": "Enable ARG gene prediction and clustering for horizontal gene transfer inference.",
                     "fa_icon": "fas fa-project-diagram"
                 },
+                "genomad_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Classify the contigs as chromosome, plasmid or virus and find proviruses with geNomad (needs an assembly).",
+                    "help_text": "geNomad 1.13.0 end-to-end on each assembly (1.1-5.5 CPU-h and ~18 GB per assembly in the Phase 9c benchmark); summaries in 06_contig_taxonomy/genomad/. With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains mobile_class, plasmid_score, virus_score, provirus, virus_taxonomy and plasmid_conjugation_genes, and 00_summary gains arg_contig_mobile. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo.",
+                    "fa_icon": "fas fa-dna"
+                },
                 "min_read_sample": {
                     "type": "integer",
                     "default": 0,
@@ -327,29 +334,34 @@
                     "description": "Path to custom DeepARG database directory.",
                     "fa_icon": "fas fa-folder"
                 },
-                "custom_blast_db": {
+                "genomad_db": {
                     "type": "string",
-                    "format": "directory-path",
-                    "description": "Path to custom BLAST NT database directory.",
-                    "fa_icon": "fas fa-folder"
-                },
-                "custom_taxdump_files": {
-                    "type": "string",
-                    "format": "directory-path",
-                    "description": "Path to custom NCBI taxdump directory.",
-                    "fa_icon": "fas fa-folder"
-                },
-                "blast_db": {
-                    "type": "string",
-                    "default": "nt",
-                    "description": "Built-in BLAST nucleotide database key (see config/databases.config).",
+                    "default": "v1.9",
+                    "enum": ["v1.9"],
+                    "description": "geNomad database release for --genomad_prediction (see config/databases.config): the pinned Zenodo file, 0.84 GB download, 2.2 GB unpacked.",
                     "fa_icon": "fas fa-database"
                 },
-                "taxdump_files": {
+                "custom_genomad_db": {
                     "type": "string",
-                    "default": "ncbi",
-                    "description": "Built-in NCBI taxdump files key (see config/databases.config).",
+                    "format": "directory-path",
+                    "description": "Path to a local geNomad database directory (genomad_db, genomad_marker_metadata.tsv, version.txt, ...); skips the download.",
+                    "help_text": "geNomad 1.10-1.13 take database 1.9; the version in version.txt is recorded in software_versions.yml.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "metabuli_db": {
+                    "type": "string",
+                    "default": "refseq_standard",
+                    "enum": ["refseq_standard", "gtdb232"],
+                    "description": "Metabuli database for contig taxonomy (--contig_tax_and_arg; see config/databases.config).",
+                    "help_text": "'refseq_standard' (default): the Kraken2 PlusPF genome set (RefSeq archaea, bacteria, viruses, plasmids, protozoa, fungi, human) with NCBI taxonomy; an 80 GB download, 110 GB unpacked. 'gtdb232': GTDB R232 species representatives with GTDB names, 634 GB download / 744 GB unpacked; not measured in the pipeline's benchmarks.",
                     "fa_icon": "fas fa-database"
+                },
+                "custom_metabuli_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local Metabuli database directory (db.parameters, diffIdx, info, taxonomyDB and the taxdump it was built with: nodes.dmp and names.dmp, at most one directory down); skips the download.",
+                    "help_text": "BlobTools reads the database's own taxdump, so every taxid Metabuli reports resolves (refseq_standard keeps it in ncbi-taxdump/).",
+                    "fa_icon": "fas fa-folder"
                 },
                 "custom_decontamination_index": {
                     "type": "string",
@@ -756,6 +768,31 @@
                     ],
                     "description": "DeepARG model version.",
                     "fa_icon": "fas fa-code-branch"
+                }
+            }
+        },
+        "contig_taxonomy_options": {
+            "title": "Contig taxonomy options",
+            "type": "object",
+            "fa_icon": "fas fa-tags",
+            "description": "Metabuli classification of the contigs (--contig_tax_and_arg).",
+            "properties": {
+                "metabuli_min_score": {
+                    "type": "number",
+                    "default": 0.2,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Metabuli --min-score: minimum sequence similarity score for a contig to be classified.",
+                    "help_text": "Chosen with --metabuli_min_sp_score in the Phase 9c benchmark (docs/benchmarks/contig_classifiers_2026.md): without cutoffs Metabuli classifies ~97 % of contigs, but its low-score calls mostly disagree with BLAST.",
+                    "fa_icon": "fas fa-percentage"
+                },
+                "metabuli_min_sp_score": {
+                    "type": "number",
+                    "default": 0.5,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "Metabuli --min-sp-score: minimum score for a species-level (or lower) call; below it the call moves up to genus or higher.",
+                    "fa_icon": "fas fa-percentage"
                 }
             }
         },
@@ -1457,6 +1494,9 @@
         },
         {
             "$ref": "#/$defs/deeparg_options"
+        },
+        {
+            "$ref": "#/$defs/contig_taxonomy_options"
         },
         {
             "$ref": "#/$defs/rgi_options"

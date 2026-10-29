@@ -18,6 +18,7 @@
     
     OUTPUTS:
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
+        gtdbtk: [meta, reports] - The sample's GTDB-Tk bac120/ar53 summaries
         versions: Tool version information
     
     WORKFLOW:
@@ -274,5 +275,6 @@ workflow BINNING {
 
     emit:
     refined_bins = ch_refined_bins    // channel: [ val(meta), path(bins) ]
+    gtdbtk       = ch_gtdb_tk         // channel: [ val(meta), [ GTDB-Tk bac120/ar53 summaries ] ]
     versions     = ch_versions        // channel: path(versions.yml)
 }

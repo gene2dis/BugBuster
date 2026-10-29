@@ -452,22 +452,181 @@ check_grep "arg_blobplot: five ARG classes and no 'Other'" "../arg_blobplot.log"
 #
 # arg_contig_level_report.py: the contig table is written tab-separated, as
 # its .tsv name says (it was comma-separated). Inputs: the real BlobTools
-# table above and a synthetic DeepARG mapping file (DeepARG 1.0.4 header,
-# one acrA hit on contig k141_0, values taken from a real test_sample1 hit).
+# table above (length, GC, coverage), a Metabuli classifications file for its
+# contigs (lines in Metabuli 1.2.0's --lineage 1 format, trailing tab
+# included: species, genus, a virus and an unclassified contig) and a
+# synthetic DeepARG mapping file (DeepARG 1.0.4 header, one acrA hit on
+# contig k141_0, values taken from a real test_sample1 hit).
 #
 echo "--- arg_contig_level_report.py ---"
 ACR_WORK="${WORK}/arg_contig_level_report"
 mkdir -p "${ACR_WORK}"
 cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_classifications.tsv" \
    "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_WORK}/"
 NEXT_WORKDIR="${ACR_WORK}"
-expect_pass "arg_contig_level_report: BlobTools and DeepARG tables joined" arg_contig_level_report.py
-check_grep "arg_contig_level_report: tab-separated header" "Contig_tax_and_arg_prediction.tsv" \
-    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	.*	counts$"
-check_grep "arg_contig_level_report: ARG joined to its contig" "Contig_tax_and_arg_prediction.tsv" \
-    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	.*	ACRA	multidrug	"
-check_grep "arg_contig_level_report: contig without an ARG kept with empty ARG columns" \
-    "Contig_tax_and_arg_prediction.tsv" "^test_sample2	k141_820	.*						$"
+expect_pass "arg_contig_level_report: BlobTools, Metabuli and DeepARG tables joined" arg_contig_level_report.py
+check_grep "arg_contig_level_report: tab-separated header with Metabuli's seven ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	phylum	class	order	family	genus	species	taxonomy_rank	taxonomy_score	ARG_gene	.*	counts$"
+check_grep "arg_contig_level_report: ARG joined to its contig, ranks from the lineage" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	Pseudomonadota	Gammaproteobacteria	Moraxellales	Moraxellaceae	Acinetobacter	Acinetobacter baumannii	species	0.95811	ACRA	multidrug	"
+check_grep "arg_contig_level_report: genus-level call leaves species empty" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_820	1015	0.4138	1.9009	Bacteria	.*	Acinetobacter		genus	0.412783							$"
+check_grep "arg_contig_level_report: Viruses (acellular root) is the superkingdom" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	[^	]*	[^	]*	[^	]*	Viruses	Uroviricota	Caudoviricetes	Crassvirales	Suoliviridae	Cohcovirus		genus	"
+check_grep "arg_contig_level_report: unclassified contig kept with empty ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	[^	]*	[^	]*	[^	]*								unclassified	0.0	"
+ACR_NOTAX="${WORK}/arg_contig_level_report_notax"
+mkdir -p "${ACR_NOTAX}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_NOTAX}/"
+NEXT_WORKDIR="${ACR_NOTAX}"
+expect_fail "arg_contig_level_report: no Metabuli file fails" arg_contig_level_report.py
+
+#
+# bin_contig_labels.py + the report's bin columns (Phase 9b, L5 a): contig ->
+# refined bin (from the bins alone); a contig in two bins counts once (first
+# bin, warning); a bins dir with only a marker gives a header. The report adds
+# the bin's GTDB-Tk string, untouched, from <sample>_gtdbtk_*.tsv; a bin
+# GTDB-Tk has no row for keeps an empty classification.
+#
+echo "--- bin_contig_labels.py ---"
+BCL_WORK="${WORK}/bin_contig_labels"
+mkdir -p "${BCL_WORK}/test_sample2_binette_bins" "${BCL_WORK}/empty_bins"
+printf ">k141_0 flag=1\nACGT\n>k141_820\nACGT\n" > "${BCL_WORK}/test_sample2_binette_bins/binette_bin1.fa"
+printf ">k141_231\nACGT\n>k141_0\nACGT\n" > "${BCL_WORK}/test_sample2_binette_bins/binette_bin2.fa"
+touch "${BCL_WORK}/empty_bins/SKIPPED.txt"
+printf "user_genome\tclassification\tclosest_genome_reference\nbinette_bin1\td__Bacteria;p__Pseudomonadota;c__Gammaproteobacteria;o__Pseudomonadales;f__Moraxellaceae;g__Acinetobacter;s__Acinetobacter baumannii\tGCF_009035845.1\n" \
+    > "${BCL_WORK}/test_sample2_gtdbtk_bac120.tsv"
+printf "user_genome\tclassification\n" > "${BCL_WORK}/test_sample2_gtdbtk_ar53.tsv"
+NEXT_WORKDIR="${BCL_WORK}"
+expect_pass "bin_contig_labels: contig to bin table" bin_contig_labels.py test_sample2 test_sample2_binette_bins
+check_grep "bin_contig_labels: header" "test_sample2_contig_bins.tsv" "^contig	bin$"
+check_grep "bin_contig_labels: contig in its bin" "test_sample2_contig_bins.tsv" "^k141_0	binette_bin1$"
+check_grep "bin_contig_labels: second bin" "test_sample2_contig_bins.tsv" "^k141_231	binette_bin2$"
+check_grep "bin_contig_labels: contig in two bins warned" "../bin_contig_labels.log" "contig k141_0 of bin binette_bin2 is already in bin binette_bin1"
+if [ "$(grep -c '^k141_0	' "${BCL_WORK}/test_sample2_contig_bins.tsv")" = "1" ]; then
+    echo "✓ bin_contig_labels: a shared contig counts once"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_contig_labels: a shared contig counts once"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BCL_WORK}"
+expect_pass "bin_contig_labels: marker-only bins dir" bin_contig_labels.py sampleempty empty_bins
+if [ "$(cat "${BCL_WORK}/sampleempty_contig_bins.tsv")" = "contig	bin" ]; then
+    echo "✓ bin_contig_labels: marker-only bins dir gives a header-only table"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_contig_labels: marker-only bins dir gives a header-only table"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BCL_WORK}"
+expect_fail "bin_contig_labels: missing bins dir argument fails" bin_contig_labels.py test_sample2
+ACB_WORK="${WORK}/arg_contig_level_report_bins"
+mkdir -p "${ACB_WORK}"
+cp "${ACR_WORK}"/test_sample2_* "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BCL_WORK}"/test_sample2_gtdbtk_*.tsv "${ACB_WORK}/"
+rm -f "${ACB_WORK}/Contig_tax_and_arg_prediction.tsv"
+NEXT_WORKDIR="${ACB_WORK}"
+expect_pass "arg_contig_level_report: with bin tables" arg_contig_level_report.py
+check_grep "arg_contig_level_report: bin columns after the NCBI ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	phylum	class	order	family	genus	species	taxonomy_rank	taxonomy_score	bin	bin_gtdb_classification	ARG_gene	"
+check_grep "arg_contig_level_report: binned contig keeps its Metabuli ranks and gets the GTDB string" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	Acinetobacter baumannii	species	0.95811	binette_bin1	d__Bacteria;.*;s__Acinetobacter baumannii	ACRA	"
+check_grep "arg_contig_level_report: unbinned contig has empty bin columns" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	.*	unclassified	0.0			"
+check_grep "arg_contig_level_report: bin without a GTDB-Tk row keeps an empty classification" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	.*	genus	0.334152	binette_bin2		"
+
+#
+# bin_arg_split.py (Phase 9b, M8): DEEPARG_CONTIGS' hits and the assembly's
+# Pyrodigal proteins split by bin (the contig table of bin_contig_labels.py
+# above) into ARG_FASTA_FORMATTER's per-bin layout; a bin without hits gets a
+# header-only .mapping.ARG; genes of unbinned contigs are dropped.
+#
+echo "--- bin_arg_split.py ---"
+BAS_WORK="${WORK}/bin_arg_split"
+mkdir -p "${BAS_WORK}"
+cp "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BAS_WORK}/"
+printf ">k141_0_1 # 1 # 397 # 1 # ID=k141_0_1\nMKAA\n>k141_0_2 # 1000 # 1150 # 1\nMKCC\n>k141_820_1 # 10 # 300 # 1\nMKDD\n>k141_231_1 # 10 # 300 # -1\nMKEE\n>k141_456_1 # 5 # 200 # 1\nMKFF\n" \
+    | gzip > "${BAS_WORK}/test_sample2.faa.gz"
+{
+    cat "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG"
+    printf "TETM\t1\t50\tk141_456_1\ttetracycline\tX|FEATURES|tetM|tetracycline|tetM\t0.99\t99.0\t50\t100.0\t1e-20\t1\n"
+} > "${BAS_WORK}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+NEXT_WORKDIR="${BAS_WORK}"
+expect_pass "bin_arg_split: hits and proteins split by bin" bin_arg_split.py test_sample2 test_sample2_contig_bins.tsv \
+    test_sample2.faa.gz test_sample2_contigs_deep_arg.out.mapping.ARG
+check_file "bin_arg_split: bin1 proteins" "test_sample2_bins_proteins/test_sample2_binette_bin1_proteins.faa"
+check_file "bin_arg_split: bin2 proteins" "test_sample2_bins_proteins/test_sample2_binette_bin2_proteins.faa"
+check_grep "bin_arg_split: bin1 holds its contigs' proteins with Pyrodigal's headers" \
+    "test_sample2_bins_proteins/test_sample2_binette_bin1_proteins.faa" "^>k141_820_1 # 10 # 300 # 1$"
+check_grep "bin_arg_split: bin1's ACRA hit with DeepARG's header" \
+    "test_sample2_deeparg_results/test_sample2_binette_bin1_deep_arg.out.mapping.ARG" "^ACRA	1	397	k141_0_1	multidrug	"
+if [ "$(cat "${BAS_WORK}/test_sample2_deeparg_results/test_sample2_binette_bin2_deep_arg.out.mapping.ARG")" = \
+     "$(head -1 "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG")" ]; then
+    echo "✓ bin_arg_split: a bin without hits gets the header only"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_arg_split: a bin without hits gets the header only"; FAIL=$((FAIL + 1))
+fi
+if ! grep -rq "k141_456" "${BAS_WORK}/test_sample2_bins_proteins" "${BAS_WORK}/test_sample2_deeparg_results"; then
+    echo "✓ bin_arg_split: genes of unbinned contigs are dropped"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_arg_split: genes of unbinned contigs are dropped"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BAS_WORK}"
+expect_fail "bin_arg_split: a file that is not a DeepARG table fails" bin_arg_split.py test_sampleX \
+    test_sample2_contig_bins.tsv test_sample2.faa.gz test_sample2_contig_bins.tsv
+
+#
+# arg_contig_level_report.py with geNomad (Phase 9b, L6 d): synthetic geNomad
+# 1.13.0 summaries (real column layout) for three contigs: k141_820 a plasmid
+# (MOBQ), k141_231 a virus, k141_0 a chromosome contig with a provirus at
+# 200-900 that overlaps its gene k141_0_1 (1-397) but not k141_0_2
+# (1000-1150); gene coordinates from a Pyrodigal-style GFF. Empty geNomad
+# files (stub outputs) still give the columns.
+#
+echo "--- arg_contig_level_report.py (geNomad) ---"
+ACG_WORK="${WORK}/arg_contig_level_report_genomad"
+mkdir -p "${ACG_WORK}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_classifications.tsv" "${ACG_WORK}/"
+{
+    cat "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG"
+    printf "TETM\t1\t50\tk141_0_2\ttetracycline\tX|FEATURES|tetM|tetracycline|tetM\t0.99\t99.0\t50\t100.0\t1e-20\t1\n"
+    printf "MEFA\t1\t50\tk141_820_1\tmacrolide-lincosamide-streptogramin\tX|FEATURES|mefA|MLS|mefA\t0.98\t98.0\t50\t100.0\t1e-20\t1\n"
+    printf "BCRA\t1\t50\tk141_231_1\tbacitracin\tX|FEATURES|bcrA|bacitracin|bcrA\t0.97\t97.0\t50\t100.0\t1e-20\t1\n"
+} > "${ACG_WORK}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+printf "seq_name\tchromosome_score\tplasmid_score\tvirus_score\nk141_0\t0.9500\t0.0300\t0.0200\nk141_820\t0.0100\t0.9800\t0.0100\nk141_231\t0.0100\t0.0100\t0.9800\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_aggregated_classification.tsv"
+printf "seq_name\tlength\ttopology\tn_genes\tgenetic_code\tplasmid_score\tfdr\tn_hallmarks\tmarker_enrichment\tconjugation_genes\tamr_genes\nk141_820\t1015\tNo terminal repeats\t2\t11\t0.9800\tNA\t1\t5.0\tMOBQ\tNA\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_plasmid_summary.tsv"
+printf "seq_name\tlength\ttopology\tcoordinates\tn_genes\tgenetic_code\tvirus_score\tfdr\tn_hallmarks\tmarker_enrichment\ttaxonomy\nk141_231\t1018\tNo terminal repeats\tNA\t2\t11\t0.9800\tNA\t2\t6.4\tViruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;\nk141_0|provirus_200_900\t701\tProvirus\t200-900\t1\t11\t0.9000\tNA\t1\t3.0\tViruses;Duplodnaviria;;;;;\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_virus_summary.tsv"
+printf "##gff-version  3\nk141_0\tpyrodigal_v3.7.1\tCDS\t1\t397\t50.0\t+\t0\tID=k141_0_1;partial=10;\nk141_0\tpyrodigal_v3.7.1\tCDS\t1000\t1150\t50.0\t+\t0\tID=k141_0_2;partial=00;\nk141_820\tpyrodigal_v3.7.1\tCDS\t10\t300\t50.0\t+\t0\tID=k141_820_1;\nk141_231\tpyrodigal_v3.7.1\tCDS\t10\t300\t50.0\t-\t0\tID=k141_231_1;\n" \
+    | gzip > "${ACG_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACG_WORK}"
+expect_pass "arg_contig_level_report: with geNomad tables" arg_contig_level_report.py
+check_grep "arg_contig_level_report: geNomad columns before the ARG columns" "Contig_tax_and_arg_prediction.tsv" \
+    "	taxonomy_score	mobile_class	plasmid_score	virus_score	provirus	virus_taxonomy	plasmid_conjugation_genes	ARG_gene	"
+check_grep "arg_contig_level_report: ARG gene overlapping a provirus" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200	200-900	Viruses;Duplodnaviria;;;;;		ACRA	"
+check_grep "arg_contig_level_report: ARG gene outside the provirus" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200				TETM	"
+check_grep "arg_contig_level_report: plasmid contig with its conjugation genes" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_820	.*	plasmid	0.9800	0.0100			MOBQ	MEFA	"
+check_grep "arg_contig_level_report: virus contig with its taxonomy" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	.*	virus	0.0100	0.9800		Viruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;		BCRA	"
+check_grep "arg_contig_level_report: contig without a geNomad call is chromosome" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	.*	chromosome						"
+ACGE_WORK="${WORK}/arg_contig_level_report_genomad_empty"
+mkdir -p "${ACGE_WORK}"
+cp "${ACR_WORK}"/test_sample2_* "${ACGE_WORK}/"
+rm -f "${ACGE_WORK}/Contig_tax_and_arg_prediction.tsv"
+touch "${ACGE_WORK}/test_sample2_filtered_contigs_aggregated_classification.tsv" \
+      "${ACGE_WORK}/test_sample2_filtered_contigs_plasmid_summary.tsv" \
+      "${ACGE_WORK}/test_sample2_filtered_contigs_virus_summary.tsv"
+echo "" | gzip > "${ACGE_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACGE_WORK}"
+expect_pass "arg_contig_level_report: empty geNomad files (stub) still give the columns" arg_contig_level_report.py
+check_grep "arg_contig_level_report: empty geNomad files give chromosome" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome						ACRA	"
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

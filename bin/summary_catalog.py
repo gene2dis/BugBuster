@@ -63,15 +63,24 @@ STAGES = [
         "summary": "not summarised yet",
     },
     {
-        "key": "contig_arg", "title": "Contig taxonomy and ARGs (BLAST nt, BlobTools, DeepARG)",
-        "params": "--contig_tax_and_arg (needs an assembly)",
-        "processes": ["NT_BLASTN", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
+        "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
+        "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
+        "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
         "summary": "not summarised yet",
     },
     {
-        "key": "bin_arg", "title": "Bin-level ARG clustering (DeepARG on bins, MMseqs2)",
+        "key": "genomad", "title": "Plasmid / virus classification of contigs (geNomad)",
+        "params": "--genomad_prediction (needs an assembly; ARG columns with --contig_tax_and_arg)",
+        "processes": ["NFCORE_GENOMAD_ENDTOEND"],
+        "summary": "arg_contig_mobile (ARG genes on plasmid / virus contigs and in proviruses; needs "
+                   "--contig_tax_and_arg)",
+        # its table comes from the contig stage's table: without that table, geNomad ran with nothing to summarise
+        "needs": "contig_arg",
+    },
+    {
+        "key": "bin_arg", "title": "Bin-level ARG clustering (assembly DeepARG hits split by bin, MMseqs2)",
         "params": "--arg_bin_clustering (needs binning)",
-        "processes": ["DEEPARG_BINS", "CLUSTERING"],
+        "processes": ["BIN_ARG_SPLIT", "CLUSTERING"],
         "summary": "not summarised yet",
     },
     {
@@ -91,13 +100,15 @@ STAGES = [
 
 def stage_status(processes_ran, tables_found):
     """[(stage, status)]: 'ran', 'not run', or 'ran, no table found' (a stage whose processes ran but whose
-    summarised table is missing from the results directory)."""
+    summarised table is missing from the results directory). A stage whose table is built from another stage's
+    table ("needs") is not flagged when that table is missing too: it ran with nothing to summarise."""
     out = []
     for st in STAGES:
         ran = any(p in processes_ran for p in st["processes"])
+        needed_found = "needs" not in st or st["needs"] in tables_found
         if st["key"] in tables_found:
             status = "ran"
-        elif ran and st["summary"] != "not summarised yet":
+        elif ran and st["summary"] != "not summarised yet" and needed_found:
             status = "ran, no table found"
         elif ran:
             status = "ran"

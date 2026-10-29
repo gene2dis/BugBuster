@@ -99,28 +99,28 @@ build_fixtures() {
     mkdir -p "${staging}/gtdbtk_empty/release232"
     ( cd "${staging}/gtdbtk_empty" && tar -czf "${f}/gtdbtk_empty.tar.gz" release232 )
 
-    # Mock NCBI blast db repository: metadata JSON + 2 volumes + md5 files
-    mkdir -p "${f}/blastdb" "${staging}/blast"
-    ( cd "${staging}/blast" \
-        && echo t > taxdb.btd && echo t > taxdb.bti && echo t > taxonomy4blast.sqlite3 \
-        && echo v > nt.000.nin && echo v > nt.000.nhr \
-        && tar -czf "${f}/blastdb/nt.000.tar.gz" taxdb.btd taxdb.bti taxonomy4blast.sqlite3 nt.000.nin nt.000.nhr \
-        && rm ./* \
-        && echo v > nt.001.nin && echo v > nt.001.nhr \
-        && tar -czf "${f}/blastdb/nt.001.tar.gz" nt.001.nin nt.001.nhr )
-    ( cd "${f}/blastdb" \
-        && md5sum nt.000.tar.gz > nt.000.tar.gz.md5 \
-        && md5sum nt.001.tar.gz > nt.001.tar.gz.md5 \
-        && printf '{"dbname":"nt","files":["%s","%s"]}\n' \
-            "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.000.tar.gz" \
-            "https://ftp.ncbi.nlm.nih.gov/blast/db/nt.001.tar.gz" > nt-nucl-metadata.json )
+    # Metabuli database tarball (refseq_standard layout: one directory with
+    # the index files and the taxdump in ncbi-taxdump/), a variant without
+    # the taxdump and one without db.parameters
+    mkdir -p "${staging}/metabuli/refseq_standard/ncbi-taxdump"
+    ( cd "${staging}/metabuli" \
+        && for mf in db.parameters diffIdx info taxonomyDB; do echo m > "refseq_standard/${mf}"; done \
+        && echo n > refseq_standard/ncbi-taxdump/nodes.dmp && echo n > refseq_standard/ncbi-taxdump/names.dmp \
+        && tar -czf "${f}/metabuli_mini.tar.gz" refseq_standard \
+        && rm -r refseq_standard/ncbi-taxdump \
+        && tar -czf "${f}/metabuli_notaxdump.tar.gz" refseq_standard \
+        && rm refseq_standard/db.parameters \
+        && tar -czf "${f}/metabuli_noparams.tar.gz" refseq_standard )
 
-    # Same blast repo but with a corrupted checksum for volume 001 ('x' can
-    # never be a hex digit; the former '0' left the md5 unchanged whenever the
-    # timestamp-dependent tarball md5 already started with 0 - a 1-in-16 flake)
-    cp -r "${f}/blastdb" "${f}/blastdb_badmd5"
-    sed 's/^./x/' "${f}/blastdb_badmd5/nt.001.tar.gz.md5" > "${f}/blastdb_badmd5/tmp.md5" \
-        && mv "${f}/blastdb_badmd5/tmp.md5" "${f}/blastdb_badmd5/nt.001.tar.gz.md5"
+    # geNomad database release tarball (one genomad_db/ directory) and one
+    # whose version.txt names another release
+    mkdir -p "${staging}/genomad/genomad_db"
+    ( cd "${staging}/genomad" \
+        && for gf in genomad_db genomad_db.dbtype genomad_marker_metadata.tsv; do echo g > "genomad_db/${gf}"; done \
+        && echo 1.9 > genomad_db/version.txt \
+        && tar -czf "${f}/genomad_db_v1.9.tar.gz" genomad_db \
+        && echo 1.8 > genomad_db/version.txt \
+        && tar -czf "${f}/genomad_db_v1.8.tar.gz" genomad_db )
 
     # Mock eggNOG emapper-3.0 data repository: the seven uncompressed data
     # files the reformat script fetches from the base URL
@@ -403,16 +403,6 @@ expect_fail "sylph: gzip without accession/lineage layout fails" sylph_db_reform
 expect_fail "sylph: unknown mode fails" sylph_db_reformat.sh index "${BASE_URL}/mini-c200.syldb"
 
 #
-# tax_files_reformat.sh
-#
-echo "--- tax_files_reformat.sh ---"
-expect_pass "taxdump: valid tarball" tax_files_reformat.sh "${BASE_URL}/taxdump.tar.gz"
-check_file "taxdump: nodes.dmp in tax_files" "tax_files/nodes.dmp"
-check_file "taxdump: names.dmp in tax_files" "tax_files/names.dmp"
-expect_fail "taxdump: corrupt tarball fails" tax_files_reformat.sh "${BASE_URL}/corrupt.tar.gz"
-expect_fail "taxdump: tarball without dmp files fails" tax_files_reformat.sh "${BASE_URL}/k2_mini.tar.gz"
-
-#
 # checkm2_db_reformat.sh
 #
 echo "--- checkm2_db_reformat.sh ---"
@@ -431,15 +421,31 @@ expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/
 expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
 
 #
-# blast_nt_reformat.sh
+# metabuli_db_reformat.sh
 #
-echo "--- blast_nt_reformat.sh ---"
-expect_pass "blast: valid volume set" blast_nt_reformat.sh "${BASE_URL}/blastdb"
-check_file "blast: taxdb.btd in blast_nt_db" "blast_nt_db/taxdb.btd"
-check_file "blast: volume 000 index in blast_nt_db" "blast_nt_db/nt.000.nin"
-check_file "blast: volume 001 index in blast_nt_db" "blast_nt_db/nt.001.nin"
-expect_fail "blast: wrong md5 fails" blast_nt_reformat.sh "${BASE_URL}/blastdb_badmd5"
-expect_fail "blast: missing metadata fails" blast_nt_reformat.sh "${BASE_URL}/no_such_dir"
+echo "--- metabuli_db_reformat.sh ---"
+expect_pass "metabuli: valid tarball" metabuli_db_reformat.sh "${BASE_URL}/metabuli_mini.tar.gz"
+check_file "metabuli: index files in metabuli_db" "metabuli_db/diffIdx"
+check_file "metabuli: taxdump kept in metabuli_db" "metabuli_db/ncbi-taxdump/nodes.dmp"
+expect_fail "metabuli: corrupt tarball fails" metabuli_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_fail "metabuli: tarball without db.parameters fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_noparams.tar.gz"
+expect_fail "metabuli: database without a taxdump fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_notaxdump.tar.gz"
+expect_fail "metabuli: 404 URL fails" metabuli_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
+
+#
+# genomad_db_reformat.sh
+#
+echo "--- genomad_db_reformat.sh ---"
+GENOMAD_MD5=$(md5sum "${FIXTURES}/genomad_db_v1.9.tar.gz" | cut -d' ' -f1)
+GENOMAD_OLD_MD5=$(md5sum "${FIXTURES}/genomad_db_v1.8.tar.gz" | cut -d' ' -f1)
+expect_pass "genomad: valid release" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" "${GENOMAD_MD5}" 1.9
+check_file "genomad: database files in genomad_db" "genomad_db/genomad_db"
+check_file "genomad: version.txt kept" "genomad_db/version.txt"
+expect_fail "genomad: wrong md5 fails" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" \
+    00000000000000000000000000000000 1.9
+expect_fail "genomad: another release than the registry's fails" genomad_db_reformat.sh \
+    "${BASE_URL}/genomad_db_v1.8.tar.gz" "${GENOMAD_OLD_MD5}" 1.9
+expect_fail "genomad: 404 URL fails" genomad_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz" "${GENOMAD_MD5}" 1.9
 
 #
 # eggnog_db_reformat.sh

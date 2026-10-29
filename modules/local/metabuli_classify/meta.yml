@@ -1,0 +1,47 @@
+name: metabuli_classify
+description: Classifies each contig with Metabuli (DNA and amino-acid k-mers against a Metabuli database, refseq_standard by default) and writes a BlobTools hits file from the per-contig calls
+keywords:
+  - contig taxonomy
+  - metabuli
+  - taxonomic classification
+  - metagenomics
+tools:
+  - metabuli:
+      description: Metagenomic taxonomic classifier that jointly analyzes amino acid and DNA sequences
+      homepage: https://github.com/steineggerlab/Metabuli
+      documentation: https://jaebeom-kim.github.io/metabuli-doc/
+      doi: "10.1038/s41592-024-02273-y"
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - contigs:
+      type: file
+      description: Filtered contigs
+      pattern: "*_filtered_contigs.fa"
+  - db:
+      type: directory
+      description: Metabuli database directory (db.parameters, diffIdx, info, taxonomyDB, and its taxdump), read only
+
+output:
+  - classifications:
+      type: file
+      description: Tuple of meta and Metabuli's per-contig calls with lineage (classify --lineage 1)
+      pattern: "*_classifications.tsv"
+  - hits:
+      type: file
+      description: Tuple of meta and a BlobTools hits file (contig, taxid, score) of the classified contigs
+      pattern: "*_metabuli_hits.tsv"
+  - report:
+      type: file
+      description: Metabuli's clade report (Kraken-style)
+      pattern: "*_report.tsv"
+  - versions:
+      type: file
+      description: Software versions (Metabuli and the database's creation date)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -846,6 +846,38 @@ does not cover the community. Check the per-sample `.tsv` profiles in
 the samples (`--sylph_db`, or `--custom_sylph_db` together with its
 `--custom_sylph_taxonomy`), or rerun with `--taxonomic_profiler none`.
 
+### Contig taxonomy: "no nodes.dmp and names.dmp in the Metabuli database", removed BLAST parameters, or `undef` superkingdoms
+
+**Symptom (a):** a `--contig_tax_and_arg` run stops with *no nodes.dmp and
+names.dmp in the Metabuli database ... BlobTools needs the taxdump the database
+was built with*. `--custom_metabuli_db` points at a directory whose taxdump is
+neither in it nor one level down (`refseq_standard` keeps it in
+`ncbi-taxdump/`). Point the parameter at the database directory itself (the one
+with `db.parameters`), or copy the taxdump the database was built with next to
+it. A taxdump from another date can leave Metabuli taxids unresolved in the
+BlobTools tables, so do not substitute a newer one.
+
+**Symptom (b):** *The following invalid input values have been detected:
+--custom_blast_db* (or `--blast_db`, `--taxdump_files`,
+`--custom_taxdump_files`). Contig taxonomy uses Metabuli since Phase 9b and these
+parameters were removed; drop them and give `--custom_metabuli_db` instead.
+
+**Symptom (c):** in results of earlier versions, every contig's
+`superkingdom` in `Contig_tax_and_arg_prediction.tsv` is `undef`. BlobTools
+1.1.1 looked for the `superkingdom` rank, which NCBI renamed `domain` in 2025.
+The ranks now come from Metabuli, and BlobTools gets a copy of `nodes.dmp` with
+the rank renamed back; rerun the contig step to fix old results.
+
+### NFCORE_GENOMAD_ENDTOEND or FORMAT_GENOMAD_DB fails
+
+`FORMAT_GENOMAD_DB` checks the downloaded file's md5 and that its `version.txt`
+says 1.9; a mismatch means a corrupted or replaced Zenodo file. With
+`--custom_genomad_db`, the directory must hold the unpacked database
+(`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); geNomad
+1.13.0 takes database 1.9. `NFCORE_GENOMAD_ENDTOEND` requests 8 CPUs and 36 GB (about
+18 GB used per assembly in the Phase 9c benchmark); an out-of-memory failure is
+retried with twice the memory.
+
 ---
 
 ## Decontamination Issues

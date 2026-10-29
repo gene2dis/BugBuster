@@ -18,11 +18,11 @@ input:
       description: Sample metadata (meta.id is the sample name)
   - proteins:
       type: directory
-      description: PRODIGAL_BINS output directory with one protein FASTA per refined bin (<sample>_<bin>_proteins.faa)
+      description: BIN_ARG_SPLIT output directory with the Pyrodigal proteins of each refined bin (<sample>_<bin>_proteins.faa)
       pattern: "*_bins_proteins"
   - deeparg:
       type: directory
-      description: DEEPARG_BINS output directory with one DeepARG mapping file per bin (<sample>_<bin>_deep_arg.out.mapping.ARG)
+      description: BIN_ARG_SPLIT output directory with each bin's DEEPARG_CONTIGS hits (<sample>_<bin>_deep_arg.out.mapping.ARG; header only for a bin without hits)
       pattern: "*_deeparg_results"
 
 output:

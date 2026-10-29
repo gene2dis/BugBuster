@@ -69,21 +69,29 @@ processes:
           description: sylph-tax metadata file (e.g. gtdb_r232_metadata.tsv.gz)
           pattern: "sylph_db/*.tsv.gz"
 
-  - name: FORMAT_NT_BLAST_DB
-    description: Runs bin/blast_nt_reformat.sh - reads the nt volume list from nt-nucl-metadata.json, downloads every volume with its .md5, verifies (md5sum -c) and extracts them, checks the taxdb files and one .nin index per volume, and moves everything into blast_nt_db/
+  - name: FORMAT_METABULI_DB
+    description: Runs bin/metabuli_db_reformat.sh - downloads the Metabuli database tarball, extracts it, checks that it holds db.parameters, diffIdx, info, taxonomyDB and a taxdump (nodes.dmp, names.dmp), and moves it to metabuli_db/
     input:
       - db:
           type: value
-          description: NCBI BLAST database base URL (params.blast_ref_db[params.blast_db].url)
-    output: []
+          description: Metabuli database tarball URL (params.metabuli_ref_db[params.metabuli_db].url)
+    output:
+      - metabuli_db:
+          type: directory
+          description: Metabuli database directory
+          pattern: "metabuli_db"
 
-  - name: FORMAT_TAXDUMP_FILES
-    description: Runs bin/tax_files_reformat.sh - downloads the NCBI taxdump tarball, extracts it and keeps only nodes.dmp and names.dmp in tax_files/
+  - name: FORMAT_GENOMAD_DB
+    description: Runs bin/genomad_db_reformat.sh - downloads the pinned geNomad database release (Zenodo), checks its md5, extracts it, checks version.txt against the registry's version and the main database files, and moves it to genomad_db/
     input:
-      - db:
+      - key:
           type: value
-          description: taxdump.tar.gz URL (params.taxonomy_files[params.taxdump_files].url)
-    output: []
+          description: geNomad database registry key (params.genomad_db)
+    output:
+      - genomad_db:
+          type: directory
+          description: geNomad database directory
+          pattern: "genomad_db"
 
   - name: DOWNLOAD_DEEPARG_DB
     description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date

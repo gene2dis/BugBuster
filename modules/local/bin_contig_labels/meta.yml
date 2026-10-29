@@ -1,0 +1,32 @@
+name: bin_contig_labels
+description: Maps each contig of a sample's refined bins to its bin (contig, bin), for the bin columns of Contig_tax_and_arg_prediction.tsv (ARG_CONTIG_LEVEL_REPORT adds the bin's GTDB-Tk classification) and the bin-level ARG split; needs only the bins, not GTDB-Tk
+keywords:
+  - binning
+  - bin membership
+tools:
+  - python:
+      description: bin/bin_contig_labels.py (Python standard library only)
+      homepage: https://www.python.org/
+      documentation: https://docs.python.org/3/
+      licence: ["PSF-2.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - bins:
+      type: directory
+      description: The sample's refined bins (*.fa; a directory with only a SKIPPED/FAILED marker gives a header-only table)
+
+output:
+  - labels:
+      type: file
+      description: Tuple of meta and the contig to bin table (contig, bin = bin FASTA name without .fa = GTDB-Tk's user_genome)
+      pattern: "*_contig_bins.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"
