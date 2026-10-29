@@ -429,6 +429,33 @@ next release is tagged.
 
 ### Changed
 
+- **Databases are stored once and reused across runs (`storeDir`)**: the
+  database download and build tasks (`FORMAT_*`, `DOWNLOAD_DEEPARG_DB`,
+  `DOWNLOAD_GTDBTK_DB`, `RGI_LOAD`, `SOURMASH_TAX_PREPARE` and the
+  decontamination index builds) store their output in
+  `<databases_dir>/<database>/<registry key>/` (e.g.
+  `kraken/standard-8/k2_ref_db`, `bwamem3_index/phiX174_human/contaminants_index`)
+  instead of copying it there with `publishDir`. A later run with the same
+  `--databases_dir` skips them, with any work directory (`[skipping] Stored
+  process` in the log); another version goes into its own folder; the files
+  are moved out of the work directory, so each database is on disk once
+  (eggNOG 7 ~44 GB, WoLr2 ~94 GB, Metabuli ~110 GB used to exist twice).
+  Keys: the registry key of each database; DeepARG (unversioned upstream)
+  `deeparg/1.0.4`; SUPER-FOCUS `superfocus/<db>/<aligner>`; RGI
+  `rgi/<card version>[_wildcard]_k<kmer size>` (`latest` is stored too: the
+  first run fixes which CARD release it means for that `--databases_dir`;
+  delete the folder or pin `--rgi_card_version` to update); bwa-mem3 index
+  `phiX174_human` plus `_dense` with `--bwamem3_dense_sa`. `-stub` runs store
+  under `<databases_dir>/stub/`. Builds from the user's own files
+  (`--custom_host_fasta` / `--custom_phiX_fasta`, `--custom_rgi_wildcard`, a
+  `--custom_sourmash_db` lineages file) still run every time and are copied
+  to the old locations for reuse through `--custom_*`. The stored
+  `versions.yml` of DeepARG, RGI, sourmash and the index builds is reused, so
+  `software_versions.yml` reports the versions that built the stored
+  database. Databases published by earlier releases (no `<key>/` level) are
+  not found: pass them with `--custom_*`, or delete them. GTDB-Tk's package
+  is unpacked into `gtdbtk_db/` instead of its release directory name
+  (roadmap M9)
 - **Breaking (contig taxonomy)**: Metabuli 1.2.0
   (`quay.io/biocontainers/metabuli:1.2.0--pl5321h0bb26bb_0` and its depot
   sif; new `METABULI_CLASSIFY`, `classify --seq-mode 3 --lineage 1`,

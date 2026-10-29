@@ -135,17 +135,18 @@ results/clean_reads/sample1/
 results/01_quality_control/summary/Reads_report.csv
 ```
 
-### Combined Index (Published)
+### Combined Index (Stored)
 ```
-<databases_dir>/bwamem3_index/contaminants_index/  # default: <output>/../databases
-<databases_dir>/bowtie_index/contaminants_index/   # under --read_aligner bowtie2
+<databases_dir>/bwamem3_index/phiX174_human/contaminants_index/  # default: <output>/../databases; reused by later runs
+<databases_dir>/bowtie_index/phiX174_human/contaminants_index/   # under --read_aligner bowtie2
+<databases_dir>/bwamem3_index/contaminants_index/                # copy of an index built from --custom_host_fasta / --custom_phiX_fasta
 ```
 
 ---
 
 ## Performance Tips
 
-1. **Reuse the index**: a fresh run rebuilds it unless you pass the published one (`<databases_dir>/bwamem3_index/contaminants_index`) with `--custom_decontamination_index`
+1. **Reuse the index**: keep the same `--databases_dir` and later runs skip the build; an index built from `--custom_host_fasta` is rebuilt every run unless you pass its copy (`<databases_dir>/bwamem3_index/contaminants_index`) with `--custom_decontamination_index`
 2. **Use `--store_clean_reads true`** to keep clean reads in the output dir (`-resume` remains the task cache)
 3. **Use `-profile low_disk`** to free the work directory after a successful run (it does not lower peak usage; put `-work-dir` on a large filesystem)
 

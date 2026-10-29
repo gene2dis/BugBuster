@@ -59,7 +59,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 
 - [Nextflow](https://www.nextflow.io/docs/latest/getstarted.html#installation) (`>=25.10.0`)
 - Container runtime: [Docker](https://docs.docker.com/engine/installation/), [Singularity](https://sylabs.io/guides/), or [Podman](https://podman.io/)
-- An x86-64 CPU with AVX2 (Haswell 2013 or newer) for the default aligner, bwa-mem3, and ~75 GB RAM to build its human decontamination index (set `--max_memory` to the node's RAM). A fresh run rebuilds the index unless you pass the published one (`<databases_dir>/bwamem3_index/contaminants_index`) with `--custom_decontamination_index`. On older CPUs or smaller nodes, use `--read_aligner bowtie2`
+- An x86-64 CPU with AVX2 (Haswell 2013 or newer) for the default aligner, bwa-mem3, and ~75 GB RAM to build its human decontamination index (set `--max_memory` to the node's RAM). The index is built once per `--databases_dir` and reused by later runs (an index from `--custom_host_fasta` is rebuilt every run; pass its copy, `<databases_dir>/bwamem3_index/contaminants_index`, with `--custom_decontamination_index`). On older CPUs or smaller nodes, use `--read_aligner bowtie2`
 
 ### Basic Usage
 
@@ -126,7 +126,7 @@ See [docs/deployment.md](docs/deployment.md) for detailed deployment instruction
 
 ## Databases
 
-All databases are automatically downloaded on first use and published to `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Only databases required for your selected pipeline options will be downloaded. The pipeline does not read that directory back: a fresh run downloads them again, so pass the published paths with the `--custom_*` parameters to reuse them (`-resume` reuses them from the work directory).
+All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, one folder per database and version (`<databases_dir>/<database>/<key>/`). Only databases required for your selected pipeline options will be downloaded. A later run with the same `--databases_dir` reuses them without downloading again; selecting another version downloads it into its own folder. Databases you already have are passed with the `--custom_*` parameters and used in place.
 
 You can use custom databases by specifying paths with `--custom_*` parameters (see table below).
 
@@ -398,7 +398,7 @@ results/
     └── reads/humann/{sample}/  # HUMAnN gene families / reactions / pathways (RPK), MetaPhlAn profile, KO/EC/MetaCyc tables (if read_level_functional=humann)
 ```
 
-**Database Storage**: Databases are stored separately at `<output_dir>/../databases/` by default (configurable via `--databases_dir`).
+**Database Storage**: Databases are stored separately at `<output_dir>/../databases/<database>/<key>/` by default (configurable via `--databases_dir`) and reused by later runs.
 
 For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output-structure).
 

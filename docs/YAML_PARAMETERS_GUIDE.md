@@ -375,7 +375,10 @@ custom_decontamination_index: "/path/to/contaminants_index"
 
 A Bowtie2 index (`bowtie2-build`) is used the same way, with
 `read_aligner: "bowtie2"`; under the default aligner it is rejected at launch.
-The index the pipeline builds is also published to
+An index the pipeline builds from the registry genomes is stored in
+`<databases_dir>/bwamem3_index/phiX174_human/` and reused by later runs with
+the same `databases_dir`, so it does not need this option. One built from
+`custom_host_fasta` / `custom_phiX_fasta` is copied to
 `<databases_dir>/bwamem3_index/contaminants_index` (bowtie2:
 `<databases_dir>/bowtie_index/contaminants_index`), ready to pass here.
 
