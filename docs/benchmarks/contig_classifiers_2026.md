@@ -7,7 +7,12 @@ Benchmark run 2026-10-28 to 2026-10-29, after [the contig taxonomy benchmark](co
 
 For each tool: runtime, CPU-seconds, peak memory, database size, contigs classified per rank or class, agreement on the ARG-bearing contigs, and what wiring it into the pipeline would take. No pipeline code changed.
 
-**Decision (owner):** pending.
+**Decision (owner, 2026-10-29):**
+
+- **L5 (c):** Metabuli with `refseq_standard` replaces Kraken2 on the contigs, with `--min-score 0.2 --min-sp-score 0.5` as parameters (those defaults). This revises the L2 decision of 2026-10-28 ([contig taxonomy benchmark](contig_taxonomy_2026.md)): the contig step gets no Kraken2 database parameter and no Kraken2 memory fix. BlobTools stays for the tables and plots, fed Metabuli's per-contig taxids. The read-level Kraken2 is unchanged.
+- **L6 (d):** geNomad behind its own flag, off by default.
+- **L5 (a):** add the bin and its GTDB-Tk classification as separate columns; the NCBI columns are not filled from them.
+- **Not wired:** (b) Taxometer and (e) RGI's k-mers on contigs. mob-suite and platon were not run.
 
 **Outcome (recommendations):**
 
@@ -213,7 +218,7 @@ mob-suite and platon (both local) were not run: geNomad answered the question th
 
 ## Wiring (what each option would take)
 
-All changes would go into Phase 9b, with L2 and M8.
+All changes would go into Phase 9b, with L2 and M8. The owner chose (c) as the replacement for Kraken2, (d) behind a flag and (a) (Decision, above).
 
 **(c) Metabuli on the contigs**, replacing Kraken2 there, or alongside it:
 - Process: a local METABULI_CLASSIFY module (no nf-core module), `classify --seq-mode 3 --lineage 1 --threads ${task.cpus} --max-ram` from the task's memory (32 for `process_medium`'s 36 GB), `--min-score` and `--min-sp-score` as parameters (defaults 0.2 and 0.5), image `metabuli:1.2.0--pl5321h0bb26bb_0`. `process_medium` at 8 CPUs would take about twice the wall time measured here at 16.
