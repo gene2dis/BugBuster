@@ -178,7 +178,7 @@ nextflow run main.nf \
     -profile docker
 ```
 
-Result: Database saved to `/shared/databases/rgi/` for future use.
+Result: Database stored in `/shared/databases/rgi/latest_wildcard_k61/card_db`; later runs with the same `--databases_dir` reuse it without downloading again.
 
 ### Example 2: Reuse Complete Database
 
@@ -188,7 +188,7 @@ nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
     --rgi_prediction true \
-    --custom_rgi_card_db /shared/databases/rgi/card_db \
+    --custom_rgi_card_db /shared/databases/rgi/latest_wildcard_k61/card_db \
     -profile docker
 ```
 

@@ -339,6 +339,20 @@ workflow {
         log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
+    // Databases published by releases before storeDir (roadmap M9) sit where
+    // no stored check looks (<databases_dir>/<db>/<key>/ now): say so before
+    // they are downloaded a second time
+    if (params.databases_dir) {
+        def old_layout = ['kraken/k2_ref_db', 'metabuli_db', 'genomad_db', 'deeparg_db', 'gtdbtk/release*',
+                          'eggnog/eggnog_db', 'dbcan/dbcan_db', 'bakta/bakta_db', 'woltka/woltka_db',
+                          'superfocus/superfocus_db', 'humann/humann_db', 'kmarvel/kmarvel_db', 'rgi/card_db',
+                          'sylph/*.syl*db', 'checkm2/*.dmnd', 'cog/*.def.tab']
+            .collectMany { p -> [file("${params.databases_dir}/${p}", type: 'any')].flatten().findAll { f -> f.exists() } }
+        if (old_layout) {
+            log.warn "--databases_dir ${params.databases_dir} holds databases in the layout of an earlier release (${old_layout*.name.join(', ')}), which this release does not reuse: it stores them in <databases_dir>/<database>/<key>/ and downloads any it does not find there. Pass the old ones with the --custom_* options, or delete them to free the space (see CHANGELOG)"
+        }
+    }
+
     // bwa-mem3 (the default aligner) builds the human decontamination index
     // with ~57-75 GB RAM, bowtie2 with ~6 GB. Under a lower --max_memory the
     // build stops with exit 3: say so before the downloads start

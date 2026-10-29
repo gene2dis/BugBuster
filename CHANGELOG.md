@@ -442,7 +442,7 @@ next release is tagged.
   (eggNOG 7 ~44 GB, WoLr2 ~94 GB, Metabuli ~110 GB used to exist twice).
   Keys: the registry key of each database; DeepARG (unversioned upstream)
   `deeparg/1.0.4`; SUPER-FOCUS `superfocus/<db>/<aligner>`; RGI
-  `rgi/<card version>[_wildcard]_k<kmer size>` (`latest` is stored too: the
+  `rgi/<card version>[_wildcard_k<kmer size>]` (`latest` is stored too: the
   first run fixes which CARD release it means for that `--databases_dir`;
   delete the folder or pin `--rgi_card_version` to update); bwa-mem3 index
   `phiX174_human` plus `_dense` with `--bwamem3_dense_sa`. `-stub` runs store
@@ -454,8 +454,10 @@ next release is tagged.
   `software_versions.yml` reports the versions that built the stored
   database. Databases published by earlier releases (no `<key>/` level) are
   not found: pass them with `--custom_*`, or delete them. GTDB-Tk's package
-  is unpacked into `gtdbtk_db/` instead of its release directory name
-  (roadmap M9)
+  is unpacked into `gtdbtk_db/` instead of its release directory name.
+  A launch warning lists databases in the old layout. Not covered: the
+  sourmash k-mer zip, which Nextflow stages from its URL into each work
+  directory (pass it with `--custom_sourmash_db`) (roadmap M9)
 - **Breaking (contig taxonomy)**: Metabuli 1.2.0
   (`quay.io/biocontainers/metabuli:1.2.0--pl5321h0bb26bb_0` and its depot
   sif; new `METABULI_CLASSIFY`, `classify --seq-mode 3 --lineage 1`,

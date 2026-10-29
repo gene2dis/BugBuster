@@ -95,7 +95,8 @@ build_fixtures() {
     mkdir -p "${staging}/gtdbtk/release232/markers"
     ( cd "${staging}/gtdbtk" \
         && echo m > release232/markers/marker.txt \
-        && tar -czf "${f}/gtdbtk_r232_data.tar.gz" release232 )
+        && tar -czf "${f}/gtdbtk_r232_data.tar.gz" release232 \
+        && tar -czf "${f}/gtdbtk_dotslash.tar.gz" ./release232 )
     mkdir -p "${staging}/gtdbtk_empty/release232"
     ( cd "${staging}/gtdbtk_empty" && tar -czf "${f}/gtdbtk_empty.tar.gz" release232 )
 
@@ -419,6 +420,8 @@ expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r
 check_file "gtdbtk: release files extracted" "gtdbtk_db/markers/marker.txt"
 expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
 expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
+expect_pass "gtdbtk: ./release232 entries" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_dotslash.tar.gz"
+check_file "gtdbtk: ./ prefix still gives gtdbtk_db/markers" "gtdbtk_db/markers/marker.txt"
 
 #
 # metabuli_db_reformat.sh

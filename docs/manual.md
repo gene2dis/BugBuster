@@ -194,12 +194,14 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use and stores them in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Each one goes into a folder named after the database and its registry key (`<databases_dir>/<database>/<key>/`, e.g. `kraken/standard-8/k2_ref_db`; the full layout is under [Database Storage Directory](#database-storage-directory)). A later run with the same `--databases_dir` finds them there and skips the download or build (Nextflow `storeDir`; the log shows `[skipping] Stored process`), whatever its work directory. Selecting another version (e.g. `--kraken2_db gtdb_220`) downloads it into its own folder. The files are moved out of the work directory, so each database is stored once.
+BugBuster automatically downloads required databases on first use and stores them in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Each one goes into a folder named after the database and its registry key (`<databases_dir>/<database>/<key>/`, e.g. `kraken/standard-8/k2_ref_db`; the full layout is under [Database Storage Directory](#database-storage-directory)). A later run with the same `--databases_dir` finds them there and skips the download or build (except the sourmash k-mer database, below) (Nextflow `storeDir`; the log shows `[skipping] Stored process`), whatever its work directory. Selecting another version (e.g. `--kraken2_db gtdb_220`) downloads it into its own folder. The files are moved out of the work directory, so each database is stored once.
 
 - **Refreshing a database**: delete its `<databases_dir>/<database>/<key>/` folder; the next run downloads it again. Do the same if a download was interrupted while being stored (a folder with missing files is taken as complete). RGI's default `--rgi_card_version latest` is stored as `rgi/latest_wildcard_k61`: the first run fixes which CARD release `latest` means for that `--databases_dir` (the stored `versions.yml` records the real version); delete the folder or pin `--rgi_card_version` to update it.
 - **Builds from your own files** (the decontamination index from `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with `--custom_rgi_wildcard`, the sourmash taxonomy from a `--custom_sourmash_db` lineages file) have no version to key a folder on: they run in every new run and are copied to `<databases_dir>` for reuse through the matching `--custom_*` option.
 - **`-stub` runs** store their placeholder files under `<databases_dir>/stub/`, never where a real run would take them for a database.
 - **`--custom_*` paths** are used in place and never copied.
+- **The sourmash k-mer database** (`gtdb-reps-rs220-k31.zip`, `--taxonomic_profiler sourmash`) is not downloaded by a pipeline task but staged by Nextflow from its URL into each work directory: a new work directory fetches it again. Download it once and pass it with `--custom_sourmash_db` to avoid that.
+- **One run at a time fills a new database folder.** Nextflow has no lock on these folders: two runs started together against an empty `--databases_dir` both download, and a run started while another is still moving a large database into place can take the half-moved folder as complete. Let the first run store its databases before starting others that share the directory.
 - **Earlier releases** published databases without the `<key>/` level (e.g. `kraken/k2_ref_db`); this release does not find them there. Pass them with the `--custom_*` options, or delete them and let the pipeline download again.
 
 ### Automatic Download Databases
@@ -1502,7 +1504,7 @@ databases/                            # Database storage (configurable via --dat
 ├── metabuli/refseq_standard/         # Metabuli database for contig taxonomy (metabuli_db/, ~110 GB, with its taxdump)
 ├── genomad/v1.9/                     # geNomad database 1.9 (genomad_db/, ~2.2 GB)
 ├── deeparg/1.0.4/                    # DeepARG database (deeparg_db/; unversioned upstream, keyed by the deeparg version)
-├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, WildCARD, --rgi_kmer_size)
+├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, _wildcard_k<--rgi_kmer_size> with WildCARD)
 ├── kmarvel/card_v4.0.1/              # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
 ├── checkm2/v3/                       # CheckM2 database (*.dmnd)
 ├── gtdbtk/release_232/               # GTDB-TK database (gtdbtk_db/)

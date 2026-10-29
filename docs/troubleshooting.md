@@ -785,7 +785,8 @@ you expected.
 run skips the download whenever the expected files or folder are there,
 without checking their contents. A folder left incomplete (for example by a
 copy to another filesystem that was interrupted while the database was being
-stored, or files removed by hand) is taken as complete. RGI's default
+stored, a second run started while the first was still storing it, or files
+removed by hand) is taken as complete. RGI's default
 `--rgi_card_version latest` is fixed at the first download in that
 `--databases_dir`.
 

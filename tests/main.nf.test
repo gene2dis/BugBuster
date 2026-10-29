@@ -1015,9 +1015,10 @@ nextflow_pipeline {
     }
 
     test("Stub run skips a database already stored in databases_dir") {
-        // FORMAT_KMARVEL_DB's storeDir already holds the database (as a
-        // previous run leaves it): the task is skipped and KMARVEL reads the
-        // stored copy (roadmap M9)
+        // FORMAT_KMARVEL_DB's and RGI_LOAD's storeDirs already hold their
+        // databases (as a previous run leaves them): both tasks are skipped,
+        // KMARVEL and RGI read the stored copies, and RGI_LOAD's stored
+        // versions.yml reaches software_versions.yml (roadmap M9)
         options "-stub"
 
         when {
@@ -1029,12 +1030,17 @@ nextflow_pipeline {
                     def db = new File(store, "stub/kmarvel/card_v4.0.1/kmarvel_db")
                     db.mkdirs()
                     ['CARD_protein_all.fasta', 'metadata.tsv', 'snps.txt', 'DB_VERSION'].each { name -> new File(db, name).text = '' }
+                    def rgi = new File(store, "stub/rgi/latest_wildcard_k61")
+                    new File(rgi, "card_db").mkdirs()
+                    new File(rgi, "card_db/card.json").text = ''
+                    new File(rgi, "versions.yml").text = '"PREPARE_DATABASES:RGI_LOAD":\n    rgi: 6.0.8\n    card: 9.9.9-stored\n'
                     store.absolutePath
                 }()
                 quality_control    = true
                 assembly_mode      = "none"
                 taxonomic_profiler = "none"
                 kmarvel_prediction = true
+                rgi_prediction     = true
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 max_cpus   = 2
@@ -1045,6 +1051,9 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_LOAD") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_BWT") } == 2
+            assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("9.9.9-stored")
             assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL (") } == 2
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_gene_family_matrix.tsv").exists()
         }
