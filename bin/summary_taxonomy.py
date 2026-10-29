@@ -106,7 +106,7 @@ def build_taxonomy(batches, samples, order):
     for rank in ranks:
         names = tax[rank].replace("", np.nan).fillna(f"unassigned {rank.lower()}")
         agg = rel.groupby(names).sum()
-        agg = agg.loc[agg.mean(axis=1).sort_values(ascending=False).index]
+        agg = agg.loc[agg.mean(axis=1).sort_values(ascending=False, kind="stable").index]
         agg.index.name = rank
         wide[rank] = agg
     return {"label": labels.pop(), "rel": rel, "tax": tax, "long": long, "wide": wide, "ranks": ranks,

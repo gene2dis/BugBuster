@@ -133,7 +133,7 @@ def main():
     
     # Count bins by phylum
     phylum_counts = all_tax_bin_reports_csv.groupby('Phylum').size().reset_index(name='Bin count')
-    phylum_counts = phylum_counts.sort_values('Bin count', ascending=False)
+    phylum_counts = phylum_counts.sort_values('Bin count', ascending=False, kind='stable')
     
     # Write CSV output
     all_tax_bin_reports_csv.to_csv('MAGs_tax_summary.csv', index=False)

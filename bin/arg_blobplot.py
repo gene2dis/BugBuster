@@ -64,7 +64,7 @@ def main():
     # Calculate total length by ARG class
     arg_class_summary = contig_arg_data.groupby('predicted_ARG_class')['contig_length'].sum().reset_index()
     arg_class_summary.columns = ['predicted_ARG_class', 'length_sum']
-    arg_class_summary = arg_class_summary.sort_values('length_sum', ascending=False)
+    arg_class_summary = arg_class_summary.sort_values('length_sum', ascending=False, kind='stable')
     
     # Determine max number of classes to show (top 9 or all if less)
     max_num_pull = min(9, len(arg_class_summary)) if not all_na else 1
