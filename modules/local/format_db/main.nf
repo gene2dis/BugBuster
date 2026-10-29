@@ -13,7 +13,7 @@ process FORMAT_KRAKEN_DB {
         val(db)
 
     output:
-        path("*")
+        path("k2_ref_db")
 
     script:
         """
@@ -22,8 +22,8 @@ process FORMAT_KRAKEN_DB {
 
     stub:
         """
-        mkdir kraken_db
-        touch kraken_db/hash.k2d kraken_db/opts.k2d kraken_db/taxo.k2d
+        mkdir k2_ref_db
+        touch k2_ref_db/hash.k2d k2_ref_db/opts.k2d k2_ref_db/taxo.k2d
         """
 }
 
@@ -208,7 +208,7 @@ process DOWNLOAD_GTDBTK_DB {
         val(db)
 
     output:
-        path("*")
+        path("gtdbtk_db")
 
     script:
         """

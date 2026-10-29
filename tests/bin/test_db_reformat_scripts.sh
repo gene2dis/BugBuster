@@ -416,7 +416,7 @@ expect_fail "checkm2: tarball without dmnd fails" checkm2_db_reformat.sh "${BASE
 #
 echo "--- gtdb-tk_db_reformat.sh ---"
 expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r232_data.tar.gz"
-check_file "gtdbtk: release files extracted" "release232/markers/marker.txt"
+check_file "gtdbtk: release files extracted" "gtdbtk_db/markers/marker.txt"
 expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
 expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
 
