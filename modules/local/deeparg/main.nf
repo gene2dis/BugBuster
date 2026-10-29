@@ -1,5 +1,7 @@
 process DEEPARG_CONTIGS {
-    container 'quay.io/ffuentessantander/deeparg:1.0.4'
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
+        'https://depot.galaxyproject.org/singularity/deeparg:1.0.4--pyhdfd78af_0' :
+        'quay.io/biocontainers/deeparg:1.0.4--pyhdfd78af_0' }"
 
     tag "${meta.id}"
     label 'process_medium'
@@ -43,6 +45,10 @@ process DEEPARG_CONTIGS {
         export PATH="\$PWD/diamond_wrapper:\$PATH"
         export DEEPARG_DIAMOND_THREADS=${task.cpus}
         export OPENBLAS_NUM_THREADS=${task.cpus} OMP_NUM_THREADS=${task.cpus}
+        # Theano creates its compile cache under \$HOME/.theano: '/' in a
+        # docker task without HOME (not writable), the user's home under
+        # singularity. Keep it in the task directory (design doc Q21)
+        export THEANO_FLAGS="base_compiledir=\$PWD/theano_compiledir"
 
         deeparg predict \\
                 -d ${deeparg_db} \\

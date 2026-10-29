@@ -132,7 +132,9 @@ process FORMAT_GENOMAD_DB {
 
 process DOWNLOAD_DEEPARG_DB {
 
-    container 'quay.io/ffuentessantander/deeparg:1.0.4'
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?
+        'https://depot.galaxyproject.org/singularity/deeparg:1.0.4--pyhdfd78af_0' :
+        'quay.io/biocontainers/deeparg:1.0.4--pyhdfd78af_0' }"
 
     tag "download_deeparg_db"
     label 'process_download'
