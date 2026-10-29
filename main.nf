@@ -851,9 +851,18 @@ workflow {
                     [meta, [files].flatten().find { f -> f.name.endsWith('.out.mapping.ARG') }]
                 })
         )
+        // ARG_FASTA_FORMATTER writes nothing (a missing output) for a sample
+        // without a hit in any bin: keep the samples with at least one hit
+        // (a .mapping.ARG with more than its header line)
         ARG_FASTA_FORMATTER(
             BIN_ARG_SPLIT.out.bin_args
-                .filter { _meta, proteins, _deeparg -> proteins.listFiles().size() > 0 }
+                .filter { meta, _proteins, deeparg ->
+                    def has_hits = deeparg.listFiles().any { f -> f.withReader { reader -> reader.readLine() != null && reader.readLine() != null } }
+                    if ( !has_hits ) {
+                        log.info "No bin-level ARG hits for ${meta.id}: nothing to cluster"
+                    }
+                    has_hits
+                }
         )
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
         CLUSTERING(ch_arg_fasta.collect(sort: true))

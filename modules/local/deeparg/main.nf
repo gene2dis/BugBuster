@@ -29,15 +29,23 @@ process DEEPARG_CONTIGS {
         # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
         # starts one thread per host core whatever the task's CPUs, and the
         # image's OpenBLAS does the same in the classifier. A diamond wrapper
-        # first on PATH adds --threads; deeparg ignores DIAMOND's exit status,
-        # so the real binary must be found here.
+        # first on PATH adds --threads. deeparg ignores DIAMOND's exit status
+        # (a DIAMOND killed for memory gave an empty ARG table and a "successful"
+        # task), so the wrapper records a failure and the task exits with
+        # DIAMOND's status after deeparg (137 is retried with more memory)
         DEEPARG_REAL_DIAMOND=\$(command -v diamond) || { echo "diamond not found" >&2; exit 1; }
         export DEEPARG_REAL_DIAMOND
+        export DEEPARG_DIAMOND_FAILED="\$PWD/diamond_failed"
         mkdir diamond_wrapper
         cat > diamond_wrapper/diamond <<-'END_WRAPPER'
         #!/bin/sh
         case "\$1" in
-            blastp|blastx|view) exec "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS" ;;
+            blastp|blastx|view)
+                "\$DEEPARG_REAL_DIAMOND" "\$@" --threads "\$DEEPARG_DIAMOND_THREADS"
+                status=\$?
+                # keep the first failure: the later 'view' then fails too
+                [ \$status -eq 0 ] || [ -s "\$DEEPARG_DIAMOND_FAILED" ] || echo \$status > "\$DEEPARG_DIAMOND_FAILED"
+                exit \$status ;;
         esac
         exec "\$DEEPARG_REAL_DIAMOND" "\$@"
         END_WRAPPER
@@ -50,13 +58,22 @@ process DEEPARG_CONTIGS {
         # singularity. Keep it in the task directory (design doc Q21)
         export THEANO_FLAGS="base_compiledir=\$PWD/theano_compiledir"
 
+        deeparg_status=0
         deeparg predict \\
                 -d ${deeparg_db} \\
                 --model LS \\
                 --type prot \\
                 $args \\
                 --input ${prefix}_proteins_input.faa \\
-                --out ${prefix}_contigs_deep_arg.out
+                --out ${prefix}_contigs_deep_arg.out || deeparg_status=\$?
+
+        # DIAMOND's status first: deeparg then fails (or not) for lack of its
+        # alignments, and only DIAMOND's 137 says "retry with more memory"
+        if [ -s diamond_failed ]; then
+            echo "ERROR: diamond exited with status \$(cat diamond_failed) inside deeparg predict; its ARG table would be incomplete" >&2
+            exit \$(cat diamond_failed)
+        fi
+        [ \$deeparg_status -eq 0 ] || exit \$deeparg_status
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

@@ -181,9 +181,9 @@ workflow PREPARE_DATABASES {
 
     //
     // Metabuli database for contig-level taxonomy. BLOBTOOLS reads the
-    // taxdump the database was built with (nodes.dmp and names.dmp, at most
-    // one directory down, e.g. refseq_standard's ncbi-taxdump/), so every
-    // taxid Metabuli reports resolves
+    // taxdump the database was built with (nodes.dmp and names.dmp, together
+    // at the top level or in one subdirectory, e.g. refseq_standard's
+    // ncbi-taxdump/), so every taxid Metabuli reports resolves
     //
     if ( flagOn(params.contig_tax_and_arg) ) {
         if ( params.custom_metabuli_db ) {
@@ -192,16 +192,24 @@ workflow PREPARE_DATABASES {
             ch_metabuli_ref = channel.fromList(params.metabuli_ref_db[params.metabuli_db]["url"])
             ch_metabuli_db = FORMAT_METABULI_DB(ch_metabuli_ref).metabuli_db
         }
+        // Both files from one directory: the database's top level, else its
+        // only subdirectory holding both (two candidates is an error, not a
+        // guess: nodes and names of different taxdumps would mismatch)
         ch_metabuli_taxdump = ch_metabuli_db
             .map { db ->
-                def dmp = ['nodes.dmp', 'names.dmp'].collect { name ->
-                    def found = [db.resolve(name)] + (db.listFiles() ?: []).findAll { f -> f.isDirectory() }.collect { d -> d.resolve(name) }
-                    found.find { f -> f.exists() }
+                def has_both = { dir -> dir.resolve('nodes.dmp').exists() && dir.resolve('names.dmp').exists() }
+                def taxdump_dir = has_both.call(db) ? db : null
+                if ( taxdump_dir == null ) {
+                    def subdirs = (db.listFiles() ?: []).findAll { f -> f.isDirectory() && has_both.call(f) }.sort { f -> f.name }
+                    if ( subdirs.size() > 1 ) {
+                        error("ERROR: several taxdumps in the Metabuli database ${db} (${subdirs*.name.join(', ')}): keep only the one the database was built with")
+                    }
+                    taxdump_dir = subdirs ? subdirs[0] : null
                 }
-                if ( dmp.any { f -> f == null } ) {
+                if ( taxdump_dir == null ) {
                     error("ERROR: no nodes.dmp and names.dmp in the Metabuli database ${db} (or one directory down): BlobTools needs the taxdump the database was built with")
                 }
-                dmp
+                [taxdump_dir.resolve('nodes.dmp'), taxdump_dir.resolve('names.dmp')]
             }
     }
 

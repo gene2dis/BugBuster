@@ -465,8 +465,12 @@ next release is tagged.
   sifs), replacing the `quay.io/ffuentessantander` images, which had no
   Dockerfile; the same Python, DIAMOND and library versions inside. DeepARG's
   Theano compile cache is kept in the task directory (the biocontainer has no
-  writable `/.theano`). `DEEPARG_CONTIGS` requests 4 CPUs and 4 GB × attempt
+  writable `/.theano`). `DEEPARG_CONTIGS` requests 4 CPUs and 8 GB × attempt
   (3.2 cores and 0.9 GB used at 8 CPUs)
+- **DeepARG no longer hides a DIAMOND failure**: deeparg ignores DIAMOND's
+  exit status, so a DIAMOND killed for memory gave an empty or partial ARG
+  table in a successful task. `DEEPARG_CONTIGS` now fails with DIAMOND's
+  status (137 is retried with more memory)
 - **ARGs-OAP 3.2.4 → 4.0.0, biocontainer** (`quay.io/biocontainers/args_oap:4.0.0--pyhdfd78af_0`
   and its depot sif, replacing `quay.io/ffuentessantander/args_oap:3.2.4`, which
   had no Dockerfile). 4.0.0 changes no database or pipeline step (it adds an

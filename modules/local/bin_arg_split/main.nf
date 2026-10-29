@@ -2,7 +2,7 @@ process BIN_ARG_SPLIT {
     tag "${meta.id}"
     label 'process_single'
 
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0' :
         'quay.io/biocontainers/mulled-v2-f42a44964bca5225c7860882e231a7b5488b5485:47ef981087c59f79fdbcab4d9d7316e9ac2e688d-0' }"
 
@@ -35,6 +35,8 @@ process BIN_ARG_SPLIT {
     printf '>k141_1_1\\nMK\\n' > ${meta.id}_bins_proteins/${meta.id}_bin1_proteins.faa
     printf '#ARG\\tquery-start\\tquery-end\\tread_id\\tpredicted_ARG-class\\tbest-hit\\tprobability\\tidentity\\talignment-length\\talignment-bitscore\\talignment-evalue\\tcounts\\n' \\
         > ${meta.id}_deeparg_results/${meta.id}_bin1_deep_arg.out.mapping.ARG
+    printf 'ACRA\\t1\\t2\\tk141_1_1\\tmultidrug\\tX|FEATURES|acrA|multidrug|acrA\\t0.99\\t100.0\\t2\\t4.0\\t1e-10\\t1\\n' \\
+        >> ${meta.id}_deeparg_results/${meta.id}_bin1_deep_arg.out.mapping.ARG
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -17,6 +17,8 @@ import gzip
 import os
 import sys
 
+MAX_OPEN = 500
+
 
 def contig_of(gene):
     return gene.rsplit('_', 1)[0]
@@ -41,19 +43,23 @@ def main():
     os.makedirs(prot_dir)
     os.makedirs(arg_dir)
 
+    # The proteins of at most MAX_OPEN bins are written per pass over the FAA,
+    # so a co-assembly with thousands of bins stays under the open-file limit
     opener = gzip.open if faa.endswith('.gz') else open
-    outs = {b: open(os.path.join(prot_dir, f'{sample}_{b}_proteins.faa'), 'w') for b in bins}
     n_proteins = 0
-    with opener(faa, 'rt') as fh:
-        out = None
-        for line in fh:
-            if line.startswith('>'):
-                out = outs.get(contig_bin.get(contig_of(line[1:].split()[0])))
-                n_proteins += out is not None
-            if out is not None:
-                out.write(line)
-    for out in outs.values():
-        out.close()
+    for first in range(0, len(bins), MAX_OPEN):
+        outs = {b: open(os.path.join(prot_dir, f'{sample}_{b}_proteins.faa'), 'w')
+                for b in bins[first:first + MAX_OPEN]}
+        with opener(faa, 'rt') as fh:
+            out = None
+            for line in fh:
+                if line.startswith('>'):
+                    out = outs.get(contig_bin.get(contig_of(line[1:].split()[0])))
+                    n_proteins += out is not None
+                if out is not None:
+                    out.write(line)
+        for out in outs.values():
+            out.close()
 
     with open(mapping) as fh:
         arg_header = fh.readline()
