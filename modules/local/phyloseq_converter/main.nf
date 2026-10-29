@@ -2,10 +2,10 @@ process PHYLOSEQ_CONVERTER {
     tag "$db_name"
     label 'process_single'
     
-    conda "bioconda::bioconductor-phyloseq=1.44.0 conda-forge::r-optparse=1.7"
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
-        'https://depot.galaxyproject.org/singularity/bioconductor-phyloseq:1.46.0--r43hdfd78af_0' :
-        'quay.io/biocontainers/bioconductor-phyloseq:1.46.0--r43hdfd78af_0' }"
+    conda "bioconda::bioconductor-phyloseq=1.54.0"
+    // phyloseq 1.54.0 biocontainer, pinned for every engine: depot.galaxyproject.org
+    // has no 1.54 singularity image (CONTRIBUTING)
+    container 'quay.io/biocontainers/bioconductor-phyloseq:1.54.0--r45hdfd78af_0'
     
     input:
     path(otu_table)

@@ -442,6 +442,10 @@ next release is tagged.
   pandas 2 could be one unit off in the last place, so some values move in
   their 16th-17th significant digit (e.g. ARGs-OAP copies per cell). Tables
   are otherwise unchanged and figures look the same
+- **phyloseq 1.46.0 → 1.54.0** in PHYLOSEQ_CONVERTER
+  (`quay.io/biocontainers/bioconductor-phyloseq:1.54.0--r45hdfd78af_0`, R
+  4.5.2), the docker image for every engine since no 1.54 Singularity image
+  is published; the `.RDS` holds the same object
 - **Databases are stored once and reused across runs (`storeDir`)**: the
   database download and build tasks (`FORMAT_*`, `DOWNLOAD_DEEPARG_DB`,
   `DOWNLOAD_GTDBTK_DB`, `RGI_LOAD`, `SOURMASH_TAX_PREPARE` and the
