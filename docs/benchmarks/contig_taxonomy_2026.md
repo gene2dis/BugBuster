@@ -9,7 +9,7 @@ No pipeline code changed. Every run used dev's own modules (Setup).
 
 **Decision (owner, 2026-10-28):**
 
-- **L2:** Kraken2 on the contigs with `k2_standard`, replacing BLASTN against nt. A GTDB database for Kraken2 was considered and not taken: the local GTDB r220 build needs about 500 GB in memory and has no viruses, plasmid-only sequences or eukaryotes. The registry's `gtdb_220` Kraken2 entry is a database of the same kind (a 415 GB download), so it cannot load within the default `--max_memory` of 128 GB either. sylph does not classify single contigs (it estimates how much of each reference genome is in a sample).
+- **L2:** Kraken2 on the contigs with `k2_standard`, replacing BLASTN against nt. A GTDB database for Kraken2 was considered and not taken: the local GTDB r220 build needs about 500 GB in memory and has no viruses, plasmid-only sequences or eukaryotes. The registry's `gtdb_220` Kraken2 entry is a database of the same kind (a 415 GB download), so it cannot load within the default `--max_memory` of 128 GB either. sylph does not classify single contigs (it estimates how much of each reference genome is in a sample). Revised 2026-10-29: Metabuli replaces Kraken2 on the contigs ([contig classifiers benchmark](contig_classifiers_2026.md)).
 - **M8:** derive the bin-level ARGs from the contig-level DeepARG run; drop PRODIGAL_BINS and DEEPARG_BINS.
 - **Taxdump bug:** fixed together with these changes, not as a separate fix on the development branch.
 

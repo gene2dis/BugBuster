@@ -9,7 +9,7 @@ For each tool: runtime, CPU-seconds, peak memory, database size, contigs classif
 
 **Decision (owner, 2026-10-29):**
 
-- **L5 (c):** Metabuli with `refseq_standard` replaces Kraken2 on the contigs, with `--min-score 0.2 --min-sp-score 0.5` as parameters (those defaults). This revises the L2 decision of 2026-10-28 ([contig taxonomy benchmark](contig_taxonomy_2026.md)): the contig step gets no Kraken2 database parameter and no Kraken2 memory fix. BlobTools stays for the tables and plots, fed Metabuli's per-contig taxids. The read-level Kraken2 is unchanged.
+- **L5 (c):** Metabuli with `refseq_standard` replaces Kraken2 on the contigs, with `--min-score 0.2 --min-sp-score 0.5` as parameters (those defaults). This revises the L2 decision of 2026-10-28 ([contig taxonomy benchmark](contig_taxonomy_2026.md)): the contig step gets no Kraken2 database parameter and no Kraken2 memory fix. BlobTools stays for the tables and plots, fed Metabuli's per-contig taxids. The read-level Kraken2 is unchanged, including its memory problem with the 2026 `k2_standard`.
 - **L6 (d):** geNomad behind its own flag, off by default.
 - **L5 (a):** add the bin and its GTDB-Tk classification as separate columns; the NCBI columns are not filled from them.
 - **Not wired:** (b) Taxometer and (e) RGI's k-mers on contigs. mob-suite and platon were not run.
@@ -19,7 +19,7 @@ For each tool: runtime, CPU-seconds, peak memory, database size, contigs classif
 - **(c) Metabuli: the one new classifier worth wiring, and a candidate to replace Kraken2 on the contigs.** It needs 5–12 GB of memory with `--max-ram 32` against Kraken2's 103 GB, with the same calls at every `--max-ram` tried (32, 64 and 128 GiB). It takes about the same CPU time (443–942 CPU-s per assembly against Kraken2's 221–1,393), and its database is the same size on disk (110 GB, an 80 GB download, against 104 GB). It gives a genus to more contigs: 73.9 % of all contigs against Kraken2's 62.1 %, and 236 of the 317 ARG-bearing contigs against 190, with `--min-score 0.2 --min-sp-score 0.5`. The trade-off is precision: where BLAST also names one, its genera agree with BLAST on 91.8 % of the ARG-bearing contigs (Kraken2: 95.2 %) and its species on 77.7 % (Kraken2: 88.8 %). Without score cutoffs it classifies 97 % of contigs, but its low-score calls are mostly wrong (below 0.5, species agree with BLAST 15–44 % of the time), so the cutoffs are needed. They were chosen on these four samples with BLAST as the reference, so the agreement figures at those cutoffs are an upper bound. Its database also has protozoa and fungi (Kraken2's PlusPF genome set): 442 contigs are *Trichomonas*, a trichomonad that BLAST confirms and Kraken2's standard database cannot name.
 - **(a) Bin inheritance: add the bin and its GTDB classification as separate columns, without filling the NCBI columns from them.** It costs nothing new (GTDB-Tk already runs when binning is on) and labels 18 % of the contigs of A–C, including 173 of their 311 ARG-bearing contigs. When the GTDB and NCBI genera agree, the higher ranks differ on many contigs only because the two taxonomies place the same genus differently (when the genus is the same, the family still differs on 36.5 % of contigs). The labels are least reliable where they would help most: on binned contigs Kraken2 gives no genus, the bin's genus agrees with BLAST for 119 of 347.
 - **(b) Taxometer: do not wire.** It labels almost every contig, but its additions do not hold up: of the genera it adds where Kraken2 had none, 30 % agree with BLAST (35 % at score ≥ 0.95). Of the 12 labels it changes that BLAST can check, 11 match Kraken2's original label. It cannot predict what its input barely contains, so the eukaryotic and phage contigs Kraken2 leaves unclassified become Bacteria.
-- **(d) geNomad: worth adding as columns, and as an ARGs-on-plasmids/phages summary, if 1.1–5.5 CPU-h per assembly is acceptable.** 34 of the 317 ARG-bearing contigs (50 of 403 ARG genes) are plasmid calls, 1 is a virus, and 2 more ARG genes lie inside proviruses. Several of the "plasmid" ARGs (tetM, ermG–mefA–mel, cfxA2) usually sit on integrative conjugative elements or transposons, which geNomad has no class for. geNomad explains a large part of the superkingdom disagreements between Kraken2 and BLAST (phage contigs: 41 of 88 in C, 7 of 18 in D), but not the contigs Kraken2 leaves unclassified (2.7–6.8 % of those are plasmid or virus calls).
+- **(d) geNomad: worth adding as columns, and as an ARGs-on-plasmids/phages summary, if 1.1–5.5 CPU-h per assembly is acceptable.** 34 of the 317 ARG-bearing contigs (50 of 403 ARG genes) are plasmid calls, 1 is a virus, and 2 more ARG genes lie inside proviruses. Several of the "plasmid" ARGs (tetM, ermG–mefA–mel, cfxA2) usually sit on integrative conjugative elements or transposons, which geNomad has no class for. geNomad explains part of the superkingdom disagreements between Kraken2 and BLAST (phage contigs: 58 of 143 in C, 13 of 28 in D), but not the contigs Kraken2 leaves unclassified (2.7–6.8 % of those are plasmid or virus calls).
 - **(e) RGI pathogen-of-origin k-mers on contigs: do not wire.** `rgi kmer_query` needs RGI's own hits (`rgi main` on the contigs), and those cover 78 of the 317 ARG-bearing contigs. 44 of its 84 predictions name no taxon; where they do, the genus is what the taxonomy tools already say (33 of 33 with Kraken2). It never calls a gene plasmid-only: 55 of 84 are "chromosome or plasmid".
 
 ## Summary
@@ -29,10 +29,10 @@ For each tool: runtime, CPU-seconds, peak memory, database size, contigs classif
 | (c) Metabuli cost | 59–100 s, 443–942 CPU-s per assembly at 16 threads; 5.3–12.3 GB anon at `--max-ram 32`, 16–23 GB at the default 128; database 110 GB (80 GB download). Kraken2 (9a): 221–1,393 CPU-s, 103 GB | Metabuli fits `process_medium` with no retry |
 | (c) Metabuli results, all contigs | genus: 39,971 of 54,080 contigs (73.9 %) with the cutoffs, 47,590 without; Kraken2 33,570 (62.1 %). Genus agrees with Kraken2 on 99.4 % of contigs both classify | Metabuli, with `--min-score 0.2 --min-sp-score 0.5` |
 | (c) Metabuli results, ARG-bearing contigs (317) | genus 236 (Kraken2 190, BLAST 278); agrees with BLAST at genus 202/220, species 129/166 (Kraken2 178/187, 111/125) | as above, with the trade-off stated |
-| (a) Bin inheritance | 9,348 of 51,990 contigs of A–C binned, 173 of 311 ARG-bearing; GTDB vs Kraken2 genus 94.7 %; on binned contigs without a Kraken2 genus, 119 of 347 agree with BLAST | separate `bin` and GTDB columns |
+| (a) Bin inheritance | 9,348 of 52,002 contigs of A–C binned, 173 of 311 ARG-bearing; GTDB vs Kraken2 genus 94.7 %; on binned contigs without a Kraken2 genus, 119 of 347 agree with BLAST | separate `bin` and GTDB columns |
 | (b) Taxometer | 98–278 s, 850–3,202 CPU-s, < 0.8 GB; added genera 559 of 1,875 agree with BLAST; changed labels 1 of 12 | do not wire |
-| (d) geNomad | 346–2,014 s, 3,927–19,730 CPU-s, 17–18 GB; database 2.2 GB (0.84 GB download). ARG-bearing contigs: 34 plasmid, 1 virus, 2 ARG genes in proviruses | add, if the cost is accepted |
-| (e) RGI k-mers | 259–501 s, 271–539 CPU-s, 16.5 GB (the k-mer database load); RGI hits on 78 of 317 contigs; 40 of 84 k-mer predictions name a taxon | do not wire |
+| (d) geNomad | 346–2,014 s, 3,927–19,730 CPU-s, 17.4–18.4 GB; database 2.2 GB (0.84 GB download). ARG-bearing contigs: 34 plasmid, 1 virus, 2 ARG genes in proviruses | add, if the cost is accepted |
+| (e) RGI k-mers | 259–501 s, 271–539 CPU-s, 16.5–16.8 GB (the k-mer database load); RGI hits on 78 of 317 contigs; 40 of 84 k-mer predictions name a taxon | do not wire |
 | mob-suite, platon | not run: geNomad left no gap the decision needs (see (d)) | an option for 9b if plasmid replicon types are wanted |
 
 The rest of this document gives the measurements behind each row.
@@ -48,7 +48,7 @@ The rest of this document gives the measurements behind each row.
 | C | 10,542 | 36.6 | 6 (2,390) | 37 (41) |
 | D | 2,078 | 3.7 | none | 6 (6) |
 
-**Reference for agreement.** BLASTN against nt with BlobTools (the contig taxonomy benchmark's runs) covers every contig of C and D and the ARG-bearing contigs of A and B. BLAST is a reference, not the truth: on the contigs Kraken2 cannot classify, its best hit is often a distant relative (below 82–85 % identity for a tenth of the ARG-bearing contigs). All NCBI names are compared on 2026 taxdumps: Kraken2's and BlobTools' (the k2_standard taxdump, June 2026) and Metabuli's (April 2026). 32 contigs whose Metabuli and Kraken2 genera differ only because a phage genus was renamed between the two dumps are counted as disagreements in the tables and noted where it matters. BlobTools' superkingdom is derived from its phylum through the June 2026 taxdump, because BlobTools 1.1.1 writes `undef` there with the 2026 taxdump (the contig taxonomy benchmark used the March 2024 taxdump's column instead, so its superkingdom counts differ slightly). BlobTools has no class rank.
+**Reference for agreement.** BLASTN against nt with BlobTools (the contig taxonomy benchmark's runs) covers every contig of C and D and the ARG-bearing contigs of A and B. BLAST is a reference, not the truth: on the contigs Kraken2 cannot classify, its best hit is often a distant relative (below 82–85 % identity for a tenth of the ARG-bearing contigs). All NCBI names are compared on 2026 taxdumps: Kraken2's and BlobTools' (the k2_standard taxdump, June 2026) and Metabuli's (April 2026). 32 contigs whose Metabuli and Kraken2 genera differ only because a phage genus was renamed between the two dumps are counted as disagreements in the tables and noted where it matters. BlobTools' superkingdom is derived from its phylum through the June 2026 taxdump (or, for a hit with no phylum such as "Bacteriophage sp." or "uncultured bacterium", from its lowest named rank), because BlobTools 1.1.1 writes `undef` there with the 2026 taxdump (the contig taxonomy benchmark used the March 2024 taxdump's column instead, so its superkingdom counts differ slightly). BlobTools has no class rank.
 
 **Tools.** Every tool ran in its biocontainer under Docker, with 16 threads unless stated, outside Nextflow, so that time and memory could be measured from the container's cgroup:
 
@@ -82,7 +82,7 @@ The rest of this document gives the measurements behind each row.
 - **Metabuli honours `--max-ram`, and the cap costs nothing here.** The calls were identical, row for row, at 32, 64 and 128 GiB, and the capped runs were no slower. Metabuli does not hold its 110 GB database in memory; it reads it from disk in parts.
 - **CPU time is close to Kraken2's, for a different reason.** Kraken2's CPU-s are almost all the load of its 103 GB hash (classification itself took 1–6 s), so they shrink when the hash is in the page cache. Metabuli's grow with the assembly (443 CPU-s for 3.7 Mbp, 911 for 117.8 Mbp).
 - **Memory is the difference:** at `--max-ram 32` Metabuli fits `process_medium` (8 CPUs, 36 GB) on the first attempt, where Kraken2 needs the 144 GB retry of `process_high`, clamped to `--max_memory`.
-- Database: 110 GB on disk (`diffIdx` 52 GB, `info` 64 GB, taxonomy 0.8 GB); the download is 80 GB.
+- Database: 110 GB on disk (`diffIdx` 48.4 GB, `info` 59.8 GB, taxonomy 0.7 GB); the download is 80 GB.
 
 ### Contigs classified
 
@@ -90,7 +90,7 @@ Contigs given a name at each rank, of all contigs:
 
 | Rank | A: Kraken2 / Metabuli with cutoffs / without | B | C (and BLAST) | D (and BLAST) |
 |---|---|---|---|---|
-| Superkingdom | 17,525 / 20,031 / 24,737 | 11,225 / 12,277 / 15,659 | 8,380 / 9,006 / 10,307 (9,363) | 943 / 1,307 / 1,987 (1,364) |
+| Superkingdom | 17,525 / 20,031 / 24,737 | 11,225 / 12,277 / 15,659 | 8,380 / 9,006 / 10,307 (9,531) | 943 / 1,307 / 1,987 (1,392) |
 | Genus | 15,608 / 18,859 / 22,435 | 9,381 / 11,274 / 13,794 | 7,840 / 8,681 / 9,681 (8,938) | 741 / 1,157 / 1,680 (1,239) |
 | Species | 12,521 / 14,875 / 20,283 | 7,370 / 9,009 / 12,242 | 6,725 / 7,566 / 8,793 (9,553) | 677 / 757 / 1,519 (1,394) |
 
@@ -111,7 +111,7 @@ ARG-bearing contigs of all four samples (317), where both tools name the rank:
 
 | Rank | Kraken2 vs BLAST | Metabuli with cutoffs vs BLAST | Metabuli without cutoffs vs BLAST | Metabuli with cutoffs vs Kraken2 |
 |---|---|---|---|---|
-| Superkingdom | 252/254 | 268/270 | 300/307 | 252/252 |
+| Superkingdom | 254/256 | 271/273 | 303/311 | 252/252 |
 | Phylum | 233/239 | 259/264 | 289/300 | 235/237 |
 | Order | 204/210 | 228/248 | 248/276 | 204/208 |
 | Family | 191/201 | 216/235 | 227/257 | 196/198 |
@@ -125,9 +125,9 @@ All contigs of C and D (BLAST covers them all): genus agrees with BLAST on 98.2 
 
 **Metabuli against Kraken2.** Where both name a genus, they agree on 33,108 of 33,317 contigs (99.4 %). 32 of the other 209 are one phage genus renamed between the two taxdumps (*Taduhovirus* → *Aurodevirus*, same taxid). The rest are different calls: *Prevotella* against *Segatella* (17), *Flavonifractor* against *Dysosmobacter* (8), *Bacteroides* against *Phocaeicola* or *Parabacteroides* (13), and smaller sets.
 
-**Eukaryotes.** With the cutoffs Metabuli calls 543 contigs eukaryotic: 442 *Trichomonas vaginalis* (0.88 Mbp; 270 in C, 106 in A, 50 in B, 16 in D) and 99 *Homo sapiens*. Kraken2 names 109 contigs human and none trichomonad. BLAST ran on 286 of the trichomonad contigs: its best hit is *T. vaginalis* for 250, and the other 36 have no BLAST species. That makes them trichomonad DNA, not necessarily that species. This is the genome set, not the tool: k2_standard has no protozoa or fungi, and Kraken2's PlusPF database (not on the server) would include them.
+**Eukaryotes.** With the cutoffs Metabuli calls 543 contigs eukaryotic: 442 *Trichomonas vaginalis* (0.88 Mbp; 270 in C, 106 in A, 50 in B, 16 in D), 2 more named only *Trichomonas*, and 99 *Homo sapiens*. Kraken2 names 109 contigs human and none trichomonad. BLAST ran on 286 of the trichomonad contigs: its best hit is *T. vaginalis* for 250, and the other 36 have no BLAST species. That makes them trichomonad DNA, not necessarily that species. This is the genome set, not the tool: k2_standard has no protozoa or fungi, and Kraken2's PlusPF database (not on the server) would include them.
 
-**Phage contigs.** Metabuli does no better than Kraken2 on the 1,448 contigs geNomad calls viral: with the cutoffs it names 916 Bacteria, 41 Viruses and 31 Eukaryota, and leaves 455 unclassified (Kraken2: 830 Bacteria, 41 Viruses, 572 unclassified).
+**Phage contigs.** Metabuli does no better than Kraken2 on the 1,448 contigs geNomad calls viral: with the cutoffs it names 916 Bacteria, 41 Viruses, 31 Eukaryota and 5 Archaea, and leaves 455 unclassified (Kraken2: 830 Bacteria, 41 Viruses, 5 Archaea, 572 unclassified).
 
 ## (a) Bin inheritance (GTDB-Tk, GTDB r232)
 
@@ -166,7 +166,7 @@ Taxometer's labels against its input (Kraken2), all four samples, at its default
 
 On the ARG-bearing contigs, Taxometer adds a genus to 120 (0.5) or 74 (0.95), and 29 of 85 and 25 of 55 of those agree with BLAST.
 
-- **Its additions are a guess from the sample's own labelled contigs.** It can only predict labels that are frequent in its input. Of its superkingdom additions that BLAST can check, 510 of 1,601 disagree, and 509 of those are contigs BLAST calls eukaryotic (246, mostly the trichomonad) or viral (263), which Taxometer calls Bacteria (503), Archaea (4) or Eukaryota (2).
+- **Its additions are a guess from the sample's own labelled contigs.** It can only predict labels that are frequent in its input. Of its superkingdom additions that BLAST can check, 603 of 1,715 disagree, and 602 of those are contigs BLAST calls eukaryotic (246, mostly the trichomonad) or viral (356), which Taxometer calls Bacteria (593), Eukaryota (5) or Archaea (4).
 - **On the same hard contigs Metabuli does better.** Contigs of C and D without a Kraken2 genus but with a BLAST genus: Taxometer's genus agrees on 195 of 517 (D) and 341 of 1,291 (C), Metabuli with the cutoffs on 209 of 306 and 516 of 698.
 - **Its changes are almost always wrong where they can be checked**, and they are few.
 
@@ -193,11 +193,11 @@ Classes on the 34 ARG-bearing plasmid contigs (a contig counts once per class): 
 
 **"Plasmid" includes other mobile elements.** tetM, ermG–mefA–mel and cfxA2 are typically carried on integrative conjugative elements and transposons (Tn916-like, CTnDOT-like, MTn4555-like), and geNomad has no class for those: a contig with a conjugation module scores as plasmid. So read "plasmid" as "mobile element, probably plasmid". Replicon typing (mob-suite) could separate true plasmids, but whether to add geNomad does not depend on it, so it was not run.
 
-**Virus taxonomy** is ICTV's, not NCBI's: 1,329 of the 1,448 virus calls are *Caudoviricetes* (tailed phages), 33 *Herviviricetes*, 76 unclassified.
+**Virus taxonomy** is ICTV's, not NCBI's: 1,329 of the 1,448 virus calls are *Caudoviricetes* (tailed phages), 33 *Herviviricetes*, 9 in four other classes (5 *Faserviricetes*, filamentous phages), and 77 have no class (76 unclassified).
 
 ### Against the taxonomy results
 
-- **Disagreements between Kraken2 and BLAST** (C and D, all contigs): at superkingdom, 41 of 88 in C and 7 of 18 in D are virus calls; at genus, 26 of 115 in C (17 plasmid, 9 virus) and 1 of 34 in D. Phage contigs carry genes shared with their hosts, so one tool calls the host and the other the phage.
+- **Disagreements between Kraken2 and BLAST** (C and D, all contigs): at superkingdom, 58 of 143 in C and 13 of 28 in D are virus calls; at genus, 26 of 115 in C (17 plasmid, 9 virus) and 1 of 34 in D. Phage contigs carry genes shared with their hosts, so one tool calls the host and the other the phage.
 - **Contigs Kraken2 leaves unclassified are mostly chromosomal:** plasmid or virus calls are 2.7 % of them in D (31 of 1,134), 6.8 % in C (147 of 2,159), 3.5 % in B and 4.2 % in A. They are chromosomal DNA of genomes not in the database, not unclassified mobile elements.
 - **Classifiers call phages Bacteria.** Of the 1,448 virus calls, Kraken2 names 41 as Viruses and 830 as Bacteria; Metabuli the same 41 and 916. Both databases contain phages within bacterial genomes (prophages), and for most phage contigs that is the nearest reference.
 
@@ -220,12 +220,12 @@ mob-suite and platon (both local) were not run: geNomad answered the question th
 
 All changes would go into Phase 9b, with L2 and M8. The owner chose (c) as the replacement for Kraken2, (d) behind a flag and (a) (Decision, above).
 
-**(c) Metabuli on the contigs**, replacing Kraken2 there, or alongside it:
+**(c) Metabuli on the contigs**, replacing Kraken2 there (the owner's decision):
 - Process: a local METABULI_CLASSIFY module (no nf-core module), `classify --seq-mode 3 --lineage 1 --threads ${task.cpus} --max-ram` from the task's memory (32 for `process_medium`'s 36 GB), `--min-score` and `--min-sp-score` as parameters (defaults 0.2 and 0.5), image `metabuli:1.2.0--pl5321h0bb26bb_0`. `process_medium` at 8 CPUs would take about twice the wall time measured here at 16.
 - Database: a `metabuli_ref_db` registry entry (`refseq_standard`, 80 GB download, 110 GB unpacked; `gtdb232`, 634 GB download, 744 GB unpacked, not measured) and `--custom_metabuli_db`.
 - Columns in `Contig_tax_and_arg_prediction.tsv`: the seven ranks from Metabuli's lineage (with class, which BlobTools lacks), plus `taxonomy_rank` and `taxonomy_score`. BlobTools' tables and plots would take Metabuli's per-contig taxid as their hits file, as planned for Kraken2.
 - Summary: classified contigs per rank per sample, and the share of eukaryotic and unclassified contigs.
-- If Metabuli replaces Kraken2 on the contigs, the 9b memory fix for KRAKEN2 on contigs is no longer needed, and the read-level KRAKEN2 keeps its own database.
+- With Metabuli replacing Kraken2 on the contigs, KRAKEN2 needs no memory fix for the contigs. The read-level KRAKEN2 keeps its own database, and its memory problem with the 2026 `k2_standard` ([contig taxonomy benchmark](contig_taxonomy_2026.md)) is not solved by this.
 
 **(a) Bin inheritance:**
 - No new tool: a step after GTDB-Tk (when `--include_binning` is on) joins bin membership (the bin FASTA headers, already used by the M8 change) with GTDB-Tk's summary.
