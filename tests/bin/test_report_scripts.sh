@@ -483,6 +483,58 @@ cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.t
 NEXT_WORKDIR="${ACR_NOTAX}"
 expect_fail "arg_contig_level_report: no Metabuli file fails" arg_contig_level_report.py
 
+#
+# bin_contig_labels.py + the report's bin columns (Phase 9b, L5 a): contig ->
+# refined bin -> the bin's GTDB-Tk string, untouched; a contig in two bins
+# counts once (first bin, warning); a bin GTDB-Tk has no row for keeps an
+# empty classification; a bins dir with only a marker gives a header.
+#
+echo "--- bin_contig_labels.py ---"
+BCL_WORK="${WORK}/bin_contig_labels"
+mkdir -p "${BCL_WORK}/test_sample2_binette_bins" "${BCL_WORK}/empty_bins"
+printf ">k141_0 flag=1\nACGT\n>k141_820\nACGT\n" > "${BCL_WORK}/test_sample2_binette_bins/binette_bin1.fa"
+printf ">k141_231\nACGT\n>k141_0\nACGT\n" > "${BCL_WORK}/test_sample2_binette_bins/binette_bin2.fa"
+touch "${BCL_WORK}/empty_bins/SKIPPED.txt"
+printf "user_genome\tclassification\tclosest_genome_reference\nbinette_bin1\td__Bacteria;p__Pseudomonadota;c__Gammaproteobacteria;o__Pseudomonadales;f__Moraxellaceae;g__Acinetobacter;s__Acinetobacter baumannii\tGCF_009035845.1\n" \
+    > "${BCL_WORK}/test_sample2_gtdbtk_bac120.tsv"
+printf "user_genome\tclassification\n" > "${BCL_WORK}/test_sample2_gtdbtk_ar53.tsv"
+NEXT_WORKDIR="${BCL_WORK}"
+expect_pass "bin_contig_labels: contig to bin to GTDB-Tk table" bin_contig_labels.py test_sample2 test_sample2_binette_bins \
+    test_sample2_gtdbtk_bac120.tsv test_sample2_gtdbtk_ar53.tsv
+check_grep "bin_contig_labels: header" "test_sample2_contig_bins.tsv" "^contig	bin	bin_gtdb_classification$"
+check_grep "bin_contig_labels: GTDB string untouched" "test_sample2_contig_bins.tsv" \
+    "^k141_0	binette_bin1	d__Bacteria;p__Pseudomonadota;.*;s__Acinetobacter baumannii$"
+check_grep "bin_contig_labels: bin without a GTDB-Tk row keeps an empty classification" "test_sample2_contig_bins.tsv" \
+    "^k141_231	binette_bin2	$"
+check_grep "bin_contig_labels: contig in two bins warned" "../bin_contig_labels.log" "contig k141_0 of bin binette_bin2 is already in bin binette_bin1"
+if [ "$(grep -c '^k141_0	' "${BCL_WORK}/test_sample2_contig_bins.tsv")" = "1" ]; then
+    echo "✓ bin_contig_labels: a shared contig counts once"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_contig_labels: a shared contig counts once"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BCL_WORK}"
+expect_pass "bin_contig_labels: marker-only bins dir" bin_contig_labels.py sampleempty empty_bins
+if [ "$(cat "${BCL_WORK}/sampleempty_contig_bins.tsv")" = "contig	bin	bin_gtdb_classification" ]; then
+    echo "✓ bin_contig_labels: marker-only bins dir gives a header-only table"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_contig_labels: marker-only bins dir gives a header-only table"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BCL_WORK}"
+expect_fail "bin_contig_labels: a file that is not a GTDB-Tk summary fails" bin_contig_labels.py test_sample2 \
+    test_sample2_binette_bins test_sample2_binette_bins/binette_bin1.fa
+ACB_WORK="${WORK}/arg_contig_level_report_bins"
+mkdir -p "${ACB_WORK}"
+cp "${ACR_WORK}"/test_sample2_* "${BCL_WORK}/test_sample2_contig_bins.tsv" "${ACB_WORK}/"
+rm -f "${ACB_WORK}/Contig_tax_and_arg_prediction.tsv"
+NEXT_WORKDIR="${ACB_WORK}"
+expect_pass "arg_contig_level_report: with bin tables" arg_contig_level_report.py
+check_grep "arg_contig_level_report: bin columns after the NCBI ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	phylum	class	order	family	genus	species	taxonomy_rank	taxonomy_score	bin	bin_gtdb_classification	ARG_gene	"
+check_grep "arg_contig_level_report: binned contig keeps its Metabuli ranks and gets the GTDB string" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	Acinetobacter baumannii	species	0.95811	binette_bin1	d__Bacteria;.*;s__Acinetobacter baumannii	ACRA	"
+check_grep "arg_contig_level_report: unbinned contig has empty bin columns" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	.*	unclassified	0.0			"
+
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "${FAIL}" -eq 0 ]

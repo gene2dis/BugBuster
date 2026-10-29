@@ -3,7 +3,10 @@
 ARG Contig Level Report Generator
 Joins, per contig, the BlobTools table (length, GC, coverage), Metabuli's
 classification (seven ranks from its lineage, the rank it called at and its
-score) and the DeepARG predictions. Python migration of Contig_arg_unify.R
+score) and the DeepARG predictions. With binning, the contig's refined bin
+and that bin's GTDB-Tk classification (<sample>_contig_bins.tsv) come as two
+more columns, next to the NCBI ranks and never filling them. Python
+migration of Contig_arg_unify.R
 """
 
 import pandas as pd
@@ -87,6 +90,19 @@ def main():
         ignore_index=True)
     all_blob_reports = all_blob_reports.merge(all_tax, on=['Sample', 'contig_name'], how='left')
 
+    # Bin membership and the bin's GTDB-Tk classification (binning on)
+    bin_files = glob.glob('*_contig_bins.tsv')
+    bin_cols = []
+    if bin_files:
+        bins = pd.concat(
+            [pd.read_csv(f, sep='\t', dtype=str, keep_default_na=False).assign(Sample=f[:-len('_contig_bins.tsv')])
+             for f in bin_files],
+            ignore_index=True).rename(columns={'contig': 'contig_name'})
+        all_blob_reports = all_blob_reports.merge(
+            bins[['Sample', 'contig_name', 'bin', 'bin_gtdb_classification']],
+            on=['Sample', 'contig_name'], how='left')
+        bin_cols = ['bin', 'bin_gtdb_classification']
+
     # Read DeepARG files
     deeparg_files = glob.glob('*_contigs_deep_arg.out.mapping.ARG')
     if not deeparg_files:
@@ -127,7 +143,8 @@ def main():
     all_data = all_data[[
         'Sample', 'contig_name', 'contig_length', 'GC', 'coverage'
     ] + RANKS + [
-        'taxonomy_rank', 'taxonomy_score',
+        'taxonomy_rank', 'taxonomy_score'
+    ] + bin_cols + [
         'ARG_gene', 'predicted_ARG_class', 'best_hit', 'probability',
         'identity', 'alignment_evalue', 'counts'
     ]]

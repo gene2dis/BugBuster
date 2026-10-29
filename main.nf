@@ -168,6 +168,7 @@ include { DEEPARG_BINS             } from './modules/local/deeparg/main'
 include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
+include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
@@ -556,6 +557,7 @@ workflow {
     ch_bam_meta      = channel.empty()
     ch_counting_bam  = channel.empty()
     ch_refined_bins  = channel.empty()
+    ch_contig_bins   = channel.empty()   // [meta, <id>_contig_bins.tsv] when binning is on
 
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
@@ -581,6 +583,23 @@ workflow {
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)
+
+            //
+            // MODULE: contig -> bin -> the bin's GTDB-Tk classification, for
+            // the bin columns of the contig report and the bin-level ARG
+            // split (Phase 9b, L5 a / M8). A sample GTDB-Tk has no report for
+            // gets an empty classification column
+            //
+            if ( flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering) ) {
+                BIN_CONTIG_LABELS(
+                    ch_refined_bins
+                        .join(BINNING.out.gtdbtk, remainder: true)
+                        .filter { _meta, bins, _reports -> bins != null }
+                        .map { meta, bins, reports -> [meta, bins, reports ?: []] }
+                )
+                ch_contig_bins = BIN_CONTIG_LABELS.out.labels
+                ch_versions = ch_versions.mix(BIN_CONTIG_LABELS.out.versions.first())
+            }
         }
     }
 
@@ -746,7 +765,8 @@ workflow {
             ch_contig_args.only_deeparg
                 .concat(
                     ch_blob_table.only_blob,
-                    METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls }
+                    METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls },
+                    ch_contig_bins.map { _meta, labels -> labels }
                 )
                 .collect(sort: true)
         )
