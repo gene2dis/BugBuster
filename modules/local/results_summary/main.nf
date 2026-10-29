@@ -99,6 +99,8 @@ process RESULTS_SUMMARY {
                 dest=${run_dir}/07_functional_annotation/summary ;;
             *.ags.tsv)
                 dest=${run_dir}/07_functional_annotation/microbecensus/\${name%.ags.tsv} ;;
+            Contig_tax_and_arg_prediction.tsv)
+                dest=${run_dir}/05_arg_prediction/contig_level/summary ;;
             *)
                 echo "WARNING: RESULTS_SUMMARY does not read \$name; skipped" >&2
                 continue ;;

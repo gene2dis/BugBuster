@@ -27,6 +27,13 @@
                             "modules"
                         ]
                     },
+                    "genomad/endtoend": {
+                        "branch": "master",
+                        "git_sha": "7b3452a23773f687ededb4befd037920e5a51341",
+                        "installed_by": [
+                            "modules"
+                        ]
+                    },
                     "kraken2/kraken2": {
                         "branch": "master",
                         "git_sha": "d67d33d5925fcec4691b499670fa2bd926fd2be5",

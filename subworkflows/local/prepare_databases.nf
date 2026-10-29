@@ -11,6 +11,7 @@ include { FORMAT_KRAKEN_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_SYLPH_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_SYLPH_TAXONOMY   } from '../../modules/local/format_db/main'
 include { FORMAT_METABULI_DB      } from '../../modules/local/format_db/main'
+include { FORMAT_GENOMAD_DB       } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
@@ -40,6 +41,7 @@ workflow PREPARE_DATABASES {
     ch_deeparg_db       = channel.empty()
     ch_metabuli_db      = channel.empty()
     ch_metabuli_taxdump = channel.empty()
+    ch_genomad_db       = channel.empty()
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
     ch_rgi_card_db      = channel.empty()
@@ -204,6 +206,18 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // geNomad database for plasmid / virus classification of the contigs
+    // (pinned release; geNomad's own download-database floats to the latest)
+    //
+    if ( flagOn(params.genomad_prediction) ) {
+        if ( params.custom_genomad_db ) {
+            ch_genomad_db = channel.fromPath(params.custom_genomad_db, type: 'dir', checkIfExists: true)
+        } else {
+            ch_genomad_db = FORMAT_GENOMAD_DB(channel.of(params.genomad_db)).genomad_db
+        }
+    }
+
+    //
     // GTDB-TK and CheckM2 databases for binning
     //
     if ( flagOn(params.include_binning) ) {
@@ -365,6 +379,7 @@ workflow PREPARE_DATABASES {
     deeparg_db             = ch_deeparg_db
     metabuli_db            = ch_metabuli_db
     metabuli_taxdump       = ch_metabuli_taxdump     // [nodes.dmp, names.dmp] of the Metabuli database
+    genomad_db             = ch_genomad_db
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db

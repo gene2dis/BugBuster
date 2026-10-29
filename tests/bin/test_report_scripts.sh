@@ -535,6 +535,60 @@ check_grep "arg_contig_level_report: binned contig keeps its Metabuli ranks and 
 check_grep "arg_contig_level_report: unbinned contig has empty bin columns" "Contig_tax_and_arg_prediction.tsv" \
     "^test_sample2	k141_456	.*	unclassified	0.0			"
 
+#
+# arg_contig_level_report.py with geNomad (Phase 9b, L6 d): synthetic geNomad
+# 1.13.0 summaries (real column layout) for three contigs: k141_820 a plasmid
+# (MOBQ), k141_231 a virus, k141_0 a chromosome contig with a provirus at
+# 200-900 that overlaps its gene k141_0_1 (1-397) but not k141_0_2
+# (1000-1150); gene coordinates from a Pyrodigal-style GFF. Empty geNomad
+# files (stub outputs) still give the columns.
+#
+echo "--- arg_contig_level_report.py (geNomad) ---"
+ACG_WORK="${WORK}/arg_contig_level_report_genomad"
+mkdir -p "${ACG_WORK}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_classifications.tsv" "${ACG_WORK}/"
+{
+    cat "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG"
+    printf "TETM\t1\t50\tk141_0_2\ttetracycline\tX|FEATURES|tetM|tetracycline|tetM\t0.99\t99.0\t50\t100.0\t1e-20\t1\n"
+    printf "MEFA\t1\t50\tk141_820_1\tmacrolide-lincosamide-streptogramin\tX|FEATURES|mefA|MLS|mefA\t0.98\t98.0\t50\t100.0\t1e-20\t1\n"
+    printf "BCRA\t1\t50\tk141_231_1\tbacitracin\tX|FEATURES|bcrA|bacitracin|bcrA\t0.97\t97.0\t50\t100.0\t1e-20\t1\n"
+} > "${ACG_WORK}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+printf "seq_name\tchromosome_score\tplasmid_score\tvirus_score\nk141_0\t0.9500\t0.0300\t0.0200\nk141_820\t0.0100\t0.9800\t0.0100\nk141_231\t0.0100\t0.0100\t0.9800\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_aggregated_classification.tsv"
+printf "seq_name\tlength\ttopology\tn_genes\tgenetic_code\tplasmid_score\tfdr\tn_hallmarks\tmarker_enrichment\tconjugation_genes\tamr_genes\nk141_820\t1015\tNo terminal repeats\t2\t11\t0.9800\tNA\t1\t5.0\tMOBQ\tNA\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_plasmid_summary.tsv"
+printf "seq_name\tlength\ttopology\tcoordinates\tn_genes\tgenetic_code\tvirus_score\tfdr\tn_hallmarks\tmarker_enrichment\ttaxonomy\nk141_231\t1018\tNo terminal repeats\tNA\t2\t11\t0.9800\tNA\t2\t6.4\tViruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;\nk141_0|provirus_200_900\t701\tProvirus\t200-900\t1\t11\t0.9000\tNA\t1\t3.0\tViruses;Duplodnaviria;;;;;\n" \
+    > "${ACG_WORK}/test_sample2_filtered_contigs_virus_summary.tsv"
+printf "##gff-version  3\nk141_0\tpyrodigal_v3.7.1\tCDS\t1\t397\t50.0\t+\t0\tID=k141_0_1;partial=10;\nk141_0\tpyrodigal_v3.7.1\tCDS\t1000\t1150\t50.0\t+\t0\tID=k141_0_2;partial=00;\nk141_820\tpyrodigal_v3.7.1\tCDS\t10\t300\t50.0\t+\t0\tID=k141_820_1;\nk141_231\tpyrodigal_v3.7.1\tCDS\t10\t300\t50.0\t-\t0\tID=k141_231_1;\n" \
+    | gzip > "${ACG_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACG_WORK}"
+expect_pass "arg_contig_level_report: with geNomad tables" arg_contig_level_report.py
+check_grep "arg_contig_level_report: geNomad columns before the ARG columns" "Contig_tax_and_arg_prediction.tsv" \
+    "	taxonomy_score	mobile_class	plasmid_score	virus_score	provirus	virus_taxonomy	plasmid_conjugation_genes	ARG_gene	"
+check_grep "arg_contig_level_report: ARG gene overlapping a provirus" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200	200-900	Viruses;Duplodnaviria;;;;;		ACRA	"
+check_grep "arg_contig_level_report: ARG gene outside the provirus" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200				TETM	"
+check_grep "arg_contig_level_report: plasmid contig with its conjugation genes" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_820	.*	plasmid	0.9800	0.0100			MOBQ	MEFA	"
+check_grep "arg_contig_level_report: virus contig with its taxonomy" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	.*	virus	0.0100	0.9800		Viruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;		BCRA	"
+check_grep "arg_contig_level_report: contig without a geNomad call is chromosome" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	.*	chromosome						"
+ACGE_WORK="${WORK}/arg_contig_level_report_genomad_empty"
+mkdir -p "${ACGE_WORK}"
+cp "${ACR_WORK}"/test_sample2_* "${ACGE_WORK}/"
+rm -f "${ACGE_WORK}/Contig_tax_and_arg_prediction.tsv"
+touch "${ACGE_WORK}/test_sample2_filtered_contigs_aggregated_classification.tsv" \
+      "${ACGE_WORK}/test_sample2_filtered_contigs_plasmid_summary.tsv" \
+      "${ACGE_WORK}/test_sample2_filtered_contigs_virus_summary.tsv"
+echo "" | gzip > "${ACGE_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACGE_WORK}"
+expect_pass "arg_contig_level_report: empty geNomad files (stub) still give the columns" arg_contig_level_report.py
+check_grep "arg_contig_level_report: empty geNomad files give chromosome" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome						ACRA	"
+
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
 [ "${FAIL}" -eq 0 ]

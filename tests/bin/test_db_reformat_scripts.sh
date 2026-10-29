@@ -112,6 +112,16 @@ build_fixtures() {
         && rm refseq_standard/db.parameters \
         && tar -czf "${f}/metabuli_noparams.tar.gz" refseq_standard )
 
+    # geNomad database release tarball (one genomad_db/ directory) and one
+    # whose version.txt names another release
+    mkdir -p "${staging}/genomad/genomad_db"
+    ( cd "${staging}/genomad" \
+        && for gf in genomad_db genomad_db.dbtype genomad_marker_metadata.tsv; do echo g > "genomad_db/${gf}"; done \
+        && echo 1.9 > genomad_db/version.txt \
+        && tar -czf "${f}/genomad_db_v1.9.tar.gz" genomad_db \
+        && echo 1.8 > genomad_db/version.txt \
+        && tar -czf "${f}/genomad_db_v1.8.tar.gz" genomad_db )
+
     # Mock eggNOG emapper-3.0 data repository: the seven uncompressed data
     # files the reformat script fetches from the base URL
     mkdir -p "${f}/eggnogdb"
@@ -421,6 +431,21 @@ expect_fail "metabuli: corrupt tarball fails" metabuli_db_reformat.sh "${BASE_UR
 expect_fail "metabuli: tarball without db.parameters fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_noparams.tar.gz"
 expect_fail "metabuli: database without a taxdump fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_notaxdump.tar.gz"
 expect_fail "metabuli: 404 URL fails" metabuli_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
+
+#
+# genomad_db_reformat.sh
+#
+echo "--- genomad_db_reformat.sh ---"
+GENOMAD_MD5=$(md5sum "${FIXTURES}/genomad_db_v1.9.tar.gz" | cut -d' ' -f1)
+GENOMAD_OLD_MD5=$(md5sum "${FIXTURES}/genomad_db_v1.8.tar.gz" | cut -d' ' -f1)
+expect_pass "genomad: valid release" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" "${GENOMAD_MD5}" 1.9
+check_file "genomad: database files in genomad_db" "genomad_db/genomad_db"
+check_file "genomad: version.txt kept" "genomad_db/version.txt"
+expect_fail "genomad: wrong md5 fails" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" \
+    00000000000000000000000000000000 1.9
+expect_fail "genomad: another release than the registry's fails" genomad_db_reformat.sh \
+    "${BASE_URL}/genomad_db_v1.8.tar.gz" "${GENOMAD_OLD_MD5}" 1.9
+expect_fail "genomad: 404 URL fails" genomad_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz" "${GENOMAD_MD5}" 1.9
 
 #
 # eggnog_db_reformat.sh

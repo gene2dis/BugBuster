@@ -81,6 +81,18 @@ processes:
           description: Metabuli database directory
           pattern: "metabuli_db"
 
+  - name: FORMAT_GENOMAD_DB
+    description: Runs bin/genomad_db_reformat.sh - downloads the pinned geNomad database release (Zenodo), checks its md5, extracts it, checks version.txt against the registry's version and the main database files, and moves it to genomad_db/
+    input:
+      - key:
+          type: value
+          description: geNomad database registry key (params.genomad_db)
+    output:
+      - genomad_db:
+          type: directory
+          description: geNomad database directory
+          pattern: "genomad_db"
+
   - name: DOWNLOAD_DEEPARG_DB
     description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date
     input: []

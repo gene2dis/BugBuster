@@ -5,12 +5,18 @@ Joins, per contig, the BlobTools table (length, GC, coverage), Metabuli's
 classification (seven ranks from its lineage, the rank it called at and its
 score) and the DeepARG predictions. With binning, the contig's refined bin
 and that bin's GTDB-Tk classification (<sample>_contig_bins.tsv) come as two
-more columns, next to the NCBI ranks and never filling them. Python
-migration of Contig_arg_unify.R
+more columns, next to the NCBI ranks and never filling them. With geNomad
+(--genomad_prediction), each contig gets its mobile class (plasmid or virus
+call of geNomad's summaries, else chromosome), its aggregated plasmid and
+virus scores, virus taxonomy and plasmid conjugation genes, and each ARG gene
+the provirus regions it overlaps (gene coordinates from the Pyrodigal GFF).
+Python migration of Contig_arg_unify.R
 """
 
 import pandas as pd
 import glob
+import gzip
+import re
 import sys
 
 RANKS = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
@@ -50,6 +56,69 @@ def read_metabuli(path, sample):
                 row['taxonomy_score'] = 0.0
             rows.append(row)
     return pd.DataFrame(rows, columns=['Sample', 'contig_name'] + RANKS + ['taxonomy_rank', 'taxonomy_score'])
+
+
+GENOMAD_COLS = ['mobile_class', 'plasmid_score', 'virus_score', 'provirus', 'virus_taxonomy',
+                'plasmid_conjugation_genes']
+# geNomad names its outputs after the contigs file, <sample>_filtered_contigs
+GENOMAD_SUFFIX = '_filtered_contigs_'
+
+
+def read_tsv(path):
+    """A TSV as strings; an empty file (a stub, or a table without rows) gives an empty frame."""
+    try:
+        return pd.read_csv(path, sep='\t', dtype=str, keep_default_na=False)
+    except pd.errors.EmptyDataError:
+        return pd.DataFrame()
+
+
+def genomad_tables():
+    """{sample: (contig-level frame, {contig: [(start, end, taxonomy)] of its proviruses})}."""
+    out = {}
+    for path in glob.glob(f'*{GENOMAD_SUFFIX}plasmid_summary.tsv'):
+        sample = path[:-len(f'{GENOMAD_SUFFIX}plasmid_summary.tsv')]
+        plasmids = read_tsv(path)
+        viruses = read_tsv(f'{sample}{GENOMAD_SUFFIX}virus_summary.tsv')
+        scores = read_tsv(f'{sample}{GENOMAD_SUFFIX}aggregated_classification.tsv')
+        contig = pd.DataFrame(columns=['contig_name'])
+        if not scores.empty:
+            contig = scores[['seq_name', 'plasmid_score', 'virus_score']].rename(columns={'seq_name': 'contig_name'})
+        proviruses = {}
+        whole_viruses = pd.DataFrame(columns=['contig_name', 'virus_taxonomy'])
+        if not viruses.empty:
+            is_provirus = viruses['seq_name'].str.contains('|provirus_', regex=False)
+            for name, taxonomy in viruses.loc[is_provirus, ['seq_name', 'taxonomy']].itertuples(index=False):
+                host, region = name.split('|', 1)
+                _, start, end = region.split('_')
+                proviruses.setdefault(host, []).append((int(start), int(end), taxonomy))
+            whole_viruses = viruses.loc[~is_provirus, ['seq_name', 'taxonomy']].rename(
+                columns={'seq_name': 'contig_name', 'taxonomy': 'virus_taxonomy'})
+        plasmid_names = set(plasmids['seq_name']) if not plasmids.empty else set()
+        contig = contig.merge(whole_viruses, on='contig_name', how='outer')
+        if not plasmids.empty:
+            contig = contig.merge(plasmids[['seq_name', 'conjugation_genes']].rename(
+                columns={'seq_name': 'contig_name', 'conjugation_genes': 'plasmid_conjugation_genes'}),
+                on='contig_name', how='outer')
+        out[sample] = (contig, proviruses, plasmid_names, set(whole_viruses['contig_name']))
+    return out
+
+
+def gene_coordinates(sample):
+    """{gene id: (start, end)} from the sample's Pyrodigal GFF (<sample>.gff.gz)."""
+    coords = {}
+    path = f'{sample}.gff.gz'
+    try:
+        with gzip.open(path, 'rt') as fh:
+            for line in fh:
+                f = line.rstrip('\n').split('\t')
+                if line.startswith('#') or len(f) < 9 or f[2] != 'CDS':
+                    continue
+                gene = re.search(r'ID=([^;]+)', f[8])
+                if gene:
+                    coords[gene.group(1)] = (int(f[3]), int(f[4]))
+    except FileNotFoundError:
+        sys.exit(f"ERROR: geNomad tables for {sample} but no Pyrodigal GFF ({path}) for the ARG gene coordinates")
+    return coords
 
 
 def main():
@@ -103,6 +172,25 @@ def main():
             on=['Sample', 'contig_name'], how='left')
         bin_cols = ['bin', 'bin_gtdb_classification']
 
+    # geNomad: contig-level calls and scores (--genomad_prediction)
+    genomad = genomad_tables()
+    genomad_cols = []
+    if genomad:
+        per_sample = []
+        for sample, (contig, _proviruses, plasmid_names, virus_names) in genomad.items():
+            part = all_blob_reports.loc[all_blob_reports['Sample'] == sample, ['Sample', 'contig_name']].merge(
+                contig, on='contig_name', how='left')
+            part['mobile_class'] = 'chromosome'
+            part.loc[part['contig_name'].isin(plasmid_names), 'mobile_class'] = 'plasmid'
+            part.loc[part['contig_name'].isin(virus_names), 'mobile_class'] = 'virus'
+            per_sample.append(part)
+        all_blob_reports = all_blob_reports.merge(
+            pd.concat(per_sample, ignore_index=True).reindex(
+                columns=['Sample', 'contig_name', 'mobile_class', 'plasmid_score', 'virus_score',
+                         'virus_taxonomy', 'plasmid_conjugation_genes']),
+            on=['Sample', 'contig_name'], how='left')
+        genomad_cols = GENOMAD_COLS
+
     # Read DeepARG files
     deeparg_files = glob.glob('*_contigs_deep_arg.out.mapping.ARG')
     if not deeparg_files:
@@ -123,7 +211,7 @@ def main():
 
     # Select and rename columns
     all_arg_reports = all_arg_reports[[
-        'Sample', 'contig_name', '#ARG', 'predicted_ARG-class',
+        'Sample', 'contig_name', 'read_id', '#ARG', 'predicted_ARG-class',
         'best-hit', 'probability', 'identity', 'alignment-evalue', 'counts'
     ]].rename(columns={
         '#ARG': 'ARG_gene',
@@ -139,12 +227,32 @@ def main():
         how='left'
     )
 
+    # geNomad proviruses overlapping each ARG gene: their coordinates, and
+    # their taxonomy when the contig itself is not a virus call
+    if genomad:
+        all_data['provirus'] = ''
+        for sample, (_contig, proviruses, _plasmids, _viruses) in genomad.items():
+            coords = gene_coordinates(sample)
+            rows = all_data.index[(all_data['Sample'] == sample) & all_data['read_id'].notna()
+                                  & all_data['contig_name'].isin(list(proviruses))]
+            for i in rows:
+                gene = coords.get(all_data.at[i, 'read_id'])
+                if gene is None:
+                    continue
+                hits = [(a, b, tax) for a, b, tax in proviruses[all_data.at[i, 'contig_name']]
+                        if gene[0] <= b and gene[1] >= a]
+                if hits:
+                    all_data.at[i, 'provirus'] = ';'.join(f'{a}-{b}' for a, b, _ in hits)
+                    current = all_data.at[i, 'virus_taxonomy']
+                    if pd.isna(current) or current == '':
+                        all_data.at[i, 'virus_taxonomy'] = ' | '.join(tax for _, _, tax in hits)
+
     # Reorder columns
     all_data = all_data[[
         'Sample', 'contig_name', 'contig_length', 'GC', 'coverage'
     ] + RANKS + [
         'taxonomy_rank', 'taxonomy_score'
-    ] + bin_cols + [
+    ] + bin_cols + genomad_cols + [
         'ARG_gene', 'predicted_ARG_class', 'best_hit', 'probability',
         'identity', 'alignment_evalue', 'counts'
     ]]

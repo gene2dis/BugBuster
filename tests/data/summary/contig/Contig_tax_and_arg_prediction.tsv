@@ -1,0 +1,6 @@
+Sample	contig_name	contig_length	GC	coverage	superkingdom	phylum	class	order	family	genus	species	taxonomy_rank	taxonomy_score	mobile_class	plasmid_score	virus_score	provirus	virus_taxonomy	plasmid_conjugation_genes	ARG_gene	predicted_ARG_class	best_hit	probability	identity	alignment_evalue	counts
+sampleA	k141_0	1196	0.4005	3.7	Bacteria							species	0.95	chromosome	0.0300	0.0200	200-900	Viruses;Duplodnaviria;;;;;		ACRA	multidrug		0.99			1
+sampleA	k141_0	1196	0.4005	3.7	Bacteria							species	0.95	chromosome	0.0300	0.0200				TETM	tetracycline		0.99			1
+sampleA	k141_820	1015	0.41	1.9	Bacteria							genus	0.41	plasmid	0.9800	0.0100			MOBQ	TETM	tetracycline		0.98			1
+sampleA	k141_231	1018	0.42	2.7	Viruses							genus	0.33	virus	0.0100	0.9800		Viruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;		BCRA	bacitracin		0.97			1
+sampleA	k141_456	1080	0.40	2.0								unclassified	0.0	chromosome	0.1000	0.1000										

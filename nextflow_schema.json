@@ -121,6 +121,13 @@
                     "description": "Enable ARG gene prediction and clustering for horizontal gene transfer inference.",
                     "fa_icon": "fas fa-project-diagram"
                 },
+                "genomad_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Classify the contigs as chromosome, plasmid or virus and find proviruses with geNomad (needs an assembly).",
+                    "help_text": "geNomad 1.13.0 end-to-end on each assembly (1.1-5.5 CPU-h and ~18 GB per assembly in the Phase 9c benchmark); summaries in 06_contig_taxonomy/genomad/. With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains mobile_class, plasmid_score, virus_score, provirus, virus_taxonomy and plasmid_conjugation_genes, and 00_summary gains arg_contig_mobile. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo.",
+                    "fa_icon": "fas fa-dna"
+                },
                 "min_read_sample": {
                     "type": "integer",
                     "default": 0,
@@ -325,6 +332,20 @@
                     "type": "string",
                     "format": "directory-path",
                     "description": "Path to custom DeepARG database directory.",
+                    "fa_icon": "fas fa-folder"
+                },
+                "genomad_db": {
+                    "type": "string",
+                    "default": "v1.9",
+                    "enum": ["v1.9"],
+                    "description": "geNomad database release for --genomad_prediction (see config/databases.config): the pinned Zenodo file, 0.84 GB download, 2.2 GB unpacked.",
+                    "fa_icon": "fas fa-database"
+                },
+                "custom_genomad_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local geNomad database directory (genomad_db, genomad_marker_metadata.tsv, version.txt, ...); skips the download.",
+                    "help_text": "geNomad 1.10-1.13 take database 1.9; the version in version.txt is recorded in software_versions.yml.",
                     "fa_icon": "fas fa-folder"
                 },
                 "metabuli_db": {

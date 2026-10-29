@@ -269,6 +269,25 @@ TABLE_DOCS = {
         "description": "Copies per cell of each SARG subtype. Blank as in arg_sarg_type_cpc.",
         "columns": [("sarg_type, sarg_subtype", "SARG type and subtype"), WIDE_CELL],
     },
+    "arg_contig_mobile": {
+        "title": "Contig ARGs on plasmids, viruses and proviruses (geNomad)",
+        "description": "DeepARG genes on the assembled contigs (--contig_tax_and_arg) counted by where geNomad "
+                       "(--genomad_prediction) places them, per assembly and ARG class. geNomad's plasmid class "
+                       "also takes integrative conjugative elements and transposon cargo (e.g. tetM, ermG-mefA, "
+                       "cfxA2), which it has no class for: 'on plasmid' means mobile-element contig, not "
+                       "necessarily a plasmid. The per-contig calls are in the run's "
+                       "contig_level/summary/Contig_tax_and_arg_prediction.tsv (mobile_class, plasmid_score, "
+                       "virus_score, provirus).",
+        "columns": [
+            ("assembly", "the assembly the contigs come from: a sample name, or coassembly"),
+            ("arg_class", "DeepARG predicted ARG class"),
+            ("arg_genes", "ARG genes of the class on the assembly's contigs"),
+            ("arg_genes_on_plasmid", "of those, genes on contigs geNomad calls plasmid"),
+            ("arg_genes_on_virus", "genes on contigs geNomad calls virus (whole contig)"),
+            ("arg_genes_in_provirus", "genes overlapping a provirus region geNomad found inside a contig"),
+            ("pct_mobile", "% of arg_genes on a plasmid or virus contig or in a provirus (each gene counted once)"),
+        ],
+    },
     "function_read_long": {
         "title": "Read-level functional profile, long format",
         "description": "AGGREGATE_READ_FUNCTIONS' read_function_abundance.tsv of every batch: one row per sample and "
@@ -592,6 +611,8 @@ UNITS = [
 ]
 
 PITFALLS = [
+    "geNomad's plasmid class includes integrative conjugative elements and transposon cargo (arg_contig_mobile): "
+    "an ARG 'on a plasmid' sits on a mobile-element contig, not necessarily a plasmid.",
     "Single reads vs pairs: Reads_report.csv, ARGs-OAP nRead, RGI mapped reads and Woltka counts are single reads "
     "(both mates); the summary's counts are read pairs (reads / 2), except ARGs-OAP's read_count and ppm.",
     "ARG units are not interchangeable: K-MARVEL / RGI RPKM (read pairs) and ARGs-OAP copies per cell (SARG copies "

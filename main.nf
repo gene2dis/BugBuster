@@ -67,7 +67,8 @@ def printHelp() {
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
-      --contig_tax_and_arg          Enable contig-level taxonomy and ARG (default: ${params.contig_tax_and_arg})
+      --contig_tax_and_arg          Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) (default: ${params.contig_tax_and_arg})
+      --genomad_prediction          Classify contigs as chromosome / plasmid / virus with geNomad (default: ${params.genomad_prediction})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
@@ -136,6 +137,7 @@ include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { METABULI_CLASSIFY } from './modules/local/metabuli_classify/main'
+include { GENOMAD_ENDTOEND  } from './modules/nf-core/genomad/endtoend/main'
 include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
@@ -271,6 +273,9 @@ workflow {
     if (flagOn(params.contig_tax_and_arg) && params.assembly_mode == 'none') {
         error("--contig_tax_and_arg requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
+    if (flagOn(params.genomad_prediction) && params.assembly_mode == 'none') {
+        error("--genomad_prediction requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
+    }
     if (flagOn(params.contig_level_functional) && params.assembly_mode == 'none') {
         error("--contig_level_functional requires an assembly (--assembly_mode assembly or coassembly), but --assembly_mode is 'none'")
     }
@@ -384,6 +389,7 @@ workflow {
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
+    log.info "  geNomad (mobile)     : ${params.genomad_prediction}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
     log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : params.read_level_functional == 'humann' ? " (${params.custom_humann_db ? 'custom database' : params.humann_db})" : ''}"
@@ -722,6 +728,27 @@ workflow {
     }
 
     //
+    // MODULE: geNomad plasmid / virus / provirus classification of the
+    // contigs (Phase 9b, L6 d; nf-core genomad/endtoend, 1.13.0 image set in
+    // config/modules.config). Its summaries are published; with
+    // --contig_tax_and_arg they also add the mobile_class columns to the
+    // contig table. Versions come on the topic channel
+    //
+    ch_genomad_tables = channel.empty()
+    if ( flagOn(params.genomad_prediction) && params.assembly_mode != "none" ) {
+        GENOMAD_ENDTOEND(
+            ch_contigs_meta,
+            PREPARE_DATABASES.out.genomad_db
+                .ifEmpty { error "ERROR: geNomad database is empty. Ensure --genomad_prediction is enabled and a valid geNomad database is configured (--genomad_db, or --custom_genomad_db)." }
+                .map { db -> [[id: 'genomad_db'], db] }
+                .first()
+        )
+        ch_genomad_tables = GENOMAD_ENDTOEND.out.aggregated_classification
+            .mix(GENOMAD_ENDTOEND.out.plasmid_summary, GENOMAD_ENDTOEND.out.virus_summary)
+            .map { _meta, table -> table }
+    }
+
+    //
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( flagOn(params.contig_tax_and_arg) && params.assembly_mode != "none" ) {
@@ -766,11 +793,20 @@ workflow {
                 .concat(
                     ch_blob_table.only_blob,
                     METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls },
-                    ch_contig_bins.map { _meta, labels -> labels }
+                    ch_contig_bins.map { _meta, labels -> labels },
+                    // geNomad's tables, and the Pyrodigal GFF for the ARG
+                    // genes' coordinates (proviruses)
+                    ch_genomad_tables,
+                    flagOn(params.genomad_prediction)
+                        ? ch_contig_genes_gff.map { _meta, gff -> gff }
+                        : channel.empty()
                 )
                 .collect(sort: true)
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
+        // the summary's arg_contig_mobile (ARGs on geNomad's plasmids,
+        // viruses and proviruses) reads the contig table
+        ch_summary_reports = ch_summary_reports.mix(ch_arg_contig_data.arg_reports)
 
         ch_versions = ch_versions.mix(
             METABULI_CLASSIFY.out.versions.first(),

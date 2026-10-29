@@ -22,6 +22,8 @@
 #     tables against the source, COG names, NA_no_ags without MicrobeCensus
 #   - README.md / README.docx (well-formed WordprocessingML) / LLM_GUIDE.md, the
 #     stages read from an invalid software_versions.yml, "ran, no table found"
+#   - contig ARGs on geNomad's plasmids / viruses / proviruses
+#     (tests/data/summary/contig/): arg_contig_mobile per assembly and class
 #   - every emitted column documented; taxonomy NA_low_depth and prevalence
 #     denominator; one tier per gene across methods; CRP-1 keeps its name
 #
@@ -120,6 +122,8 @@ echo "=== results_summary.py test suite ==="
 [ "${RS_TEST_HOST:-0}" = "1" ] && echo "python: host" || echo "image: ${SUMMARY_IMG}"
 cd "${TMP_DIR}"
 make_results run1/results sampleA sampleB
+mkdir -p run1/results/05_arg_prediction/contig_level/summary
+cp "${FIX}/contig/Contig_tax_and_arg_prediction.tsv" run1/results/05_arg_prediction/contig_level/summary/
 
 check "single run with metadata, grouping and ordering" \
     py "${SUMMARY}" --results run1/results --outdir out --metadata "${FIX}/metadata.tsv" \
@@ -165,6 +169,22 @@ assert tax.at["GCF_000009045.1", "est_read_pairs"] == 12507
 
 grp = pd.read_csv("out/tables/group_arg_detection.tsv", sep="\t")
 assert set(grp["pattern"]) == {"V1:+ V2:NA"}, grp["pattern"]
+PYEOF
+
+check "contig ARGs on plasmids, viruses and proviruses (arg_contig_mobile)" py - <<'PYEOF'
+import pandas as pd
+mob = pd.read_csv("out/tables/arg_contig_mobile.tsv", sep="\t").set_index(["assembly", "arg_class"])
+assert list(mob.index) == [("sampleA", "tetracycline"), ("sampleA", "bacitracin"), ("sampleA", "multidrug")], mob
+tet = mob.loc[("sampleA", "tetracycline")]
+assert (tet["arg_genes"], tet["arg_genes_on_plasmid"], tet["arg_genes_on_virus"], tet["arg_genes_in_provirus"]) \
+    == (2, 1, 0, 0) and tet["pct_mobile"] == 50.0, tet
+assert mob.loc[("sampleA", "bacitracin"), "arg_genes_on_virus"] == 1
+assert mob.loc[("sampleA", "multidrug"), "arg_genes_in_provirus"] == 1
+md = open("out/README.md").read()
+assert "ICE" in md or "integrative conjugative" in md
+for stage in ("| Contig taxonomy and ARGs", "| Plasmid / virus classification of contigs (geNomad)"):
+    row = next(l for l in md.splitlines() if l.startswith(stage))
+    assert "| ran |" in row, row
 PYEOF
 
 check "ARGs-OAP tables: SARG subtypes and types in copies per cell, cell estimates" py - <<'PYEOF'

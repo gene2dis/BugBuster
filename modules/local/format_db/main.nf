@@ -101,6 +101,35 @@ process FORMAT_METABULI_DB {
         """
 }
 
+process FORMAT_GENOMAD_DB {
+    tag "format_genomad_db"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download'
+
+    input:
+        val(key)
+
+    output:
+        path("genomad_db"), emit: genomad_db
+
+    script:
+        def entry = params.genomad_ref_db[key]
+        """
+        ${entry["fmtscript"]} \
+            '${entry["url"]}' \
+            '${entry["md5"]}' \
+            '${entry["version"]}'
+        """
+
+    stub:
+        """
+        mkdir genomad_db
+        touch genomad_db/genomad_db genomad_db/genomad_db.dbtype genomad_db/genomad_marker_metadata.tsv
+        echo 1.9 > genomad_db/version.txt
+        """
+}
+
 process DOWNLOAD_DEEPARG_DB {
 
     container 'quay.io/ffuentessantander/deeparg:1.0.4'

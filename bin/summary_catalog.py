@@ -66,7 +66,14 @@ STAGES = [
         "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
         "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
         "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
-        "summary": "not summarised yet",
+        "summary": "not summarised yet (read by the geNomad stage's arg_contig_mobile)",
+    },
+    {
+        "key": "genomad", "title": "Plasmid / virus classification of contigs (geNomad)",
+        "params": "--genomad_prediction (needs an assembly; ARG columns with --contig_tax_and_arg)",
+        "processes": ["GENOMAD_ENDTOEND"],
+        "summary": "arg_contig_mobile (ARG genes on plasmid / virus contigs and in proviruses; needs "
+                   "--contig_tax_and_arg)",
     },
     {
         "key": "bin_arg", "title": "Bin-level ARG clustering (DeepARG on bins, MMseqs2)",
