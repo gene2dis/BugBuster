@@ -135,7 +135,7 @@ include { SOFTWARE_VERSIONS  } from './subworkflows/local/software_versions'
 include { MICROBECENSUS } from './modules/local/microbecensus/main'
 
 	// TAXONOMIC PREDICTION IN CONTIGS
-include { NT_BLASTN        } from './modules/local/nt_blastn/main'
+include { METABULI_CLASSIFY } from './modules/local/metabuli_classify/main'
 include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
@@ -706,13 +706,15 @@ workflow {
     // CONTIG-LEVEL TAXONOMY AND ARG PREDICTION
     //
     if ( flagOn(params.contig_tax_and_arg) && params.assembly_mode != "none" ) {
-        // The list wrap keeps a multi-file BLAST DB as ONE tuple element
-        // (path(nt_db)) instead of flattening it into the tuple, which staged
-        // only the first DB file into NT_BLASTN
-        NT_BLASTN(ch_contigs_meta.combine(PREPARE_DATABASES.out.blast_db
-            .ifEmpty { error "ERROR: BLAST database is empty. Ensure params.contig_tax_and_arg is enabled and a valid BLAST database is configured." }
-            .map { db_files -> [db_files] }))
-        ch_nt_blastn = NT_BLASTN.out.megablast_to_blob
+        // Metabuli classifies each contig (Phase 9b, replacing megablast
+        // against nt); its calls give the report's ranks and, as a hits file,
+        // BlobTools' tables and plots
+        METABULI_CLASSIFY(
+            ch_contigs_meta,
+            PREPARE_DATABASES.out.metabuli_db
+                .ifEmpty { error "ERROR: Metabuli database is empty. Ensure params.contig_tax_and_arg is enabled and a valid Metabuli database is configured (--metabuli_db, or --custom_metabuli_db)." }
+                .first()
+        )
         //
         // Run nf-core SAMTOOLS_INDEX for BAM indexing
         // nf-core SAMTOOLS_INDEX signature:
@@ -726,13 +728,14 @@ workflow {
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
             .join(NFCORE_SAMTOOLS_INDEX.out.index)
-        // Wrap the collected taxdump files in a list so they arrive as ONE
-        // tuple element (path(tax_files)) instead of being flattened into the
-        // tuple — flattened, only the first file was staged into BLOBTOOLS
+        // The Metabuli database's [nodes.dmp, names.dmp], one value for every
+        // sample
         ch_blob_table = BLOBTOOLS(
-            ch_nt_blastn
-                .join(ch_index_bam)
-                .combine(PREPARE_DATABASES.out.taxdump.collect().map { files -> [files] })
+            METABULI_CLASSIFY.out.hits
+                .join(ch_contigs_meta)
+                .map { meta, hits, contigs -> [meta, contigs, hits] }
+                .join(ch_index_bam),
+            PREPARE_DATABASES.out.metabuli_taxdump.first()
         )
         BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
@@ -741,13 +744,16 @@ workflow {
             .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
             ch_contig_args.only_deeparg
-                .concat(ch_blob_table.only_blob)
+                .concat(
+                    ch_blob_table.only_blob,
+                    METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls }
+                )
                 .collect(sort: true)
         )
         ARG_BLOBPLOT(ch_arg_contig_data.arg_reports)
 
         ch_versions = ch_versions.mix(
-            NT_BLASTN.out.versions.first(),
+            METABULI_CLASSIFY.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
             DEEPARG_CONTIGS.out.versions.first(),

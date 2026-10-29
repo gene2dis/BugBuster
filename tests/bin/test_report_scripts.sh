@@ -452,22 +452,36 @@ check_grep "arg_blobplot: five ARG classes and no 'Other'" "../arg_blobplot.log"
 #
 # arg_contig_level_report.py: the contig table is written tab-separated, as
 # its .tsv name says (it was comma-separated). Inputs: the real BlobTools
-# table above and a synthetic DeepARG mapping file (DeepARG 1.0.4 header,
-# one acrA hit on contig k141_0, values taken from a real test_sample1 hit).
+# table above (length, GC, coverage), a Metabuli classifications file for its
+# contigs (lines in Metabuli 1.2.0's --lineage 1 format, trailing tab
+# included: species, genus, a virus and an unclassified contig) and a
+# synthetic DeepARG mapping file (DeepARG 1.0.4 header, one acrA hit on
+# contig k141_0, values taken from a real test_sample1 hit).
 #
 echo "--- arg_contig_level_report.py ---"
 ACR_WORK="${WORK}/arg_contig_level_report"
 mkdir -p "${ACR_WORK}"
 cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_classifications.tsv" \
    "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_WORK}/"
 NEXT_WORKDIR="${ACR_WORK}"
-expect_pass "arg_contig_level_report: BlobTools and DeepARG tables joined" arg_contig_level_report.py
-check_grep "arg_contig_level_report: tab-separated header" "Contig_tax_and_arg_prediction.tsv" \
-    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	.*	counts$"
-check_grep "arg_contig_level_report: ARG joined to its contig" "Contig_tax_and_arg_prediction.tsv" \
-    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	.*	ACRA	multidrug	"
-check_grep "arg_contig_level_report: contig without an ARG kept with empty ARG columns" \
-    "Contig_tax_and_arg_prediction.tsv" "^test_sample2	k141_820	.*						$"
+expect_pass "arg_contig_level_report: BlobTools, Metabuli and DeepARG tables joined" arg_contig_level_report.py
+check_grep "arg_contig_level_report: tab-separated header with Metabuli's seven ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	phylum	class	order	family	genus	species	taxonomy_rank	taxonomy_score	ARG_gene	.*	counts$"
+check_grep "arg_contig_level_report: ARG joined to its contig, ranks from the lineage" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	Pseudomonadota	Gammaproteobacteria	Moraxellales	Moraxellaceae	Acinetobacter	Acinetobacter baumannii	species	0.95811	ACRA	multidrug	"
+check_grep "arg_contig_level_report: genus-level call leaves species empty" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_820	1015	0.4138	1.9009	Bacteria	.*	Acinetobacter		genus	0.412783							$"
+check_grep "arg_contig_level_report: Viruses (acellular root) is the superkingdom" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	[^	]*	[^	]*	[^	]*	Viruses	Uroviricota	Caudoviricetes	Crassvirales	Suoliviridae	Cohcovirus		genus	"
+check_grep "arg_contig_level_report: unclassified contig kept with empty ranks" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_456	[^	]*	[^	]*	[^	]*								unclassified	0.0	"
+ACR_NOTAX="${WORK}/arg_contig_level_report_notax"
+mkdir -p "${ACR_NOTAX}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_NOTAX}/"
+NEXT_WORKDIR="${ACR_NOTAX}"
+expect_fail "arg_contig_level_report: no Metabuli file fails" arg_contig_level_report.py
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

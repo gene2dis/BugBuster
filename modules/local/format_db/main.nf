@@ -75,49 +75,29 @@ process FORMAT_SYLPH_TAXONOMY {
         """
 }
 
-process FORMAT_NT_BLAST_DB {
-    tag "format_blast_db"
+process FORMAT_METABULI_DB {
+    tag "format_metabuli_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
+    // refseq_standard: an 80 GB download that unpacks to 110 GB
     label 'process_download_extensive'
 
     input:
         val(db)
 
     output:
-        path("*")
+        path("metabuli_db"), emit: metabuli_db
 
     script:
         """
-        ${params.blast_ref_db[params.blast_db]["fmtscript"]} $db
+        ${params.metabuli_ref_db[params.metabuli_db]["fmtscript"]} $db
         """
 
     stub:
         """
-        touch nt.00.nin nt.00.nhr nt.00.nsq nt.nal
-        """
-}
-
-process FORMAT_TAXDUMP_FILES {
-    tag "format_taxdump"
-    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
-
-    label 'process_download'
-
-    input:
-        val(db)
-
-    output:
-        path("*")
-
-    script:
-        """
-        ${params.taxonomy_files[params.taxdump_files]["fmtscript"]} $db
-        """
-
-    stub:
-        """
-        touch nodes.dmp names.dmp nucl_gb.accession2taxid
+        mkdir -p metabuli_db/ncbi-taxdump
+        touch metabuli_db/db.parameters metabuli_db/diffIdx metabuli_db/info metabuli_db/taxonomyDB \
+            metabuli_db/ncbi-taxdump/nodes.dmp metabuli_db/ncbi-taxdump/names.dmp
         """
 }
 

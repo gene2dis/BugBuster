@@ -1,5 +1,5 @@
 name: blobtools
-description: Builds a BlobTools v1 BlobDB from contigs, their megablast hits against nt, read mappings and the NCBI taxdump, then tabulates it at all taxonomic ranks (blobtools create + view)
+description: Builds a BlobTools v1 BlobDB from contigs, their Metabuli calls (one hit per classified contig), read mappings and the Metabuli database's taxdump, then tabulates it at all taxonomic ranks (blobtools create + view); the taxdump's 2025 'domain' rank and the Viruses node are renamed 'superkingdom' in a task-dir copy of nodes.dmp
 keywords:
   - contig taxonomy
   - blobtools
@@ -19,10 +19,10 @@ input:
   - contigs:
       type: file
       description: Assembled contigs
-  - blastn_hits:
+  - hits:
       type: file
-      description: Megablast hits of the contigs against nt in BlobTools hits format (qseqid staxids bitscore ...)
-      pattern: "*_megablast.out"
+      description: BlobTools hits file from METABULI_CLASSIFY (contig, taxid, Metabuli score)
+      pattern: "*_metabuli_hits.tsv"
   - bam:
       type: file
       description: Reads mapped back to the contigs, used for coverage
@@ -33,7 +33,7 @@ input:
       pattern: "*.bai"
   - tax_files:
       type: file
-      description: NCBI taxdump nodes.dmp and names.dmp, staged as loose files (FORMAT_TAXDUMP_FILES) or as a directory (--custom_taxdump_files); located with find either way
+      description: nodes.dmp and names.dmp of the Metabuli database (the taxdump its taxids come from)
 
 output:
   - blob_table:

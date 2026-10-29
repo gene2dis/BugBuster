@@ -10,8 +10,7 @@
 include { FORMAT_KRAKEN_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_SYLPH_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_SYLPH_TAXONOMY   } from '../../modules/local/format_db/main'
-include { FORMAT_NT_BLAST_DB      } from '../../modules/local/format_db/main'
-include { FORMAT_TAXDUMP_FILES    } from '../../modules/local/format_db/main'
+include { FORMAT_METABULI_DB      } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
@@ -39,8 +38,8 @@ workflow PREPARE_DATABASES {
     ch_sylph_db         = channel.empty()
     ch_sylph_taxonomy   = channel.empty()
     ch_deeparg_db       = channel.empty()
-    ch_blast_db         = channel.empty()
-    ch_taxdump          = channel.empty()
+    ch_metabuli_db      = channel.empty()
+    ch_metabuli_taxdump = channel.empty()
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
     ch_rgi_card_db      = channel.empty()
@@ -179,22 +178,29 @@ workflow PREPARE_DATABASES {
     }
 
     //
-    // BLAST and taxdump for contig-level taxonomy
+    // Metabuli database for contig-level taxonomy. BLOBTOOLS reads the
+    // taxdump the database was built with (nodes.dmp and names.dmp, at most
+    // one directory down, e.g. refseq_standard's ncbi-taxdump/), so every
+    // taxid Metabuli reports resolves
     //
     if ( flagOn(params.contig_tax_and_arg) ) {
-        if ( params.custom_blast_db ) {
-            ch_blast_db = channel.fromPath(params.custom_blast_db, checkIfExists: true)
+        if ( params.custom_metabuli_db ) {
+            ch_metabuli_db = channel.fromPath(params.custom_metabuli_db, type: 'dir', checkIfExists: true)
         } else {
-            ch_blast_ref = channel.fromList(params.blast_ref_db[params.blast_db]["url"])
-            ch_blast_db = FORMAT_NT_BLAST_DB(ch_blast_ref)
+            ch_metabuli_ref = channel.fromList(params.metabuli_ref_db[params.metabuli_db]["url"])
+            ch_metabuli_db = FORMAT_METABULI_DB(ch_metabuli_ref).metabuli_db
         }
-
-        if ( params.custom_taxdump_files ) {
-            ch_taxdump = channel.fromPath(params.custom_taxdump_files, checkIfExists: true)
-        } else {
-            ch_taxdump_ref = channel.fromList(params.taxonomy_files[params.taxdump_files]["url"])
-            ch_taxdump = FORMAT_TAXDUMP_FILES(ch_taxdump_ref)
-        }
+        ch_metabuli_taxdump = ch_metabuli_db
+            .map { db ->
+                def dmp = ['nodes.dmp', 'names.dmp'].collect { name ->
+                    def found = [db.resolve(name)] + (db.listFiles() ?: []).findAll { f -> f.isDirectory() }.collect { d -> d.resolve(name) }
+                    found.find { f -> f.exists() }
+                }
+                if ( dmp.any { f -> f == null } ) {
+                    error("ERROR: no nodes.dmp and names.dmp in the Metabuli database ${db} (or one directory down): BlobTools needs the taxdump the database was built with")
+                }
+                dmp
+            }
     }
 
     //
@@ -357,8 +363,8 @@ workflow PREPARE_DATABASES {
     sylph_taxonomy         = ch_sylph_taxonomy
     decontamination_index  = ch_decontamination_index  // Combined phiX + host index
     deeparg_db             = ch_deeparg_db
-    blast_db               = ch_blast_db
-    taxdump                = ch_taxdump
+    metabuli_db            = ch_metabuli_db
+    metabuli_taxdump       = ch_metabuli_taxdump     // [nodes.dmp, names.dmp] of the Metabuli database
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
     rgi_card_db            = ch_rgi_card_db

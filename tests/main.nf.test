@@ -550,6 +550,13 @@ nextflow_pipeline {
             assert workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_CONTIGS") }
             assert workflow.trace.tasks().any { task -> task.name.contains("ARG_CONTIG_LEVEL_REPORT") }
             assert workflow.trace.tasks().any { task -> task.name.contains("ARG_BLOBPLOT") }
+            // Contig taxonomy from Metabuli (Phase 9b; no megablast), its
+            // database downloaded and its taxdump given to BlobTools
+            assert workflow.trace.tasks().any { task -> task.name.contains("FORMAT_METABULI_DB") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("METABULI_CLASSIFY") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("BLOBTOOLS") }
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BLAST") }
+            assert path("${outputDir}/06_contig_taxonomy/metabuli/test_sample1/test_sample1_classifications.tsv").exists()
 
             // DeepARG contig predictions published to the documented layout (audit #23)
             assert path("${outputDir}/05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1_contigs_deep_arg.out.mapping.ARG").exists()

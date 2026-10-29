@@ -63,9 +63,9 @@ STAGES = [
         "summary": "not summarised yet",
     },
     {
-        "key": "contig_arg", "title": "Contig taxonomy and ARGs (BLAST nt, BlobTools, DeepARG)",
-        "params": "--contig_tax_and_arg (needs an assembly)",
-        "processes": ["NT_BLASTN", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
+        "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
+        "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
+        "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
         "summary": "not summarised yet",
     },
     {
