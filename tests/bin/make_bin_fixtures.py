@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
-"""Generate the committed bin-directory fixtures used by
-tests/modules/prodigal_bins.nf.test (regression tests for audit item #22).
+"""Generate the committed bin-directory fixtures used by the module tests
+(bin_contig_table, pyrodigal, bwamem3_*, eggnog_mapper_search; first made for
+the removed PRODIGAL_BINS tests, audit item #22).
 
 Creates, under tests/data/bins/:
   - marker_only_bins/SKIPPED.txt  a refiner-style marker dir with no *.fa

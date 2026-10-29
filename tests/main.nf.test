@@ -800,9 +800,18 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_BINS") }
+            // M8 (Phase 9b): the bins' ARGs come from DEEPARG_CONTIGS on the
+            // assembly's Pyrodigal proteins, split by bin; no per-bin
+            // Prodigal or DeepARG run
+            assert workflow.trace.tasks().any { task -> task.name.contains("PYRODIGAL") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_CONTIGS") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("BIN_CONTIG_LABELS") }
+            assert workflow.trace.tasks().any { task -> task.name.contains("BIN_ARG_SPLIT") }
+            assert !workflow.trace.tasks().any { task -> task.name.contains("DEEPARG_BINS") || task.name.contains("PRODIGAL_BINS") }
             assert workflow.trace.tasks().any { task -> task.name.contains("ARG_FASTA_FORMATTER") }
             assert workflow.trace.tasks().any { task -> task.name.contains("CLUSTERING") }
+            assert path("${outputDir}/05_arg_prediction/bin_level/deeparg/test_sample1/test_sample1_deeparg_results").exists()
+            assert path("${outputDir}/05_arg_prediction/bin_level/proteins/test_sample1/test_sample1_bins_proteins").exists()
         }
     }
 

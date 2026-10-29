@@ -126,7 +126,7 @@ feat(modules): add DIAMOND module for protein alignment
 
 - Use DSL2 syntax
 - One process per module file, except for closely related processes that share code
-  (`format_db`, `deeparg`, `bwamem3_samtools`, `bedtools`)
+  (`format_db`, `bwamem3_samtools`, `bedtools`)
 - Include `meta.yml` for new modules
 - Add `versions.yml` output for software tracking
 - Add `stub` blocks for dry-run testing
@@ -281,7 +281,7 @@ authors:
 `input:` lists the process inputs in order (a `meta` map plus one entry per `val`/`path`
 variable, using its name) and `output:` lists every `emit:` name (a `meta` entry for tuple
 outputs is optional). When one `main.nf` defines several processes (`format_db`,
-`deeparg`, `bwamem3_samtools`, `bedtools`), keep a single `meta.yml` with `tools` once at the top and a
+`bwamem3_samtools`, `bedtools`), keep a single `meta.yml` with `tools` once at the top and a
 `processes:` list instead of top-level `input`/`output`, each item with `name` (the process
 name), `description`, `input` and `output`. `tests/bin/test_module_meta.sh` (run in CI)
 checks every local module against these rules and that every process has a `tag` and a

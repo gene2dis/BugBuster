@@ -1,0 +1,42 @@
+name: bin_arg_split
+description: Splits the assembly-wide DeepARG hits (DEEPARG_CONTIGS) and Pyrodigal proteins by refined bin, into the per-bin .mapping.ARG and protein files ARG_FASTA_FORMATTER reads (bin-level ARGs without a per-bin DeepARG run, whose min-max scaling made probabilities depend on the bin)
+keywords:
+  - antimicrobial resistance
+  - binning
+  - deeparg
+tools:
+  - python:
+      description: bin/bin_arg_split.py (Python standard library only)
+      homepage: https://www.python.org/
+      documentation: https://docs.python.org/3/
+      licence: ["PSF-2.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+  - contig_bins:
+      type: file
+      description: Contig to bin table from BIN_CONTIG_LABELS
+      pattern: "*_contig_bins.tsv"
+  - proteins:
+      type: file
+      description: Pyrodigal proteins of the whole assembly (gene ids <contig>_<n>)
+      pattern: "*.faa.gz"
+  - deeparg:
+      type: file
+      description: DEEPARG_CONTIGS predictions on those proteins
+      pattern: "*.mapping.ARG"
+
+output:
+  - bin_args:
+      type: directory
+      description: Tuple of meta, <id>_bins_proteins/ (<id>_<bin>_proteins.faa) and <id>_deeparg_results/ (<id>_<bin>_deep_arg.out.mapping.ARG, DeepARG's header plus the bin's hits)
+      pattern: "*_{bins_proteins,deeparg_results}"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

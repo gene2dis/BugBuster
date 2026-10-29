@@ -146,7 +146,6 @@ include { BLOBPLOT         } from './modules/local/blobplot/main'
 	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
 	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
 	// (contig_level_functional)
-include { PRODIGAL_BINS    } from './modules/local/prodigal/main'
 include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
@@ -166,11 +165,11 @@ include { KMARVEL_REPORT   } from './modules/local/kmarvel_report/main'
 include { RESULTS_SUMMARY  } from './modules/local/results_summary/main'
 
 	// ARG PREDICTION IN CONTIGS AND BINS
-include { DEEPARG_BINS             } from './modules/local/deeparg/main'
 include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
+include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
@@ -612,12 +611,14 @@ workflow {
     //
     // SHARED GENE CALLING ON CONTIGS
     // One Pyrodigal pass (metagenome mode, both assembly modes) whose FAA feeds
-    // DeepARG and whose FAA/GFF feed the functional annotation branch (Q9).
+    // DeepARG (contig and bin level, M8) and whose FAA/GFF feed the functional
+    // annotation branch (Q9).
     //
     ch_contig_proteins  = channel.empty()
     ch_contig_genes_gff = channel.empty()
 
-    if ( (flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
+    def run_contig_deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
+    if ( (run_contig_deeparg || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
         // Run nf-core PYRODIGAL for contig ORF prediction
         // nf-core PYRODIGAL signature:
@@ -728,6 +729,21 @@ workflow {
     }
 
     //
+    // MODULE: DeepARG on the assembly's Pyrodigal proteins, for the contig
+    // table and the bin-level ARGs (M8: one run per assembly; per-bin runs
+    // min-max scaled over the bin)
+    //
+    ch_contig_deeparg      = channel.empty()   // [meta, DeepARG outputs]
+    ch_contig_deeparg_only = channel.empty()   // DeepARG outputs, for the run-level report
+    if ( run_contig_deeparg ) {
+        DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
+            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg or params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
+        ch_contig_deeparg      = DEEPARG_CONTIGS.out.deeparg
+        ch_contig_deeparg_only = DEEPARG_CONTIGS.out.only_deeparg
+        ch_versions = ch_versions.mix(DEEPARG_CONTIGS.out.versions.first())
+    }
+
+    //
     // MODULE: geNomad plasmid / virus / provirus classification of the
     // contigs (Phase 9b, L6 d; nf-core genomad/endtoend, 1.13.0 image set in
     // config/modules.config). Its summaries are published; with
@@ -785,11 +801,8 @@ workflow {
         )
         BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
-        // Contig proteins come from the shared PYRODIGAL step above
-        ch_contig_args = DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
-            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg is enabled and a valid DeepARG database is configured." }))
         ch_arg_contig_data = ARG_CONTIG_LEVEL_REPORT(
-            ch_contig_args.only_deeparg
+            ch_contig_deeparg_only
                 .concat(
                     ch_blob_table.only_blob,
                     METABULI_CLASSIFY.out.classifications.map { _meta, calls -> calls },
@@ -812,7 +825,6 @@ workflow {
             METABULI_CLASSIFY.out.versions.first(),
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
-            DEEPARG_CONTIGS.out.versions.first(),
             ARG_CONTIG_LEVEL_REPORT.out.versions,
             ARG_BLOBPLOT.out.versions
         )
@@ -822,18 +834,25 @@ workflow {
     // ARG PREDICTION IN BINS AND CLUSTERING
     //
     if ( flagOn(params.arg_bin_clustering) && flagOn(params.include_binning) ) {
-        PRODIGAL_BINS(ch_refined_bins)
-        ch_raw_orfs = PRODIGAL_BINS.out.prodigal_bins
-        DEEPARG_BINS(ch_raw_orfs.combine(PREPARE_DATABASES.out.deeparg_db
-            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
-        ch_deeparg = DEEPARG_BINS.out.deeparg_bins
-        ARG_FASTA_FORMATTER(ch_raw_orfs.join(ch_deeparg))
+        // DEEPARG_CONTIGS' hits and the Pyrodigal proteins split by bin (M8),
+        // in the per-bin layout ARG_FASTA_FORMATTER reads; a sample without
+        // refined bins has nothing to cluster
+        BIN_ARG_SPLIT(
+            ch_contig_bins
+                .join(ch_contig_proteins)
+                .join(ch_contig_deeparg.map { meta, files ->
+                    [meta, [files].flatten().find { f -> f.name.endsWith('.out.mapping.ARG') }]
+                })
+        )
+        ARG_FASTA_FORMATTER(
+            BIN_ARG_SPLIT.out.bin_args
+                .filter { _meta, proteins, _deeparg -> proteins.listFiles().size() > 0 }
+        )
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
         CLUSTERING(ch_arg_fasta.collect(sort: true))
 
         ch_versions = ch_versions.mix(
-            PRODIGAL_BINS.out.versions.first(),
-            DEEPARG_BINS.out.versions.first(),
+            BIN_ARG_SPLIT.out.versions.first(),
             ARG_FASTA_FORMATTER.out.versions.first(),
             CLUSTERING.out.versions
         )

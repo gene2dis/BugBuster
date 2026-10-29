@@ -536,6 +536,46 @@ check_grep "arg_contig_level_report: unbinned contig has empty bin columns" "Con
     "^test_sample2	k141_456	.*	unclassified	0.0			"
 
 #
+# bin_arg_split.py (Phase 9b, M8): DEEPARG_CONTIGS' hits and the assembly's
+# Pyrodigal proteins split by bin (the contig table of bin_contig_labels.py
+# above) into ARG_FASTA_FORMATTER's per-bin layout; a bin without hits gets a
+# header-only .mapping.ARG; genes of unbinned contigs are dropped.
+#
+echo "--- bin_arg_split.py ---"
+BAS_WORK="${WORK}/bin_arg_split"
+mkdir -p "${BAS_WORK}"
+cp "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BAS_WORK}/"
+printf ">k141_0_1 # 1 # 397 # 1 # ID=k141_0_1\nMKAA\n>k141_0_2 # 1000 # 1150 # 1\nMKCC\n>k141_820_1 # 10 # 300 # 1\nMKDD\n>k141_231_1 # 10 # 300 # -1\nMKEE\n>k141_456_1 # 5 # 200 # 1\nMKFF\n" \
+    | gzip > "${BAS_WORK}/test_sample2.faa.gz"
+{
+    cat "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG"
+    printf "TETM\t1\t50\tk141_456_1\ttetracycline\tX|FEATURES|tetM|tetracycline|tetM\t0.99\t99.0\t50\t100.0\t1e-20\t1\n"
+} > "${BAS_WORK}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+NEXT_WORKDIR="${BAS_WORK}"
+expect_pass "bin_arg_split: hits and proteins split by bin" bin_arg_split.py test_sample2 test_sample2_contig_bins.tsv \
+    test_sample2.faa.gz test_sample2_contigs_deep_arg.out.mapping.ARG
+check_file "bin_arg_split: bin1 proteins" "test_sample2_bins_proteins/test_sample2_binette_bin1_proteins.faa"
+check_file "bin_arg_split: bin2 proteins" "test_sample2_bins_proteins/test_sample2_binette_bin2_proteins.faa"
+check_grep "bin_arg_split: bin1 holds its contigs' proteins with Pyrodigal's headers" \
+    "test_sample2_bins_proteins/test_sample2_binette_bin1_proteins.faa" "^>k141_820_1 # 10 # 300 # 1$"
+check_grep "bin_arg_split: bin1's ACRA hit with DeepARG's header" \
+    "test_sample2_deeparg_results/test_sample2_binette_bin1_deep_arg.out.mapping.ARG" "^ACRA	1	397	k141_0_1	multidrug	"
+if [ "$(cat "${BAS_WORK}/test_sample2_deeparg_results/test_sample2_binette_bin2_deep_arg.out.mapping.ARG")" = \
+     "$(head -1 "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG")" ]; then
+    echo "✓ bin_arg_split: a bin without hits gets the header only"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_arg_split: a bin without hits gets the header only"; FAIL=$((FAIL + 1))
+fi
+if ! grep -rq "k141_456" "${BAS_WORK}/test_sample2_bins_proteins" "${BAS_WORK}/test_sample2_deeparg_results"; then
+    echo "✓ bin_arg_split: genes of unbinned contigs are dropped"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_arg_split: genes of unbinned contigs are dropped"; FAIL=$((FAIL + 1))
+fi
+NEXT_WORKDIR="${BAS_WORK}"
+expect_fail "bin_arg_split: a file that is not a DeepARG table fails" bin_arg_split.py test_sampleX \
+    test_sample2_contig_bins.tsv test_sample2.faa.gz test_sample2_contig_bins.tsv
+
+#
 # arg_contig_level_report.py with geNomad (Phase 9b, L6 d): synthetic geNomad
 # 1.13.0 summaries (real column layout) for three contigs: k141_820 a plasmid
 # (MOBQ), k141_231 a virus, k141_0 a chromosome contig with a provirus at
