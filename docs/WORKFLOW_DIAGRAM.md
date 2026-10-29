@@ -41,10 +41,14 @@ flowchart TD
     Binning --> RefinedBins["Refined Bins<br/>Binette (if ≥2 binners) + CheckM2 + GTDB-TK"]
     
     %% Contig-level Analysis Branch
-    Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy<br/>NT_BLASTN + BLOBTOOLS]
-    Contigs -->|"if contig_tax_and_arg<br/>or contig_level_functional"| Pyrodigal[PYRODIGAL<br/>Shared Gene Calling]
-    Pyrodigal -->|if contig_tax_and_arg| ContigARG[DEEPARG_CONTIGS]
+    Contigs -->|if contig_tax_and_arg| ContigTax[Contig-level Taxonomy<br/>METABULI_CLASSIFY + BLOBTOOLS]
+    Contigs -->|if genomad_prediction| Genomad[GENOMAD_ENDTOEND<br/>plasmid / virus / provirus]
+    Contigs -->|"if contig_tax_and_arg, arg_bin_clustering<br/>or contig_level_functional"| Pyrodigal[PYRODIGAL<br/>Shared Gene Calling]
+    Pyrodigal -->|"if contig_tax_and_arg<br/>or arg_bin_clustering"| ContigARG[DEEPARG_CONTIGS]
+    RefinedBins -->|"if contig_tax_and_arg<br/>or arg_bin_clustering"| BinLabels[BIN_CONTIG_LABELS<br/>contig → bin → GTDB-Tk]
     ContigTax --> ARGContigReport
+    Genomad -->|with contig_tax_and_arg| ARGContigReport
+    BinLabels --> ARGContigReport
     ContigARG --> ARGContigReport[ARG_CONTIG_LEVEL_REPORT]
     ARGContigReport --> ARGBlobplot[ARG_BLOBPLOT]
 
@@ -57,7 +61,8 @@ flowchart TD
     RefinedBins -->|"if mag_level_functional<br/>(needs >= 2 binners)"| Bakta[BAKTA_BAKTA<br/>MAG annotation, per bin]
 
     %% Bin ARG Clustering Branch
-    RefinedBins -->|if arg_bin_clustering| BinARG[PRODIGAL_BINS → DEEPARG_BINS]
+    ContigARG -->|if arg_bin_clustering| BinARG[BIN_ARG_SPLIT<br/>DeepARG hits per bin]
+    BinLabels --> BinARG
     BinARG --> ARGFormat[ARG_FASTA_FORMATTER]
     ARGFormat --> Clustering[CLUSTERING]
     
@@ -113,6 +118,7 @@ flowchart TD
     Start --> Bindb{Binning<br/>Enabled?}
     Start --> Contigdb{Contig Analysis<br/>Enabled?}
     Start --> Argbindb{arg_bin_clustering?}
+    Start --> Genomaddb{genomad_prediction?}
     Start --> Funcdb{Functional<br/>Enabled?}
     Start --> RGIdb{RGI<br/>Enabled?}
     Start --> KMARVELdb{K-MARVEL<br/>Enabled?}
@@ -130,8 +136,8 @@ flowchart TD
     Bindb -->|Yes| GTDBTK[DOWNLOAD_GTDBTK_DB]
     Contigdb -->|Yes| DeepARG[DOWNLOAD_DEEPARG_DB]
     Argbindb -->|Yes| DeepARG
-    Contigdb -->|Yes| BLAST[FORMAT_NT_BLAST_DB]
-    Contigdb -->|Yes| Taxdump[FORMAT_TAXDUMP_FILES]
+    Contigdb -->|Yes| Metabuli["FORMAT_METABULI_DB<br/>(its taxdump feeds BLOBTOOLS)"]
+    Genomaddb -->|Yes| GenomadDB[FORMAT_GENOMAD_DB]
     Funcdb -->|Yes| EggnogDB[FORMAT_EGGNOG_DB]
     Funcdb -->|Yes| CogDB[FORMAT_COG_DB]
     Funcdb -->|"Yes (+ functional_cazy)"| DbcanDB[FORMAT_DBCAN_DB]
@@ -145,7 +151,7 @@ flowchart TD
 ```
 
 **Outputs:**
-- `kraken_db`, `sourmash_db`, `sylph_db`, `sylph_taxonomy`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `blast_db`, `taxdump`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `rgi_card_db`, `kmarvel_db`
+- `kraken_db`, `sourmash_db`, `sylph_db`, `sylph_taxonomy`, `decontamination_index`, `checkm2_db`, `gtdbtk_db`, `deeparg_db`, `metabuli_db`, `metabuli_taxdump`, `genomad_db`, `eggnog_db`, `dbcan_db`, `cog_def`, `bakta_db`, `woltka_db`, `superfocus_db`, `humann_db`, `rgi_card_db`, `kmarvel_db`
 
 ---
 
@@ -322,7 +328,8 @@ flowchart TD
 | `args_oap_prediction` | `false` | Enable ARGs-OAP read-level ARG prediction (`read_arg_prediction` is a deprecated alias) |
 | `rgi_prediction` | `false` | Enable RGI AMR prediction with pathogen-of-origin |
 | `kmarvel_prediction` | `false` | Enable K-MARVEL read-level ARG assembly against CARD |
-| `contig_tax_and_arg` | `false` | Enable contig-level taxonomy and ARG |
+| `contig_tax_and_arg` | `false` | Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) |
+| `genomad_prediction` | `false` | geNomad plasmid / virus / provirus calls on the contigs (needs an assembly) |
 | `contig_level_functional` | `false` | Enable the contig functional annotation branch (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables) |
 | `functional_cazy` | `true` | run_dbcan CAZy annotation within the functional branch |
 | `dbcan_consensus` | `'recommended'` | Which dbCAN calls feed aggregation: 'recommended' (≥2 tools) or 'any' |
@@ -332,7 +339,7 @@ flowchart TD
 | `superfocus_aligner` | `'diamond'` | SUPER-FOCUS search backend: 'diamond', 'mmseqs2' |
 | `humann_db` | `'v4_alpha-full'` | HUMAnN database set: 'v4_alpha-full' (ChocoPhlAn 44.8 GB) or 'v4_alpha-ec_filtered' (6.9 GB) |
 | `featurecounts_multimap` | `'primary'` | featureCounts multi-mapping policy: 'primary', 'all', 'none' |
-| `arg_bin_clustering` | `false` | Enable ARG clustering in bins |
+| `arg_bin_clustering` | `false` | Enable ARG clustering in bins (DEEPARG_CONTIGS hits split by bin) |
 
 ---
 
@@ -372,11 +379,11 @@ flowchart LR
 ### ARG Prediction Modules
 - **Read-level**: ARGS_OAP, ARGS_OAP_REPORT, RGI_BWT, RGI_KMER, RGI_REPORT, KMARVEL, KMARVEL_REPORT
 - **Contig-level**: DEEPARG_CONTIGS
-- **Bin-level**: DEEPARG_BINS
+- **Bin-level**: BIN_CONTIG_LABELS, BIN_ARG_SPLIT (DEEPARG_CONTIGS hits split by bin)
 
 ### Annotation & Reporting Modules
 - **Functional**: PYRODIGAL (shared gene calling), EGGNOG_MAPPER_SEARCH / EGGNOG_MAPPER_ANNOTATE, RUN_DBCAN, FEATURECOUNTS_GENES, MICROBECENSUS, AGGREGATE_FUNCTIONS, BAKTA_BAKTA (MAG level, per bin), WOLTKA_ALIGN / WOLTKA_CLASSIFY / SUPERFOCUS / HUMANN / AGGREGATE_READ_FUNCTIONS (read level)
-- **Taxonomy**: NT_BLASTN, BLOBTOOLS
+- **Taxonomy**: METABULI_CLASSIFY, BLOBTOOLS, GENOMAD_ENDTOEND (plasmid / virus)
 - **Reporting**: custom report generators
 
 ---
@@ -441,15 +448,18 @@ flowchart LR
 | `ARGS_OAP` / `ARGS_OAP_REPORT` | ARGs-OAP read-level ARGs against SARG (copies per cell, per 16S, ppm) and its run-level tables |
 | `RGI_BWT` / `RGI_KMER` / `RGI_REPORT` | CARD-based AMR prediction with pathogen-of-origin |
 | `KMARVEL` / `KMARVEL_REPORT` | K-MARVEL read-level CARD ARG assembly (blastp-confirmed) and its summary matrices |
-| `DEEPARG_CONTIGS` / `DEEPARG_BINS` | ARG prediction on contigs / bins |
+| `DEEPARG_CONTIGS` | ARG prediction on an assembly's proteins (one run per assembly; also gives the bin-level ARGs) |
 
 ### Contig Analysis
 | Module | Description |
 |--------|-------------|
-| `NT_BLASTN` | Contig taxonomic assignment via megablast |
+| `METABULI_CLASSIFY` | Contig taxonomic classification with Metabuli (`refseq_standard`) |
+| `GENOMAD_ENDTOEND` | geNomad plasmid / virus / provirus calls on the contigs (`--genomad_prediction`) |
+| `BIN_CONTIG_LABELS` | Contig → refined bin → GTDB-Tk classification |
+| `BIN_ARG_SPLIT` | DEEPARG_CONTIGS hits and Pyrodigal proteins split by bin |
 | `SAMTOOLS_INDEX` | Index BAM files for BLOBTOOLS |
 | `BLOBTOOLS` / `BLOBPLOT` | Contig taxonomy tables and plots |
-| `PYRODIGAL` / `PRODIGAL_BINS` | ORF prediction on contigs (shared gene-calling step, feeds DeepARG and functional annotation) / on bins |
+| `PYRODIGAL` | ORF prediction on contigs (shared gene-calling step, feeds DeepARG and functional annotation) |
 | `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | Contig-level ARG report and visualization |
 | `ARG_FASTA_FORMATTER` / `CLUSTERING` | Bin-level ARG formatting and clustering |
 
@@ -485,7 +495,7 @@ results/
 ├── 03_assembly/                 # Assembled and filtered contigs
 ├── 04_binning/                  # Raw/refined bins, quality, taxonomy
 ├── 05_arg_prediction/           # ARG results (read/contig/bin level)
-├── 06_contig_taxonomy/          # BlobTools contig taxonomy plots
+├── 06_contig_taxonomy/          # Metabuli calls, geNomad, BlobTools plots
 └── 07_functional_annotation/    # Gene calling, eggNOG + dbCAN annotations,
                                  # gene abundance, MicrobeCensus, TPM/CPGE
                                  # summary tables, Bakta MAG annotations

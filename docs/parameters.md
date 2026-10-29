@@ -16,11 +16,12 @@ Complete reference for all BugBuster pipeline parameters.
 8. [Results Summary Parameters](#results-summary-parameters)
 9. [Assembly Parameters](#assembly-parameters)
 10. [Binning Parameters](#binning-parameters)
-11. [ARG Prediction Parameters](#arg-prediction-parameters)
-12. [Functional Annotation Parameters](#functional-annotation-parameters)
-13. [Alignment Parameters](#alignment-parameters)
-14. [Resource Limit Parameters](#resource-limit-parameters)
-15. [Advanced Parameters](#advanced-parameters)
+11. [Contig Taxonomy Parameters](#contig-taxonomy-parameters)
+12. [ARG Prediction Parameters](#arg-prediction-parameters)
+13. [Functional Annotation Parameters](#functional-annotation-parameters)
+14. [Alignment Parameters](#alignment-parameters)
+15. [Resource Limit Parameters](#resource-limit-parameters)
+16. [Advanced Parameters](#advanced-parameters)
 
 ---
 
@@ -126,8 +127,14 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level taxonomy and ARG prediction using BlobTools and DeepARG. DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). The former `05_arg_prediction/contig_level/prodigal/` output no longer exists. The megablast search memory-maps the ~434 GB NCBI nt database and runs fastest when much of it fits in RAM; see [Contig taxonomy against NCBI nt](manual.md#contig-taxonomy-against-ncbi-nt)
-- **Example**: `--contig_tax_and_arg true`
+- **Description**: Enable contig-level taxonomy and ARG prediction. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#69-contig-taxonomy-genomad-and-deeparg-options)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
+- **Example**: `--contig_tax_and_arg true --custom_metabuli_db /shared/databases/metabuli/refseq_standard`
+
+### `--genomad_prediction`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 (nf-core `genomad/endtoend`, end-to-end with `--cleanup`), against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/`. With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `mobile_class`, `plasmid_score`, `virus_score`, `provirus` (provirus regions overlapping the ARG gene), `virus_taxonomy` and `plasmid_conjugation_genes`, and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo. Cost in the Phase 9c benchmark: 1.1-5.5 CPU-h and ~18 GB per assembly (`process_medium`)
+- **Example**: `--genomad_prediction true --custom_genomad_db /shared/databases/genomad_db`
 
 ### `--contig_level_functional`
 - **Type**: Boolean
@@ -154,7 +161,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable ARG gene prediction and clustering for horizontal gene transfer inference
+- **Description**: Enable bin-level ARGs and their clustering for horizontal gene transfer inference. Requires `--include_binning`. The ARGs are DEEPARG_CONTIGS' hits on the whole assembly (shared Pyrodigal proteins) split by refined bin (`BIN_ARG_SPLIT`), not a DeepARG run per bin: DeepARG min-max scales its features over its input file, so per-bin runs gave probabilities that depended on the bin (Phase 9a, M8). Per-bin hits and proteins in `05_arg_prediction/bin_level/{deeparg,proteins}/<sample>/`, MMseqs2 clusters in `bin_level/clustering/`
 - **Example**: `--arg_bin_clustering true`
 
 ### `--min_read_sample`
@@ -214,19 +221,21 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: 4.6 MB download, 4.1 MB stored
 - **Example**: `--kmarvel_db card_v4.0.1`
 
-### `--blast_db`
+### `--metabuli_db`
 - **Type**: String
-- **Default**: `nt`
-- **Description**: BLAST database selection for contig taxonomy
-- **Size**: 434 GB
-- **Example**: `--blast_db nt`
+- **Default**: `refseq_standard`
+- **Options**: `refseq_standard`, `gtdb232`
+- **Description**: Metabuli database for contig taxonomy (`--contig_tax_and_arg`). `refseq_standard`: the Kraken2 PlusPF genome set (RefSeq archaea, bacteria, viruses, plasmids, protozoa, fungi and human) with NCBI taxonomy, built 2026-04-03. `gtdb232`: GTDB R232 species representatives with human and RefSeq viruses, GTDB names; not benchmarked in the pipeline. Each database ships the taxdump it was built with, which BlobTools reads
+- **Size**: `refseq_standard` 80 GB download, 110 GB unpacked (about 190 GB free disk while it unpacks); `gtdb232` 634 / 744 GB
+- **Example**: `--metabuli_db refseq_standard`
 
-### `--taxdump_files`
+### `--genomad_db`
 - **Type**: String
-- **Default**: `ncbi`
-- **Description**: Taxonomy dump selection for BlobTools
-- **Size**: 448 MB
-- **Example**: `--taxdump_files ncbi`
+- **Default**: `v1.9`
+- **Options**: `v1.9`
+- **Description**: geNomad database release for `--genomad_prediction`: the pinned Zenodo file (record 14886553), md5- and version-checked (geNomad's own `download-database` always takes the latest release)
+- **Size**: 0.84 GB download, 2.2 GB unpacked
+- **Example**: `--genomad_db v1.9`
 
 ### `--checkm2_db`
 - **Type**: String
@@ -373,15 +382,16 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Path to custom DeepARG database directory
 - **Example**: `--custom_deeparg_db /path/to/deeparg_db`
 
-### `--custom_blast_db`
+### `--custom_metabuli_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom BLAST NT database directory
-- **Example**: `--custom_blast_db /path/to/blast_nt`
+- **Description**: Path to a local Metabuli database directory; skips the download
+- **Requirements**: `db.parameters`, `diffIdx`, `info`, `taxonomyDB`, and the taxdump the database was built with (`nodes.dmp`, `names.dmp`) in the directory or one level down (`refseq_standard` has them in `ncbi-taxdump/`); a launch error otherwise. BlobTools reads that taxdump so every Metabuli taxid resolves
+- **Example**: `--custom_metabuli_db /shared/databases/metabuli/refseq_standard`
 
-### `--custom_taxdump_files`
+### `--custom_genomad_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom NCBI taxdump directory
-- **Example**: `--custom_taxdump_files /path/to/taxdump`
+- **Description**: Path to a local geNomad database directory (`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); skips the download. geNomad 1.10-1.13 take database 1.9; its `version.txt` is recorded in `software_versions.yml`
+- **Example**: `--custom_genomad_db /shared/databases/genomad_db`
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)
@@ -808,6 +818,24 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Default**: `200000`
 - **Description**: Minimum cluster size (bp) for MetaBAT2
 - **Example**: `--metabat_minClsSize 250000`
+
+---
+
+## Contig Taxonomy Parameters
+
+### `--metabuli_min_score`
+- **Type**: Number
+- **Default**: `0.2`
+- **Range**: 0-1
+- **Description**: Metabuli `--min-score`: minimum sequence similarity score for a contig to be classified. Chosen with `--metabuli_min_sp_score` in the Phase 9c benchmark: without cutoffs Metabuli classified ~97 % of contigs, but its low-score calls mostly disagreed with BLAST against nt
+- **Example**: `--metabuli_min_score 0.3`
+
+### `--metabuli_min_sp_score`
+- **Type**: Number
+- **Default**: `0.5`
+- **Range**: 0-1
+- **Description**: Metabuli `--min-sp-score`: minimum score for a species-level (or lower) call; below it the call moves to genus or higher (below 0.5, species calls agreed with BLAST 15-44 % of the time in Phase 9c)
+- **Example**: `--metabuli_min_sp_score 0.6`
 
 ---
 

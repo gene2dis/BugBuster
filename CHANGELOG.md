@@ -12,6 +12,24 @@ next release is tagged.
 
 ### Added
 
+- **Plasmid / virus classification of contigs with geNomad
+  (`--genomad_prediction`, off by default)**: nf-core `genomad/endtoend` with
+  geNomad 1.13.0 (`quay.io/biocontainers/genomad:1.13.0--pyhdfd78af_0` and its
+  depot sif) on each assembly, against database 1.9 (`--genomad_db`, a pinned
+  Zenodo file, 0.84 GB; `--custom_genomad_db`). Outputs in
+  `06_contig_taxonomy/genomad/<sample>/`. With `--contig_tax_and_arg`,
+  `Contig_tax_and_arg_prediction.tsv` gains `mobile_class` (chromosome /
+  plasmid / virus), `plasmid_score`, `virus_score`, `provirus` (provirus
+  regions overlapping the ARG gene), `virus_taxonomy` and
+  `plasmid_conjugation_genes`, and the results summary gains
+  `arg_contig_mobile` (ARG genes per assembly and class on plasmid and virus
+  contigs and in proviruses). geNomad's plasmid class also takes integrative
+  conjugative elements and transposon cargo. 1.1-5.5 CPU-h and ~18 GB per
+  assembly in the Phase 9c benchmark (`docs/benchmarks/contig_classifiers_2026.md`)
+- **Bin columns on the contig table**: with `--include_binning`,
+  `Contig_tax_and_arg_prediction.tsv` has `bin` and `bin_gtdb_classification`
+  (the refined bin and its GTDB-Tk string, from the new `BIN_CONTIG_LABELS`),
+  next to the NCBI ranks and never filling them
 - **ARGs-OAP as a read-level ARG method (`--args_oap_prediction`)**: `ARGS_OAP`
   now runs stage two as well, which searches the ARG-like reads of stage one
   against SARG and normalises them by type, subtype and gene (copies per cell,
@@ -411,6 +429,44 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (contig taxonomy)**: Metabuli 1.2.0
+  (`quay.io/biocontainers/metabuli:1.2.0--pl5321h0bb26bb_0` and its depot
+  sif; new `METABULI_CLASSIFY`, `classify --seq-mode 3 --lineage 1`,
+  `process_medium` with `--max-ram` from the task's memory) replaces megablast
+  against NCBI nt (`NT_BLASTN`) under `--contig_tax_and_arg`. Its database is
+  `--metabuli_db refseq_standard` (the Kraken2 PlusPF genome set with NCBI
+  taxonomy; 80 GB download, 110 GB unpacked; `gtdb232` listed, not
+  benchmarked) or `--custom_metabuli_db`; the score cutoffs are
+  `--metabuli_min_score` (0.2) and `--metabuli_min_sp_score` (0.5). In the
+  Phase 9a/9c benchmarks BLAST took 201,739 CPU-s on one 36.6 Mbp assembly
+  against Metabuli's 443-942 CPU-s per assembly (5-12 GB); on ARG-bearing
+  contigs Metabuli's genus agreed with BLAST on 91.8 % and its species on
+  77.7 % where both name one, and it gave a genus to 73.9 % of all contigs.
+  `Contig_tax_and_arg_prediction.tsv` takes its ranks from Metabuli's lineage:
+  `superkingdom` (NCBI `domain`, or Viruses), `phylum`, `class` (new),
+  `order`, `family`, `genus`, `species`, plus `taxonomy_rank` and
+  `taxonomy_score`; unclassified contigs have empty ranks (BlobTools wrote
+  `no-hit`). BlobTools keeps the tables and the phylum blob plot, fed
+  Metabuli's per-contig taxids and the database's own taxdump. Metabuli's
+  calls are published to `06_contig_taxonomy/metabuli/<sample>/`
+- **Breaking (bin-level ARGs)**: `--arg_bin_clustering` takes the bins' ARGs
+  from `DEEPARG_CONTIGS` (one DeepARG run on the assembly's Pyrodigal
+  proteins) split by bin (new `BIN_ARG_SPLIT`), instead of Prodigal and
+  DeepARG per bin. DeepARG min-max scales its features over its input file,
+  so a per-bin run scored a bin's few candidates against each other (in
+  Phase 9a a class A beta-lactamase scored 0.227 alone and 0.994 with the
+  sample's other proteins; 228 of 247 hits were on both routes). PYRODIGAL
+  and DEEPARG_CONTIGS now also run for `--arg_bin_clustering`; the per-bin
+  files keep their paths (`05_arg_prediction/bin_level/{deeparg,proteins}/`)
+  but hold Pyrodigal's genes (meta mode on the assembly)
+- **DeepARG and BlobTools from biocontainers**: `DEEPARG_CONTIGS` and
+  `DOWNLOAD_DEEPARG_DB` use `quay.io/biocontainers/deeparg:1.0.4--pyhdfd78af_0`,
+  `BLOBTOOLS` `quay.io/biocontainers/blobtools:1.1.1--py_1` (and their depot
+  sifs), replacing the `quay.io/ffuentessantander` images, which had no
+  Dockerfile; the same Python, DIAMOND and library versions inside. DeepARG's
+  Theano compile cache is kept in the task directory (the biocontainer has no
+  writable `/.theano`). `DEEPARG_CONTIGS` requests 4 CPUs and 4 GB × attempt
+  (3.2 cores and 0.9 GB used at 8 CPUs)
 - **ARGs-OAP 3.2.4 → 4.0.0, biocontainer** (`quay.io/biocontainers/args_oap:4.0.0--pyhdfd78af_0`
   and its depot sif, replacing `quay.io/ffuentessantander/args_oap:3.2.4`, which
   had no Dockerfile). 4.0.0 changes no database or pipeline step (it adds an
@@ -831,6 +887,14 @@ next release is tagged.
 
 ### Removed
 
+- **Breaking**: megablast against NCBI nt for contig taxonomy (`NT_BLASTN`,
+  `FORMAT_NT_BLAST_DB`, `FORMAT_TAXDUMP_FILES`, `bin/blast_nt_reformat.sh`,
+  `bin/tax_files_reformat.sh`) and its parameters `--blast_db`,
+  `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files`: passing
+  one aborts the run at startup. The ~434 GB nt database is no longer needed;
+  BlobTools reads the taxdump of the Metabuli database
+- `PRODIGAL_BINS` and `DEEPARG_BINS` (bin-level ARGs now come from
+  `DEEPARG_CONTIGS`, see Changed)
 - **Breaking**: KARGA and KARGVA (read-level MEGARes genes and variants) are
   removed, with `ARG_NORM_REPORT` (`bin/arg_norm_report.py`) and its
   `05_arg_prediction/read_level/summary/KARGA_norm.csv` / `KARGVA_norm.csv`,
@@ -854,6 +918,13 @@ next release is tagged.
 
 ### Fixed
 
+- **BlobTools `undef` superkingdoms**: with an NCBI taxdump from 2025 on
+  (the default `--taxdump_files ncbi` downloaded the current one), BlobTools
+  1.1.1 wrote `undef` as every contig's superkingdom, because NCBI renamed the
+  rank `domain` and made Viruses an `acellular root`. `BLOBTOOLS` now gets a
+  task copy of `nodes.dmp` with both renamed `superkingdom`
+  (`bin/blobtools_nodes_fix.sh`), and the contig table's ranks come from
+  Metabuli
 - **sourmash failures reported as unclassified samples**: `SOURMASH` ran
   `sourmash gather ... || true`, so a failed gather (e.g.
   `--sourmash_tax_rank genus` or `strain`, which pick k=21 or k=51, against
