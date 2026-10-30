@@ -429,6 +429,11 @@ next release is tagged.
 
 ### Changed
 
+- **BlobTools parses the taxdump once per run**: a new `BLOBTOOLS_NODESDB`
+  task turns the Metabuli database's `nodes.dmp`/`names.dmp` into BlobTools'
+  nodesDB (~1 min) and every sample's `BLOBTOOLS` task reads it instead of
+  parsing the taxdump itself (one sample: 58 s → 24 s). Blob tables are
+  identical
 - **ARG_FASTA_FORMATTER on the report processes' image**: its helper,
   `extract_sequences.py`, existed only inside the custom
   `quay.io/ffuentessantander/biopython_utils:1.0` image (Python 3.8.10,

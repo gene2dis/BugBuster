@@ -1,5 +1,5 @@
 name: blobtools
-description: Builds a BlobTools v1 BlobDB from contigs, their Metabuli calls (one hit per classified contig), read mappings and the Metabuli database's taxdump, then tabulates it at all taxonomic ranks (blobtools create + view); the taxdump's 2025 'domain' rank and the Viruses node are renamed 'superkingdom' in a task-dir copy of nodes.dmp
+description: Builds a BlobTools v1 BlobDB from contigs, their Metabuli calls (one hit per classified contig), read mappings and the nodesDB that BLOBTOOLS_NODESDB parsed from the Metabuli database's taxdump, then tabulates it at all taxonomic ranks (blobtools create + view)
 keywords:
   - contig taxonomy
   - blobtools
@@ -31,9 +31,10 @@ input:
       type: file
       description: Index of the BAM file
       pattern: "*.bai"
-  - tax_files:
+  - nodesdb:
       type: file
-      description: nodes.dmp and names.dmp of the Metabuli database (the taxdump its taxids come from)
+      description: BLOBTOOLS_NODESDB's nodesDB.txt (the Metabuli database's taxdump, parsed once for every sample)
+      pattern: "nodesDB.txt"
 
 output:
   - blob_table:
