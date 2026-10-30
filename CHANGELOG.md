@@ -429,6 +429,13 @@ next release is tagged.
 
 ### Changed
 
+- **ARG_FASTA_FORMATTER on the report processes' image**: its helper,
+  `extract_sequences.py`, existed only inside the custom
+  `quay.io/ffuentessantander/biopython_utils:1.0` image (Python 3.8.10,
+  biopython 1.78); it is now in `bin/` (unchanged) and the process runs on
+  `community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9`
+  (biopython 1.88; its `oras://` build `cd89ac4e30745df7` under Singularity
+  and Apptainer). The ARG FASTA files are identical
 - **Databases are stored once and reused across runs (`storeDir`)**: the
   database download and build tasks (`FORMAT_*`, `DOWNLOAD_DEEPARG_DB`,
   `DOWNLOAD_GTDBTK_DB`, `RGI_LOAD`, `SOURMASH_TAX_PREPARE` and the
