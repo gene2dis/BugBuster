@@ -137,9 +137,9 @@ process RESULTS_SUMMARY {
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        python: 3.12.0
-        pandas: 2.2.3
-        matplotlib: 3.9.2
+        python: 3.13.18
+        pandas: 3.1.0
+        matplotlib: 3.11.2
         openpyxl: 3.1.5
     END_VERSIONS
     """

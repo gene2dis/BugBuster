@@ -124,28 +124,37 @@ check_file() {
 }
 
 #
-# report_unify.py (fixture formats match modules/local/qfilter,
-# bowtie2_decontaminate, and count_reads report outputs)
-#
-
-#
-# One Python image for every report process (U6): the pins must not drift apart
+# One Python image for every report process (U6): the pins must not drift apart.
+# Every local module that pins a Seqera pandas image is compared, so a new
+# module is covered without editing this list; the list only names the
+# modules that must carry the pin
 #
 echo "--- report image pins ---"
 REPORT_MODULES="aggregate_functions aggregate_read_functions arg_blobplot arg_contig_level_report args_oap_report
     bin_arg_split bin_contig_labels bin_quality_report bin_summary bin_tax_report blobplot kmarvel_report
     reads_report results_summary rgi_report taxonomy_phyloseq taxonomy_report"
-pins=$(for m in ${REPORT_MODULES}; do
-    grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/${m}/main.nf" \
-        | tr -d "'" | sort | tr '\n' ' '; echo
+missing=""
+for m in ${REPORT_MODULES}; do
+    grep -q "community.wave.seqera.io/library/python_pandas" "${REPO_DIR}/modules/local/${m}/main.nf" \
+        || missing="${missing} ${m}"
+done
+pins=$(for f in "${REPO_DIR}"/modules/local/*/main.nf; do
+    p=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${f}" | tr -d "'" | sort | tr '\n' ' ')
+    if [ -n "${p}" ]; then echo "${p}"; fi
 done | sort -u)
-if [ "$(printf '%s\n' "${pins}" | wc -l)" -eq 1 ] && [ "$(printf '%s\n' "${pins}" | wc -w)" -eq 2 ]; then
-    echo "✓ report image pins: 17 modules pin the same docker and oras images"
+n_pinned=$(grep -l "community.wave.seqera.io/library/python_pandas" "${REPO_DIR}"/modules/local/*/main.nf | wc -l)
+if [ -z "${missing}" ] && [ "$(printf '%s\n' "${pins}" | wc -l)" -eq 1 ] && [ "$(printf '%s\n' "${pins}" | wc -w)" -eq 2 ]; then
+    echo "✓ report image pins: ${n_pinned} modules pin the same docker and oras images"
     PASS=$((PASS + 1))
 else
-    echo "✗ report image pins differ between modules:"; printf '%s\n' "${pins}"
+    echo "✗ report image pins differ between modules (or missing in:${missing:- none}):"; printf '%s\n' "${pins}"
     FAIL=$((FAIL + 1))
 fi
+
+#
+# report_unify.py (fixture formats match modules/local/qfilter,
+# bowtie2_decontaminate, and count_reads report outputs)
+#
 echo "--- report_unify.py ---"
 RU_WORK="${WORK}/report_unify_filtered"
 mkdir -p "${RU_WORK}"

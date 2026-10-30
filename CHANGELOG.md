@@ -440,8 +440,11 @@ next release is tagged.
   and its `oras://` build `cd89ac4e30745df7` under Singularity and
   Apptainer). pandas 3 reads floats from the stage tables exactly, where
   pandas 2 could be one unit off in the last place, so some values move in
-  their 16th-17th significant digit (e.g. ARGs-OAP copies per cell). Tables
-  are otherwise unchanged and figures look the same
+  their 16th-17th significant digit (e.g. ARGs-OAP copies per cell). The
+  scripts that ran on pandas 1.4.2 now also read a cell holding the text
+  `None` as missing (pandas 2 and later); no column they use holds it. Tables
+  are otherwise unchanged and figures look the same. The 14 processes that
+  had no `conda` directive now declare the same packages
 - **phyloseq 1.46.0 → 1.54.0** in PHYLOSEQ_CONVERTER
   (`quay.io/biocontainers/bioconductor-phyloseq:1.54.0--r45hdfd78af_0`, R
   4.5.2), the docker image for every engine since no 1.54 Singularity image
