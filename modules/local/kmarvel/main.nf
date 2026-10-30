@@ -22,8 +22,10 @@
         on fixed dot-free names and the results are renamed to the sample
       - a failed blastp exits 0, and zero ARGs give a header-less TSV:
         bin/kmarvel_check_output.sh handles both
-      - --reference is also the blastp -db, so the FASTA is copied into the
-        task and indexed there (the shared database is never written to)
+      - --reference is also the blastp -db: the FASTA and the BLAST index
+        FORMAT_KMARVEL_DB builds are linked into the task; a database without
+        a current index (a --custom_kmarvel_db) gets a copy of the FASTA
+        indexed in the task (the shared database is never written to)
       - -k/-e are ignored (fixed by --data-type) and are not exposed
 
     Input:
@@ -31,8 +33,9 @@
         reads: host-removed reads [R1, R2, optional singletons]; all are
                concatenated, as upstream asks for paired-end data
         kmarvel_db: CARD_protein_all.fasta, metadata.tsv, snps.txt
-                    (+ DB_VERSION when built by FORMAT_KMARVEL_DB; without
-                    it, versions.yml records the FASTA's md5)
+                    (+ DB_VERSION and the BLAST index when built by
+                    FORMAT_KMARVEL_DB; without DB_VERSION, versions.yml
+                    records the FASTA's md5)
 
     Output:
         tsv: tuple val(meta), path("*_kmarvel.tsv")
@@ -77,11 +80,30 @@ process KMARVEL {
         # for a --custom_kmarvel_db without one
         card_version=\$(kmarvel_db_version.sh ${kmarvel_db})
 
-        # Own copy of the reference with its BLAST index; the small metadata
-        # files are only read
-        cp -L ${kmarvel_db}/CARD_protein_all.fasta CARD_protein_all.fasta
-        makeblastdb -in CARD_protein_all.fasta -dbtype prot -blastdb_version 5 \\
-            -title CARD_protein_all -out CARD_protein_all.fasta > makeblastdb.log
+        # The reference and its BLAST index (FORMAT_KMARVEL_DB builds it):
+        # linked when every index file is there and the index holds the
+        # FASTA's sequence and residue counts (its .pjs), else a copy of the
+        # FASTA is indexed here. The metadata files are only read
+        ref=${kmarvel_db}/CARD_protein_all.fasta
+        indexed=1
+        for ext in pdb phr pin pjs pot psq ptf pto; do
+            if [ ! -s \$ref.\$ext ]; then indexed=0; fi
+        done
+        if [ "\$indexed" = 1 ]; then
+            fasta_counts=\$(awk '/^>/ { s++; next } { gsub(/[ \\t\\r]/, ""); l += length(\$0) } END { print s + 0, l + 0 }' \$ref)
+            index_counts=\$(awk -F'[:,]' '/"number-of-sequences"/ { s = \$2 + 0 } /"number-of-letters"/ { l = \$2 + 0 } END { print s + 0, l + 0 }' \$ref.pjs)
+            if [ "\$fasta_counts" != "\$index_counts" ]; then
+                echo "WARNING: the BLAST index in ${kmarvel_db} does not match CARD_protein_all.fasta (\$index_counts vs \$fasta_counts sequences, residues): indexing a copy instead" >&2
+                indexed=0
+            fi
+        fi
+        if [ "\$indexed" = 1 ]; then
+            for f in \$ref \$ref.p*; do ln -s "\$f" .; done
+        else
+            cp -L \$ref CARD_protein_all.fasta
+            makeblastdb -in CARD_protein_all.fasta -dbtype prot -blastdb_version 5 \\
+                -title CARD_protein_all -out CARD_protein_all.fasta > makeblastdb.log
+        fi
         ln -s ${kmarvel_db}/metadata.tsv metadata.tsv
         ln -s ${kmarvel_db}/snps.txt snps.txt
 

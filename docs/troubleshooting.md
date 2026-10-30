@@ -439,7 +439,7 @@ because K-MARVEL 1.0.0 exits 0 even when its blastp step fails.
 - **"... has no CARD_protein_all.fasta (expected a FORMAT_KMARVEL_DB /
   --custom_kmarvel_db layout)":** `--custom_kmarvel_db` must point at the
   directory holding `CARD_protein_all.fasta`, `metadata.tsv` and `snps.txt`
-  (for example `<databases_dir>/kmarvel/card_v4.0.1/kmarvel_db` from an earlier run), not at its
+  (for example `<databases_dir>/kmarvel/card_v4.0.1_blastdb/kmarvel_db` from an earlier run), not at its
   parent.
 - **No ARGs for any sample:** K-MARVEL ignores reads shorter than
   `--kmarvel_min_read_length` (100 bp), so heavily trimmed short reads can leave

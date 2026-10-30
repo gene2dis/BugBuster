@@ -429,6 +429,14 @@ next release is tagged.
 
 ### Changed
 
+- **K-MARVEL's CARD BLAST index is built once**: FORMAT_KMARVEL_DB now builds
+  it into the stored database (`<databases_dir>/kmarvel/<key>_blastdb/`; the
+  new key means a store filled before the index is rebuilt, not reused) and
+  each KMARVEL task links it instead of running `makeblastdb` on a copy of
+  the FASTA. A `--custom_kmarvel_db` without an index (or with one whose
+  sequence and residue counts do not match the FASTA) is indexed per task as
+  before. Results are identical (the order of supporting read ids within a
+  row varies between runs, as before)
 - **BlobTools parses the taxdump once per run**: a new `BLOBTOOLS_NODESDB`
   task turns the Metabuli database's `nodes.dmp`/`names.dmp` into BlobTools'
   nodesDB (~1 min) and every sample's `BLOBTOOLS` task reads it instead of

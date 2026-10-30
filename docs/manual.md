@@ -1505,7 +1505,7 @@ databases/                            # Database storage (configurable via --dat
 ├── genomad/v1.9/                     # geNomad database 1.9 (genomad_db/, ~2.2 GB)
 ├── deeparg/1.0.4/                    # DeepARG database (deeparg_db/; unversioned upstream, keyed by the deeparg version)
 ├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, _wildcard_k<--rgi_kmer_size> with WildCARD)
-├── kmarvel/card_v4.0.1/              # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
+├── kmarvel/card_v4.0.1_blastdb/      # CARD 4.0.1 protein models for K-MARVEL and their BLAST index (kmarvel_db/, ~7 MB)
 ├── checkm2/v3/                       # CheckM2 database (*.dmnd)
 ├── gtdbtk/release_232/               # GTDB-TK database (gtdbtk_db/)
 ├── eggnog/emapper-3.0/               # eggNOG 7 data for eggNOG-mapper v3 (eggnog_db/, ~44 GB)

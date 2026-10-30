@@ -24,7 +24,7 @@ input:
       pattern: "*.{fq,fastq,fq.gz,fastq.gz}"
   - kmarvel_db:
       type: directory
-      description: CARD reference directory with CARD_protein_all.fasta, metadata.tsv and snps.txt (FORMAT_KMARVEL_DB or --custom_kmarvel_db); the FASTA is copied into the task and indexed with makeblastdb there
+      description: CARD reference directory with CARD_protein_all.fasta, metadata.tsv and snps.txt (FORMAT_KMARVEL_DB or --custom_kmarvel_db); the FASTA and FORMAT_KMARVEL_DB's BLAST index are linked into the task, and a database without a current index gets a copy of the FASTA indexed with makeblastdb there
       pattern: "*"
 
 output:

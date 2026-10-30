@@ -408,9 +408,9 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_kmarvel_db`
 - **Type**: String (directory path)
-- **Description**: Path to a K-MARVEL database directory; skips the download. A database stored by an earlier run (`<databases_dir>/kmarvel/card_v4.0.1/kmarvel_db`) can be reused as is (with the same `--databases_dir` it is reused without this option)
-- **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/card_v4.0.1/kmarvel_db`
-- **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). No BLAST index is needed: each task indexes its own copy of the FASTA. An optional `DB_VERSION` file (its first line) is recorded as `card:` under `KMARVEL` in `pipeline_info/software_versions.yml`; without it the entry is `custom (CARD_protein_all.fasta md5 <md5>)`, so the reference can still be traced
+- **Description**: Path to a K-MARVEL database directory; skips the download. A database stored by an earlier run (`<databases_dir>/kmarvel/card_v4.0.1_blastdb/kmarvel_db`) can be reused as is (with the same `--databases_dir` it is reused without this option)
+- **Example**: `--custom_kmarvel_db /path/to/databases/kmarvel/card_v4.0.1_blastdb/kmarvel_db`
+- **Requirements**: Directory must contain `CARD_protein_all.fasta` (CARD protein homolog + overexpression + variant model FASTAs), `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`). A BLAST index of the FASTA (`CARD_protein_all.fasta.p*`, as `makeblastdb -in CARD_protein_all.fasta -dbtype prot -blastdb_version 5 -out CARD_protein_all.fasta` writes it; FORMAT_KMARVEL_DB builds one) is optional: without one, or with one whose sequence and residue counts do not match the FASTA, each task indexes its own copy of the FASTA (under a second). An optional `DB_VERSION` file (its first line) is recorded as `card:` under `KMARVEL` in `pipeline_info/software_versions.yml`; without it the entry is `custom (CARD_protein_all.fasta md5 <md5>)`, so the reference can still be traced
 
 ### `--custom_dbcan_db`
 - **Type**: String (directory path)
