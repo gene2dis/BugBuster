@@ -43,6 +43,8 @@ trap 'rm -rf "${TMP_DIR}"' EXIT
 
 SUMMARY_IMG=$(grep -o "'community.wave.seqera.io/library/python_pandas[^']*'" \
     "${REPO_DIR}/modules/local/results_summary/main.nf" | tr -d "'" | head -1)
+# REPORT_TEST_IMG=<image>: run the scripts in that image instead of the pinned one (to try an image before pinning it)
+SUMMARY_IMG=${REPORT_TEST_IMG:-${SUMMARY_IMG}}
 py() {
     # python3 in the module's image, with the repo and the scratch dir at their host paths
     if [ "${RS_TEST_HOST:-0}" = "1" ]; then

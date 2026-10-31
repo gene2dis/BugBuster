@@ -29,6 +29,8 @@ FIXTURES="${REPO_DIR}/tests/data/taxonomy"
 # Use the exact image pinned in the module so the test cannot drift from it
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# REPORT_TEST_IMG=<image>: run the scripts in that image instead of the pinned one (to try an image before pinning it)
+REPORT_IMG=${REPORT_TEST_IMG:-${REPORT_IMG}}
 
 if [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container image from modules/local/taxonomy_report/main.nf"

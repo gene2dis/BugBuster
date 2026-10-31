@@ -353,7 +353,7 @@ def main():
         if ags_samples:
             wide[ags_samples] = wide[ags_samples].fillna(0.0)
         wide.index.name = 'accession'
-        # cell-wise formatting: pandas 2.0 (pinned image) drops float_format
+        # cell-wise formatting: pandas 2.0 drops float_format
         # when na_rep is also given (aggregate_functions.py precedent)
         for column in wide.columns:
             wide[column] = ['' if pd.isna(v) else CPGE_FORMAT.format(v) for v in wide[column]]

@@ -718,8 +718,8 @@ expect_fail "humann: 404 archive URL fails" humann_db_reformat.sh \
 # Report image smoke test (audit #21): all libraries importable, no runtime pip
 #
 echo "--- report container image ---"
-if docker run --rm "${REPORT_IMG}" python3 -c "import pandas, numpy, matplotlib, seaborn, h5py, biom" > /dev/null 2>&1; then
-    echo "✓ report image: pandas/numpy/matplotlib/seaborn/h5py/biom importable"
+if docker run --rm "${REPORT_IMG}" python3 -c "import pandas, numpy, matplotlib, seaborn, h5py, openpyxl, Bio" > /dev/null 2>&1; then
+    echo "✓ report image: pandas/numpy/matplotlib/seaborn/h5py/openpyxl/biopython importable"
     PASS=$((PASS + 1))
 else
     echo "✗ report image: python imports failed"

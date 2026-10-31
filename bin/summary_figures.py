@@ -265,7 +265,7 @@ def pick_taxa(wide, per_sample_k, cap=None):
         top = wide[s][wide[s] > 0].nlargest(per_sample_k).index
         chosen.update(top)
     chosen = [t for t in wide.index if t in chosen and not t.startswith("unassigned")]
-    ranked = wide.loc[chosen].max(axis=1).sort_values(ascending=False)
+    ranked = wide.loc[chosen].max(axis=1).sort_values(ascending=False, kind="stable")
     return list(ranked.index[:cap] if cap else ranked.index)
 
 
@@ -396,7 +396,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
     sel = gene["tier"] <= 2
     t1 = list(gene.index[(gene["tier"] == 1) & (num.max(axis=1) > 0)])
     t2 = num[sel & (gene["tier"] == 2)]
-    t2 = list((t2 > 0).sum(axis=1).sort_values(ascending=False).index[: max(0, top_n - len(t1))])
+    t2 = list((t2 > 0).sum(axis=1).sort_values(ascending=False, kind="stable").index[: max(0, top_n - len(t1))])
     rows = t1 + t2
     if rows:
         labels = [f"{g}  [T{int(gene.at[g, 'tier'])}]" for g in rows]
@@ -411,7 +411,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
         acq = dc.xs("acquired (tiers 1-2)", level="tier_group") if "acquired (tiers 1-2)" in dc.index.get_level_values(0) else None
         if acq is not None and not acq.empty:
             acqn = acq[cols].apply(pd.to_numeric, errors="coerce")
-            acqn = acqn.loc[acqn.max(axis=1).sort_values(ascending=False).index]
+            acqn = acqn.loc[acqn.max(axis=1).sort_values(ascending=False, kind="stable").index]
             heatmap(fw, "arg_drug_class_heatmap", "Acquired ARG abundance by drug class",
                     "Sum of RPKM of acquired genes (tiers 1-2) conferring resistance to each class. A gene that "
                     "confers resistance to several classes counts in each, so columns are not additive.",
@@ -571,7 +571,7 @@ def fig_sarg(fw, mat, cols, groups, low, hatch):
     num = num[num.fillna(0).gt(0).any(axis=1)]
     if num.empty:
         return
-    num = num.loc[num.max(axis=1).sort_values(ascending=False).index]
+    num = num.loc[num.max(axis=1).sort_values(ascending=False, kind="stable").index]
     labels = [str(t).replace("_", " ") for t in num.index]
     heatmap(fw, "arg_sarg_type_heatmap", "ARGs-OAP (SARG): resistance gene copies per cell by type",
             "log10 copies per cell: SARG copies (reads weighted by the share of the reference they cover) summed per "

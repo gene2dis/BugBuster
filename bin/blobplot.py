@@ -76,7 +76,7 @@ def main():
     # Calculate total length by phylum
     phylum_summary = data.groupby('phylum')['length'].sum().reset_index()
     phylum_summary.columns = ['phylum', 'length_sum']
-    phylum_summary = phylum_summary.sort_values('length_sum', ascending=False)
+    phylum_summary = phylum_summary.sort_values('length_sum', ascending=False, kind='stable')
     
     # Determine number of top phyla to show (max 9)
     num_top = min(9, len(phylum_summary))
