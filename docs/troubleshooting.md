@@ -180,6 +180,41 @@ see below) and `HUMANN` (~23.5 GB per sample). Observed requirements per step ar
 listed under [Functional annotation branches](manual.md#functional-annotation-branches)
 in the manual.
 
+### KRAKEN2 is killed (exit 137), or runs for hours, with a large Kraken2 database
+
+**Cause:** Kraken2 needs the database's `hash.k2d` in memory. `KRAKEN2` requests
+1.1 × the size of `hash.k2d` + 2 GB (at least 72 GB): 116 GB for the 2026
+standard database (`hash.k2d` 103 GB). Every request is capped by
+`--max_memory` (128 GB by default), and the cap does not make a larger database
+fit: below about 1.1 × `hash.k2d` the task is killed for memory, and with
+memory mapping (below) it slows to a crawl instead, because the database is
+read again from disk over and over.
+
+Check the size with `ls -lh <database>/hash.k2d`.
+
+**Solution** when `--max_memory` (or the machine) is smaller than that:
+1. Use a database that fits: `--kraken2_db standard-8` (7.5 GB), or another
+   size-capped Kraken2 index through `--custom_kraken_db`
+2. Use another profiler: `--taxonomic_profiler sylph` (the default) or
+   `sourmash`
+3. Run on a node with more memory and raise `--max_memory` to match (see
+   [the limits section](#process-requirement-exceeds-available-cpus-or-memory-or-raised-limits-seem-ignored))
+
+`KRAKEN2` runs Kraken2 with `--memory-mapping`: it reads `hash.k2d` through the
+page cache instead of loading it first, which on a 10 M read-pair sample took
+3 min instead of 10 (2 min instead of 7 when the database was already cached),
+with the same report. The page cache counts against the task's memory, so this
+does not lower the memory a task needs. If the database sits on a network
+filesystem and `KRAKEN2` is slower than expected, load it into memory instead
+with a `-c` config:
+```groovy
+process {
+    withName: '.*:KRAKEN2' {
+        ext.args = "--confidence ${params.kraken_confidence}"
+    }
+}
+```
+
 ### Out of disk space
 
 **Error:**

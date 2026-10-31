@@ -429,6 +429,16 @@ next release is tagged.
 
 ### Changed
 
+- **Read-level Kraken2 requests memory for its database and memory-maps it**:
+  `KRAKEN2` now requests 1.1 × the size of the database's `hash.k2d` + 2 GB
+  (at least the 72 GB it had): the 2026 standard database (`hash.k2d` 103 GB)
+  failed the 72 GB first attempt and gets 116 GB, while `standard-8` stays at
+  72 GB. It also runs with `--memory-mapping`, reading `hash.k2d` through the
+  page cache instead of loading it first: on a 10 M read-pair sample with the
+  standard database, 3 min instead of 10 (2 min instead of 7 when the
+  database was cached), with the same report. Memory mapping does not lower
+  the memory a task needs; `docs/troubleshooting.md` says what to do with a
+  smaller `--max_memory` and how to drop the flag on a network filesystem
 - **ARGs-OAP keeps 8 CPUs, now set by name**: timed on a 10 M read-pair
   sample, 8 CPUs took 46 min (stage one 31 min, stage two 15 min), 4 CPUs
   73 min and 2 CPUs 127 min, with identical outputs at every count, so
