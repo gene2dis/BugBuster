@@ -8,14 +8,16 @@
 #
 # The pinned image runs under `docker run --read-only` (a read-only root, as in
 # a sif) on a tiny on-the-fly fixture:
-#   - the module's BLOBTOOLS script still carries `--db nodesDB.txt`,
+#   - BLOBTOOLS_NODESDB builds nodesDB.txt in the task directory once, with
+#     BlobTools' own parser (roadmap S1), and BLOBTOOLS reads it with --db;
+#     the parse runs on a read-only image and create + view work from it,
 #   - create (with --db) + view succeed and write nodesDB.txt in the work dir,
 #   - create without --db fails with the read-only error (the test can see
 #     the defect),
 #   - with a 2025-style taxdump ('domain' top rank, Viruses an 'acellular
 #     root' with a realm below it) the superkingdom column is 'undef' as is,
 #     and Bacteria / Viruses after bin/blobtools_nodes_fix.sh (which the
-#     module runs).
+#     BLOBTOOLS_NODESDB runs).
 #
 # Requirements: docker (present on GitHub ubuntu-latest runners).
 #
@@ -24,6 +26,7 @@ set -euo pipefail
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
 MODULE="${REPO_DIR}/modules/local/blobtools/main.nf"
+NODESDB_MODULE="${REPO_DIR}/modules/local/blobtools_nodesdb/main.nf"
 
 # Use the exact image pinned in the module so the test cannot drift from it
 # (the docker URI of the engine closure; the depot sif is the same build)
@@ -69,10 +72,40 @@ make_fixture() {
 #
 # 1. The module keeps the fix
 #
-if grep -q -- "--db nodesDB.txt" "${MODULE}"; then
-    pass "module: blobtools create passes --db nodesDB.txt"
+if grep -q -- '--db ${nodesdb}' "${MODULE}" && ! grep -q -- '--nodes' "${MODULE}"; then
+    pass "module: BLOBTOOLS reads the prebuilt nodesDB with --db, no --nodes"
 else
-    fail "module: blobtools create passes --db nodesDB.txt"
+    fail "module: BLOBTOOLS reads the prebuilt nodesDB with --db, no --nodes"
+fi
+if grep -q "nodesDB='nodesDB.txt'" "${NODESDB_MODULE}" \
+        && grep -q "'quay.io/biocontainers/blobtools:1.1.1--py_1'" "${NODESDB_MODULE}"; then
+    pass "module: BLOBTOOLS_NODESDB writes nodesDB.txt in the task dir, same image"
+else
+    fail "module: BLOBTOOLS_NODESDB writes nodesDB.txt in the task dir, same image"
+fi
+
+#
+# 1b. The module's nodesDB parse on a read-only image, then create --db from it
+#
+P="${TMP_DIR}/prebuilt"
+make_fixture "${P}"
+cp "${P}/nodes.dmp" "${P}/nodes_blobtools.dmp"
+# the python line of BLOBTOOLS_NODESDB, with the task's names.dmp path
+PARSE=$(grep -o 'import blobtools.BtIO.*nodesDBdefault=None)' "${NODESDB_MODULE}" | sed 's/\\\${names_dmp}/names.dmp/')
+if docker run --rm --read-only --tmpfs /tmp -u "$(id -u):$(id -g)" -e HOME=/tmp \
+        -v "${P}:/w" -w /w "${BLOB_IMG}" python -c "${PARSE}" > "${P}/parse.log" 2>&1 \
+        && [ -s "${P}/nodesDB.txt" ]; then
+    pass "BLOBTOOLS_NODESDB parse writes nodesDB.txt on a read-only image"
+else
+    fail "BLOBTOOLS_NODESDB parse writes nodesDB.txt on a read-only image"; cat "${P}/parse.log"
+fi
+if run_ro "${P}" "${P}/create.log" create --infile contigs.fa --hitsfile hits.tsv \
+        --db nodesDB.txt --cov reads.cov --out p \
+        && run_ro "${P}" "${P}/view.log" view --input p.blobDB.json --out p_Blob_table --rank all \
+        && grep -q "Escherichia coli" "${P}"/p_Blob_table*; then
+    pass "create --db with the prebuilt nodesDB alone gives the species call"
+else
+    fail "create --db with the prebuilt nodesDB alone gives the species call"; cat "${P}/create.log" "${P}/view.log" 2>/dev/null
 fi
 
 #
@@ -126,7 +159,7 @@ superkingdoms() {
     # superkingdoms <blob table> — c1,c2 superkingdom.t column values
     grep -v '^#' "$1" | sort | cut -f6 | paste -sd, -
 }
-if grep -q "blobtools_nodes_fix.sh" "${MODULE}"; then
+if grep -q "blobtools_nodes_fix.sh" "${NODESDB_MODULE}"; then
     pass "module: nodes.dmp passes through blobtools_nodes_fix.sh"
 else
     fail "module: nodes.dmp passes through blobtools_nodes_fix.sh"
