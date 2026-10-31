@@ -437,9 +437,9 @@ next release is tagged.
   3,938 to 3,894 and with an EC number from 1,668 to 1,661 (CAZy 84, unchanged);
   no protein annotated both times changes its annotation. The search took
   11 min instead of 56 (3,241 instead of 37,762 CPU seconds). When
-  `--max_memory` holds the search below 96 GB, the module now passes DIAMOND's
-  block size and index chunks for the task's memory (eggNOG-mapper sized them
-  from the machine's total RAM)
+  `--max_memory` holds the search below 96 GB, the module now passes the
+  largest DIAMOND block size and index chunks whose estimated peak fits the
+  task's memory (eggNOG-mapper sized them from the machine's total RAM)
 - **Functional step resources from measured use**: `EGGNOG_MAPPER_ANNOTATE`
   requests 48 GB (was 36), `RUN_DBCAN` 8 CPUs and 16 GB (was 16 CPUs, 72 GB;
   as fast on 8), `BAKTA_BAKTA` 4 CPUs and 16 GB per bin (was 8 and 36 GB),
