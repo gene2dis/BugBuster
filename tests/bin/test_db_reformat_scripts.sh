@@ -650,8 +650,8 @@ else
     FAIL=$((FAIL + 1))
 fi
 if [ -z "$(ls "${LAST_WORKDIR}" | grep -v '^kmarvel_db$')" ] \
-        && [ "$(ls "${LAST_WORKDIR}/kmarvel_db" | tr '\n' ' ')" = "CARD_protein_all.fasta DB_VERSION metadata.tsv snps.txt " ]; then
-    echo "✓ kmarvel: only the four database files are left"
+        && [ "$(LC_ALL=C ls "${LAST_WORKDIR}/kmarvel_db" | tr '\n' ' ')" = "CARD_protein_all.fasta CARD_protein_all.fasta.pdb CARD_protein_all.fasta.phr CARD_protein_all.fasta.pin CARD_protein_all.fasta.pjs CARD_protein_all.fasta.pot CARD_protein_all.fasta.psq CARD_protein_all.fasta.ptf CARD_protein_all.fasta.pto DB_VERSION metadata.tsv snps.txt " ]; then
+    echo "✓ kmarvel: only the four database files and the FASTA's BLAST index are left"
     PASS=$((PASS + 1))
 else
     echo "✗ kmarvel: leftover files next to or inside kmarvel_db/"
