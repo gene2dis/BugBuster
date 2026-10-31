@@ -429,6 +429,12 @@ next release is tagged.
 
 ### Changed
 
+- **ARGs-OAP keeps 8 CPUs, now set by name**: timed on a 10 M read-pair
+  sample, 8 CPUs took 46 min (stage one 31 min, stage two 15 min), 4 CPUs
+  73 min and 2 CPUs 127 min, with identical outputs at every count, so
+  `ARGS_OAP` gets `cpus = 8` in `config/modules.config` instead of inheriting
+  it from `process_medium`. The 24 h limit stays (stage one scales with read
+  count)
 - **K-MARVEL's CARD BLAST index is built once**: FORMAT_KMARVEL_DB now builds
   it into the stored database (`<databases_dir>/kmarvel/<key>_blastdb/`; the
   new key means a store filled before the index is rebuilt, not reused) and
