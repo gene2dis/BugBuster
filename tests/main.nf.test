@@ -554,7 +554,8 @@ nextflow_pipeline {
             // database downloaded and its taxdump given to BlobTools
             assert workflow.trace.tasks().any { task -> task.name.contains("FORMAT_METABULI_DB") }
             assert workflow.trace.tasks().any { task -> task.name.contains("METABULI_CLASSIFY") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("BLOBTOOLS") }
+            // "BLOBTOOLS (": the per-sample task, not BLOBTOOLS_NODESDB
+            assert workflow.trace.tasks().any { task -> task.name.contains("BLOBTOOLS (") }
             // the taxdump parsed into BlobTools' nodesDB once, not per sample (S1)
             assert workflow.trace.tasks().count { task -> task.name.startsWith("BLOBTOOLS_NODESDB") } == 1
             assert !workflow.trace.tasks().any { task -> task.name.contains("BLAST") }
