@@ -75,7 +75,7 @@ def process_reports_with_filtering(filter_args):
     
     # Sort columns by total reads (descending)
     numeric_cols = all_reports.select_dtypes(include=[np.number]).columns
-    col_sums = all_reports[numeric_cols].sum().sort_values(ascending=False)
+    col_sums = all_reports[numeric_cols].sum().sort_values(ascending=False, kind="stable")
     ordered_cols = ['Id'] + col_sums.index.tolist()
     all_reports_order = all_reports[ordered_cols]
     

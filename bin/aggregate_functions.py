@@ -937,10 +937,12 @@ def main():
         wide = subset.pivot_table(index='accession', columns='sample_id',
                                   values='abundance_tpm', aggfunc='sum',
                                   fill_value=0.0)
-        wide = wide.reindex(columns=sample_ids, fill_value=0.0).sort_index()
+        # astype: pandas < 3 pivot_table downcasts all-integral values to
+        # int64, which would bypass float_format
+        wide = wide.reindex(columns=sample_ids, fill_value=0.0).sort_index().astype(float)
         wide.index.name = 'accession'
         # float_format instead of per-cell mapping: DataFrame.map needs
-        # pandas >= 2.1 and the pinned image ships 2.0
+        # pandas >= 2.1 (the scripts still run on 2.0)
         wide.to_csv(args.output_dir / f'function_wide_{label}_tpm.tsv',
                     sep='\t', header=True, float_format='%.4f')
 
@@ -955,7 +957,7 @@ def main():
         if ags_samples:
             wide_cpge[ags_samples] = wide_cpge[ags_samples].fillna(0.0)
         wide_cpge.index.name = 'accession'
-        # Cell-wise formatting: pandas 2.0 (pinned image) drops float_format
+        # Cell-wise formatting: pandas 2.0 drops float_format
         # when na_rep is also given, and DataFrame.map needs >= 2.1
         for column in wide_cpge.columns:
             wide_cpge[column] = ['' if pd.isna(value) else CPGE_FORMAT.format(value)

@@ -429,6 +429,26 @@ next release is tagged.
 
 ### Changed
 
+- **One Python image for every report process**: the 17 report and
+  aggregation processes (READS_REPORT, TAXONOMY_REPORT, TAXONOMY_PHYLOSEQ,
+  KMARVEL_REPORT, RGI_REPORT, ARGS_OAP_REPORT, ARG_CONTIG_LEVEL_REPORT,
+  BLOBPLOT, ARG_BLOBPLOT, BIN_*, AGGREGATE_*, RESULTS_SUMMARY) ran on three
+  images (pandas 1.4.2, 2.0.3 and 2.2.3) and now share one Seqera Containers
+  image: Python 3.13, pandas 3.1.0, numpy 2.5.4, matplotlib 3.11.2, seaborn
+  0.13.2, h5py 3.16.0, openpyxl 3.1.5 and biopython 1.88
+  (`community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9`,
+  and its `oras://` build `cd89ac4e30745df7` under Singularity and
+  Apptainer). pandas 3 reads floats from the stage tables exactly, where
+  pandas 2 could be one unit off in the last place, so some values move in
+  their 16th-17th significant digit (e.g. ARGs-OAP copies per cell). The
+  scripts that ran on pandas 1.4.2 now also read a cell holding the text
+  `None` as missing (pandas 2 and later); no column they use holds it. Tables
+  are otherwise unchanged and figures look the same. The 14 processes that
+  had no `conda` directive now declare the same packages
+- **phyloseq 1.46.0 → 1.54.0** in PHYLOSEQ_CONVERTER
+  (`quay.io/biocontainers/bioconductor-phyloseq:1.54.0--r45hdfd78af_0`, R
+  4.5.2), the docker image for every engine since no 1.54 Singularity image
+  is published; the `.RDS` holds the same object
 - **Databases are stored once and reused across runs (`storeDir`)**: the
   database download and build tasks (`FORMAT_*`, `DOWNLOAD_DEEPARG_DB`,
   `DOWNLOAD_GTDBTK_DB`, `RGI_LOAD`, `SOURMASH_TAX_PREPARE` and the
@@ -951,6 +971,19 @@ next release is tagged.
 
 ### Fixed
 
+- **Order of tied rows in report tables and figures**: single-key sorts used
+  pandas' default quicksort, which does not keep the input order of equal
+  values, and numpy 2 orders such ties differently from numpy 1. The summary's
+  `taxonomy_*_wide.tsv` and `taxonomy_species_prevalence.tsv`, the summary
+  heatmaps, the blob and bin-taxonomy plots, READS_REPORT's column order and
+  the phyloseq plot taxa now sort stably (the phyloseq peak ranking also
+  followed Python set order). Tied rows may appear in a different order than
+  before; values are unchanged
+- **Whole-number matrices written as integers**: pandas < 3 `pivot_table`
+  turns all-integral floats into integers, so a TPM matrix whose values were
+  all whole numbers lost its `%.4f` format and the sourmash OTU table, sylph
+  abundances and bin depths could print as integers. They are now always
+  floats (only matrices of whole numbers change)
 - **BlobTools `undef` superkingdoms**: with an NCBI taxdump from 2025 on
   (the default `--taxdump_files ncbi` downloaded the current one), BlobTools
   1.1.1 wrote `undef` as every contig's superkingdom, because NCBI renamed the

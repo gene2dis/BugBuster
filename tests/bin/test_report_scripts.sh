@@ -25,19 +25,19 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
 FIXTURES="${REPO_DIR}/tests/data/taxonomy"
 
-# Use the exact images pinned in the modules so the test cannot drift from them
-MULLED_IMG=$(grep -o "'quay.io/biocontainers/mulled-v2-[^']*'" "${REPO_DIR}/modules/local/reads_report/main.nf" \
-    | tr -d "'" | head -1)
+# Use the exact image pinned in the modules so the test cannot drift from it (every
+# report process pins the same Python image; checked below)
 REPORT_IMG=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${REPO_DIR}/modules/local/taxonomy_report/main.nf" \
     | tr -d "'" | grep -v '^oras://' | head -1)
+# REPORT_TEST_IMG=<image>: run the scripts in that image instead of the pinned one (to try an image before pinning it)
+REPORT_IMG=${REPORT_TEST_IMG:-${REPORT_IMG}}
 
-if [ -z "${MULLED_IMG}" ] || [ -z "${REPORT_IMG}" ]; then
+if [ -z "${REPORT_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
 
 echo "=== Report script test suite ==="
-echo "Mulled image: ${MULLED_IMG}"
 echo "Report image: ${REPORT_IMG}"
 echo ""
 
@@ -57,7 +57,7 @@ PASS=0
 FAIL=0
 LAST_WORKDIR=""
 NEXT_WORKDIR=""
-RUN_IMG="${MULLED_IMG}"
+RUN_IMG="${REPORT_IMG}"
 
 run_script() {
     # run_script <workdir> <script-name> [args...] — inside ${RUN_IMG}
@@ -124,6 +124,34 @@ check_file() {
 }
 
 #
+# One Python image for every report process (U6): the pins must not drift apart.
+# Every local module that pins a Seqera pandas image is compared, so a new
+# module is covered without editing this list; the list only names the
+# modules that must carry the pin
+#
+echo "--- report image pins ---"
+REPORT_MODULES="aggregate_functions aggregate_read_functions arg_blobplot arg_contig_level_report args_oap_report
+    bin_arg_split bin_contig_labels bin_quality_report bin_summary bin_tax_report blobplot kmarvel_report
+    reads_report results_summary rgi_report taxonomy_phyloseq taxonomy_report"
+missing=""
+for m in ${REPORT_MODULES}; do
+    grep -q "community.wave.seqera.io/library/python_pandas" "${REPO_DIR}/modules/local/${m}/main.nf" \
+        || missing="${missing} ${m}"
+done
+pins=$(for f in "${REPO_DIR}"/modules/local/*/main.nf; do
+    p=$(grep -o "'[^']*community.wave.seqera.io/library/python_pandas[^']*'" "${f}" | tr -d "'" | sort | tr '\n' ' ')
+    if [ -n "${p}" ]; then echo "${p}"; fi
+done | sort -u)
+n_pinned=$(grep -l "community.wave.seqera.io/library/python_pandas" "${REPO_DIR}"/modules/local/*/main.nf | wc -l)
+if [ -z "${missing}" ] && [ "$(printf '%s\n' "${pins}" | wc -l)" -eq 1 ] && [ "$(printf '%s\n' "${pins}" | wc -w)" -eq 2 ]; then
+    echo "✓ report image pins: ${n_pinned} modules pin the same docker and oras images"
+    PASS=$((PASS + 1))
+else
+    echo "✗ report image pins differ between modules (or missing in:${missing:- none}):"; printf '%s\n' "${pins}"
+    FAIL=$((FAIL + 1))
+fi
+
+#
 # report_unify.py (fixture formats match modules/local/qfilter,
 # bowtie2_decontaminate, and count_reads report outputs)
 #
@@ -169,7 +197,7 @@ expect_fail "taxonomy_report: missing reads report fails" taxonomy_report.py --p
     --reads-report nonexistent_reads_report.csv --db-name standard-8 --output-dir .
 check_grep "taxonomy_report: failure names the missing input" "../taxonomy_report_missing_reads.log" \
     "Required reads report"
-RUN_IMG="${MULLED_IMG}"
+RUN_IMG="${REPORT_IMG}"
 
 #
 # bin_quality_report.py (CheckM2 batch report format)
@@ -322,7 +350,7 @@ expect_fail "bin_summary: no quality file still fails" bin_summary.py
 #
 # kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
 # two ARGs, sampleB header-only); the zero-ARG sample must stay as an
-# all-zero column. Runs in the mulled image KMARVEL_REPORT pins (MULLED_IMG).
+# all-zero column.
 #
 echo "--- kmarvel_report.py ---"
 KM_WORK="${WORK}/kmarvel_report"
@@ -357,8 +385,7 @@ expect_fail "kmarvel_report: table without the K-MARVEL columns fails" kmarvel_r
 # args_oap_report.py — ARGs-OAP 4.0.0 stage two rows (tests/data/args_oap:
 # sampleA with 12 SARG hits, two from its singletons; sampleB metadata.txt
 # only). A sample is its pairs plus singletons, normalised over both: tetA(48)
-# 4 reads, 0.548105 copies / 16 cells. Runs in the mulled image ARGS_OAP_REPORT
-# pins (MULLED_IMG).
+# 4 reads, 0.548105 copies / 16 cells.
 #
 echo "--- args_oap_report.py ---"
 AO_WORK="${WORK}/args_oap_report"
@@ -409,12 +436,10 @@ expect_fail "args_oap_report: a directory not named <sample>_args_oap fails" arg
 # blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the
 # figure is also pickled, and lambda tick formatters made pickle.dump fail
 # after the PNG was written. Fixtures are cut from a real T9 run (BlobTools
-# 1.1.1 table, ARG_CONTIG_LEVEL_REPORT output); runs in the image the
-# BLOBPLOT/ARG_BLOBPLOT modules pin.
+# 1.1.1 table, ARG_CONTIG_LEVEL_REPORT output).
 #
 echo "--- blobplot.py / arg_blobplot.py ---"
-RUN_IMG=$(grep -o "'quay.io/biocontainers/mulled-v2-[^']*'" "${REPO_DIR}/modules/local/blobplot/main.nf" \
-    | tr -d "'" | head -1)
+RUN_IMG="${REPORT_IMG}"
 check_pickle() {
     # check_pickle <desc> <script-module> <pkl> — the pickled figure loads back
     if docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e MPLCONFIGDIR=/tmp \

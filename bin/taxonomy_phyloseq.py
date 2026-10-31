@@ -238,7 +238,7 @@ class PhyloseqTableGenerator:
             columns='sample_id',
             values='n_unique_kmers',
             fill_value=0
-        )
+        ).astype(float)  # pandas < 3 pivot_table downcasts all-integral values to int64
         
         # Create taxonomy table
         tax_data = []
@@ -390,7 +390,7 @@ class PhyloseqTableGenerator:
         otu_table = combined.pivot_table(
             index='taxon_id', columns='sample_id',
             values='relative_abundance', fill_value=0
-        )
+        ).astype(float)  # pandas < 3 pivot_table downcasts all-integral values to int64
         read_counts = combined.pivot_table(
             index='taxon_id', columns='sample_id',
             values='read_pairs', fill_value=0, aggfunc='sum'
@@ -625,7 +625,7 @@ class PhyloseqTableGenerator:
         abundant taxa for the largest k that fits in top_n, then fill the
         remaining slots by mean abundance.
         """
-        mean_abundance = rel_abundance.mean(axis=1).sort_values(ascending=False)
+        mean_abundance = rel_abundance.mean(axis=1).sort_values(ascending=False, kind="stable")
         chosen: List[str] = []
         for k in range(1, self.top_n + 1):
             union = set()
@@ -636,8 +636,8 @@ class PhyloseqTableGenerator:
                 if k == 1:
                     # more samples with distinct dominant taxa than slots:
                     # keep the dominant taxa that reach the highest abundance
-                    peak = rel_abundance.loc[list(union)].max(axis=1)
-                    chosen = list(peak.sort_values(ascending=False).index[:self.top_n])
+                    peak = rel_abundance.loc[[t for t in rel_abundance.index if t in union]].max(axis=1)
+                    chosen = list(peak.sort_values(ascending=False, kind="stable").index[:self.top_n])
                 break
             chosen = [t for t in mean_abundance.index if t in union]
         for taxon in mean_abundance.index:
