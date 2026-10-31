@@ -1,7 +1,10 @@
 process ARGS_OAP {
     tag "${meta.id}"
-    // process_medium (8 CPUs, 24 h): stage one on 55-70 M read pairs took 6-8 h with process_low's 4 CPUs,
-    // and one sample hit its 8 h limit
+    // process_medium (36 GB, 24 h); its 8 CPUs are set by name in config/modules.config (roadmap S6:
+    // 4 CPUs were 60 % slower than 8). The 24 h limit stays: stage one scales with read count, 10 M
+    // read pairs took 31 min of stage one and 15 min of stage two at 8 CPUs, so a 70 M pair sample
+    // needs about 5-6 h on an idle host, and stage one on 55-70 M pairs took 6-8 h at 4 CPUs (one
+    // sample hit the old 8 h limit). 24 h covers larger samples and a busy host without retries.
     label 'process_medium'
 
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?

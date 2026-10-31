@@ -11,9 +11,11 @@
 #   snps.txt                 CARD snps.txt (the --snpdata; the copy in
 #                            K-MARVEL's repo db/ is this same file)
 #   DB_VERSION               provenance, read into the KMARVEL versions.yml
-# (~2.5 MB FASTA). No BLAST index: --reference is also the blastp -db, and
-# the KMARVEL module builds the index next to its own copy of the FASTA per
-# task, so a --custom_kmarvel_db needs none either.
+#   CARD_protein_all.fasta.p*  its BLAST index (--reference is also the
+#                            blastp -db), built once here; KMARVEL links it.
+#                            A --custom_kmarvel_db without one gets the index
+#                            built per task instead
+# (~2.5 MB FASTA).
 #
 set -euo pipefail
 
@@ -51,3 +53,6 @@ if ! grep -q '^>' kmarvel_db/CARD_protein_all.fasta; then
     echo "ERROR: kmarvel_db/CARD_protein_all.fasta has no FASTA records" >&2
     exit 1
 fi
+
+makeblastdb -in kmarvel_db/CARD_protein_all.fasta -dbtype prot -blastdb_version 5 \
+    -title CARD_protein_all -out kmarvel_db/CARD_protein_all.fasta > /dev/null

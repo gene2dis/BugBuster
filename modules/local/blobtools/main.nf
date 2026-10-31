@@ -8,7 +8,7 @@ process BLOBTOOLS {
 
     input:
         tuple val(meta), path(contigs), path(hits), path(bam), path(bam_bai)
-        path(tax_files)
+        path(nodesdb)
 
     output:
         tuple val(meta), path("*_Blob_tabl*"), emit: blob_table
@@ -19,25 +19,12 @@ process BLOBTOOLS {
         def prefix = "${meta.id}"
 
         """
-        # tax_files: nodes.dmp and names.dmp of the Metabuli database, whose
-        # taxids the hits file carries
-        nodes_dmp=\$(find -L . -maxdepth 2 -name nodes.dmp | head -n 1)
-        names_dmp=\$(find -L . -maxdepth 2 -name names.dmp | head -n 1)
-
-        # 2025 NCBI taxdumps call the top rank 'domain' (and Viruses an
-        # 'acellular root'): renamed 'superkingdom' in a task-dir copy, or
-        # BlobTools writes 'undef' as every superkingdom
-        blobtools_nodes_fix.sh \${nodes_dmp} > nodes_blobtools.dmp
-
-        # --db: write the parsed nodesDB into the task dir; the default is
-        # inside the blobtools package, which is read-only in a
-        # singularity/apptainer image (design doc Q21)
+        # nodesdb: BLOBTOOLS_NODESDB's parse of the Metabuli database's
+        # taxdump, built once for every sample; read here, not written
         blobtools create \\
                   --infile ${contigs} \\
                   --hitsfile ${hits} \\
-                  --nodes nodes_blobtools.dmp \\
-                  --names \${names_dmp} \\
-                  --db nodesDB.txt \\
+                  --db ${nodesdb} \\
                   --bam ${bam} \\
                   --out ${prefix}
 

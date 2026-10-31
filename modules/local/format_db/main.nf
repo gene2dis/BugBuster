@@ -472,6 +472,7 @@ process FORMAT_KMARVEL_DB {
         mkdir kmarvel_db
         touch kmarvel_db/CARD_protein_all.fasta kmarvel_db/metadata.tsv kmarvel_db/snps.txt \
             kmarvel_db/DB_VERSION
+        for ext in pdb phr pin pjs pot psq ptf pto; do touch kmarvel_db/CARD_protein_all.fasta.\$ext; done
         """
 }
 

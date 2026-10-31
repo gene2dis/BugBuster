@@ -160,8 +160,8 @@ Example data needed: an assembly + binning run (≥2 binners for Binette refinem
 ## Bin-level ARG clustering (unverified)
 
 - **Little is published.** Only the mmseqs `Arg_cluster_{90,95,99,100}_cluster.tsv` tables are published (representative→member, no header).
-- **Unpublished inputs.** The ARG FASTAs from `ARG_FASTA_FORMATTER` are not published, and its `extract_sequences.py` lives in the container, not the repo, so the headers (sample and bin provenance) cannot be checked.
-- **Possible ID collisions.** Prodigal ORF ids from different samples' MEGAHIT contigs may collide unless the headers carry the sample.
+- **Unpublished inputs.** The ARG FASTAs from `ARG_FASTA_FORMATTER` are not published. Their headers come from `bin/extract_sequences.py` (it used to live only in the container): `<gene id>_from_<sample>_<bin name>_gene_<ARG>_ARG_class_<class>` (e.g. `k141_92578_35_from_S1_binette_bin10_gene_ROSA_ARG_class_fosmidomycin`).
+- **ID collisions.** Gene ids from different samples' MEGAHIT contigs can be equal (`k141_*`), but the headers carry the sample and bin, so the clustered sequences stay distinct.
 - **Summary work.**
   - Publish the FASTAs.
   - Document the headers.

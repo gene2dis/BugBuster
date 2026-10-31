@@ -7,7 +7,7 @@ keywords:
   - fasta
 tools:
   - biopython:
-      description: Python tools for computational molecular biology, used by the extract_sequences.py helper that ships inside the quay.io/ffuentessantander/biopython_utils:1.0 image (the helper is not in bin/)
+      description: Python tools for computational molecular biology, used by the bin/extract_sequences.py helper (copied from the former quay.io/ffuentessantander/biopython_utils:1.0 image)
       homepage: https://biopython.org
       documentation: https://biopython.org/wiki/Documentation
       doi: "10.1093/bioinformatics/btp163"

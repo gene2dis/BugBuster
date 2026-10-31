@@ -429,6 +429,58 @@ next release is tagged.
 
 ### Changed
 
+- **eggNOG-mapper's search runs DIAMOND in `fast` mode**: `EGGNOG_MAPPER_SEARCH`
+  passes `--dmnd_sensmode fast` (eggNOG-mapper's default is `sensitive`). This
+  changes results slightly: on one test-data assembly (4,442 proteins) 67 of
+  4,254 proteins (1.6 %) lose their seed ortholog and none gain one, and the
+  proteins annotated with a KO go from 2,909 to 2,893, with a COG category from
+  3,938 to 3,894 and with an EC number from 1,668 to 1,661 (CAZy 84, unchanged);
+  no protein annotated both times changes its annotation. The search took
+  11 min instead of 56 (3,241 instead of 37,762 CPU seconds). When
+  `--max_memory` holds the search below 96 GB, the module now passes the
+  largest DIAMOND block size and index chunks whose estimated peak fits the
+  task's memory (eggNOG-mapper sized them from the machine's total RAM)
+- **Functional step resources from measured use**: `EGGNOG_MAPPER_ANNOTATE`
+  requests 48 GB (was 36), `RUN_DBCAN` 8 CPUs and 16 GB (was 16 CPUs, 72 GB;
+  as fast on 8), `BAKTA_BAKTA` 4 CPUs and 16 GB per bin (was 8 and 36 GB),
+  `FEATURECOUNTS_GENES` 4 CPUs and 4 GB (was 8 and 36 GB). Outputs are
+  identical at the new thread counts
+- **Read-level Kraken2 requests memory for its database and memory-maps it**:
+  `KRAKEN2` now requests 1.1 × the size of the database's `hash.k2d` + 2 GB
+  (at least the 72 GB it had): the 2026 standard database (`hash.k2d` 103 GB)
+  failed the 72 GB first attempt and gets 116 GB, while `standard-8` stays at
+  72 GB. It also runs with `--memory-mapping`, reading `hash.k2d` through the
+  page cache instead of loading it first: on a 10 M read-pair sample with the
+  standard database, 3 min instead of 10 (2 min instead of 7 when the
+  database was cached), with the same report. Memory mapping does not lower
+  the memory a task needs; `docs/troubleshooting.md` says what to do with a
+  smaller `--max_memory` and how to drop the flag on a network filesystem
+- **ARGs-OAP keeps 8 CPUs, now set by name**: timed on a 10 M read-pair
+  sample, 8 CPUs took 46 min (stage one 31 min, stage two 15 min), 4 CPUs
+  73 min and 2 CPUs 127 min, with identical outputs at every count, so
+  `ARGS_OAP` gets `cpus = 8` in `config/modules.config` instead of inheriting
+  it from `process_medium`. The 24 h limit stays (stage one scales with read
+  count)
+- **K-MARVEL's CARD BLAST index is built once**: FORMAT_KMARVEL_DB now builds
+  it into the stored database (`<databases_dir>/kmarvel/<key>_blastdb/`; the
+  new key means a store filled before the index is rebuilt, not reused) and
+  each KMARVEL task links it instead of running `makeblastdb` on a copy of
+  the FASTA. A `--custom_kmarvel_db` without an index (or with one whose
+  sequence and residue counts do not match the FASTA) is indexed per task as
+  before. Results are identical (the order of supporting read ids within a
+  row varies between runs, as before)
+- **BlobTools parses the taxdump once per run**: a new `BLOBTOOLS_NODESDB`
+  task turns the Metabuli database's `nodes.dmp`/`names.dmp` into BlobTools'
+  nodesDB (~1 min) and every sample's `BLOBTOOLS` task reads it instead of
+  parsing the taxdump itself (one sample: 58 s → 24 s). Blob tables are
+  identical
+- **ARG_FASTA_FORMATTER on the report processes' image**: its helper,
+  `extract_sequences.py`, existed only inside the custom
+  `quay.io/ffuentessantander/biopython_utils:1.0` image (Python 3.8.10,
+  biopython 1.78); it is now in `bin/` (unchanged) and the process runs on
+  `community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9`
+  (biopython 1.88; its `oras://` build `cd89ac4e30745df7` under Singularity
+  and Apptainer). The ARG FASTA files are identical
 - **One Python image for every report process**: the 17 report and
   aggregation processes (READS_REPORT, TAXONOMY_REPORT, TAXONOMY_PHYLOSEQ,
   KMARVEL_REPORT, RGI_REPORT, ARGS_OAP_REPORT, ARG_CONTIG_LEVEL_REPORT,

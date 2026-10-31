@@ -554,7 +554,10 @@ nextflow_pipeline {
             // database downloaded and its taxdump given to BlobTools
             assert workflow.trace.tasks().any { task -> task.name.contains("FORMAT_METABULI_DB") }
             assert workflow.trace.tasks().any { task -> task.name.contains("METABULI_CLASSIFY") }
-            assert workflow.trace.tasks().any { task -> task.name.contains("BLOBTOOLS") }
+            // "BLOBTOOLS (": the per-sample task, not BLOBTOOLS_NODESDB
+            assert workflow.trace.tasks().any { task -> task.name.contains("BLOBTOOLS (") }
+            // the taxdump parsed into BlobTools' nodesDB once, not per sample (S1)
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("BLOBTOOLS_NODESDB") } == 1
             assert !workflow.trace.tasks().any { task -> task.name.contains("BLAST") }
             assert path("${outputDir}/06_contig_taxonomy/metabuli/test_sample1/test_sample1_classifications.tsv").exists()
 
@@ -1009,8 +1012,10 @@ nextflow_pipeline {
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel/test_sample1/test_sample1_kmarvel.json").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_supporting_reads_matrix.tsv").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_gene_family_matrix.tsv").exists()
-            // storeDir keyed by the registry key; stub runs store under stub/
-            assert path("${outputDir}/../databases/stub/kmarvel/card_v4.0.1/kmarvel_db/DB_VERSION").exists()
+            // storeDir keyed by the registry key (+ _blastdb: the store holds
+            // the BLAST index); stub runs store under stub/
+            assert path("${outputDir}/../databases/stub/kmarvel/card_v4.0.1_blastdb/kmarvel_db/DB_VERSION").exists()
+            assert path("${outputDir}/../databases/stub/kmarvel/card_v4.0.1_blastdb/kmarvel_db/CARD_protein_all.fasta.pin").exists()
         }
     }
 
@@ -1027,9 +1032,10 @@ nextflow_pipeline {
                 output = "${outputDir}"
                 databases_dir = {
                     def store = new File("${outputDir}", "store")
-                    def db = new File(store, "stub/kmarvel/card_v4.0.1/kmarvel_db")
+                    def db = new File(store, "stub/kmarvel/card_v4.0.1_blastdb/kmarvel_db")
                     db.mkdirs()
                     ['CARD_protein_all.fasta', 'metadata.tsv', 'snps.txt', 'DB_VERSION'].each { name -> new File(db, name).text = '' }
+                    ['pdb', 'phr', 'pin', 'pjs', 'pot', 'psq', 'ptf', 'pto'].each { ext -> new File(db, "CARD_protein_all.fasta.${ext}").text = '' }
                     def rgi = new File(store, "stub/rgi/latest_wildcard_k61")
                     new File(rgi, "card_db").mkdirs()
                     new File(rgi, "card_db/card.json").text = ''
@@ -1056,6 +1062,41 @@ nextflow_pipeline {
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("9.9.9-stored")
             assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL (") } == 2
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_gene_family_matrix.tsv").exists()
+        }
+    }
+
+    test("Stub run rebuilds a K-MARVEL store filled before it held the BLAST index") {
+        // A store from before roadmap S2 (kmarvel/<key>/, no BLAST index) is
+        // not reused: FORMAT_KMARVEL_DB runs again into <key>_blastdb
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                databases_dir = {
+                    def store = new File("${outputDir}", "store")
+                    def db = new File(store, "stub/kmarvel/card_v4.0.1/kmarvel_db")
+                    db.mkdirs()
+                    ['CARD_protein_all.fasta', 'metadata.tsv', 'snps.txt', 'DB_VERSION'].each { name -> new File(db, name).text = '' }
+                    store.absolutePath
+                }()
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                kmarvel_prediction = true
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 1
+            assert path("${outputDir}/store/stub/kmarvel/card_v4.0.1_blastdb/kmarvel_db/CARD_protein_all.fasta.pin").exists()
+            assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL (") } == 2
         }
     }
 
