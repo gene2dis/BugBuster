@@ -429,6 +429,22 @@ next release is tagged.
 
 ### Changed
 
+- **eggNOG-mapper's search runs DIAMOND in `fast` mode**: `EGGNOG_MAPPER_SEARCH`
+  passes `--dmnd_sensmode fast` (eggNOG-mapper's default is `sensitive`). This
+  changes results slightly: on one test-data assembly (4,442 proteins) 67 of
+  4,254 proteins (1.6 %) lose their seed ortholog and none gain one, and the
+  proteins annotated with a KO go from 2,909 to 2,893, with a COG category from
+  3,938 to 3,894 and with an EC number from 1,668 to 1,661 (CAZy 84, unchanged);
+  no protein annotated both times changes its annotation. The search took
+  11 min instead of 56 (3,241 instead of 37,762 CPU seconds). When
+  `--max_memory` holds the search below 96 GB, the module now passes DIAMOND's
+  block size and index chunks for the task's memory (eggNOG-mapper sized them
+  from the machine's total RAM)
+- **Functional step resources from measured use**: `EGGNOG_MAPPER_ANNOTATE`
+  requests 48 GB (was 36), `RUN_DBCAN` 8 CPUs and 16 GB (was 16 CPUs, 72 GB;
+  as fast on 8), `BAKTA_BAKTA` 4 CPUs and 16 GB per bin (was 8 and 36 GB),
+  `FEATURECOUNTS_GENES` 4 CPUs and 4 GB (was 8 and 36 GB). Outputs are
+  identical at the new thread counts
 - **Read-level Kraken2 requests memory for its database and memory-maps it**:
   `KRAKEN2` now requests 1.1 × the size of the database's `hash.k2d` + 2 GB
   (at least the 72 GB it had): the 2026 standard database (`hash.k2d` 103 GB)

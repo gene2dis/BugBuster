@@ -49,6 +49,15 @@ process EGGNOG_MAPPER_SEARCH {
     script:
     def args = task.ext.args ?: ''
     def prefix = task.ext.prefix ?: "${meta.id}"
+    // emapper sizes diamond's block size and index chunks from the host's
+    // RAM, not the task's (block 8 with one chunk peaks at ~80 GB), so a task
+    // below 96 GB gets the band its own memory falls in (emapper's bands,
+    // diamond.py _auto_dmnd_resources); ext.args can still override them
+    def mem_gb = task.memory ? task.memory.toGiga() : null
+    def dmnd_resources = mem_gb == null || mem_gb >= 96 ? ''
+        : mem_gb >= 64 ? '--dmnd_block_size 6 --dmnd_index_chunks 2'
+        : mem_gb >= 32 ? '--dmnd_block_size 4 --dmnd_index_chunks 2'
+        : '--dmnd_block_size 2 --dmnd_index_chunks 4'
     """
     # Pyrodigal emits gzipped proteins; gzip -cdf also passes plain FASTA
     # through unchanged
@@ -63,6 +72,7 @@ process EGGNOG_MAPPER_SEARCH {
         -m diamond \\
         --no_annot \\
         --itype proteins \\
+        ${dmnd_resources} \\
         ${args} \\
         --cpu ${task.cpus} \\
         -i ${prefix}_proteins_input.faa \\
