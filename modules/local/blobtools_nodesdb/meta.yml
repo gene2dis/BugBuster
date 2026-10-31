@@ -1,0 +1,30 @@
+name: blobtools_nodesdb
+description: Parses the Metabuli database's taxdump into BlobTools' nodesDB once, for every sample's BLOBTOOLS task; the taxdump's 2025 'domain' rank and the Viruses node are renamed 'superkingdom' in a task-dir copy of nodes.dmp first
+keywords:
+  - contig taxonomy
+  - blobtools
+  - taxonomy
+tools:
+  - blobtools:
+      description: Interrogation of genome assemblies via taxon-annotated GC-coverage plots (BlobTools v1, 1.1.1)
+      homepage: https://github.com/DRL/blobtools
+      documentation: https://blobtools.readme.io/docs
+      doi: "10.12688/f1000research.12232.1"
+
+input:
+  - tax_files:
+      type: file
+      description: nodes.dmp and names.dmp of the Metabuli database (the taxdump its taxids come from)
+
+output:
+  - nodesdb:
+      type: file
+      description: BlobTools nodesDB (one line per taxid with rank, scientific name and parent)
+      pattern: "nodesDB.txt"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

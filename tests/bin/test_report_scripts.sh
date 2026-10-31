@@ -130,7 +130,7 @@ check_file() {
 # modules that must carry the pin
 #
 echo "--- report image pins ---"
-REPORT_MODULES="aggregate_functions aggregate_read_functions arg_blobplot arg_contig_level_report args_oap_report
+REPORT_MODULES="aggregate_functions aggregate_read_functions arg_blobplot arg_contig_level_report arg_fasta_formatter args_oap_report
     bin_arg_split bin_contig_labels bin_quality_report bin_summary bin_tax_report blobplot kmarvel_report
     reads_report results_summary rgi_report taxonomy_phyloseq taxonomy_report"
 missing=""

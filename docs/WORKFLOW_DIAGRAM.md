@@ -458,6 +458,7 @@ flowchart LR
 | `BIN_CONTIG_LABELS` | Contig → refined bin → GTDB-Tk classification |
 | `BIN_ARG_SPLIT` | DEEPARG_CONTIGS hits and Pyrodigal proteins split by bin |
 | `SAMTOOLS_INDEX` | Index BAM files for BLOBTOOLS |
+| `BLOBTOOLS_NODESDB` | BlobTools' nodesDB from the Metabuli database's taxdump, once per run |
 | `BLOBTOOLS` / `BLOBPLOT` | Contig taxonomy tables and plots |
 | `PYRODIGAL` | ORF prediction on contigs (shared gene-calling step, feeds DeepARG and functional annotation) |
 | `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | Contig-level ARG report and visualization |

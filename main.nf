@@ -138,6 +138,7 @@ include { MICROBECENSUS } from './modules/local/microbecensus/main'
 	// TAXONOMIC PREDICTION IN CONTIGS
 include { METABULI_CLASSIFY } from './modules/local/metabuli_classify/main'
 include { GENOMAD_ENDTOEND as NFCORE_GENOMAD_ENDTOEND } from './modules/nf-core/genomad/endtoend/main'
+include { BLOBTOOLS_NODESDB } from './modules/local/blobtools_nodesdb/main'
 include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
@@ -810,14 +811,15 @@ workflow {
         // BLOBTOOLS expects: tuple val(meta), path(bam), path(bam_bai)
         ch_index_bam = ch_bam_meta
             .join(NFCORE_SAMTOOLS_INDEX.out.index)
-        // The Metabuli database's [nodes.dmp, names.dmp], one value for every
-        // sample
+        // BlobTools' nodesDB from the Metabuli database's [nodes.dmp,
+        // names.dmp], parsed once and read by every sample's task
+        BLOBTOOLS_NODESDB(PREPARE_DATABASES.out.metabuli_taxdump.first())
         ch_blob_table = BLOBTOOLS(
             METABULI_CLASSIFY.out.hits
                 .join(ch_contigs_meta)
                 .map { meta, hits, contigs -> [meta, contigs, hits] }
                 .join(ch_index_bam),
-            PREPARE_DATABASES.out.metabuli_taxdump.first()
+            BLOBTOOLS_NODESDB.out.nodesdb
         )
         BLOBPLOT(ch_blob_table.only_blob.collect(sort: true))
 
@@ -844,6 +846,7 @@ workflow {
 
         ch_versions = ch_versions.mix(
             METABULI_CLASSIFY.out.versions.first(),
+            BLOBTOOLS_NODESDB.out.versions,
             BLOBTOOLS.out.versions.first(),
             BLOBPLOT.out.versions,
             ARG_CONTIG_LEVEL_REPORT.out.versions,

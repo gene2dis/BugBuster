@@ -126,9 +126,16 @@ complexity. The eggNOG search requests 16 CPUs and 96 GB on the first attempt;
 an out-of-memory failure is retried with 2 × 96 GB, capped at `--max_memory`
 (default 128 GB). The 79.9 GB peak above was measured under apptainer, which
 does not enforce task memory on a local machine, so make at least ~96 GB
-available to it where memory is enforced (docker, SLURM, cloud batch). The annotate step (`process_medium`, 36 GB on
-the first attempt) peaked at 35.1 GB, close to that request, so on larger
-co-assemblies it may also need its retry.
+available to it where memory is enforced (docker, SLURM, cloud batch). When
+`--max_memory` holds the search below 96 GB, it passes DIAMOND a smaller block
+size and more index chunks for the memory it has (eggNOG-mapper would size
+them from the machine's total RAM). The search times above were measured with
+eggNOG-mapper's default `sensitive` DIAMOND mode; the pipeline now runs it with
+`--dmnd_sensmode fast`, which on one test-data assembly (4,442 proteins) took
+11 min instead of 56 and 3,241 instead of 37,762 CPU seconds, for 1.6 % fewer
+proteins with a seed ortholog. The annotate step (8 CPUs, 48 GB on the first
+attempt) peaked at 35.1 GB. `RUN_DBCAN` runs on 8 CPUs (16 GB), as fast as on
+16, and `BAKTA_BAKTA` on 4 CPUs (16 GB) per bin.
 
 #### Contig taxonomy (Metabuli) and geNomad
 
@@ -1505,7 +1512,7 @@ databases/                            # Database storage (configurable via --dat
 ├── genomad/v1.9/                     # geNomad database 1.9 (genomad_db/, ~2.2 GB)
 ├── deeparg/1.0.4/                    # DeepARG database (deeparg_db/; unversioned upstream, keyed by the deeparg version)
 ├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, _wildcard_k<--rgi_kmer_size> with WildCARD)
-├── kmarvel/card_v4.0.1/              # CARD 4.0.1 protein models for K-MARVEL (kmarvel_db/, ~4.1 MB)
+├── kmarvel/card_v4.0.1_blastdb/      # CARD 4.0.1 protein models for K-MARVEL and their BLAST index (kmarvel_db/, ~7 MB)
 ├── checkm2/v3/                       # CheckM2 database (*.dmnd)
 ├── gtdbtk/release_232/               # GTDB-TK database (gtdbtk_db/)
 ├── eggnog/emapper-3.0/               # eggNOG 7 data for eggNOG-mapper v3 (eggnog_db/, ~44 GB)
