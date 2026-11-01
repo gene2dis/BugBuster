@@ -6,7 +6,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from summary_common import die, fill_columns, norm_taxon, warn
+from summary_common import NA_NO_AGS, die, fill_columns, norm_taxon, warn
 
 
 KMARVEL_COLUMNS = [
@@ -644,3 +644,30 @@ def _combos(methods):
     for k in range(len(methods), 0, -1):
         subsets += [list(c) for c in combinations(methods, k)]
     return subsets
+
+
+def rpkg_tables(rpkm_tables, clean_pairs, genome_equivalents, order):
+    """arg_<x>_rpkg from arg_<x>_rpkm (gene, family, drug class): RPKM x clean read pairs / 1e6 / MicrobeCensus
+    genome equivalents = supporting read pairs per kb of gene per genome equivalent. 0, blank (a call without an
+    RPKM) and the NA codes stay as they are; a sample without a MicrobeCensus estimate is NA_no_ags in every cell
+    but its NA codes (as the CPGE tables do).
+    rpkm_tables: {name: wide table}; clean_pairs, genome_equivalents: Series by sample."""
+    out = {}
+    for name, mat in rpkm_tables.items():
+        new = name.replace("_rpkm", "_rpkg")
+        if mat is None or mat.empty:
+            out[new] = pd.DataFrame()
+            continue
+        mat = mat.copy()
+        for s in [c for c in order if c in mat.columns]:
+            ge, pairs = genome_equivalents.get(s), clean_pairs.get(s)
+            factor = pairs / 1e6 / ge if ge and pairs and not pd.isna(ge) and not pd.isna(pairs) else None
+            col = mat[s].astype(object)
+            num = pd.to_numeric(col, errors="coerce")
+            coded = col.map(lambda v: isinstance(v, str))
+            if factor is None:
+                mat[s] = col.where(coded & (col != ""), NA_NO_AGS)
+            else:
+                mat[s] = col.where(num.isna(), num * factor)
+        out[new] = mat
+    return out

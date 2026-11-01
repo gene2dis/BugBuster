@@ -173,10 +173,12 @@ workflow FUNCTIONAL_ANNOTATION {
         BAKTA_BAKTA(ch_bins, ch_bakta_db.first(), [], [], [], [])
         ch_bakta_gff = BAKTA_BAKTA.out.gff
         ch_bakta_tsv = BAKTA_BAKTA.out.tsv
+        ch_bakta_txt = BAKTA_BAKTA.out.txt
         ch_versions  = ch_versions.mix(BAKTA_BAKTA.out.versions.first())
     } else {
         ch_bakta_gff = channel.empty()
         ch_bakta_tsv = channel.empty()
+        ch_bakta_txt = channel.empty()
     }
 
     emit:
@@ -194,5 +196,6 @@ workflow FUNCTIONAL_ANNOTATION {
     ags_summary         = ch_ags_summary                // ags_and_ge.tsv
     bakta_gff           = ch_bakta_gff                  // [ meta(+bin), *.gff3 ] per bin (empty when --mag_level_functional false)
     bakta_tsv           = ch_bakta_tsv                  // [ meta(+bin), *.tsv ] per bin
+    bakta_txt           = ch_bakta_txt                  // [ meta(+bin), *.txt ] per bin (Bakta's summary)
     versions            = ch_versions
 }

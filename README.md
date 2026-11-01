@@ -380,6 +380,7 @@ results/
 │   └── bin_level/              # Bin-level ARG (if arg_bin_clustering=true)
 │       ├── proteins/           # Per-bin Pyrodigal proteins (from the shared gene calling)
 │       ├── deeparg/            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
+│       ├── arg_fasta/          # ARG proteins per bin (the clustering input)
 │       └── clustering/         # MMseqs2 ARG clusters
 ├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
 │   ├── metabuli/{sample}/      # Metabuli per-contig calls (with lineage) and clade report

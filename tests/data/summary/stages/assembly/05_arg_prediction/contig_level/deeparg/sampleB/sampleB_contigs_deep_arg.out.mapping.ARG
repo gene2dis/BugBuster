@@ -1,0 +1,4 @@
+#ARG	query-start	query-end	read_id	predicted_ARG-class	best-hit	probability	identity	alignment-length	alignment-bitscore	alignment-evalue	counts
+QNRB	1	226	k141_4865_1	fluoroquinolone	gi:502364505:ref:WP_012772744.1:|FEATURES|qnrB|fluoroquinolone|qnrB	0.9998633314666789	100	226	337	3.08e-119	1
+UGD	1	385	k141_10755_2	peptide	AAC75089.1|FEATURES|ugd|peptide|ugd	0.9103687060686594	56.3	430	462	7.07e-163	1
+CFXA2	29	321	k141_11344_1	beta-lactam	AF472622.2.gene1.p01|FEATURES|CfxA2|beta-lactam|CfxA2	0.9999951554866056	98.6	293	569	1.36e-206	1

@@ -12,6 +12,35 @@ next release is tagged.
 
 ### Added
 
+- **Run summary covers the assembly-based stages** (`00_summary/`): new
+  tables for the six stages the summary did not read yet. Existing tables are
+  unchanged; `samples_qc` gains columns at its end.
+  - Assembly: `assembly_stats` (contigs, length, N50 / L50, GC, contigs kept
+    by the length filter) and `assembly_read_use` (% of each sample's reads on
+    the contigs and on predicted genes).
+  - Binning and Bakta: `mags`, one row per refined MAG with CheckM2 quality, a
+    MIMAG tier (rRNA and tRNA genes from Bakta; without Bakta at most medium),
+    the GTDB-Tk lineage and Bakta's counts; `mag_abundance`, each MAG's depth
+    and share of the sequenced bases per sample.
+  - Contig ARGs: `arg_contig_long` (each DeepARG hit with its contig's
+    Metabuli taxon, bin, MAG tier and geNomad class), `arg_contig_hosts` (ARG
+    genes per host genus) and `arg_contig_abundance` (each ARG gene's reads,
+    TPM and CPGE per sample, with `--contig_level_functional`).
+  - Bin-level ARG clustering: `arg_mag_long` (the clusters of every MAG ARG
+    gene at 90-100 % identity) and `arg_cluster_sharing` (90 % clusters in
+    more than one MAG).
+  - Contig-level functions: `function_contig_long` and
+    `function_contig_<ontology>` (ko, cog, ec, pfam, cazy, cazy_dbcan; CPGE
+    with MicrobeCensus, else TPM), named COG categories and eggNOG CAZy
+    families; `samples_qc` `pct_reads_on_genes` and `func_contig_*`. Never
+    merged with the read-level `function_read_*` tables.
+  - `arg_gene_rpkg`, `arg_family_rpkg`, `arg_drug_class_rpkg`: the read-level
+    ARG RPKM matrices per MicrobeCensus genome equivalent.
+  - The README and LLM guide document every new column, the TPM / CPGE
+    definitions and the caveats (MIMAG tiers, gene counts on contigs are not
+    read abundance, pooled co-assembly depth, shared clusters are not evidence
+    of transfer alone), and say what "relative abundance" means for each
+    taxonomic profiler. The HTML report has a plain section per stage.
 - **Plasmid / virus classification of contigs with geNomad
   (`--genomad_prediction`, off by default)**: nf-core `genomad/endtoend` with
   geNomad 1.13.0 (`quay.io/biocontainers/genomad:1.13.0--pyhdfd78af_0` and its
@@ -1023,6 +1052,29 @@ next release is tagged.
 
 ### Fixed
 
+- **A custom Kraken2 or sourmash database was labelled as the registry
+  default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
+  the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the
+  plot titles and the summary's `taxonomy_db` still named the `--kraken2_db`
+  (`standard-8`) or `--sourmash_db` (`gtdb_220_k31`) key. They now carry the
+  custom database's name, as sylph's do: the Kraken2 directory's name, the
+  sourmash k-mer file's name without its extension. Runs on registry databases
+  are unchanged. A results directory made with a custom database before this
+  change no longer merges with one made after it in a batch summary (the
+  labels differ)
+- **Co-assembly bin depth tables padded with spaces**: BEDTOOLS_BIN_DEPTH
+  wrote `<sample>_bin_depth.tsv` rows as `sample<TAB>bin<TAB> 59 <TAB> 0.138756`
+  (awk `print` with commas). The fields are now tab-separated only; values are
+  unchanged (`Bin_summary.csv` read them correctly before and after)
+- **Bin quality plot legend**: `Total_bins_quality_plot.png` described the
+  Low class as "Completeness < 50%, Contamination > 5%"; the classification
+  marks a bin Low when either holds, and the legend now says "or". The classes
+  themselves are unchanged (the summary's `mags` table gives MIMAG tiers)
+- **Bin-level ARG FASTAs published in a stray top-level `arg/` folder**:
+  ARG_FASTA_FORMATTER had no publish rule of its own, so the default rule put
+  its `<sample>_<bin>_ARGs.faa` files (the clustering input) in
+  `<output>/arg/`. They are now published to
+  `05_arg_prediction/bin_level/arg_fasta/<sample>/`
 - **Order of tied rows in report tables and figures**: single-key sorts used
   pandas' default quicksort, which does not keep the input order of equal
   values, and numpy 2 orders such ties differently from numpy 1. The summary's

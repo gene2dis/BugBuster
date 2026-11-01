@@ -815,6 +815,10 @@ nextflow_pipeline {
             assert workflow.trace.tasks().any { task -> task.name.contains("CLUSTERING") }
             assert path("${outputDir}/05_arg_prediction/bin_level/deeparg/test_sample1/test_sample1_deeparg_results").exists()
             assert path("${outputDir}/05_arg_prediction/bin_level/proteins/test_sample1/test_sample1_bins_proteins").exists()
+            // the ARG FASTAs CLUSTERING reads sit next to the clusters, not
+            // in a top-level arg/ (conf/base.config's default publishDir)
+            assert path("${outputDir}/05_arg_prediction/bin_level/arg_fasta/test_sample1/test_sample1_stub_ARGs.faa").exists()
+            assert !path("${outputDir}/arg").exists()
         }
     }
 
@@ -1931,11 +1935,51 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_PHYLOSEQ") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH") } == 0
 
-            // a custom database is still labelled with the --sourmash_db key
-            // (unlike sylph's file-name label), so the name is not pinned here
-            assert path("${outputDir}/02_taxonomy/sourmash").list().count { f -> f.fileName.toString() ==~ /test_sample1_smgather_.+\.with-lineages\.csv/ } == 1
-            assert path("${outputDir}/02_taxonomy/tables/Reads_report_taxonomy.csv").exists()
+            // Outputs are labelled by the custom k-mer file's name, not the
+            // --sourmash_db default (gtdb_220_k31), as sylph's are
+            def tax = "${outputDir}/02_taxonomy"
+            assert path("${tax}/sourmash/test_sample1_smgather_stub_db.with-lineages.csv").exists()
+            assert path("${tax}/tables/sourmash_stub_db_otu_table.tsv").exists()
+            assert !path("${tax}/tables/sourmash_gtdb_220_k31_otu_table.tsv").exists()
+            assert path("${tax}/tables/Reads_report_taxonomy.csv").exists()
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("sourmash: 4.9.4")
+        }
+    }
+
+    test("Stub run wires kraken2 with a custom database (no download)") {
+        // tests/data/kraken2/stub_db holds empty placeholders of a Kraken2
+        // database directory (the KRAKEN2 memory rule reads hash.k2d's size;
+        // stubs read nothing else)
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "kraken2"
+                custom_kraken_db   = "${projectDir}/tests/data/kraken2/stub_db"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KRAKEN_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("KRAKEN2 (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("BRACKEN (") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("TAXONOMY_PHYLOSEQ") } == 1
+
+            // Outputs are labelled by the custom database directory's name,
+            // not the --kraken2_db default (standard-8)
+            def tax = "${outputDir}/02_taxonomy"
+            assert path("${tax}/tables/kraken2_stub_db_otu_table.tsv").exists()
+            assert !path("${tax}/tables/kraken2_standard-8_otu_table.tsv").exists()
+            assert path("${tax}/tables/Reads_report_taxonomy.csv").exists()
         }
     }
 

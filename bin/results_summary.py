@@ -67,13 +67,18 @@ from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mar
                               prevalence_table, species_rank, watchlist_table)
 from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_tables,  # noqa: E402
                           card_families, compare_methods, load_kmarvel, load_prevalence, load_rgi, load_rules,
-                          load_snps, unify_gene_tiers)
-from summary_functional import (cog_matrix, function_long, function_sample_columns,  # noqa: E402
-                                function_tables, load_microbecensus, load_read_functional,
-                                merge_read_functional)
+                          load_snps, rpkg_tables, unify_gene_tiers)
+from summary_functional import (cog_matrix, contig_function_long, contig_function_sample_columns,  # noqa: E402
+                                contig_function_tables, function_long, function_sample_columns,
+                                function_tables, load_contig_functional, load_microbecensus, load_read_functional,
+                                merge_contig_functional, merge_read_functional)
+from summary_assembly import assembly_stats_table, load_assembly, read_use_frame  # noqa: E402
+from summary_mags import load_mags, mag_abundance_frame, mags_table  # noqa: E402
+from summary_bin_args import arg_cluster_sharing_table, arg_mag_long_table, load_bin_clusters  # noqa: E402
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
-from summary_contigs import contig_mobile_table, has_genomad, load_contig_args  # noqa: E402
+from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
+                             contig_mobile_table, has_genomad, load_arg_gene_abundance, load_contig_table)
 from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category, fig_sarg,  # noqa: E402
                              fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
@@ -187,6 +192,9 @@ RESERVED_COLUMNS = {
     "func_fraction_annotated", "n_samples_evaluable", "backend",
     "ontology", "accession", "term_description",
     "abundance_cpge", "abundance_native", "native_unit",
+    "assembly", "pct_reads_on_contigs", "pct_reads_on_genes", "bin", "mean_depth_x", "pct_sample_bases", "gene_id",
+    "contig", "arg_gene", "arg_class", "count", "tpm", "cpge", "abundance_tpm", "func_contig_genes_annotated_pct",
+    "func_contig_annotated_by_abundance_pct",
 }
 
 
@@ -319,6 +327,34 @@ def method_notes(ctx):
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
                      f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if f['unit'] == 'cpge' else f['unit']}. "
                      "Reported apart from any contig-level functional profile.")
+    t = ctx["tables"]
+    if "taxonomy_long" in t:
+        db = str(t["samples_qc"][0]["taxonomy_db"].iloc[0]) if "taxonomy_db" in t["samples_qc"][0] else ""
+        what = {"kraken2": "Kraken2 read classification re-estimated at species level by Bracken (relative abundance "
+                           "= Bracken species reads; reads Bracken leaves above species are outside it, and the "
+                           "classified fraction is Kraken2's, before Bracken)",
+                "sourmash": "sourmash gather against genome sketches (relative abundance = abundance-weighted share "
+                            "of the k-mers of the matched genomes)",
+                "sylph": "sylph against genome sketches (relative abundance = sylph's taxonomic abundance)"}
+        prof = next((k for k in what if db.startswith(k)), "")
+        if prof:
+            notes.append(f"Taxonomy: {what[prof]}. Classified fractions are not comparable between profilers.")
+    if "assembly_stats" in t:
+        notes.append("Assembly: MEGAHIT, BBMap statistics of all contigs; only contigs of at least "
+                     "min_contig_length_bp go on to binning, contig taxonomy, ARGs and functions. Reads not on contigs "
+                     "are outside every contig-based table (assembly_read_use).")
+    if "mags" in t:
+        notes.append("MAGs: refined bins (Binette with >= 2 binners) scored by CheckM2, classified by GTDB-Tk and, "
+                     "with Bakta, checked for rRNA and tRNA genes: quality_tier follows MIMAG.")
+    if "arg_contig_long" in t:
+        notes.append("Contig ARGs: DeepARG on the predicted proteins of the contigs, with the contig's Metabuli taxon, "
+                     "bin and geNomad class: physical linkage of an ARG and its host, counted in genes on contigs.")
+    if ctx.get("contig_functional"):
+        c = ctx["contig_functional"]
+        notes.append(f"Contig functional profile: eggNOG-mapper and dbCAN on the predicted genes, featureCounts per "
+                     f"sample ({', '.join(c['ontologies'])}), in "
+                     f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if c['unit'] == 'cpge' else 'TPM'}. "
+                     "Reported apart from the read-level profile.")
     return notes
 
 
@@ -397,13 +433,20 @@ def main(argv=None):
         sarg, sarg_cells, sarg_ran = load_args_oap(root)
         func = load_read_functional(root)
         mc = load_microbecensus(root)
-        contig_args = load_contig_args(root)
+        contig_table = load_contig_table(root)
+        contig_args = arg_rows(contig_table)
+        assembly = load_assembly(root)
+        mags = load_mags(root)
+        clusters = load_bin_clusters(root)
+        cfunc = load_contig_functional(root)
+        arg_abund = load_arg_gene_abundance(root) if cfunc is not None else None
         names = set()
         if reads is not None:
             names |= set(reads["sample"])
         if taxonomy is not None:
             names |= set(taxonomy["otu"].columns)
         names |= kran | rgi_ran | sarg_ran | (func["ran"] if func else set()) | set(mc["sample"])
+        names |= cfunc["ran"] if cfunc else set()
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
@@ -414,11 +457,16 @@ def main(argv=None):
         found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
                                 ("rgi", rgi_ran), ("args_oap", sarg_ran), ("read_functional", func is not None),
                                 ("microbecensus", not mc.empty), ("contig_arg", contig_args is not None),
-                                ("genomad", has_genomad(contig_args))) if v}
+                                ("genomad", has_genomad(contig_args)), ("assembly", assembly is not None),
+                                ("binning", mags is not None), ("bin_arg", clusters is not None),
+                                ("contig_functional", cfunc is not None),
+                                ("mag_functional", mags is not None and mags["bakta"])) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
-                        "sarg_ran": sarg_ran, "func": func, "mc": mc, "contig_args": contig_args, "samples": names,
+                        "sarg_ran": sarg_ran, "func": func, "mc": mc, "contig_args": contig_args,
+                        "contig_table": contig_table, "assembly": assembly, "mags": mags, "clusters": clusters,
+                        "cfunc": cfunc, "arg_abund": arg_abund, "samples": names,
                         "versions": versions,
                         "processes": parse_versions(versions), "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
@@ -677,6 +725,81 @@ def main(argv=None):
                     "unit": next(iter(ftables.values()))[1] if ftables else "",
                     "n_samples": len(func["ran"] & set(order))}
 
+    # ---- ARG RPKM per MicrobeCensus genome equivalent (RPKG), when MicrobeCensus ran
+    if "mc_genome_equivalents" in samples and samples["mc_genome_equivalents"].notna().any() \
+            and "clean_pairs" in samples:
+        rpkm = {n: tables[n][0] for n in ("arg_gene_rpkm", "arg_family_rpkm", "arg_drug_class_rpkm") if n in tables}
+        for name, mat in rpkg_tables(rpkm, samples["clean_pairs"], samples["mc_genome_equivalents"], order).items():
+            tables[name] = (mat, tables[name.replace("_rpkg", "_rpkm")][1])
+
+    # ---- assembly: contig statistics, reads on contigs and genes (featureCounts)
+    asm_parts = [(b["label"], b["assembly"]) for b in batches]
+    astats = assembly_stats_table(asm_parts)
+    if astats is not None:
+        tables["assembly_stats"] = (astats, False)
+        use = read_use_frame(asm_parts, {b["label"]: sorted(b["samples"]) for b in batches})
+        if use is not None:
+            tables["assembly_read_use"] = (with_meta(use, samples, meta_cols, order, []), False)
+            num = pd.to_numeric(use.set_index("sample")["pct_reads_on_genes"], errors="coerce")
+            samples["pct_reads_on_genes"] = num.reindex(samples.index)
+
+    # ---- MAGs: CheckM2, MIMAG tier, GTDB-Tk, Bakta; depth per sample
+    mag_parts = [(b["label"], b["mags"]) for b in batches]
+    mags = mags_table(mag_parts)
+    if mags is not None:
+        tables["mags"] = (mags, False)
+        mc_bases = (mc.drop_duplicates("sample").set_index("sample")["mc_total_bases"] if mc is not None
+                    else pd.Series(dtype=float))
+        bases = {}
+        for smp in order:
+            b_ = mc_bases.get(smp, np.nan)
+            if pd.isna(b_) and {"clean_pairs", "mean_read_length"} <= set(samples.columns):
+                b_ = samples.at[smp, "clean_pairs"] * 2 * samples.at[smp, "mean_read_length"]
+            bases[smp] = b_
+        ab = mag_abundance_frame(mag_parts, {b["label"]: b["contig_table"] for b in batches}, bases)
+        if ab is not None:
+            # the sample's batch is the MAG's: with_meta adds it back
+            ab = with_meta(ab.drop(columns="batch"), samples, meta_cols, order, ["assembly", "bin"])
+            lead = ["assembly", "batch", "bin", "sample"]
+            tables["mag_abundance"] = (ab[lead + [c for c in ab.columns if c not in lead]], False)
+
+    # ---- contig ARGs with their taxon and bin (linkage), and their abundance per sample
+    clong = arg_contig_long_table([(b["label"], b["contig_args"]) for b in batches], mags)
+    if clong is not None:
+        tables["arg_contig_long"] = (clong, False)
+        tables["arg_contig_hosts"] = (arg_contig_hosts_table(clong), False)
+    abund = [b["arg_abund"].assign(batch=b["label"]) for b in batches if b["arg_abund"] is not None]
+    if abund:
+        abund = pd.concat(abund, ignore_index=True).drop(columns="batch")
+        tables["arg_contig_abundance"] = (with_meta(abund, samples, meta_cols, order, ["arg_class", "arg_gene",
+                                                                                       "gene_id"]), False)
+
+    # ---- bin-level ARG clusters
+    known = {b["label"]: set(b["samples"]) | ({"coassembly"} | (set(b["mags"]["mags"]["assembly"])
+                                                               if b["mags"] is not None else set()))
+             for b in batches}
+    mlong = arg_mag_long_table([(b["label"], b["clusters"], known[b["label"]]) for b in batches])
+    if mlong is not None:
+        tables["arg_mag_long"] = (mlong, False)
+        tables["arg_cluster_sharing"] = (arg_cluster_sharing_table(mlong), False)
+
+    # ---- contig-level functional profile (never merged with the read-level one)
+    cfunc = merge_contig_functional([b["cfunc"] for b in batches])
+    cfunc_ctx = None
+    if cfunc is not None:
+        cstatus = sample_status(order, cfunc["ran"], low)
+        tables["function_contig_long"] = (with_meta(contig_function_long(cfunc), samples, meta_cols, order,
+                                                    ["backend", "ontology", "accession"]), False)
+        ctables = contig_function_tables(cfunc, order, cstatus)
+        for ont, (mat, unit) in ctables.items():
+            tables[f"function_contig_{ont}"] = (mat, True)
+            table_units[f"function_contig_{ont}"] = unit
+        ccols = contig_function_sample_columns(cfunc, order)
+        for c in ccols.columns:
+            samples[c] = ccols[c]
+        cfunc_ctx = {"ontologies": sorted(ctables), "unit": next(iter(ctables.values()))[1] if ctables else "",
+                     "n_samples": len(cfunc["ran"] & set(order))}
+
     prim_arg = None
     if methods_ran:
         prim_arg = calls_by[primary]
@@ -728,7 +851,8 @@ def main(argv=None):
         "group_by": args.group_by, "comparison": comparison, "tier1_view": tier1_view,
         "rgi_min_coverage": args.rgi_min_coverage, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
         "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
-        "sarg": sarg_ctx, "functional": func_ctx, "table_units": table_units, "title": args.title,
+        "sarg": sarg_ctx, "functional": func_ctx, "contig_functional": cfunc_ctx, "table_units": table_units,
+        "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
     }
     ctx["method_notes"] = method_notes(ctx)

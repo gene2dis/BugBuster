@@ -233,6 +233,8 @@ workflow BINNING {
             }
         }
 
+    ch_bin_depth = channel.empty()   // <sample>_bin_depth.tsv, co-assembly only
+
     //
     // Generate reports - mode-specific handling
     //
@@ -263,6 +265,7 @@ workflow BINNING {
 
         BEDTOOLS_BIN_DEPTH(sample_bams.combine(BIN_CONTIG_TABLE.out.table))
         def ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
+        ch_bin_depth = ch_bin_cov
         ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
 
         BIN_SUMMARY(
@@ -276,5 +279,7 @@ workflow BINNING {
     emit:
     refined_bins = ch_refined_bins    // channel: [ val(meta), path(bins) ]
     gtdbtk       = ch_gtdb_tk         // channel: [ val(meta), [ GTDB-Tk bac120/ar53 summaries ] ]
+    refined_quality = ch_checkm_refined  // channel: [ val(meta), CheckM2 report(s) of the refined bins ]
+    bin_depth    = ch_bin_depth       // channel: path(<sample>_bin_depth.tsv), co-assembly only
     versions     = ch_versions        // channel: path(versions.yml)
 }

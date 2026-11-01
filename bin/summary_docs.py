@@ -29,6 +29,14 @@ WIDE_CELL = ("<sample>", "one column per sample. 0 = not detected in a sample of
                          "not detected in a low-depth sample (unknown, not absent); NA_not_run = the method did not "
                          "run on the sample")
 
+WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 / MicrobeCensus genome equivalents. 0 = "
+                             "not detected; blank = a call without an RPKM; NA_no_ags = no MicrobeCensus estimate for "
+                             "the sample; NA_low_depth / NA_not_run as in the other wide tables")
+
+ASSEMBLY_KEY = [("assembly", "the assembly: a sample name (--assembly_mode assembly), or coassembly"),
+                ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with the "
+                          "assembly, the key: every co-assembly is called coassembly")]
+
 TABLE_DOCS = {
     "samples_qc": {
         "title": "Per-sample summary",
@@ -70,6 +78,12 @@ TABLE_DOCS = {
             ("func_reads_assigned, func_fraction_annotated", "read functional profile: reads the backend assigned "
                                                              "(Woltka: to WoL ORFs, mates counted separately) and "
                                                              "the share of them with any functional term"),
+            ("pct_reads_on_genes", "% of the sample's reads (mates counted separately) featureCounts placed on "
+                                   "predicted genes of its assembly (--contig_level_functional; assembly_read_use): "
+                                   "the reads the contig-level TPM describes"),
+            ("func_contig_genes_annotated_pct, func_contig_annotated_by_abundance_pct",
+             "contig-level functional profile: % of the predicted genes with any eggNOG / dbCAN term, and their share "
+             "of the sample's TPM"),
         ],
     },
     "taxonomy_long": {
@@ -316,6 +330,208 @@ TABLE_DOCS = {
                     ("<sample>", "abundance; 0 = term not found; NA_no_ags = no MicrobeCensus estimate for the "
                                  "sample, so no CPGE; NA_low_depth / NA_not_run as in the other wide tables")],
     },
+    "arg_gene_rpkg": {
+        "title": "ARG genes x samples (RPKG)",
+        "description": "arg_gene_rpkm per MicrobeCensus genome equivalent: supporting read pairs per kb of gene per "
+                       "genome equivalent (an estimate of cells), so samples of different average genome size compare. "
+                       "Written when MicrobeCensus ran.",
+        "columns": [("gene", "gene (allele numbers collapsed)"), ("tier, category", "tier and category (arg_long)"),
+                    WIDE_RPKG],
+    },
+    "arg_family_rpkg": {
+        "title": "ARG gene families x samples (RPKG)",
+        "description": "arg_family_rpkm per MicrobeCensus genome equivalent.",
+        "columns": [("gene_family", "CARD AMR gene family"), WIDE_RPKG],
+    },
+    "arg_drug_class_rpkg": {
+        "title": "ARG drug classes x samples (RPKG)",
+        "description": "arg_drug_class_rpkm per MicrobeCensus genome equivalent. A multi-class gene counts in each "
+                       "class, so the rows are not additive.",
+        "columns": [("tier_group", "acquired (tiers 1-2), intrinsic/efflux (tier 3), or CARD mutation present "
+                                   "(tier 4 rows with resistance_snp_status card_snp_present)"),
+                    ("drug_class", "CARD drug class"), WIDE_RPKG],
+    },
+    "assembly_stats": {
+        "title": "Assemblies",
+        "description": "One row per assembly (MEGAHIT): BBMap statistics of all its contigs, and how many passed the "
+                       "length filter that every contig-based step uses (binning, contig taxonomy, ARGs, functions). "
+                       "MEGAHIT is not reproducible run to run: the same reads give slightly different contigs.",
+        "columns": ASSEMBLY_KEY + [
+            ("assembly_mode", "assembly (one per sample) or coassembly (all samples pooled)"),
+            ("contigs, assembly_length_mb", "contigs MEGAHIT wrote and their total length (Mb)"),
+            ("n50_kb, l50", "N50 (kb): half of the assembly is in contigs at least this long; L50: how many contigs "
+                            "that takes (BBMap prints them the other way round, as N/L50 = count/length)"),
+            ("max_contig_kb", "longest contig (kb)"),
+            ("gc_pct", "GC content of the contigs (%)"),
+            ("min_contig_length_bp, contigs_kept, pct_contigs_kept", "length filter (--bbmap_length) and the contigs "
+                                                                     "it kept, as a number and % of contigs"),
+        ],
+    },
+    "assembly_read_use": {
+        "title": "Reads on the assembly",
+        "description": "Per sample, the share of its reads featureCounts placed on the contigs of its assembly (a "
+                       "co-assembly for every sample under --assembly_mode coassembly) and on their predicted genes. "
+                       "Reads not on contigs are outside every contig-based table. NA_not_run without "
+                       "--contig_level_functional (featureCounts is part of it).",
+        "columns": SAMPLE_KEY + [
+            ("assembly", "the assembly the sample's reads were aligned to: the sample itself, or coassembly"),
+            ("pct_reads_on_contigs", "% of the sample's reads (mates counted separately) aligned to a filtered contig"),
+            ("pct_reads_on_genes", "% of its reads assigned to a predicted gene: the denominator of contig-level TPM"),
+        ],
+    },
+    "mags": {
+        "title": "MAGs (refined bins)",
+        "description": "One row per refined MAG (Binette, or the single binner's bins): CheckM2 quality, MIMAG tier, "
+                       "GTDB-Tk lineage and, with --mag_level_functional, Bakta's rRNA, tRNA and gene counts. MAGs of "
+                       "different per-sample assemblies are not dereplicated: one species can appear once per sample.",
+        "columns": ASSEMBLY_KEY + [
+            ("bin", "MAG name in its assembly (binette_binN)"),
+            ("binner", "binette (refinement of >= 2 binners) or the single binner"),
+            ("completeness_pct, contamination_pct", "CheckM2 estimates (%)"),
+            ("checkm2_model", "CheckM2 model behind the completeness (specific neural network or general gradient "
+                              "boost)"),
+            ("genome_size_mb, contigs, contig_n50_kb, gc_pct, coding_density", "CheckM2: MAG size (Mb), contigs, "
+                                                                               "contig N50 (kb), GC (%), coding "
+                                                                               "density"),
+            ("quality_tier", "MIMAG (Bowers et al. 2017): high = completeness > 90, contamination < 5, 23S + 16S + 5S "
+                             "rRNA and >= 18 tRNA amino acids; medium = completeness >= 50, contamination < 10; low = "
+                             "the rest. Stricter on rRNA/tRNA than the High/Mid/Low of the run's 04_binning plots"),
+            ("tier_basis", "checkm2_rrna_trna: Bakta's rRNA / tRNA checked; checkm2_only: no Bakta, so at most medium"),
+            ("domain, phylum, class, order, family, genus, species", "GTDB-Tk classification (GTDB names; blank where "
+                                                                    "it stops)"),
+            ("gtdb_closest_reference", "GTDB-Tk's closest reference genome (blank when there is none)"),
+            ("rrna_16s, rrna_23s, rrna_5s", "Bakta found the rRNA gene (truncated genes at a contig end count); blank "
+                                            "without Bakta"),
+            ("trna_aa_types", "standard amino acids with a Bakta tRNA (pseudo tRNAs not counted)"),
+            ("cds, pct_hypothetical, crispr_arrays", "Bakta: coding sequences, % of them hypothetical proteins, CRISPR "
+                                                     "arrays"),
+        ],
+    },
+    "mag_abundance": {
+        "title": "MAG depth per sample",
+        "description": "Read depth of each MAG in each sample and the share of the sample's sequenced bases it holds. "
+                       "Under co-assembly every MAG has a row per sample (BEDTOOLS_BIN_DEPTH: the mean of its contigs' "
+                       "mean depths, each contig weighted equally); under per-sample assembly a MAG has a row for its "
+                       "own sample only (length-weighted contig coverage from the contig table, --contig_tax_and_arg; "
+                       "NA_not_run without it).",
+        "columns": [
+            ("assembly", "the assembly the MAG comes from: a sample name, or coassembly"),
+            ("batch", "results directory (--batch-labels / --summary_batch_label)"),
+            ("bin", "MAG name (mags)"),
+            ("sample", "sample whose reads give the depth"),
+            ("<metadata>", "columns of the --metadata table"),
+            ("mean_depth_x", "mean read depth on the MAG's contigs (raw, not normalised)"),
+            ("pct_sample_bases", "depth x MAG size / bases sequenced in the sample (MicrobeCensus total bases, all "
+                                 "reads; else clean pairs x 2 x mean read length, without singletons) x 100: "
+                                 "comparable between samples of one assembly mode, unlike raw depth; not between "
+                                 "modes (co-assembly depth weights every contig equally, per-sample depth by length)"),
+        ],
+    },
+    "arg_contig_long": {
+        "title": "Contig ARGs with their taxon and bin",
+        "description": "One row per DeepARG hit on an assembled contig (--contig_tax_and_arg), with the contig's "
+                       "Metabuli taxon, bin and geNomad class. This is linkage (the ARG and the taxon are on one "
+                       "contig), unlike read-level candidate hosts. Counts are genes on contigs, not read abundances; "
+                       "ARGs of low-coverage or unassembled genomes are missing. DeepARG calls are predictions: many "
+                       "have < 80 % identity to their reference.",
+        "columns": ASSEMBLY_KEY + [
+            ("contig, contig_length_bp", "contig name and length"),
+            ("contig_depth_x", "BlobTools mean read depth of the contig (raw; under co-assembly pooled over all "
+                               "samples)"),
+            ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
+            ("deeparg_probability, identity_pct", "DeepARG probability and % identity to the best SARG-DeepARG hit"),
+            ("host_rank, host_taxon", "lowest of the seven ranks Metabuli reached for the contig and its name "
+                                      "(unclassified when none)"),
+            ("phylum, genus, species", "Metabuli's phylum, genus and species of the contig (NCBI names)"),
+            ("taxonomy_score", "Metabuli's score of the call"),
+            ("bin, mag_tier, bin_gtdb_species", "MAG the contig is binned in, its MIMAG tier (mags) and GTDB species; "
+                                                "blank for unbinned contigs"),
+            ("mobile_class", "geNomad: chromosome, plasmid or virus (blank without --genomad_prediction)"),
+        ],
+    },
+    "arg_contig_hosts": {
+        "title": "Contig ARGs per host taxon",
+        "description": "ARG genes on contigs per assembly, ARG class and host: the contig's genus, or the lowest rank "
+                       "above it that Metabuli reached (unclassified when none). Gene counts, not abundances.",
+        "columns": ASSEMBLY_KEY + [
+            ("arg_class", "DeepARG predicted ARG class"),
+            ("host_rank, host_taxon", "rank (genus or above) and name of the host"),
+            ("arg_genes, arg_contigs", "ARG genes of the class on contigs of the host, and those contigs"),
+            ("on_mag", "of the genes, those on a binned contig"),
+            ("on_mobile", "of the genes, those on a geNomad plasmid or virus contig"),
+        ],
+    },
+    "arg_contig_abundance": {
+        "title": "Contig ARG genes per sample",
+        "description": "Each DeepARG gene's read abundance in each sample, from featureCounts on its predicted gene "
+                       "(--contig_level_functional): under co-assembly one row per gene and sample, under per-sample "
+                       "assembly the gene's own sample only. TPM and CPGE as in the contig-level functional tables.",
+        "columns": SAMPLE_KEY + [
+            ("assembly", "the assembly the gene was predicted on: a sample name, or coassembly"),
+            ("gene_id, contig", "Pyrodigal gene and its contig"),
+            ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
+            ("count", "reads featureCounts assigned to the gene (mates counted separately)"),
+            ("tpm", "transcripts-per-million style share of the sample's reads on predicted genes (design doc 6.1)"),
+            ("cpge", "copies per genome equivalent: RPK / MicrobeCensus genome equivalents (blank without it)"),
+        ],
+    },
+    "arg_mag_long": {
+        "title": "ARG genes of MAGs and their clusters",
+        "description": "One row per ARG gene on a MAG (--arg_bin_clustering: DeepARG hits of the assembly split by "
+                       "bin) and its MMseqs2 cluster at 90, 95, 99 and 100 % identity. A cluster is named after its "
+                       "representative gene; genes of one cluster share that sequence identity.",
+        "columns": ASSEMBLY_KEY + [
+            ("bin", "MAG (mags)"),
+            ("gene_id", "Pyrodigal gene"),
+            ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
+            ("cluster_90, cluster_95, cluster_99, cluster_100", "cluster at each identity, as "
+                                                                "<assembly>:<bin>:<gene of the representative>"),
+        ],
+    },
+    "arg_cluster_sharing": {
+        "title": "ARG clusters shared by MAGs",
+        "description": "Clusters at 90 % identity found in more than one MAG. The same ARG sequence in MAGs of "
+                       "different samples or taxa is consistent with transfer but not evidence of it on its own. Only "
+                       "ARGs on binned contigs are here.",
+        "columns": [
+            ("cluster", "cluster (arg_mag_long cluster_90)"),
+            ("batch", "results directory (clusters are made within one run)"),
+            ("arg_gene, arg_class", "DeepARG ARGs and classes of the members"),
+            ("n_mags, n_assemblies", "MAGs and assemblies holding the cluster"),
+            ("mags", "the MAGs, as <assembly>:<bin>"),
+        ],
+    },
+    "function_contig_long": {
+        "title": "Contig-level functional profile, long format",
+        "description": "AGGREGATE_FUNCTIONS' function_abundance.tsv (eggNOG-mapper and dbCAN on the predicted genes of "
+                       "the assemblies, --contig_level_functional): one row per sample and term. A gene with two "
+                       "terms of an ontology counts fully for each, so an ontology's terms add up to more than the "
+                       "genes. Reported apart from the read-level profile (function_read_*), never merged with it.",
+        "columns": SAMPLE_KEY + [
+            ("backend", "eggnog-mapper or run_dbcan"),
+            ("ontology", "ko, cog (COG category letters), ec, pfam (Pfam names), cazy (eggNOG), cazy_dbcan (dbCAN "
+                         "families and eCAMI subfamilies)"),
+            ("accession, term_description", "term and its name: COG categories from NCBI COG, eggNOG CAZy families "
+                                             "from eggNOG; blank for KO, EC, Pfam and dbCAN"),
+            ("abundance_tpm", "TPM: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of RPK_j) * "
+                              "1e6, summed over the term's genes. The share of the sample's functional pool, relative "
+                              "to reads on predicted genes (pct_reads_on_genes); compositional"),
+            ("abundance_cpge", "copies per genome equivalent: genome_equivalents = total_bases_sampled / "
+                               "average_genome_size_bp (MicrobeCensus); CPGE_i = RPK_i / genome_equivalents. Not "
+                               "compositional; blank without MicrobeCensus"),
+        ],
+    },
+    "function_contig_<ontology>": {
+        "title": "Contig-level functional profile per ontology, wide",
+        "description": "One row per term, one column per sample, in copies per genome equivalent (CPGE) when "
+                       "MicrobeCensus ran, else in TPM (the README and the sheet's unit say which). Rows sorted by "
+                       "mean abundance. Not comparable row by row with function_read_<ontology>: other genes, other "
+                       "reads, other units.",
+        "columns": [("accession", "term"), ("description", "term name (COG categories, eggNOG CAZy families; blank "
+                                                            "for KO, EC, Pfam and dbCAN)"),
+                    ("<sample>", "abundance; 0 = term not found; NA_no_ags = no MicrobeCensus estimate for the "
+                                 "sample, so no CPGE; NA_low_depth / NA_not_run as in the other wide tables")],
+    },
 }
 
 
@@ -327,6 +543,8 @@ def table_doc(name, group_by=None):
         doc = TABLE_DOCS["taxonomy_<rank>_wide"]
     elif name.startswith("function_read_") and name != "function_read_long":
         doc = TABLE_DOCS["function_read_<ontology>"]
+    elif name.startswith("function_contig_") and name != "function_contig_long":
+        doc = TABLE_DOCS["function_contig_<ontology>"]
     else:
         return None
     if name == "group_arg_detection":
@@ -603,8 +821,20 @@ UNITS = [
                    "count mates separately"),
     ("RPM, RPKM", "K-MARVEL / RGI: supporting read pairs per million clean read pairs; RPM per kb of reference gene. "
                   "Comparable between samples of different depth; not copies per cell"),
-    ("CPGE", "read functional profile: reads per kb per MicrobeCensus genome equivalent (RPK / GE)"),
-    ("relative abundance", "taxonomy: % of the profiled (classified) community; each sample sums to 100"),
+    ("CPGE", "functional profiles: reads per kb per MicrobeCensus genome equivalent (RPK / GE). Contig level: "
+             "genome_equivalents = total_bases_sampled / average_genome_size_bp (MicrobeCensus); CPGE_i = RPK_i / "
+             "genome_equivalents. Approximate average copies of that gene per community member; not compositional"),
+    ("TPM", "contig-level functional profile: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of "
+            "RPK_j) * 1e6. The share of the sample's functional pool attributable to that gene; compositional, and "
+            "relative to the reads on predicted genes only (assembly_read_use pct_reads_on_genes)"),
+    ("RPKG", "arg_*_rpkg: K-MARVEL / RGI supporting read pairs per kb of gene per MicrobeCensus genome equivalent "
+             "(RPKM x clean read pairs / 1e6 / genome equivalents)"),
+    ("relative abundance", "taxonomy: % of the profiled (classified) community; each sample sums to 100. What is "
+                           "profiled differs by profiler: Kraken2 + Bracken species read estimates, sourmash's "
+                           "abundance-weighted k-mer share of the matched genomes, sylph's taxonomic abundance; their "
+                           "classified fractions (samples_qc) are not comparable between profilers"),
+    ("MIMAG tier", "mags quality_tier: high / medium / low (Bowers et al. 2017); tier_basis says whether Bakta's "
+                   "rRNA / tRNA genes were checked (without them a MAG is at most medium)"),
     ("copies per cell", "ARGs-OAP: SARG copies (reads weighted by the share of the reference they cover) / "
                         "ARGs-OAP cell estimate (nCell)"),
     ("NA_low_depth", "not detected in a sample below --min-clean-pairs: unknown, not absent"),
@@ -634,6 +864,22 @@ PITFALLS = [
     "samples_qc.",
     "Tier 1 calls of RGI from WildCARD sequences may come from commensal relatives of the clinical gene: check "
     "rgi_kmer_hosts / rgi_host_check.",
+    "TPM and CPGE are not interchangeable (the most common error with these tables): TPM is a share of the reads on "
+    "predicted genes (compositional), CPGE is copies per genome equivalent (not compositional). Contig-level TPM "
+    "describes only the reads on predicted genes, which can be well under half of a sample's reads (assembly_read_use).",
+    "A gene with two terms of one ontology counts fully for each (intended): an ontology's terms add up to more than "
+    "the gene total.",
+    "Read-level (function_read_*) and contig-level (function_contig_*) functional tables come from different genes, "
+    "reads and units: never merge or compare them row by row.",
+    "Contig ARG tables count genes on assembled contigs, not read abundance: ARGs of low-coverage or unassembled "
+    "genomes are missing, and DeepARG calls below 80 % identity are common. Under co-assembly the contig depth is "
+    "pooled over all samples; arg_contig_abundance gives each sample's reads on the gene.",
+    "MAG quality: the mags quality_tier is MIMAG; the High/Mid/Low classes of the run's 04_binning plots and tables "
+    "are another, older scheme. MAGs of different per-sample assemblies are not dereplicated.",
+    "Co-assembly MAG depth (mag_abundance) is the mean of its contigs' mean depths, each contig weighted equally; "
+    "compare samples with pct_sample_bases rather than raw depth.",
+    "An ARG cluster shared by MAGs of different samples or taxa (arg_cluster_sharing) is the same sequence at the "
+    "stated identity; it is consistent with transfer, not evidence of it by itself.",
 ]
 
 
@@ -805,7 +1051,13 @@ def llm_guide(ctx):
             "- ARG load per sample in one unit: `tables/samples_qc.tsv` `acquired_rpkm` (CARD methods) or "
             "`sarg_copies_per_cell` (ARGs-OAP, SARG); never add the two.",
             "- A functional term across samples: `tables/function_read_<ontology>.tsv` (CPGE when available), or "
-            "`tables/function_read_long.tsv` filtered by `ontology` and `accession`.",
+            "`tables/function_read_long.tsv` filtered by `ontology` and `accession`; the contig-level profile is "
+            "`tables/function_contig_<ontology>.tsv` / `function_contig_long.tsv` (never mix the two).",
+            "- Good-quality genomes: `tables/mags.tsv` with `quality_tier == 'high'` (or 'medium'), lineage in "
+            "`phylum` ... `species`; their depth per sample in `tables/mag_abundance.tsv` (`pct_sample_bases`).",
+            "- Which organisms carry an ARG (linkage, assembled contigs): `tables/arg_contig_long.tsv` (`host_taxon`, "
+            "`bin`, `mobile_class`), summarised in `tables/arg_contig_hosts.tsv`; ARGs shared between MAGs in "
+            "`tables/arg_cluster_sharing.tsv`.",
             "- Software versions: `README.md`, section Software versions (per batch when several were merged).", ""]
     return "\n".join(out)
 

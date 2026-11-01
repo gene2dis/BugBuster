@@ -48,25 +48,29 @@ STAGES = [
         "key": "microbecensus", "title": "Average genome size (MicrobeCensus)",
         "params": "--microbecensus (runs with a contig or read functional branch)",
         "processes": ["MICROBECENSUS"],
-        "summary": "samples_qc mc_avg_genome_size_bp, mc_genome_equivalents",
+        "summary": "samples_qc mc_avg_genome_size_bp, mc_genome_equivalents; arg_*_rpkg (ARGs per genome "
+                   "equivalent)",
     },
     {
         "key": "assembly", "title": "Assembly (MEGAHIT)",
         "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize), --megahit_k_list, --megahit_min_count",
         "processes": ["BBNORM", "MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
-        "summary": "not summarised yet",
+        "summary": "assembly_stats (contigs, length, N50, contigs kept by the length filter); assembly_read_use (% "
+                   "of reads on contigs and genes, with --contig_level_functional)",
     },
     {
         "key": "binning", "title": "Binning and MAGs (SemiBin2 / MetaBAT2 / COMEBin, Binette, CheckM2, GTDB-Tk)",
         "params": "--include_binning, --binners (Binette refinement with >= 2 binners)",
-        "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "BINETTE", "CHECKM2_BATCH", "GTDB_TK_BATCH"],
-        "summary": "not summarised yet",
+        "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "BINETTE", "CHECKM2_BATCH", "GTDB_TK_BATCH",
+                      "BEDTOOLS_BIN_DEPTH"],
+        "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {
         "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
         "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
         "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
-        "summary": "not summarised yet",
+        "summary": "arg_contig_long (each contig ARG with its taxon, bin and geNomad class), arg_contig_hosts; "
+                   "arg_contig_abundance (with --contig_level_functional)",
     },
     {
         "key": "genomad", "title": "Plasmid / virus classification of contigs (geNomad)",
@@ -80,20 +84,23 @@ STAGES = [
     {
         "key": "bin_arg", "title": "Bin-level ARG clustering (assembly DeepARG hits split by bin, MMseqs2)",
         "params": "--arg_bin_clustering (needs binning)",
-        "processes": ["BIN_ARG_SPLIT", "CLUSTERING"],
-        "summary": "not summarised yet",
+        "processes": ["BIN_ARG_SPLIT", "ARG_FASTA_FORMATTER", "CLUSTERING"],
+        "summary": "arg_mag_long (ARG genes of MAGs and their clusters at 90-100 % identity), arg_cluster_sharing",
     },
     {
         "key": "contig_functional", "title": "Contig-level functional (Pyrodigal, eggNOG-mapper, dbCAN, featureCounts)",
         "params": "--contig_level_functional (needs an assembly), --functional_cazy",
-        "processes": ["PYRODIGAL", "EGGNOG_MAPPER_ANNOTATE", "RUN_DBCAN", "FEATURECOUNTS_GENES", "AGGREGATE_FUNCTIONS"],
-        "summary": "not summarised yet",
+        "processes": ["PYRODIGAL", "EGGNOG_MAPPER_SEARCH", "EGGNOG_MAPPER_ANNOTATE", "RUN_DBCAN",
+                      "FEATURECOUNTS_GENES", "AGGREGATE_FUNCTIONS"],
+        "summary": "function_contig_long, function_contig_<ontology> (CPGE or TPM); samples_qc func_contig_*, "
+                   "pct_reads_on_genes",
     },
     {
         "key": "mag_functional", "title": "MAG annotation (Bakta)",
         "params": "--mag_level_functional (needs binning with >= 2 binners)",
         "processes": ["BAKTA_BAKTA"],
-        "summary": "not summarised yet",
+        "summary": "mags columns rrna_16s / rrna_23s / rrna_5s, trna_aa_types (the MIMAG high tier), cds, "
+                   "pct_hypothetical, crispr_arrays",
     },
 ]
 

@@ -1,0 +1,35 @@
+# Contig Filtering Summary Report
+# Generated: 2026-11-01 00:00:00 UTC
+# Pipeline: BugBuster
+#
+# This report tracks samples where contig filtering resulted in empty outputs
+#
+================================================================================
+
+## BBMAP Contig Filtering Statistics
+
+Sample_ID	Contigs_Before	Contigs_After	Min_Length	All_Filtered
+------------------------------------------------------------------------
+coassembly	180428	34888	1000	FALSE
+
+
+## Samples with Empty Contigs Detected at Alignment Stage
+
+No empty contig reports found (all samples had contigs after filtering)
+
+
+## Summary Statistics
+
+Total samples processed: 1
+Samples with all contigs filtered: 0
+Percentage of samples with empty contigs: 0%
+
+================================================================================
+
+Note: Samples with empty contigs may indicate:
+  - Low sequencing depth
+  - Poor read quality
+  - Assembly failure
+  - Overly strict length filtering threshold
+
+Consider reviewing these samples and adjusting --bbmap_length if needed.

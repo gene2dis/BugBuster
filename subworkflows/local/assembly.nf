@@ -58,6 +58,8 @@ workflow ASSEMBLY {
     ch_bam_only = channel.empty()
     ch_sample_bams = channel.empty()
     ch_filter_reports = channel.empty()
+    ch_contig_stats   = channel.empty()   // <id>_contig.stats (BBMap stats.sh)
+    ch_filter_summary = channel.empty()   // contig_filtering_summary.txt
     ch_empty_reports = channel.empty()
     def reduce_reads = params.assembly_read_reduction == 'normalize'
 
@@ -89,6 +91,7 @@ workflow ASSEMBLY {
         
         // Collect filter reports for tracking
         ch_filter_reports = BBMAP.out.filter_report
+        ch_contig_stats   = BBMAP.out.stats
         
         // Set output channels
         ch_contigs_with_reads = BBMAP.out.contigs_with_reads
@@ -166,6 +169,7 @@ workflow ASSEMBLY {
         
         // Collect filter reports for tracking
         ch_filter_reports = BBMAP.out.filter_report
+        ch_contig_stats   = BBMAP.out.stats
         
         // Set output channels
         ch_contigs_only = BBMAP.out.contigs_only
@@ -226,6 +230,7 @@ workflow ASSEMBLY {
             ch_filter_reports.collect(sort: true).ifEmpty([]),
             ch_empty_reports.collect(sort: true).ifEmpty([])
         )
+        ch_filter_summary = CONTIG_FILTER_SUMMARY.out.summary_report
         ch_versions = ch_versions.mix(CONTIG_FILTER_SUMMARY.out.versions)
     }
 
@@ -235,5 +240,7 @@ workflow ASSEMBLY {
     bam             = ch_bam_with_contigs    // channel: [ val(meta), path(contigs), path(bam) ] - for depth analysis
     bam_meta        = ch_bam_only            // channel: [ val(meta), path(bam) ] - for indexing
     counting_bam    = ch_sample_bams         // channel: [ val(meta), path(bam) ] - per sample, against its assembly or the co-assembly
+    stats           = ch_contig_stats        // channel: path(<id>_contig.stats) - BBMap statistics of the MEGAHIT contigs
+    filter_summary  = ch_filter_summary      // channel: path(contig_filtering_summary.txt)
     versions        = ch_versions            // channel: path(versions.yml)
 }

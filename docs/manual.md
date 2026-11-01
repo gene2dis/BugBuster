@@ -660,8 +660,8 @@ breaks `-resume`.
 | `--custom_decontamination_index` | Path to a pre-built combined index directory (host + phiX) matching `--read_aligner`: bwa-mem3/bwa-mem2 (`*.bwt.2bit.64`, default) or Bowtie2 (`*.bt2`) |
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
-| `--custom_kraken_db` | Path to custom Kraken2 database directory |
-| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
+| `--custom_kraken_db` | Path to custom Kraken2 database directory; outputs are labelled with the directory's name |
+| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]`; outputs are labelled with the k-mer file's name without extension |
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
@@ -995,7 +995,8 @@ By default, databases are stored in a `databases/` directory at the same level a
 ### 6.17 Results Summary Options
 
 The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP),
-read functional and MicrobeCensus results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
+read functional and MicrobeCensus results, and the assembly, MAG, contig ARG, bin-level ARG cluster and contig
+functional results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
 README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
 network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only
 when its stage ran; the README and the guide list every pipeline stage and whether it ran in each results directory.
@@ -1031,6 +1032,12 @@ How the summary reports the results:
 - **ARGs-OAP (SARG).** With `--args_oap_prediction`, the summary reads `ARGS_OAP_REPORT`'s tables into `arg_sarg_long` (one row per sample and SARG subtype), `arg_sarg_type_cpc` and `arg_sarg_subtype_cpc` (copies per cell, samples as columns), `samples_qc` `args_oap_n16S`, `args_oap_ncell`, `sarg_n_subtypes` and `sarg_copies_per_cell`, and a heatmap by SARG type. SARG names its types and subtypes differently from CARD, so ARGs-OAP is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only. A sample ARGs-OAP could not normalise (no 16S or cells) is blank, not 0.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
 - **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
+- **Assembly.** With an assembly, `assembly_stats` gives each assembly's contigs, length, N50 / L50, GC and the contigs the length filter kept, and `assembly_read_use` the share of each sample's reads on the contigs and on their predicted genes (with `--contig_level_functional`; `NA_not_run` otherwise). Reads not on contigs are outside every contig-based table.
+- **MAGs.** With binning, `mags` has one row per refined MAG: CheckM2 completeness and contamination, a MIMAG tier (`quality_tier`: high needs completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and at least 18 tRNA amino acids; medium completeness >= 50 %, contamination < 10 %), the GTDB-Tk lineage and, with `--mag_level_functional`, Bakta's rRNA, tRNA, CDS and CRISPR counts. Without Bakta the rRNA/tRNA part is unchecked and a MAG is at most medium (`tier_basis checkm2_only`). The High/Mid/Low classes of `04_binning/` are an older, different scheme. `mag_abundance` gives each MAG's depth per sample and `pct_sample_bases` (depth x MAG size / bases sequenced); under co-assembly the depth is BEDTOOLS_BIN_DEPTH's mean of per-contig depths (each contig weighted equally), under per-sample assembly the length-weighted contig coverage of the MAG's own sample (needs `--contig_tax_and_arg`).
+- **Contig ARGs (linkage).** With `--contig_tax_and_arg`, `arg_contig_long` lists every DeepARG hit with its contig's Metabuli taxon (lowest rank reached), bin, MIMAG tier and geNomad class, and `arg_contig_hosts` the ARG genes per host genus. The ARG and the taxon are on one assembled contig, unlike the read-level candidate hosts; the counts are genes on contigs, not read abundance. With `--contig_level_functional`, `arg_contig_abundance` adds each gene's reads per sample (count, TPM, CPGE).
+- **Bin-level ARG clusters.** With `--arg_bin_clustering`, `arg_mag_long` lists the ARG genes of the MAGs and their MMseqs2 cluster at 90, 95, 99 and 100 % identity, and `arg_cluster_sharing` the 90 % clusters found in more than one MAG. A shared cluster is the same sequence in different genomes: consistent with transfer, not evidence of it alone.
+- **Contig functional profile.** With `--contig_level_functional`, `function_contig_long` and `function_contig_<ontology>` (ko, cog, ec, pfam, cazy from eggNOG, cazy_dbcan from dbCAN) hold AGGREGATE_FUNCTIONS' tables, in CPGE when MicrobeCensus ran, else in TPM. TPM_i = RPK_i / (sum of RPK_j) x 1e6 is a share of the reads on predicted genes (compositional); CPGE_i = RPK_i / genome equivalents is copies per genome equivalent (not compositional). A gene with two terms of one ontology counts for each. COG categories and eggNOG CAZy families are named; KO, EC and Pfam keep their identifiers only. These tables are never merged with the read-level `function_read_*`.
+- **ARGs per genome equivalent.** When MicrobeCensus ran, `arg_gene_rpkg`, `arg_family_rpkg` and `arg_drug_class_rpkg` repeat the RPKM matrices per genome equivalent (RPKM x clean read pairs / 1e6 / genome equivalents).
 - **README and LLM guide.** `README.md` / `README.docx` (written with the Python standard library) list the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the summary folder for a language model or a script: run facts as YAML, the stages that ran, methods, every table column and figure, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. The summary folder is the part meant to be shared, so neither file names a local path: paths are relative to the folder, batches appear by label and input files by name. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
 - **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
 
@@ -1152,7 +1159,12 @@ results/
 │   │                                           # arg_presence, arg_drug_class_rpkm, arg_priority_panel, group_arg_detection,
 │   │                                           # arg_method_comparison, arg_method_overlap (K-MARVEL and RGI both ran),
 │   │                                           # arg_sarg_long, arg_sarg_type_cpc, arg_sarg_subtype_cpc (ARGs-OAP),
-│   │                                           # function_read_long, function_read_<ontology> (read functional)
+│   │                                           # function_read_long, function_read_<ontology> (read functional),
+│   │                                           # arg_gene_rpkg, arg_family_rpkg, arg_drug_class_rpkg (MicrobeCensus),
+│   │                                           # assembly_stats, assembly_read_use (assembly), mags, mag_abundance
+│   │                                           # (binning), arg_contig_long, arg_contig_hosts, arg_contig_abundance
+│   │                                           # (contig ARGs), arg_mag_long, arg_cluster_sharing (bin ARG clustering),
+│   │                                           # function_contig_long, function_contig_<ontology> (contig functional)
 │   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
 │                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
 │                                               # arg_sarg_type_heatmap, function_cog_heatmap (.png/.pdf/.svg)
@@ -1277,6 +1289,8 @@ results/
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       ├── deeparg/                            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
+│       ├── arg_fasta/                          # ARG proteins per bin, the clustering input
+│       │   └── {sample}/                       # {sample}_{bin}_ARGs.faa (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)

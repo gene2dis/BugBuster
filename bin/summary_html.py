@@ -363,6 +363,59 @@ def write_html(outdir, title, ctx):
             body += ("<h3>Most abundant KEGG orthologs (top 50)</h3>"
                      + df_to_html(t["function_read_ko"][0].head(50), index=True, table_id="t_ko"))
         section("functional", "Functional profile (read level)", body)
+    if "assembly_stats" in t:
+        body = ("<p class='muted'>MEGAHIT assemblies: statistics of all contigs, and those kept by the length filter "
+                "that binning, contig taxonomy, ARGs and functions use. Reads not on contigs are outside every "
+                "contig-based table.</p>" + df_to_html(t["assembly_stats"][0], table_id="t_asm"))
+        if "assembly_read_use" in t:
+            body += "<h3>Reads on the assembly</h3>" + df_to_html(t["assembly_read_use"][0], table_id="t_asmuse")
+        section("assembly", "Assembly", body)
+    if "mags" in t:
+        m = t["mags"][0]
+        tiers = m["quality_tier"].value_counts()
+        body = (f"<p class='muted'>{len(m)} refined MAGs: {int(tiers.get('high', 0))} high, "
+                f"{int(tiers.get('medium', 0))} medium and {int(tiers.get('low', 0))} low quality (MIMAG; tier_basis "
+                "says whether Bakta's rRNA / tRNA genes were checked). The High/Mid/Low classes of the run's "
+                "04_binning plots are another, older scheme.</p>" + df_to_html(m, table_id="t_mags"))
+        if "mag_abundance" in t:
+            body += ("<h3>Depth per sample</h3><p class='muted'>pct_sample_bases compares samples of one assembly "
+                     "mode; raw depth does not.</p>" + df_to_html(t["mag_abundance"][0], max_rows=1000, table_id="t_magab"))
+        section("mags", "MAGs", body)
+    if "arg_contig_long" in t or "arg_contig_mobile" in t:
+        body = ("<p class='muted'>ARG genes found on assembled contigs, with the contig's taxon and bin: physical "
+                "linkage, unlike the read-level candidate hosts. These are gene counts on contigs, not read "
+                "abundances.</p>")
+        if "arg_contig_hosts" in t:
+            body += "<h3>ARG genes per host</h3>" + df_to_html(t["arg_contig_hosts"][0], table_id="t_chost")
+        if "arg_contig_mobile" in t:
+            body += ("<h3>On plasmids, viruses and proviruses (geNomad)</h3>"
+                     + df_to_html(t["arg_contig_mobile"][0], table_id="t_cmob"))
+        if "arg_contig_long" in t:
+            body += ("<h3>Every contig ARG</h3>"
+                     + df_to_html(t["arg_contig_long"][0], max_rows=1000, table_id="t_clong"))
+        section("contig_args", "ARGs on contigs", body)
+    if "arg_mag_long" in t:
+        body = ("<p class='muted'>ARG genes of the MAGs clustered at 90-100 % identity. A cluster in several MAGs is "
+                "the same sequence in different genomes: consistent with transfer, not evidence of it alone.</p>"
+                "<h3>Clusters shared by MAGs (90 %)</h3>" + df_to_html(t["arg_cluster_sharing"][0], table_id="t_share")
+                + "<h3>ARG genes of the MAGs</h3>" + df_to_html(t["arg_mag_long"][0], max_rows=1000, table_id="t_maga"))
+        section("bin_args", "ARGs of MAGs", body)
+    if ctx.get("contig_functional"):
+        c = ctx["contig_functional"]
+        unit = "copies per genome equivalent (CPGE)" if c["unit"] == "cpge" else "TPM"
+        body = (f"<p class='muted'>eggNOG-mapper and dbCAN on the predicted genes of the assemblies, counted per "
+                f"sample by featureCounts, on {c['n_samples']} samples, in {html.escape(unit)}. TPM is relative to the "
+                "reads on predicted genes (assembly_read_use); a gene with several terms counts for each. Not "
+                "comparable row by row with the read-level profile.</p>")
+        qc = t["samples_qc"][0]
+        ccols = [x for x in ("sample", "pct_reads_on_genes", "func_contig_genes_annotated_pct",
+                             "func_contig_annotated_by_abundance_pct") if x in qc.columns]
+        body += "<h3>Per sample</h3>" + df_to_html(qc[ccols], table_id="t_cfunc")
+        for ont, title in (("cog", "COG categories"), ("ko", "Most abundant KEGG orthologs (top 50)")):
+            if f"function_contig_{ont}" in t:
+                body += (f"<h3>{title}</h3>"
+                         + df_to_html(t[f"function_contig_{ont}"][0].head(50), index=True, table_id=f"t_c{ont}"))
+        section("contig_functional", "Functional profile (contig level)", body)
 
     caveats = [
         "All counts are read pairs. Reads_report.csv counts single reads (both mates), so its numbers are twice those here.",
