@@ -1023,6 +1023,29 @@ next release is tagged.
 
 ### Fixed
 
+- **A custom Kraken2 or sourmash database was labelled as the registry
+  default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
+  the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the
+  plot titles and the summary's `taxonomy_db` still named the `--kraken2_db`
+  (`standard-8`) or `--sourmash_db` (`gtdb_220_k31`) key. They now carry the
+  custom database's name, as sylph's do: the Kraken2 directory's name, the
+  sourmash k-mer file's name without its extension. Runs on registry databases
+  are unchanged. A results directory made with a custom database before this
+  change no longer merges with one made after it in a batch summary (the
+  labels differ)
+- **Co-assembly bin depth tables padded with spaces**: BEDTOOLS_BIN_DEPTH
+  wrote `<sample>_bin_depth.tsv` rows as `sample<TAB>bin<TAB> 59 <TAB> 0.138756`
+  (awk `print` with commas). The fields are now tab-separated only; values are
+  unchanged (`Bin_summary.csv` read them correctly before and after)
+- **Bin quality plot legend**: `Total_bins_quality_plot.png` described the
+  Low class as "Completeness < 50%, Contamination > 5%"; the classification
+  marks a bin Low when either holds, and the legend now says "or". The classes
+  themselves are unchanged (the summary's `mags` table gives MIMAG tiers)
+- **Bin-level ARG FASTAs published in a stray top-level `arg/` folder**:
+  ARG_FASTA_FORMATTER had no publish rule of its own, so the default rule put
+  its `<sample>_<bin>_ARGs.faa` files (the clustering input) in
+  `<output>/arg/`. They are now published to
+  `05_arg_prediction/bin_level/arg_fasta/<sample>/`
 - **Order of tied rows in report tables and figures**: single-key sorts used
   pandas' default quicksort, which does not keep the input order of equal
   values, and numpy 2 orders such ties differently from numpy 1. The summary's

@@ -22,7 +22,7 @@ include { SYLPH_TAXPROF        } from '../../modules/local/sylph_taxprof/main'
 include { TAXONOMY_REPORT      } from '../../modules/local/taxonomy_report/main'
 include { TAXONOMY_PHYLOSEQ    } from '../../modules/local/taxonomy_phyloseq/main'
 include { PHYLOSEQ_CONVERTER   } from '../../modules/local/phyloseq_converter/main'
-include { flagOn; sylphDbLabel } from './utils_params'
+include { flagOn; sylphDbLabel; kraken2DbLabel; sourmashDbLabel } from './utils_params'
 
 workflow TAXONOMY {
     take:
@@ -69,7 +69,7 @@ workflow TAXONOMY {
             KRAKEN2.out.report.map { _meta, report -> report }.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'kraken2',
-            params.kraken2_db
+            kraken2DbLabel()
         )
         ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
         
@@ -77,7 +77,7 @@ workflow TAXONOMY {
         TAXONOMY_PHYLOSEQ(
             BRACKEN.out.txt.map { _meta, report -> report }.collect(sort: true),
             'kraken2',
-            params.kraken2_db,
+            kraken2DbLabel(),
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
             params.taxonomy_top_n_taxa ?: 10
         )
@@ -89,7 +89,7 @@ workflow TAXONOMY {
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
                 TAXONOMY_PHYLOSEQ.out.sample_metadata,
-                params.kraken2_db
+                kraken2DbLabel()
             )
             ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
         }
@@ -102,7 +102,7 @@ workflow TAXONOMY {
         // Run Sourmash classification
         ch_sm_taxonomy = SOURMASH(
             reads.combine(sourmash_db),
-            params.sourmash_db,
+            sourmashDbLabel(),
             params.sourmash_tax_rank
         )
         ch_versions = ch_versions.mix(ch_sm_taxonomy.versions.first())
@@ -112,7 +112,7 @@ workflow TAXONOMY {
             ch_sm_taxonomy.report.collect(sort: true),
             reads_report.flatten().filter { file -> file.name.endsWith('.csv') }.first(),
             'sourmash',
-            params.sourmash_db
+            sourmashDbLabel()
         )
         ch_versions = ch_versions.mix(TAXONOMY_REPORT.out.versions)
         
@@ -120,7 +120,7 @@ workflow TAXONOMY {
         TAXONOMY_PHYLOSEQ(
             ch_sm_taxonomy.sourmash_gather.collect(sort: true),
             'sourmash',
-            params.sourmash_db,
+            sourmashDbLabel(),
             params.taxonomy_plot_levels ?: 'Phylum,Family,Genus,Species',
             params.taxonomy_top_n_taxa ?: 10
         )
@@ -132,7 +132,7 @@ workflow TAXONOMY {
                 TAXONOMY_PHYLOSEQ.out.otu_table,
                 TAXONOMY_PHYLOSEQ.out.tax_table,
                 TAXONOMY_PHYLOSEQ.out.sample_metadata,
-                params.sourmash_db
+                sourmashDbLabel()
             )
             ch_versions = ch_versions.mix(PHYLOSEQ_CONVERTER.out.versions)
         }

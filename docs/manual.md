@@ -660,8 +660,8 @@ breaks `-resume`.
 | `--custom_decontamination_index` | Path to a pre-built combined index directory (host + phiX) matching `--read_aligner`: bwa-mem3/bwa-mem2 (`*.bwt.2bit.64`, default) or Bowtie2 (`*.bt2`) |
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
-| `--custom_kraken_db` | Path to custom Kraken2 database directory |
-| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]` |
+| `--custom_kraken_db` | Path to custom Kraken2 database directory; outputs are labelled with the directory's name |
+| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]`; outputs are labelled with the k-mer file's name without extension |
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
@@ -1277,6 +1277,8 @@ results/
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
 │       ├── deeparg/                            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
+│       ├── arg_fasta/                          # ARG proteins per bin, the clustering input
+│       │   └── {sample}/                       # {sample}_{bin}_ARGs.faa (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
 ├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)

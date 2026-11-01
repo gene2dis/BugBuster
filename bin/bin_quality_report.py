@@ -164,7 +164,7 @@ def main():
     
     # Create legend
     legend_labels = [
-        'Low\n(Completeness < 50%, Contamination > 5%)',
+        'Low\n(Completeness < 50% or Contamination > 5%)',
         'Mid\n(Completeness ≥ 50% < 90%, Contamination ≤ 5%)',
         'High\n(Completeness ≥ 90%, Contamination ≤ 5%)'
     ]

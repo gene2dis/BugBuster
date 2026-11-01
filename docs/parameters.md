@@ -161,7 +161,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable bin-level ARGs and their clustering for horizontal gene transfer inference. Requires `--include_binning`. The ARGs are DEEPARG_CONTIGS' hits on the whole assembly (shared Pyrodigal proteins) split by refined bin (`BIN_ARG_SPLIT`), not a DeepARG run per bin: DeepARG min-max scales its features over its input file, so per-bin runs gave probabilities that depended on the bin (Phase 9a, M8). Per-bin hits and proteins in `05_arg_prediction/bin_level/{deeparg,proteins}/<sample>/`, MMseqs2 clusters in `bin_level/clustering/`
+- **Description**: Enable bin-level ARGs and their clustering for horizontal gene transfer inference. Requires `--include_binning`. The ARGs are DEEPARG_CONTIGS' hits on the whole assembly (shared Pyrodigal proteins) split by refined bin (`BIN_ARG_SPLIT`), not a DeepARG run per bin: DeepARG min-max scales its features over its input file, so per-bin runs gave probabilities that depended on the bin (Phase 9a, M8). Per-bin hits and proteins in `05_arg_prediction/bin_level/{deeparg,proteins}/<sample>/`, the ARG proteins per bin (the clustering input, headers `<gene>_from_<sample>_<bin>_gene_<ARG>_ARG_class_<class>`) in `bin_level/arg_fasta/<sample>/`, MMseqs2 clusters in `bin_level/clustering/`
 - **Example**: `--arg_bin_clustering true`
 
 ### `--min_read_sample`
@@ -349,12 +349,12 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_kraken_db`
 - **Type**: String (directory path)
-- **Description**: Path to custom Kraken2 database directory
+- **Description**: Path to custom Kraken2 database directory. Outputs are then labelled with the directory's name (e.g. `kraken2_k2_standard_otu_table.tsv` and `k2_standard` in the `Kraken DB` column) instead of the `--kraken2_db` key
 - **Example**: `--custom_kraken_db /path/to/kraken2_db`
 
 ### `--custom_sourmash_db`
 - **Type**: Array of strings
-- **Description**: Paths to custom Sourmash database files [kmer_file, lineages_file]
+- **Description**: Paths to custom Sourmash database files [kmer_file, lineages_file]. Outputs are then labelled with the k-mer file's name without its extension (e.g. `gtdb-reps-rs226-k31.dna` for `gtdb-reps-rs226-k31.dna.zip`, in file names and the `Sourmash DB` column) instead of the `--sourmash_db` key
 - **Example**: `--custom_sourmash_db '["/path/to/kmers.zip", "/path/to/lineages.csv"]'`
 
 ### `--custom_sylph_db`

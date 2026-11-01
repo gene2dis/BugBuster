@@ -37,9 +37,9 @@ nextflow_process {
             def lines = path(process.out.bin_depth.get(0)).readLines()
             assert lines == [
                 "sample\tbin_id\tTotal_contigs\taverage_cov",
-                "test\tbin.a\t 1 \t 0.1",
-                "test\tbin.b\t 1 \t 0",
-                "test\tbin.empty\t 0 \t 0"
+                "test\tbin.a\t1\t0.1",
+                "test\tbin.b\t1\t0",
+                "test\tbin.empty\t0\t0"
             ]
             assert path(process.out.versions.get(0)).text.contains("bedtools:")
         }
@@ -62,7 +62,7 @@ nextflow_process {
             assert process.success
             assert path(process.out.bin_depth.get(0)).readLines() == [
                 "sample\tbin_id\tTotal_contigs\taverage_cov",
-                "test\tbin.a\t 1 \t 0.1"
+                "test\tbin.a\t1\t0.1"
             ]
         }
     }

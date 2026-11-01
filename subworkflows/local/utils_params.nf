@@ -27,3 +27,22 @@ def flagOn(value) {
 def sylphDbLabel() {
     return params.custom_sylph_db ? file(params.custom_sylph_db).baseName : params.sylph_db
 }
+
+// Labels of a custom Kraken2 or sourmash database, as sylphDbLabel() does for
+// sylph: the --kraken2_db / --sourmash_db registry key, or the custom
+// database's own name, so a custom database is not shown as the registry
+// default in file names, the Kraken DB / Sourmash DB columns, plots and the
+// summary. Kraken2's database is a directory: its whole name (k2_standard; a
+// dated name keeps its dots). sourmash's is a [k-mer file, lineages] list: the
+// k-mer file's name without its extension (gtdb-reps-rs226-k31.dna)
+def kraken2DbLabel() {
+    return params.custom_kraken_db ? file(params.custom_kraken_db).name : params.kraken2_db
+}
+
+def sourmashDbLabel() {
+    if (!params.custom_sourmash_db) {
+        return params.sourmash_db
+    }
+    def kmer_db = params.custom_sourmash_db instanceof List ? params.custom_sourmash_db[0] : params.custom_sourmash_db
+    return file(kmer_db).baseName
+}

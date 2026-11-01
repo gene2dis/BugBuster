@@ -123,7 +123,9 @@ process BEDTOOLS_BIN_DEPTH {
                 for (i = 1; i <= n_bins; i++) {
                     bin = order[i]
                     promedio = n_contigs[bin] > 0 ? cov_sum[bin] / n_contigs[bin] : 0
-                    print sample "\\t" bin "\\t", n_contigs[bin], "\\t", promedio
+                    # %s formats numbers as print did (%.6g, integers as
+                    # such); print with commas put a space around each field
+                    printf "%s\\t%s\\t%s\\t%s\\n", sample, bin, n_contigs[bin], promedio
                 }
             }
         ' ${contig_to_bin} - >> ${prefix}_bin_depth.tsv
