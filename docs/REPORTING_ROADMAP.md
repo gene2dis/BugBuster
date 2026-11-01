@@ -4,8 +4,11 @@ Planned improvements to how BugBuster presents its results. The first round (Oct
 32-sample run with QC, sylph and K-MARVEL. It produced the run-level summary (`00_summary/`,
 `bin/results_summary.py`) and fixed the QC, taxonomy and classification plots (CHANGELOG, Unreleased).
 
-The modules below have **no example results yet**. Every item comes from reading the code, not from looking at real
-output, and is marked **unverified** until example data confirm it. When a module gets example data:
+Items that come from reading the code, not from real output, are marked **unverified** until example data confirm
+them. In November 2026 (roadmap Phases 11a and 11b) the taxonomy, contig, binning, bin ARG and functional sections
+were checked against reference runs of every branch (a per-sample assembly and a co-assembly of the same subsampled
+real reads, and Kraken2 and sourmash runs on a 3-sample, 2 M-pair fixture); each item now says verified, fixed,
+deferred or dropped, with the evidence. When a module gets example data:
 
 1. Confirm or drop each item.
 2. Fix what is confirmed.
@@ -27,27 +30,30 @@ These problems were found on real data in the Sylph and K-MARVEL outputs. They a
 - **Cross-batch merge.** Large studies run in batches: a summary must outer-join taxa and genes across results directories.
 - **Join keys.** Modules spell the sample key differently (`Id`, `sample`, `Sample`, `sample_id`). The summary should accept all of them.
 
-## Taxonomy: Kraken2/Bracken and sourmash (unverified)
+## Taxonomy: Kraken2/Bracken and sourmash (verified 2026-11-01)
 
 These paths share `bin/taxonomy_phyloseq.py` and `bin/taxonomy_report.py` with sylph. They already get the
 plot fixes (top-k union, natural order, scaled labels), and `results_summary.py` reads their `*_otu_table.tsv` /
-`*_tax_table.tsv` without changes. The remaining issues are:
+`*_tax_table.tsv` without changes.
 
-- **Kraken2 OTU values are Bracken `clade_reads` for `S` rows only** (`taxonomy_phyloseq.py`, kraken parser).
-  - `S` is hardcoded even when `--bracken_tax_level` is not `S`. Check what the table holds then.
-  - Reads assigned above species are outside the denominator.
-- **Sourmash OTU values are abundance-weighted hashes.**
-  - The value is `unique_intersect_bp / scaled * average_abund`, not reads.
-  - Samples with zero matches are dropped, not zero-filled.
-- **`Classified` units differ by profiler.**
-  - Kraken2 is 0-100; sourmash and sylph are 0-1. Sourmash's is the summed `f_unique_weighted`, a k-mer fraction, not reads.
-  - The plot detects the scale with `max() > 1`, which misreads a kraken2 batch where every sample is at most 1% classified.
-  - Make the column a fraction for every profiler.
-- **Different denominators.** Kraken2's `Classified` comes from the pre-Bracken report, while the OTU table is post-Bracken.
-- **Duplicate accessions.** The pivot uses the default `aggfunc='mean'`, so a duplicate accession within a sample would be averaged, not summed.
-- **Summary work.** Pass the profiler's unclassified fraction into `samples_qc`. The summary must not assume sylph's `relative_abundance` semantics: say what "relative abundance" means per profiler in the summary report's methods section.
-
-Example data needed: a kraken2 + Bracken run and a sourmash run on the same samples as a sylph run.
+- **Kraken2 OTU values are Bracken species estimates: verified.** Each sample's OTU column equals the sum of
+  Bracken's `new_est_reads` (the `S` rows; Bracken writes no other level by default).
+  - Open (not testable on the default level): `S` is hardcoded even when `--bracken_tax_level` is not `S`.
+  - Reads assigned above species are outside the denominator: verified, small (the OTU table holds 97.4-97.7 % of
+    the classified reads). Stated in the summary's methods notes.
+- **Sourmash OTU values are abundance-weighted hashes: verified** (`unique_intersect_bp / scaled * average_abund`
+  for every row). Open (not testable: every sample matched): samples with zero matches are dropped, not zero-filled.
+- **`Classified` units differ by profiler: verified in the stage file** (Kraken2 0-100, sourmash and sylph 0-1).
+  Handled downstream: `samples_qc.classified_fraction` is a fraction for every profiler, and `taxonomy_report.py`
+  chooses the scale by profiler; the `max() > 1` item is **dropped** (fixed earlier). Making the stage column a
+  fraction stays optional.
+- **Different denominators: verified.** Kraken2's `Classified` is pre-Bracken, the OTU table post-Bracken.
+- **Duplicate accessions: dropped.** Neither profiler writes one (Bracken one row per taxid, gather each genome once).
+- **Summary work: fixed.** The unclassified fraction is in `samples_qc`, and the README methods notes and the units
+  table say what "relative abundance" means per profiler and that the classified fractions are not comparable between
+  profilers (30 % vs 9 % on the same reads).
+- **Fixed (roadmap Phase 11b): a custom database was labelled as the registry default.** With `--custom_kraken_db`
+  or `--custom_sourmash_db` the labels are now the database's own name.
 
 ## Read-level ARGs: ARGs-OAP (verified on a 3-sample, 2 M-pair fixture, 2026-10-27)
 
@@ -125,63 +131,78 @@ Still open:
   alphabetical order. The summary's figures cover the per-sample view; consider dropping these plots.
 - **No MAPQ filter.** Reads mapping equally well to several WildCARD sequences are counted for one of them by KMA.
 
-## Contig-level ARG and taxonomy: DeepARG + BLASTN/BlobTools (unverified)
+## Contig-level ARG and taxonomy: DeepARG + Metabuli/BlobTools (verified 2026-11-01)
 
-`bin/arg_contig_level_report.py` writes `Contig_tax_and_arg_prediction.tsv`. `bin/arg_blobplot.py` and `bin/blobplot.py` draw the blob plots.
+`bin/arg_contig_level_report.py` writes `Contig_tax_and_arg_prediction.tsv` (Metabuli replaced BLASTN in roadmap
+Phase 9b). `bin/arg_blobplot.py` and `bin/blobplot.py` draw the blob plots.
 
-- **Fixed:** the table is now tab-separated, and `ARG_blob_plot.png` shows only the ARG-carrying contigs (contigs
-  without an ARG were labelled "Other"). Both were confirmed on the test fixtures, not yet on a real run.
-- **A contig with several ARGs is plotted once per ARG.** The table has one row per contig and ARG hit, and the blob
-  plot draws every row.
-- **Blob plots pool all samples.**
-  - `blobplot.py` shows only 8 phyla (`<=` threshold), and lets `no-hit` take a colour slot.
-  - Percentages are of contigs or rows, not of length or coverage.
-- **Coverage is raw.** It is BlobTools `bam0`, not normalised to depth.
-- **Fragile contig names.** `contig_name` is taken from the first two `_` tokens of the ORF id, which assumes MEGAHIT `k141_N` naming.
-- **Summary work.** This is real ARG→taxon linkage: the ARG and the taxon are on the same contig. Present it as linkage, separate from the read-level co-occurrence hosts. Normalise coverage to clean read pairs.
+- **Fixed and verified on real runs:** the table is tab-separated, and `ARG_blob_plot.png` shows only the
+  ARG-carrying contigs.
+- **A contig with several ARGs is plotted once per ARG: verified** (co-assembly: 301 hits on 228 contigs, 44
+  contigs with more than one). Deferred to roadmap Phase 11d (figure redesign).
+- **Blob plots pool all samples: verified** (the phylum plot draws every assembly in one panel and never uses its
+  `Sample` column). Deferred to Phase 11d, with:
+  - `blobplot.py` shows 8 phyla (`<=` threshold) and `no-hit` takes a colour slot: verified.
+  - `arg_blobplot.py` keeps the top 9 ARG classes by summed contig length, not by count, and writes `MLS` as `Mls`
+    (found 2026-11-01).
+  - Percentages are of contigs or rows, not of length or coverage: verified.
+- **Coverage is raw: verified** (BlobTools `bam0`; under co-assembly pooled over all samples). The summary's
+  `arg_contig_long` says so, and `arg_contig_abundance` gives each sample's reads on the gene (featureCounts).
+- **Fragile contig names: dropped** (fixed earlier: everything before the last `_` of the gene id).
+- **Summary work: fixed (Phase 11b).** `arg_contig_long` (each hit with its contig's taxon at the lowest rank
+  Metabuli reached, bin, MIMAG tier and geNomad class), `arg_contig_hosts` (genes per host genus) and
+  `arg_contig_abundance`, presented as linkage, apart from the read-level candidate hosts. Found on the way: the
+  `counts` column is always 1, `taxonomy_rank` takes 14 values (the summary collapses them), and 65 % of DeepARG hits
+  are below 80 % identity (stated in the caveats).
 
-Example data needed: an `--assembly_mode assembly --contig_tax_and_arg` run.
-
-## Binning (unverified)
+## Binning (verified 2026-11-01)
 
 The binning reports are `bin/bin_quality_report.py`, `bin/bin_tax_report.py` and, for co-assembly, `bin/bin_summary.py`.
 
-- **Quality classes are not MIMAG.**
-  - Contamination above 5% is classed Low.
-  - The plot legend says "Completeness <50%, Contamination >5%", but the code applies OR.
-  - Use MIMAG tiers (high / medium / low, with tRNA/rRNA where available) and say so.
-- **Missing dimensions.** `Mag_quality_summary.csv` has no sample dimension. `Bin_summary.csv` has no quality class and joins on `Name` alone.
-- **Taxonomy plot drops bins.** Bins without a phylum are dropped, and every phylum is plotted (no top-N).
-- **Coverage is an unweighted mean of per-contig mean depths, not normalised.** On the bowtie2 path, cross-bin reads also inflate it.
-- **Summary work.** Add a MAG table (sample, bin, quality tier, completeness, contamination, GTDB lineage, coverage per clean read pair) and a MAG × sample abundance heatmap.
+- **Quality classes are not MIMAG: verified.** Of the 27 MAGs called High in the per-sample assembly reference
+  run (45 MAGs), 3 are MIMAG high (most lack a complete rRNA set); its 4 "Low" MAGs are MIMAG medium
+  (contamination 5-10 %).
+  - **Fixed (Phase 11b):** the summary's `mags` table gives MIMAG tiers, with rRNA and tRNA genes from Bakta
+    (`tier_basis`; without Bakta at most medium). The stage classes stay as they are (owner decision).
+  - **Fixed:** the plot legend said "Completeness <50%, Contamination >5%" for Low while the code applies OR; it now
+    says "or".
+- **Missing dimensions: verified, superseded.** `Mag_quality_summary.csv` has no sample and `Bin_summary.csv` no
+  quality class; the summary's `mags` table has both, in both assembly modes.
+- **Taxonomy plot drops bins: verified in code, not exercised** (every reference MAG had a GTDB phylum). Open.
+- **Coverage is an unweighted mean of per-contig mean depths: verified**, and only under co-assembly. The summary
+  keeps it as published, says so, and adds `pct_sample_bases`; under per-sample assembly `mag_abundance` uses the
+  length-weighted contig coverage of the contig table. The bowtie2 cross-bin item is not testable on the bwa-mem3
+  reference. **Fixed:** the depth file's fields were padded with spaces.
 
-Example data needed: an assembly + binning run (≥2 binners for Binette refinement), and a co-assembly run.
+## Bin-level ARG clustering (verified 2026-11-01)
 
-## Bin-level ARG clustering (unverified)
+- **Little is published: dropped as worded.** The per-bin DeepARG hits and proteins are published, and the ARG FASTAs
+  were published too, but to a stray top-level `arg/` folder. **Fixed (Phase 11b):** they are in
+  `05_arg_prediction/bin_level/arg_fasta/<sample>/`.
+- **Headers: verified and documented** (`<gene id>_from_<sample>_<bin name>_gene_<ARG>_ARG_class_<class>`, e.g.
+  `k141_92578_35_from_S1_binette_bin10_gene_ROSA_ARG_class_fosmidomycin`; ARG names contain `_`, so the summary
+  splits on `_from_`, `_gene_` and `_ARG_class_`).
+- **ID collisions: verified, harmless.** Two per-sample assemblies shared 85,711 contig names, but the headers carry
+  the sample and bin, so every clustered sequence stays distinct.
+- **Summary work: fixed (Phase 11b).** `arg_mag_long` (each ARG gene of a MAG and its cluster at 90-100 %) and
+  `arg_cluster_sharing` (clusters found in more than one MAG, at 90 %). Within one co-assembly the identity levels
+  add little (193 genes, 189 clusters at 90 %); between per-sample assemblies 21-28 clusters span samples.
 
-- **Little is published.** Only the mmseqs `Arg_cluster_{90,95,99,100}_cluster.tsv` tables are published (representative→member, no header).
-- **Unpublished inputs.** The ARG FASTAs from `ARG_FASTA_FORMATTER` are not published. Their headers come from `bin/extract_sequences.py` (it used to live only in the container): `<gene id>_from_<sample>_<bin name>_gene_<ARG>_ARG_class_<class>` (e.g. `k141_92578_35_from_S1_binette_bin10_gene_ROSA_ARG_class_fosmidomycin`).
-- **ID collisions.** Gene ids from different samples' MEGAHIT contigs can be equal (`k141_*`), but the headers carry the sample and bin, so the clustered sequences stay distinct.
-- **Summary work.**
-  - Publish the FASTAs.
-  - Document the headers.
-  - Add a cluster × sample/bin presence table, showing which ARG clusters are shared across bins, samples or groups.
-
-Example data needed: an `--arg_bin_clustering` run.
-
-## Functional annotation, contig and read branches (unverified)
+## Functional annotation, contig and read branches (verified 2026-11-01)
 
 The tables in `07_functional_annotation/summary/` follow the design doc. There are no figures.
 
-- **Contig-branch descriptions are blank.** The wide matrices are ID-only (KO, COG letter, EC, Pfam). Add names from the ontologies; the read branch already has them.
-- **TPM is relative to assembled genes only** (unmapped reads are outside the denominator). CPGE is reads per kb per genome equivalent. Say so in a summary, next to the annotated fraction.
-- **Mates may be counted separately.** featureCounts runs with `-p` but without `--countReadPairs`. Check whether this matches the design doc's intent.
-- **Summary work.**
-  - Add a functional section with the top functions per ontology as a heatmap (CPGE when available, TPM otherwise) and the annotated fraction per sample.
-  - Keep read and contig branches separate (design doc rule).
-  - When MicrobeCensus ran, give read-level ARGs a per-genome-equivalent normalisation (RPKG) too.
-
-Example data needed: a `--contig_level_functional` run and a `--read_level_functional` run on the same samples.
+- **Contig-branch descriptions are blank: verified.** **Fixed in the summary:** COG categories and eggNOG CAZy
+  families are named (`AA10|Auxiliary Activities 10.` is split into family and name); KO, EC and Pfam stay without
+  names (no name list ships with the pipeline; owner decision). dbCAN's calls are a separate `cazy_dbcan` table.
+- **TPM is relative to assembled genes only: verified, and large** (14-84 % of a sample's reads were on predicted
+  genes). **Fixed:** the summary reports `pct_reads_on_genes` (`assembly_read_use`, `samples_qc`) and states the
+  TPM and CPGE definitions.
+- **Mates may be counted separately: dropped (intended).** featureCounts counts reads (design doc 5.2), and the
+  genome equivalents count both mates too.
+- **Summary work: fixed (Phase 11b)** as tables: `function_contig_long` and `function_contig_<ontology>` (CPGE when
+  MicrobeCensus ran, else TPM), the annotated fraction in `samples_qc`, never merged with the read branch; and
+  read-level ARGs per genome equivalent (`arg_*_rpkg`). The heatmap is left to Phase 11d.
 
 ## Out of scope
 

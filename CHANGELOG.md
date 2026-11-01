@@ -12,6 +12,35 @@ next release is tagged.
 
 ### Added
 
+- **Run summary covers the assembly-based stages** (`00_summary/`): new
+  tables for the six stages the summary did not read yet. Existing tables are
+  unchanged; `samples_qc` gains columns at its end.
+  - Assembly: `assembly_stats` (contigs, length, N50 / L50, GC, contigs kept
+    by the length filter) and `assembly_read_use` (% of each sample's reads on
+    the contigs and on predicted genes).
+  - Binning and Bakta: `mags`, one row per refined MAG with CheckM2 quality, a
+    MIMAG tier (rRNA and tRNA genes from Bakta; without Bakta at most medium),
+    the GTDB-Tk lineage and Bakta's counts; `mag_abundance`, each MAG's depth
+    and share of the sequenced bases per sample.
+  - Contig ARGs: `arg_contig_long` (each DeepARG hit with its contig's
+    Metabuli taxon, bin, MAG tier and geNomad class), `arg_contig_hosts` (ARG
+    genes per host genus) and `arg_contig_abundance` (each ARG gene's reads,
+    TPM and CPGE per sample, with `--contig_level_functional`).
+  - Bin-level ARG clustering: `arg_mag_long` (the clusters of every MAG ARG
+    gene at 90-100 % identity) and `arg_cluster_sharing` (90 % clusters in
+    more than one MAG).
+  - Contig-level functions: `function_contig_long` and
+    `function_contig_<ontology>` (ko, cog, ec, pfam, cazy, cazy_dbcan; CPGE
+    with MicrobeCensus, else TPM), named COG categories and eggNOG CAZy
+    families; `samples_qc` `pct_reads_on_genes` and `func_contig_*`. Never
+    merged with the read-level `function_read_*` tables.
+  - `arg_gene_rpkg`, `arg_family_rpkg`, `arg_drug_class_rpkg`: the read-level
+    ARG RPKM matrices per MicrobeCensus genome equivalent.
+  - The README and LLM guide document every new column, the TPM / CPGE
+    definitions and the caveats (MIMAG tiers, gene counts on contigs are not
+    read abundance, pooled co-assembly depth, shared clusters are not evidence
+    of transfer alone), and say what "relative abundance" means for each
+    taxonomic profiler. The HTML report has a plain section per stage.
 - **Plasmid / virus classification of contigs with geNomad
   (`--genomad_prediction`, off by default)**: nf-core `genomad/endtoend` with
   geNomad 1.13.0 (`quay.io/biocontainers/genomad:1.13.0--pyhdfd78af_0` and its
