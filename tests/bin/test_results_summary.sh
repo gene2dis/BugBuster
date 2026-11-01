@@ -783,10 +783,19 @@ assert len(m) == 4 and "sampleB" not in m.index.get_level_values("assembly")
 # (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH wrote before)
 ct = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
                  sep="\t", keep_default_na=False)
-ct = ct[(ct["Sample"] == "sampleA") & (ct["bin"] == "binette_bin10")]
+# one row per contig: the table repeats a contig per ARG hit
+ct = ct[(ct["Sample"] == "sampleA") & (ct["bin"] == "binette_bin10")].drop_duplicates("contig_name")
 want = round((ct["coverage"] * ct["contig_length"]).sum() / ct["contig_length"].sum(), 4)
 ab = t("st_merge", "mag_abundance").set_index(["batch", "bin", "sample"])
 assert ab.at[("asm", "binette_bin10", "sampleA"), "mean_depth_x"] == want, (ab, want)
+# bin2 holds a contig with two ARG hits (two rows): counted once
+c2 = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
+                 sep="\t", keep_default_na=False)
+c2 = c2[(c2["Sample"] == "sampleA") & (c2["bin"] == "binette_bin2")]
+assert c2["contig_name"].duplicated().any()
+c2 = c2.drop_duplicates("contig_name")
+assert ab.at[("asm", "binette_bin2", "sampleA"), "mean_depth_x"] == round(
+    (c2["coverage"] * c2["contig_length"]).sum() / c2["contig_length"].sum(), 4)
 assert ab.at[("co", "binette_bin1", "sampleC"), "mean_depth_x"] == 0.138756
 assert ab.at[("co", "binette_bin1", "sampleD"), "mean_depth_x"] == 0.0519836
 ags = pd.read_csv(f"{stg}/coassembly/07_functional_annotation/microbecensus/sampleC/sampleC.ags.tsv", sep="\t")

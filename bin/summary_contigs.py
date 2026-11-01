@@ -131,10 +131,9 @@ def arg_contig_hosts_table(long):
     if long is None or long.empty:
         return None
     df = long.copy()
-    for i, r in df.iterrows():
-        if r["host_rank"] == "species":
-            if r["genus"]:
-                df.at[i, "host_rank"], df.at[i, "host_taxon"] = "genus", r["genus"]
+    sp = (df["host_rank"] == "species") & (df["genus"] != "")
+    df.loc[sp, "host_rank"] = "genus"
+    df.loc[sp, "host_taxon"] = df.loc[sp, "genus"]
     df["on_mag"] = df["bin"] != ""
     df["on_mobile"] = df["mobile_class"].isin(["plasmid", "virus"])
     out = (df.groupby(["batch", "assembly", "arg_class", "host_rank", "host_taxon"])

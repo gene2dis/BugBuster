@@ -82,8 +82,10 @@ def split_lineage(classification):
 def bakta_features(tsv):
     """Bakta's feature table -> {rrna_16s, rrna_23s, rrna_5s, trna_aa_types}: rRNAs by product name, distinct
     standard amino acids of the tRNAs (product 'tRNA-Met(cat)' -> Met; fMet, SeC and Xxx are not counted)."""
-    df = pd.read_csv(tsv, sep="\t", comment="#", header=None, dtype=str, keep_default_na=False,
+    # header lines start with '#'; pandas' comment= would also cut a field that contains one
+    df = pd.read_csv(tsv, sep="\t", header=None, dtype=str, keep_default_na=False,
                      names=["seq", "type", "start", "stop", "strand", "locus", "gene", "product", "dbxrefs"])
+    df = df[~df["seq"].str.startswith("#")]
     # a truncated rRNA gene ("(3' truncated) 23S ribosomal RNA", at a contig end) counts as present; a
     # pseudo tRNA ("(pseudo) tRNA-Phe(gaa)") does not count
     rrna = {re.sub(r"^\([^)]*\)\s*", "", p) for p in df.loc[df["type"] == "rRNA", "product"]}
@@ -121,11 +123,12 @@ def mimag_tier(completeness, contamination, rrna_all, trna_aa, have_bakta):
 def load_mags(root):
     """-> {"mags": DataFrame (one row per refined MAG of every assembly), "depth": DataFrame(sample, bin,
     mean_depth_x) of the co-assembly or None, "bakta": bool} or None when binning did not run."""
-    rows, have_bakta = [], False
+    rows, have_bakta, reported = [], False, False
     for asm, adir in _assembly_dirs(root).items():
         q = _quality_report(asm, adir / "quality" / "checkm2")
         if q is None:
             continue
+        reported = True
         binner, qpath = q
         cm = pd.read_csv(qpath, sep="\t", dtype={"Name": str})
         if not CHECKM2_COLUMNS <= set(cm.columns):
@@ -161,7 +164,9 @@ def load_mags(root):
                 bool(feats["rrna_16s"] and feats["rrna_23s"] and feats["rrna_5s"]), feats["trna_aa_types"] or 0, bk)
             rows.append(row)
     if not rows:
-        return None
+        # binning ran but no bin passed refinement (header-only reports): an empty table, not a missing stage
+        return {"mags": pd.DataFrame(columns=[c for c in MAG_COLUMNS if c != "batch"]), "depth": None,
+                "bakta": False} if reported else None
     depth = None
     cdir = root / "04_binning" / "coassembly" / "coverage"
     dparts = []
@@ -190,6 +195,9 @@ def mags_table(parts):
     frames = [p["mags"].assign(batch=label) for label, p in parts if p is not None]
     if not frames:
         return None
+    frames = [f for f in frames if not f.empty]
+    if not frames:
+        return pd.DataFrame(columns=MAG_COLUMNS)
     df = pd.concat(frames, ignore_index=True)[MAG_COLUMNS]
     for c in ("contigs", "trna_aa_types", "cds", "crispr_arrays"):
         df[c] = df[c].astype("Int64")
@@ -225,7 +233,8 @@ def mag_abundance_frame(parts, contig_tables, sample_bases):
             if ct is None:
                 rows += [(asm, label, b, asm, NA_NOT_RUN, size[(asm, b)]) for b in bins]
                 continue
-            sub = ct[(ct["Sample"] == asm) & (ct["bin"] != "")]
+            # the contig table has a row per contig and ARG hit: one per contig for the weights
+            sub = ct[(ct["Sample"] == asm) & (ct["bin"] != "")].drop_duplicates("contig_name")
             length = pd.to_numeric(sub["contig_length"], errors="coerce")
             cov = pd.to_numeric(sub["coverage"], errors="coerce")
             w = (cov * length).groupby(sub["bin"]).sum() / length.groupby(sub["bin"]).sum()

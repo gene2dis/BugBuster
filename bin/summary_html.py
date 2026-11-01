@@ -378,8 +378,8 @@ def write_html(outdir, title, ctx):
                 "says whether Bakta's rRNA / tRNA genes were checked). The High/Mid/Low classes of the run's "
                 "04_binning plots are another, older scheme.</p>" + df_to_html(m, table_id="t_mags"))
         if "mag_abundance" in t:
-            body += ("<h3>Depth per sample</h3><p class='muted'>pct_sample_bases compares samples; raw depth does "
-                     "not.</p>" + df_to_html(t["mag_abundance"][0], max_rows=1000, table_id="t_magab"))
+            body += ("<h3>Depth per sample</h3><p class='muted'>pct_sample_bases compares samples of one assembly "
+                     "mode; raw depth does not.</p>" + df_to_html(t["mag_abundance"][0], max_rows=1000, table_id="t_magab"))
         section("mags", "MAGs", body)
     if "arg_contig_long" in t or "arg_contig_mobile" in t:
         body = ("<p class='muted'>ARG genes found on assembled contigs, with the contig's taxon and bin: physical "

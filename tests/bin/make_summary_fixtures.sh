@@ -45,6 +45,18 @@
 #   functional/sampleA.ags.tsv
 #                        MicrobeCensus table of sampleA
 #
+# Not made by this script: stages/assembly/ and stages/coassembly/ (results
+# trees of a per-sample assembly and a co-assembly for the stage tables of the
+# summary) were trimmed from the published outputs of a real all-branches run
+# (roadmap Phase 11a) and renamed (sampleA, sampleB; coassembly with sampleC,
+# sampleD): a few MAGs with their CheckM2, GTDB-Tk and Bakta rows (rRNA, tRNA
+# and the first CDS rows), a subset of contigs with every ARG row, the DeepARG
+# hits and gene abundances of those genes (plus one sampleB row reusing a
+# sampleA gene id, the per-sample assemblies' id collision), a few function
+# terms per ontology, and the bin ARG clusters of the kept MAGs (one sampleA
+# cluster made to span both of its MAGs; one co-assembly bin depth file keeps
+# the padded fields BEDTOOLS_BIN_DEPTH wrote before)
+#
 # Requires python3 with pandas, matplotlib, seaborn and h5py; no network.
 #
 set -euo pipefail

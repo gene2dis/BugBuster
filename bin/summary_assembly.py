@@ -64,8 +64,11 @@ def parse_filter_summary(path):
     rows, inside = [], False
     for line in path.read_text().splitlines():
         if line.startswith("Sample_ID\t"):
+            # the empty-contig table further down also starts with Sample_ID
             head = line.split("\t")
-            inside = True
+            inside = "Contigs_After" in head
+            if not inside and rows:
+                break
             continue
         if inside:
             if line.startswith("---"):

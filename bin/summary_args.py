@@ -648,8 +648,9 @@ def _combos(methods):
 
 def rpkg_tables(rpkm_tables, clean_pairs, genome_equivalents, order):
     """arg_<x>_rpkg from arg_<x>_rpkm (gene, family, drug class): RPKM x clean read pairs / 1e6 / MicrobeCensus
-    genome equivalents = supporting read pairs per kb of gene per genome equivalent. A sample without a
-    MicrobeCensus estimate is NA_no_ags; 0, blank (a call without an RPKM) and the NA codes stay as they are.
+    genome equivalents = supporting read pairs per kb of gene per genome equivalent. 0, blank (a call without an
+    RPKM) and the NA codes stay as they are; a sample without a MicrobeCensus estimate is NA_no_ags in every cell
+    but its NA codes (as the CPGE tables do).
     rpkm_tables: {name: wide table}; clean_pairs, genome_equivalents: Series by sample."""
     out = {}
     for name, mat in rpkm_tables.items():

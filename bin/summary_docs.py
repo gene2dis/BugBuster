@@ -421,9 +421,10 @@ TABLE_DOCS = {
             ("sample", "sample whose reads give the depth"),
             ("<metadata>", "columns of the --metadata table"),
             ("mean_depth_x", "mean read depth on the MAG's contigs (raw, not normalised)"),
-            ("pct_sample_bases", "depth x MAG size / bases sequenced in the sample (MicrobeCensus total bases, else "
-                                 "clean pairs x 2 x mean read length) x 100: comparable between samples, unlike raw "
-                                 "depth"),
+            ("pct_sample_bases", "depth x MAG size / bases sequenced in the sample (MicrobeCensus total bases, all "
+                                 "reads; else clean pairs x 2 x mean read length, without singletons) x 100: "
+                                 "comparable between samples of one assembly mode, unlike raw depth; not between "
+                                 "modes (co-assembly depth weights every contig equally, per-sample depth by length)"),
         ],
     },
     "arg_contig_long": {

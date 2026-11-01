@@ -89,6 +89,8 @@ process RESULTS_SUMMARY {
     done
     # run-level tables of the other stages, laid out at their published paths by file name; a new stage
     # adds one case here and one mix() into ch_summary_reports in main.nf
+    # an assembly's folder: coassembly, or per_sample/<sample>
+    asm_dir() { [ "\$1" = coassembly ] && echo coassembly || echo "per_sample/\$1"; }
     for f in in_reports/*; do
         [ -e "\$f" ] || continue
         name=\$(basename "\$f")
@@ -113,17 +115,17 @@ process RESULTS_SUMMARY {
                 dest=${run_dir}/pipeline_info ;;
             *_contig.stats)
                 id=\${name%_contig.stats}
-                dest=${run_dir}/03_assembly/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id") ;;
+                dest=${run_dir}/03_assembly/\$(asm_dir "\$id") ;;
             *_bin_depth.tsv)
                 dest=${run_dir}/04_binning/coassembly/coverage ;;
             *_gtdbtk_bac120.tsv|*_gtdbtk_ar53.tsv)
                 id=\${name%_gtdbtk_*}
-                dest=${run_dir}/04_binning/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id")/taxonomy/gtdbtk ;;
+                dest=${run_dir}/04_binning/\$(asm_dir "\$id")/taxonomy/gtdbtk ;;
             *_quality_report.tsv)
                 # <id>_<binner>_quality_report.tsv; binner names have no underscore
                 id=\${name%_quality_report.tsv}
                 id=\${id%_*}
-                dest=${run_dir}/04_binning/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id")/quality/checkm2 ;;
+                dest=${run_dir}/04_binning/\$(asm_dir "\$id")/quality/checkm2 ;;
             *_binette_bin*.tsv|*_binette_bin*.txt)
                 # Bakta's <id>_<bin>.tsv / .txt (it runs on Binette's refined bins only)
                 dest=${run_dir}/07_functional_annotation/mags/\${name%_binette_bin*} ;;
