@@ -74,10 +74,12 @@ def load_microbecensus(root):
         if not {"sample_id", "average_genome_size_bp", "genome_equivalents"} <= set(df.columns):
             warn(f"{path}: not a MicrobeCensus AGS table, skipped")
             continue
-        for r in df.itertuples(index=False):
-            rows.append({"sample": r.sample_id, "mc_avg_genome_size_bp": float(r.average_genome_size_bp),
-                         "mc_genome_equivalents": float(r.genome_equivalents)})
-    return pd.DataFrame(rows, columns=["sample", "mc_avg_genome_size_bp", "mc_genome_equivalents"])
+        for r in df.to_dict("records"):
+            rows.append({"sample": r["sample_id"], "mc_avg_genome_size_bp": float(r["average_genome_size_bp"]),
+                         "mc_genome_equivalents": float(r["genome_equivalents"]),
+                         "mc_total_bases": float(r["total_bases"]) if "total_bases" in r else np.nan})
+    # mc_total_bases (bases MicrobeCensus counted: every read) is for the MAG abundance, not a samples_qc column
+    return pd.DataFrame(rows, columns=["sample", "mc_avg_genome_size_bp", "mc_genome_equivalents", "mc_total_bases"])
 
 
 def merge_read_functional(parts):
@@ -173,3 +175,80 @@ def cog_matrix(tables, order):
     num.index = labels
     num = num.sort_index()
     return num.replace(0, np.nan), unit
+
+
+# ---- contig-level functional profile (AGGREGATE_FUNCTIONS, --contig_level_functional), never merged with the
+# read-level one (design doc 9.1)
+
+def load_contig_functional(root):
+    """-> {"abundance", "fraction", "ran"} from 07_functional_annotation/summary/function_abundance.tsv and
+    annotated_fraction.tsv, or None."""
+    sdir = root / "07_functional_annotation" / "summary"
+    path = sdir / "function_abundance.tsv"
+    if not path.exists():
+        return None
+    ab = pd.read_csv(path, sep="\t", dtype={"sample_id": str, "accession": str, "description": str},
+                     keep_default_na=False, na_values=[""])
+    missing = [c for c in ABUNDANCE_COLUMNS if c not in ab.columns]
+    if missing:
+        die(f"{path} lacks columns: {', '.join(missing)}")
+    for col in ("abundance_tpm", "abundance_cpge"):
+        ab[col] = pd.to_numeric(ab[col], errors="coerce")
+    ab["description"] = ab["description"].fillna("")
+    fpath = sdir / "annotated_fraction.tsv"
+    fraction = pd.read_csv(fpath, sep="\t", dtype={"sample_id": str}) if fpath.exists() else None
+    ran = set(ab["sample_id"]) | (set(fraction["sample_id"]) if fraction is not None else set())
+    return {"abundance": ab, "fraction": fraction, "ran": ran}
+
+
+def merge_contig_functional(parts):
+    parts = [p for p in parts if p is not None]
+    if not parts:
+        return None
+    fr = [p["fraction"] for p in parts if p["fraction"] is not None]
+    return {"abundance": pd.concat([p["abundance"] for p in parts], ignore_index=True),
+            "fraction": pd.concat(fr, ignore_index=True) if fr else None,
+            "ran": set().union(*[p["ran"] for p in parts])}
+
+
+def contig_terms(cf):
+    """function_abundance.tsv rows with the summary's ontology names (dbCAN's CAZy calls as cazy_dbcan, kept apart
+    from eggNOG's, as AGGREGATE_FUNCTIONS' wide tables do), eggNOG CAZy accessions split into family and name
+    ('AA10|Auxiliary Activities 10.' -> AA10, Auxiliary Activities 10) and COG categories named."""
+    ab = cf["abundance"].copy()
+    ab.loc[(ab["ontology"] == "cazy") & (ab["backend"] == "run_dbcan"), "ontology"] = "cazy_dbcan"
+    caz = (ab["ontology"] == "cazy") & ab["accession"].str.contains("|", regex=False)
+    split = ab.loc[caz, "accession"].str.split("|", n=1, expand=True)
+    if caz.any():
+        ab.loc[caz, "accession"] = split[0]
+        ab.loc[caz, "description"] = split[1].str.rstrip(".").str.strip()
+    cog = (ab["ontology"] == "cog") & (ab["description"] == "")
+    ab.loc[cog, "description"] = ab.loc[cog, "accession"].map(COG_CATEGORIES).fillna("")
+    return ab
+
+
+def contig_function_tables(cf, order, status):
+    """{ontology: (wide table, unit)} of the contig branch, in CPGE when MicrobeCensus ran (a sample without it is
+    NA_no_ags), else in TPM. Built by function_tables with TPM in the place of the read branch's native unit."""
+    ab = contig_terms(cf).assign(abundance_native=lambda d: d["abundance_tpm"], native_unit="tpm")
+    return function_tables({"abundance": ab}, order, status)
+
+
+def contig_function_long(cf):
+    """function_abundance.tsv of every batch (contig branch), sample renamed, without the read-only columns."""
+    ab = contig_terms(cf).rename(columns={"sample_id": "sample", "description": "term_description"})
+    return ab.drop(columns=[c for c in ("source", "abundance_native", "native_unit") if c in ab.columns])
+
+
+def contig_function_sample_columns(cf, order):
+    """samples_qc columns: % of the sample's predicted genes with any annotation, and their share of its TPM."""
+    out = pd.DataFrame(index=order)
+    if cf is None or cf["fraction"] is None:
+        return out
+    fr = cf["fraction"]
+    fr = fr[fr["ontology"] == "any"].drop_duplicates("sample_id").set_index("sample_id")
+    out["func_contig_genes_annotated_pct"] = (pd.to_numeric(fr["fraction_by_count"], errors="coerce") * 100
+                                              ).round(2).reindex(order)
+    out["func_contig_annotated_by_abundance_pct"] = (pd.to_numeric(fr["fraction_by_abundance"], errors="coerce")
+                                                     * 100).round(2).reindex(order)
+    return out

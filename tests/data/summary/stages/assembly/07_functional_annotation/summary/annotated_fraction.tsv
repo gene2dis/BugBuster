@@ -1,0 +1,15 @@
+sample_id	ontology	genes_total	genes_annotated	fraction_by_count	fraction_by_abundance
+sampleA	any	96116	84423	0.8783	0.8164
+sampleA	ko	96116	57552	0.5988	0.5091
+sampleA	cog	96116	79450	0.8266	0.7750
+sampleA	ec	96116	30959	0.3221	0.2629
+sampleA	pfam	96116	74340	0.7734	0.6776
+sampleA	cazy	96116	3917	0.0408	0.0368
+sampleA	cazy_dbcan	96116	3573	0.0372	0.0352
+sampleB	any	4442	4036	0.9086	0.9154
+sampleB	ko	4442	2893	0.6513	0.6416
+sampleB	cog	4442	3894	0.8766	0.8868
+sampleB	ec	4442	1661	0.3739	0.3676
+sampleB	pfam	4442	3577	0.8053	0.8043
+sampleB	cazy	4442	154	0.0347	0.0300
+sampleB	cazy_dbcan	4442	127	0.0286	0.0257

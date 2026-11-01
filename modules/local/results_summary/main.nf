@@ -97,10 +97,36 @@ process RESULTS_SUMMARY {
                 dest=${run_dir}/05_arg_prediction/read_level/args_oap_summary ;;
             read_function_abundance.tsv|read_annotated_fraction.tsv|read_sample_summary.tsv)
                 dest=${run_dir}/07_functional_annotation/summary ;;
+            function_abundance.tsv|annotated_fraction.tsv|gene_abundance.tsv)
+                dest=${run_dir}/07_functional_annotation/summary ;;
             *.ags.tsv)
                 dest=${run_dir}/07_functional_annotation/microbecensus/\${name%.ags.tsv} ;;
+            *.featureCounts.txt.summary)
+                dest=${run_dir}/07_functional_annotation/gene_abundance/\${name%.featureCounts.txt.summary} ;;
             Contig_tax_and_arg_prediction.tsv)
                 dest=${run_dir}/05_arg_prediction/contig_level/summary ;;
+            *_contigs_deep_arg.out.mapping.ARG)
+                dest=${run_dir}/05_arg_prediction/contig_level/deeparg/\${name%_contigs_deep_arg.out.mapping.ARG} ;;
+            Arg_cluster_*_cluster.tsv)
+                dest=${run_dir}/05_arg_prediction/bin_level/clustering ;;
+            contig_filtering_summary.txt)
+                dest=${run_dir}/pipeline_info ;;
+            *_contig.stats)
+                id=\${name%_contig.stats}
+                dest=${run_dir}/03_assembly/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id") ;;
+            *_bin_depth.tsv)
+                dest=${run_dir}/04_binning/coassembly/coverage ;;
+            *_gtdbtk_bac120.tsv|*_gtdbtk_ar53.tsv)
+                id=\${name%_gtdbtk_*}
+                dest=${run_dir}/04_binning/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id")/taxonomy/gtdbtk ;;
+            *_quality_report.tsv)
+                # <id>_<binner>_quality_report.tsv; binner names have no underscore
+                id=\${name%_quality_report.tsv}
+                id=\${id%_*}
+                dest=${run_dir}/04_binning/\$([ "\$id" = coassembly ] && echo coassembly || echo "per_sample/\$id")/quality/checkm2 ;;
+            *_binette_bin*.tsv|*_binette_bin*.txt)
+                # Bakta's <id>_<bin>.tsv / .txt (it runs on Binette's refined bins only)
+                dest=${run_dir}/07_functional_annotation/mags/\${name%_binette_bin*} ;;
             *)
                 echo "WARNING: RESULTS_SUMMARY does not read \$name; skipped" >&2
                 continue ;;

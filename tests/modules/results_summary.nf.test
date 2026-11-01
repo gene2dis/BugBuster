@@ -129,6 +129,102 @@ nextflow_process {
         }
     }
 
+    test("lays out the assembly, binning, contig ARG, bin ARG and contig functional stage files") {
+        // tests/data/summary/stages/assembly: a per-sample assembly results tree trimmed from a real run (two
+        // samples, one with two MAGs). Its files reach the module flat, as main.nf's ch_summary_reports gives them
+        when {
+            params {
+                output                  = "${outputDir}"
+                summary_min_clean_pairs = 10000
+                summary_batch_label     = "asm"
+            }
+            process {
+                """
+                def fix = "${projectDir}/tests/data/summary"
+                input[0]  = file("\${fix}/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = []
+                input[3]  = []
+                input[4]  = [
+                    file("${projectDir}/tests/data/kmarvel/sampleA_kmarvel.tsv", checkIfExists: true),
+                    file("${projectDir}/tests/data/kmarvel/sampleB_kmarvel.tsv", checkIfExists: true)
+                ]
+                input[5]  = []
+                input[6]  = []
+                input[7]  = []
+                input[8]  = []
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = files("\${fix}/stages/assembly/**", type: 'file').sort { f -> f.name }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.tables.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert tables.keySet().containsAll([
+                "assembly_stats.tsv", "assembly_read_use.tsv", "mags.tsv", "mag_abundance.tsv",
+                "arg_contig_long.tsv", "arg_contig_hosts.tsv", "arg_contig_abundance.tsv", "arg_mag_long.tsv",
+                "arg_cluster_sharing.tsv", "function_contig_long.tsv", "function_contig_ko.tsv",
+                "function_contig_cazy_dbcan.tsv", "arg_gene_rpkg.tsv"
+            ])
+            // the MIMAG tier needs Bakta, laid out under 07_functional_annotation/mags/<sample>/
+            def mags = tables["mags.tsv"]
+            def mh = mags[0].split("\t") as List
+            def bin10 = mags.find { line -> line.split("\t")[mh.indexOf("bin")] == "binette_bin10" }.split("\t")
+            assert bin10[mh.indexOf("quality_tier")] == "high"
+            assert bin10[mh.indexOf("tier_basis")] == "checkm2_rrna_trna"
+            // assembly statistics from 03_assembly/per_sample/<sample>/ and pipeline_info/
+            assert tables["assembly_stats.tsv"].any { line -> line.startsWith("sampleA\tasm\tassembly\t86387\t") }
+            def readme = path(process.out.readme.get(0)).text
+            assert readme.contains("`tables/mags.tsv`") && readme.contains("`tables/function_contig_long.tsv`")
+        }
+    }
+
+    test("lays out the co-assembly stage files") {
+        // tests/data/summary/stages/coassembly: the coassembly_* names go to the coassembly/ folders, the bin
+        // depth files (one with the padded fields of older runs) to 04_binning/coassembly/coverage/
+        when {
+            params {
+                output                  = "${outputDir}"
+                summary_min_clean_pairs = 10000
+                summary_batch_label     = "co"
+            }
+            process {
+                """
+                def fix = "${projectDir}/tests/data/summary"
+                input[0]  = file("\${fix}/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = []
+                input[3]  = []
+                input[4]  = []
+                input[5]  = []
+                input[6]  = []
+                input[7]  = []
+                input[8]  = []
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = files("\${fix}/stages/coassembly/**", type: 'file').sort { f -> f.name }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.tables.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert tables["assembly_stats.tsv"].any { line -> line.startsWith("coassembly\tco\tcoassembly\t180428\t") }
+            // every MAG has a depth row per sample
+            assert tables["mag_abundance.tsv"].size() == 1 + 2 * 2
+            assert tables["mag_abundance.tsv"].any { line -> line.startsWith("coassembly\tco\tbinette_bin1\tsampleC\t0.138756\t") }
+            assert tables["mags.tsv"].size() == 3
+        }
+    }
+
     test("stub") {
         options "-stub"
         when {

@@ -26,6 +26,15 @@
 #     (tests/data/summary/contig/): arg_contig_mobile per assembly and class
 #   - every emitted column documented; taxonomy NA_low_depth and prevalence
 #     denominator; one tier per gene across methods; CRP-1 keeps its name
+#   - stage tables (tests/data/summary/stages/: a per-sample assembly and a
+#     co-assembly results tree trimmed from a real run, samples renamed):
+#     assembly statistics (BBMap's count/length N/L50), reads on contigs and
+#     genes, MAGs with MIMAG tiers (rRNA/tRNA from Bakta, checkm2_only cap),
+#     MAG depth (length-weighted / padded bin depth files), contig ARGs with
+#     taxon and bin, ARG gene abundance keyed on the assembly (repeated gene
+#     ids), bin ARG clusters (header parsing, sharing), contig function tables
+#     (CAZy names, cazy_dbcan apart), ARG RPKG, the merge of both trees, and
+#     the catalog's processes exist in the pipeline
 #
 # Python runs inside the image pinned in modules/local/results_summary/main.nf
 # (docker; set RS_TEST_HOST=1 to use the host python3 instead).
@@ -370,7 +379,10 @@ for f in sorted(os.listdir("docs1/tables")):
     tables[name] = (df, False)
 unused = set(unused_doc_columns(tables, "subject"))
 # --card-prevalence columns and mean_read_length (fastp JSON) have no fixture
-allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_hosts"), ("samples_qc", "mean_read_length")}
+allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_hosts"), ("samples_qc", "mean_read_length"),
+           # the assembly and contig functional columns (tested on tests/data/summary/stages below)
+           ("samples_qc", "pct_reads_on_genes"), ("samples_qc", "func_contig_genes_annotated_pct"),
+           ("samples_qc", "func_contig_annotated_by_abundance_pct")}
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
 
@@ -723,6 +735,126 @@ html = open("mixed_out/results_summary.html").read()
 assert set(t1["gene"]) == {"KPC"}, set(t1["gene"])
 # KPC: RGI only in sampleA (both methods ran), K-MARVEL in sampleB (RGI did not run there)
 assert "KPC: 2 samples (sampleA, sampleB)" in html and "K-MARVEL (not every method ran) / RGI only" in html
+PYEOF
+
+# ---- stage tables: assembly, MAGs, contig ARGs, bin ARG clusters, contig functions (tests/data/summary/stages)
+STG="${FIX}/stages"
+make_results st_asm/results sampleA sampleB
+cp -r "${STG}/assembly/." st_asm/results/
+cp -r "${STG}/coassembly" st_co
+check "per-sample assembly tree: every column documented" \
+    documented st_asm_out --results st_asm/results --min-clean-pairs 10000
+check "co-assembly tree: every column documented" documented st_co_out --results st_co --min-clean-pairs 10000
+check "both trees merged (disjoint samples)" \
+    documented st_merge --results st_asm/results st_co --batch-labels asm co --min-clean-pairs 10000
+check "stage tables against their stage files" py - "${STG}" <<'PYEOF'
+import sys
+import pandas as pd
+stg = sys.argv[1]
+t = lambda out, name: pd.read_csv(f"{out}/tables/{name}.tsv", sep="\t", keep_default_na=False)  # noqa: E731
+# assembly statistics: BBMap's 'contig N/L50: 1683/8.588 Kbp' is count / length
+a = t("st_asm_out", "assembly_stats").set_index("assembly")
+assert a.at["sampleA", "l50"] == 1683 and a.at["sampleA", "n50_kb"] == 8.588, a.loc["sampleA"]
+assert a.at["sampleA", "contigs"] == 86387 and a.at["sampleA", "contigs_kept"] == 16094
+assert a.at["sampleA", "pct_contigs_kept"] == round(16094 / 86387 * 100, 2)
+assert a.at["sampleA", "assembly_length_mb"] == 129.856 and a.at["sampleA", "assembly_mode"] == "assembly"
+# reads on contigs and genes from the featureCounts summary
+fc = pd.read_csv(f"{stg}/assembly/07_functional_annotation/gene_abundance/sampleA/sampleA.featureCounts.txt.summary",
+                 sep="\t", index_col=0).iloc[:, 0]
+u = t("st_asm_out", "assembly_read_use").set_index("sample")
+assert u.at["sampleA", "pct_reads_on_genes"] == round(fc["Assigned"] / fc.sum() * 100, 2)
+assert u.at["sampleA", "pct_reads_on_contigs"] == round((1 - fc["Unassigned_Unmapped"] / fc.sum()) * 100, 2)
+qc = t("st_asm_out", "samples_qc").set_index("sample")
+assert qc.columns[-3:].tolist() == ["pct_reads_on_genes", "func_contig_genes_annotated_pct",
+                                    "func_contig_annotated_by_abundance_pct"], qc.columns[-3:]
+assert float(qc.at["sampleA", "pct_reads_on_genes"]) == u.at["sampleA", "pct_reads_on_genes"]
+# MIMAG: bin10 has 23S + 16S + 5S and >= 18 tRNA amino acids in Bakta; bin2 (100 % / 0.44 %) has no Bakta, so at
+# most medium; the co-assembly's bin17 likewise; sampleB's assembly has no MAG
+m = t("st_merge", "mags").set_index(["batch", "assembly", "bin"])
+assert m.loc[("asm", "sampleA", "binette_bin10"), "quality_tier"] == "high"
+assert m.loc[("asm", "sampleA", "binette_bin10"), "tier_basis"] == "checkm2_rrna_trna"
+assert m.loc[("asm", "sampleA", "binette_bin2"), ["quality_tier", "tier_basis"]].tolist() == ["medium", "checkm2_only"]
+assert m.loc[("co", "coassembly", "binette_bin17"), "tier_basis"] == "checkm2_only"
+assert m.loc[("co", "coassembly", "binette_bin1"), "quality_tier"] == "high"
+assert m.loc[("asm", "sampleA", "binette_bin10"), "genus"] == "Senimuribacter"
+assert int(m.loc[("asm", "sampleA", "binette_bin10"), "cds"]) == 2291
+assert len(m) == 4 and "sampleB" not in m.index.get_level_values("assembly")
+# MAG depth: per-sample assembly = length-weighted contig coverage of the bin; co-assembly = the bin depth file
+# (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH wrote before)
+ct = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
+                 sep="\t", keep_default_na=False)
+ct = ct[(ct["Sample"] == "sampleA") & (ct["bin"] == "binette_bin10")]
+want = round((ct["coverage"] * ct["contig_length"]).sum() / ct["contig_length"].sum(), 4)
+ab = t("st_merge", "mag_abundance").set_index(["batch", "bin", "sample"])
+assert ab.at[("asm", "binette_bin10", "sampleA"), "mean_depth_x"] == want, (ab, want)
+assert ab.at[("co", "binette_bin1", "sampleC"), "mean_depth_x"] == 0.138756
+assert ab.at[("co", "binette_bin1", "sampleD"), "mean_depth_x"] == 0.0519836
+ags = pd.read_csv(f"{stg}/coassembly/07_functional_annotation/microbecensus/sampleC/sampleC.ags.tsv", sep="\t")
+size = m.loc[("co", "coassembly", "binette_bin1"), "genome_size_mb"] * 1e6
+assert ab.at[("co", "binette_bin1", "sampleC"), "pct_sample_bases"] == round(
+    0.138756 * size / ags.at[0, "total_bases"] * 100, 4)
+# contig ARGs: one row per ARG hit, the bin's tier, the host at the lowest rank Metabuli reached
+cl = t("st_asm_out", "arg_contig_long")
+src = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
+                  sep="\t", keep_default_na=False)
+assert len(cl) == (src["ARG_gene"] != "").sum()
+assert set(cl.loc[cl["bin"] == "binette_bin10", "mag_tier"]) == {"high"}
+assert set(cl.loc[cl["bin"] == "", "mag_tier"]) <= {""}
+assert ((cl["host_rank"] == "unclassified") == (cl["host_taxon"] == "")).all()
+h = t("st_asm_out", "arg_contig_hosts")
+assert h["arg_genes"].sum() == len(cl)
+# a species call counts at its genus
+assert "species" not in set(h["host_rank"]) or (cl.loc[cl["host_rank"] == "species", "genus"] == "").any()
+# ARG gene abundance: per-sample assemblies repeat gene ids; sampleB's row with a sampleA gene id is not joined
+ga = t("st_merge", "arg_contig_abundance")
+assert 999 not in set(ga["count"]), ga[ga["count"] == 999]
+assert set(ga.loc[ga["assembly"] == "sampleA", "sample"]) == {"sampleA"}
+co = ga[ga["assembly"] == "coassembly"]
+assert set(co["sample"]) == {"sampleC", "sampleD"} and len(co) == 2 * co["gene_id"].nunique()
+# bin ARG clusters: names with underscores, a cluster shared by sampleA's two MAGs
+ml = t("st_asm_out", "arg_mag_long")
+r = ml[ml["gene_id"] == "k141_8786_20"].iloc[0]
+assert (r["arg_gene"], r["arg_class"], r["bin"]) == ("TRUNCATED_PUTATIVE_RESPONSE_REGULATOR_ARLR", "unclassified",
+                                                     "binette_bin10"), r
+sh = t("st_asm_out", "arg_cluster_sharing")
+assert len(sh) == 1 and sh.at[0, "n_mags"] == 2 and sh.at[0, "mags"] == "sampleA:binette_bin10;sampleA:binette_bin2"
+# contig functions: eggNOG CAZy names split from the accession, dbCAN apart, COG named; CPGE (MicrobeCensus ran)
+cz = pd.read_csv("st_asm_out/tables/function_contig_cazy.tsv", sep="\t", index_col=0, keep_default_na=False)
+assert not any("|" in a for a in cz.index) and (cz["description"] != "").all(), cz.head()
+assert "function_contig_cazy_dbcan" in open("st_asm_out/README.md").read()
+cog = pd.read_csv("st_asm_out/tables/function_contig_cog.tsv", sep="\t", index_col=0)
+assert cog.at["S", "description"] == "Function unknown"
+fa = pd.read_csv(f"{stg}/assembly/07_functional_annotation/summary/function_abundance.tsv", sep="\t")
+row = fa[(fa["ontology"] == "cog") & (fa["accession"] == "K") & (fa["sample_id"] == "sampleA")].iloc[0]
+assert abs(cog.at["K", "sampleA"] - row["abundance_cpge"]) < 1e-9
+fl = t("st_asm_out", "function_contig_long")
+assert len(fl) == len(fa) and "abundance_native" not in fl.columns
+assert set(fl.loc[fl["backend"] == "run_dbcan", "ontology"]) == {"cazy_dbcan"}
+PYEOF
+check "ARG RPKG = RPKM x clean pairs / 1e6 / genome equivalents (NA_no_ags without MicrobeCensus)" py - <<'PYEOF'
+import pandas as pd
+rpkm = pd.read_csv("st_asm_out/tables/arg_gene_rpkm.tsv", sep="\t", index_col=0, keep_default_na=False)
+rpkg = pd.read_csv("st_asm_out/tables/arg_gene_rpkg.tsv", sep="\t", index_col=0, keep_default_na=False)
+qc = pd.read_csv("st_asm_out/tables/samples_qc.tsv", sep="\t", index_col=0)
+f = qc.at["sampleA", "clean_pairs"] / 1e6 / qc.at["sampleA", "mc_genome_equivalents"]
+num = pd.to_numeric(rpkm["sampleA"], errors="coerce").dropna()
+assert len(num) and ((pd.to_numeric(rpkg.loc[num.index, "sampleA"]) - num * f).abs() < 1e-9).all()
+# run1: sampleB has no MicrobeCensus estimate (and is low depth: its codes stay)
+r1 = pd.read_csv("out/tables/arg_gene_rpkg.tsv", sep="\t", index_col=0, keep_default_na=False)
+assert set(r1["sampleB"]) <= {"NA_no_ags", "NA_low_depth"}, set(r1["sampleB"])
+PYEOF
+check "every process of summary_catalog.py exists in the pipeline" py - "${REPO_DIR}" <<'PYEOF'
+import re, sys
+from pathlib import Path
+sys.dont_write_bytecode = True
+repo = Path(sys.argv[1])
+sys.path.insert(0, str(repo / "bin"))
+from summary_catalog import STAGES
+text = "\n".join(p.read_text() for p in [repo / "main.nf", *repo.glob("subworkflows/local/*.nf"),
+                                         *repo.glob("modules/**/main.nf")])
+known = set(re.findall(r"^\s*process\s+(\w+)", text, re.M)) | set(re.findall(r"\bas\s+(\w+)", text))
+missing = [p for st in STAGES for p in st["processes"] if p not in known]
+assert not missing, missing
 PYEOF
 
 echo

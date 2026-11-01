@@ -1,0 +1,27 @@
+sample_id	source	backend	ontology	accession	description	abundance_tpm	abundance_cpge	abundance_native	native_unit
+sampleA	contigs	eggnog-mapper	cazy	AA10|Auxiliary Activities 10.		71.8994	2.088812		
+sampleA	contigs	eggnog-mapper	cazy	AA3|Auxiliary Activities 3.		25.0101	0.726590		
+sampleA	contigs	eggnog-mapper	cazy	AA6|Auxiliary Activities 6.		0.6160	0.017897		
+sampleA	contigs	eggnog-mapper	cog	C		22903.1035	665.378375		
+sampleA	contigs	eggnog-mapper	cog	K		55036.8367	1598.923964		
+sampleA	contigs	eggnog-mapper	cog	S		217781.6511	6326.967931		
+sampleB	contigs	eggnog-mapper	cog	C		49030.5842	215.451816		
+sampleB	contigs	eggnog-mapper	cog	K		35692.9677	156.843220		
+sampleB	contigs	eggnog-mapper	cog	S		178989.9481	786.523554		
+sampleA	contigs	eggnog-mapper	ec	ec:1.1.1.1		619.8240	18.007057		
+sampleA	contigs	eggnog-mapper	ec	ec:1.1.1.100		437.4988	12.710167		
+sampleA	contigs	eggnog-mapper	ec	ec:1.1.1.103		43.0581	1.250919		
+sampleB	contigs	eggnog-mapper	ec	ec:1.1.1.100		309.7703	1.361203		
+sampleA	contigs	eggnog-mapper	ko	K00001		150.9872	4.386462		
+sampleA	contigs	eggnog-mapper	ko	K00002		1.0418	0.030266		
+sampleA	contigs	eggnog-mapper	ko	K00003		133.9250	3.890773		
+sampleB	contigs	eggnog-mapper	ko	K00003		313.4646	1.377436		
+sampleA	contigs	eggnog-mapper	pfam	1-cysPrx_C		134.1159	3.896321		
+sampleA	contigs	eggnog-mapper	pfam	2-Hacid_dh		966.2128	28.070306		
+sampleA	contigs	eggnog-mapper	pfam	2-Hacid_dh_C		1035.0143	30.069120		
+sampleB	contigs	eggnog-mapper	pfam	1-cysPrx_C		60.3667	0.265265		
+sampleB	contigs	eggnog-mapper	pfam	2-Hacid_dh		475.4637	2.089298		
+sampleB	contigs	eggnog-mapper	pfam	2-Hacid_dh_C		475.4637	2.089298		
+sampleA	contigs	run_dbcan	cazy	AA10_e27		71.8994	2.088812		
+sampleA	contigs	run_dbcan	cazy	AA18_e1		55.2334	1.604634		
+sampleA	contigs	run_dbcan	cazy	AA18_e2		1.1483	0.033361		

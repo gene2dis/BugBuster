@@ -589,6 +589,7 @@ workflow {
         ch_bam_meta     = ASSEMBLY.out.bam_meta
         ch_counting_bam = ASSEMBLY.out.counting_bam
         ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
+        ch_summary_reports = ch_summary_reports.mix(ASSEMBLY.out.stats, ASSEMBLY.out.filter_summary)
 
         //
         // SUBWORKFLOW: Binning
@@ -606,6 +607,11 @@ workflow {
             ch_versions = ch_versions.mix(BINNING.out.versions)
 
             ch_gtdbtk_reports = BINNING.out.gtdbtk.map { _meta, reports -> reports }.flatten()
+            ch_summary_reports = ch_summary_reports.mix(
+                BINNING.out.refined_quality.map { _meta, reports -> reports }.flatten(),
+                ch_gtdbtk_reports,
+                BINNING.out.bin_depth
+            )
 
             //
             // MODULE: contig -> refined bin, for the bin columns of the
@@ -704,6 +710,16 @@ workflow {
             ch_cog_def
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
+        // the contig branch's study tables (summary/; never merged with the read branch's) and per-sample
+        // featureCounts summaries, and Bakta's per-MAG feature table and summary
+        ch_summary_reports = ch_summary_reports.mix(
+            FUNCTIONAL_ANNOTATION.out.function_abundance,
+            FUNCTIONAL_ANNOTATION.out.annotated_fraction,
+            FUNCTIONAL_ANNOTATION.out.gene_abundance,
+            FUNCTIONAL_ANNOTATION.out.gene_counts_summary.map { _meta, summary -> summary },
+            FUNCTIONAL_ANNOTATION.out.bakta_tsv.map { _meta, tsv -> tsv },
+            FUNCTIONAL_ANNOTATION.out.bakta_txt.map { _meta, txt -> txt }
+        )
     }
 
     //
@@ -754,6 +770,11 @@ workflow {
         ch_contig_deeparg      = DEEPARG_CONTIGS.out.deeparg
         ch_contig_deeparg_only = DEEPARG_CONTIGS.out.only_deeparg
         ch_versions = ch_versions.mix(DEEPARG_CONTIGS.out.versions.first())
+        // the hits' gene ids give each ARG gene's abundance per sample (gene_abundance.tsv)
+        if ( flagOn(params.contig_level_functional) ) {
+            ch_summary_reports = ch_summary_reports.mix(
+                DEEPARG_CONTIGS.out.only_deeparg.flatten().filter { f -> f.name.endsWith('.mapping.ARG') })
+        }
     }
 
     //
@@ -883,6 +904,7 @@ workflow {
         )
         ch_arg_fasta = ARG_FASTA_FORMATTER.out.arg_reports
         CLUSTERING(ch_arg_fasta.collect(sort: true))
+        ch_summary_reports = ch_summary_reports.mix(CLUSTERING.out.clusters.flatten())
 
         ch_versions = ch_versions.mix(
             BIN_ARG_SPLIT.out.versions.first(),

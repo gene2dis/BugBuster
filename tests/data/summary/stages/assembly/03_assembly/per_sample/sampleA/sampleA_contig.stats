@@ -1,0 +1,35 @@
+A	C	G	T	N	IUPAC	Other	GC	GC_stdev
+0.2636	0.2386	0.2378	0.2601	0.0000	0.0000	0.0000	0.4763	0.1091
+
+Main genome scaffold total:         	86387
+Main genome contig total:           	86387
+Main genome scaffold sequence total:	129.856 Mb
+Main genome contig sequence total:  	129.856 Mb  	0.000% gap
+Main genome scaffold N/L50:         	1683/8.588 Kbp
+Main genome contig N/L50:           	1683/8.588 Kbp
+Main genome scaffold N/L90:         	51383/465
+Main genome contig N/L90:           	51383/465
+Max scaffold length:                	504.841 Kbp
+Max contig length:                  	504.841 Kbp
+Number of scaffolds > 50 KB:        	324
+% main genome in scaffolds > 50 KB: 	28.91%
+
+
+Minimum 	Number        	Number        	Total         	Total         	Scaffold
+Scaffold	of            	of            	Scaffold      	Contig        	Contig  
+Length  	Scaffolds     	Contigs       	Length        	Length        	Coverage
+--------	--------------	--------------	--------------	--------------	--------
+    All 	        86,387	        86,387	   129,855,753	   129,855,753	 100.00%
+    100 	        86,387	        86,387	   129,855,753	   129,855,753	 100.00%
+    250 	        86,022	        86,022	   129,774,486	   129,774,486	 100.00%
+    500 	        46,710	        46,710	   114,658,710	   114,658,710	 100.00%
+  1 Kbp 	        16,094	        16,094	    93,772,557	    93,772,557	 100.00%
+2.5 Kbp 	         4,507	         4,507	    77,126,230	    77,126,230	 100.00%
+  5 Kbp 	         2,509	         2,509	    70,309,830	    70,309,830	 100.00%
+ 10 Kbp 	         1,511	         1,511	    63,332,214	    63,332,214	 100.00%
+ 25 Kbp 	           691	           691	    50,575,816	    50,575,816	 100.00%
+ 50 Kbp 	           324	           324	    37,542,104	    37,542,104	 100.00%
+100 Kbp 	           125	           125	    23,429,317	    23,429,317	 100.00%
+250 Kbp 	            29	            29	     9,274,820	     9,274,820	 100.00%
+500 Kbp 	             1	             1	       504,841	       504,841	 100.00%
+
