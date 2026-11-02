@@ -21,7 +21,9 @@ process RESULTS_SUMMARY {
     path(card_prevalence)                           // optional WildCARD card_prevalence.txt; []
     path(arg_priority)                              // ARG tier rule table
     path(watchlist)                                 // watchlist taxa
-    path(report_assets, stageAs: 'report_assets')   // assets/report: Typst and Jinja templates, styles, references
+    // assets/report (Typst and Jinja templates, styles, references) and a hash of its files' contents, which
+    // makes an edited template rerun the task on -resume (a directory is cached by its own path, size and mtime)
+    tuple path(report_assets, stageAs: 'report_assets'), val(report_assets_hash)
     path(stage_reports, stageAs: 'in_reports/*')   // run-level tables of other stages, by file name (see the case below); []
 
     output:

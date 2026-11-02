@@ -57,7 +57,7 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/assets/report", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
                 input[14] = [
                     file("\${fix}/args_oap/args_oap_long.tsv", checkIfExists: true),
                     file("\${fix}/args_oap/args_oap_cells.tsv", checkIfExists: true),
@@ -163,7 +163,7 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/assets/report", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
                 input[14] = files("\${fix}/stages/assembly/**", type: 'file').sort { f -> f.name }
                 """
             }
@@ -216,7 +216,7 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/assets/report", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
                 input[14] = files("\${fix}/stages/coassembly/**", type: 'file').sort { f -> f.name }
                 """
             }
@@ -251,7 +251,7 @@ nextflow_process {
                 input[10] = []
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
-                input[13] = file("${projectDir}/assets/report", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
                 input[14] = []
                 """
             }

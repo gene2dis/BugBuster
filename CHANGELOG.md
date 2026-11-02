@@ -479,7 +479,8 @@ next release is tagged.
   numbering agree; templates, styles and the curated tool references
   (`references.yml`, 50 papers checked on PubMed or Crossref) are in
   `assets/report/`. The batch mode builds them for merged results too. The
-  summary tables are unchanged (byte-identical on the reference runs)
+  module gets that folder with a hash of its files' contents, so an edited
+  template reruns the summary on `-resume`. The summary tables are unchanged (byte-identical on the reference runs)
 - **One figure style for every figure** (`bin/figure_style.py`): the summary
   figures and the stage figures (read counts, taxonomy classification and
   abundance bars, blob plots, bin quality, MAG taxonomy) are drawn 89 or
