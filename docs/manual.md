@@ -997,9 +997,11 @@ By default, databases are stored in a `databases/` directory at the same level a
 The run-level summary in `00_summary/` consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP),
 read functional and MicrobeCensus results, and the assembly, MAG, contig ARG, bin-level ARG cluster and contig
 functional results: tidy and wide TSV tables, an Excel workbook (`results_summary.xlsx`, with a
-README sheet defining every column), PDF/PNG/SVG figures, a self-contained HTML report (`results_summary.html`, no
-network access needed to view it), a README (`README.md` and `README.docx`) and `LLM_GUIDE.md`. Each part appears only
-when its stage ran; the README and the guide list every pipeline stage and whether it ran in each results directory.
+README sheet defining every column), figures (PDF, SVG and 600 dpi PNG, each with its plotted values as CSV), a
+multi-page HTML report (`report/`, opened at `report/index.html` or through `results_summary.html`; it works offline,
+from the file system), the same report as a typeset PDF (`results_summary.pdf`), a `README.md` and `LLM_GUIDE.md`.
+Each part appears only when its stage ran; the README and the guide list every pipeline stage and whether it ran in
+each results directory.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -1038,8 +1040,20 @@ How the summary reports the results:
 - **Bin-level ARG clusters.** With `--arg_bin_clustering`, `arg_mag_long` lists the ARG genes of the MAGs and their MMseqs2 cluster at 90, 95, 99 and 100 % identity, and `arg_cluster_sharing` the 90 % clusters found in more than one MAG. A shared cluster is the same sequence in different genomes: consistent with transfer, not evidence of it alone.
 - **Contig functional profile.** With `--contig_level_functional`, `function_contig_long` and `function_contig_<ontology>` (ko, cog, ec, pfam, cazy from eggNOG, cazy_dbcan from dbCAN) hold AGGREGATE_FUNCTIONS' tables, in CPGE when MicrobeCensus ran, else in TPM. TPM_i = RPK_i / (sum of RPK_j) x 1e6 is a share of the reads on predicted genes (compositional); CPGE_i = RPK_i / genome equivalents is copies per genome equivalent (not compositional). A gene with two terms of one ontology counts for each. COG categories and eggNOG CAZy families are named; KO, EC and Pfam keep their identifiers only. These tables are never merged with the read-level `function_read_*`.
 - **ARGs per genome equivalent.** When MicrobeCensus ran, `arg_gene_rpkg`, `arg_family_rpkg` and `arg_drug_class_rpkg` repeat the RPKM matrices per genome equivalent (RPKM x clean read pairs / 1e6 / genome equivalents).
-- **README and LLM guide.** `README.md` / `README.docx` (written with the Python standard library) list the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the summary folder for a language model or a script: run facts as YAML, the stages that ran, methods, every table column and figure, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. The summary folder is the part meant to be shared, so neither file names a local path: paths are relative to the folder, batches appear by label and input files by name. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
-- **Attention list and reading guide.** The HTML header lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The first section, "Reading this report", explains the units, the ARG tiers (built from the tier rule file in use) and the ARG methods before any result is shown.
+- **Report and figures.** The HTML report has an overview (facts, the attention list, the stages, read fate and the
+  per-sample table), one page per section whose stage ran, a methods page (how to read the report, the ARG tiers, the
+  caveats, the inputs, every tool and database with its version and reference) and a data dictionary of every table.
+  The large figures (heatmaps, read fate) are interactive there (hover for values, a group menu, zoom on the
+  quantitative axis), tables sort and filter, and every figure links its static PDF, SVG, PNG and CSV. The Vega
+  libraries and the Inter font are bundled, so nothing is loaded from the network. `results_summary.pdf` holds the same
+  sections, figures and numbering, typeset by Typst; long tables stop at 60 rows with a pointer to the TSV. Figures
+  share one style with the pipeline's stage figures: 89 or 183 mm wide at their exact size, Inter embedded, the
+  Okabe-Ito and viridis palettes, samples in natural order inside their group (`--summary_group_by`, else the batch
+  when several results directories are merged), low-depth samples hatched and marked with a dagger, and samples as
+  rows above 60 samples (sample labels drop above about 110, where only the groups are labelled). Figures and
+  documents follow the run's data: their content changes with every run, their layout does not.
+- **README and LLM guide.** `README.md` lists the stages that ran in each results directory, every table and figure with its rows and meaning, the units, the tiers, the caveats and the software versions. `LLM_GUIDE.md` describes the summary folder for a language model or a script: run facts as YAML, the stages that ran, methods, every table column and figure, pitfalls (single reads vs pairs, non-comparable units, NA codes) and recipes. The summary folder is the part meant to be shared, so neither file names a local path: paths are relative to the folder, batches appear by label and input files by name. Which stages ran is read from `software_versions.yml`; a stage that ran without its table in the results directory is reported as "ran, no table found".
+- **Attention list and reading guide.** The report's overview lists the tier 1 genes (found by every method, by one only, or with a commensal host) and the low-depth samples. The methods page starts with "Reading this report": the units, the ARG tiers (built from the tier rule file in use) and the ARG methods.
 
 The same script summarises several finished results directories (batches) without rerunning any tool; see [Example 13](#example-13-summarise-several-batches).
 
@@ -1150,9 +1164,12 @@ results/
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── 00_summary/                                 # Run-level summary (if results_summary=true)
-│   ├── results_summary.html                    # Self-contained report: figures, sortable tables, methods
+│   ├── report/                                 # HTML report: index.html (overview), a page per section, methods,
+│   │                                           # data dictionary; interactive figures, sortable tables, works offline
+│   ├── results_summary.html                    # Opens report/index.html
+│   ├── results_summary.pdf                     # The same report, typeset (Typst)
 │   ├── results_summary.xlsx                    # Every table, plus a README sheet defining the columns
-│   ├── README.md, README.docx                  # What the summary holds: stages run, tables, figures, units, caveats
+│   ├── README.md                               # What the summary holds: stages run, tables, figures, units, caveats
 │   ├── LLM_GUIDE.md                            # The summary folder (tables, figures, methods), for a language model or a script
 │   ├── tables/                                 # samples_qc, taxonomy_long, taxonomy_<rank>_wide, taxonomy_species_prevalence,
 │   │                                           # watchlist, arg_long, arg_gene_rpkm, arg_family_rpkm,
@@ -1167,7 +1184,9 @@ results/
 │   │                                           # function_contig_long, function_contig_<ontology> (contig functional)
 │   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
 │                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
-│                                               # arg_sarg_type_heatmap, function_cog_heatmap (.png/.pdf/.svg)
+│                                               # arg_sarg_type_heatmap, function_cog_heatmap, function_contig_cog_heatmap,
+│                                               # mag_quality, mag_abundance_heatmap, arg_contig_hosts
+│                                               # (.pdf/.svg/.png, plotted values in .csv)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
 ├── 01_quality_control/                         # Quality control
@@ -1178,7 +1197,7 @@ results/
 │   │       └── {sample}.fastp.log              # Log file
 │   └── summary/                                # Aggregated read counts (also with quality_control=false)
 │       ├── Reads_report.csv                    # Read count summary
-│       └── *.png                               # QC plots
+│       └── Box_plot_reads.*                    # Reads per step (.pdf/.svg/.png, values in .csv)
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
@@ -1197,8 +1216,8 @@ results/
 │   ├── phyloseq/                               # Phyloseq objects
 │   │   ├── *.h5                                # HDF5 format
 │   │   └── *.RDS                               # R phyloseq object (if create_phyloseq_rds=true)
-│   └── figures/                                # Taxonomy plots
-│       └── *.png                               # Visualization plots
+│   └── figures/                                # Classified reads and abundance bars per level
+│       └── *.{pdf,svg,png,csv}                 # (figure files, plotted values in .csv)
 ├── 03_assembly/                                # Genome assembly (if assembly_mode != 'none')
 │   ├── per_sample/                             # Per-sample assemblies (if assembly_mode='assembly')
 │   │   └── {sample}/
@@ -1234,12 +1253,12 @@ results/
 │   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
 │   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')
 │   │   └── summary/
-│   │       ├── *.csv                           # Quality summary tables
-│   │       └── *.png                           # Quality plots
+│   │       ├── *.csv                           # Quality summary tables (Total_bins_quality_plot.csv: plotted values)
+│   │       └── Total_bins_quality_plot.*       # Quality plot (.pdf/.svg/.png)
 │   └── taxonomy/                               # Aggregated taxonomy reports (if assembly_mode='assembly')
 │       └── summary/
-│           ├── *.csv                           # Taxonomy summary tables
-│           └── *.png                           # Taxonomy plots
+│           ├── *.csv                           # Taxonomy summary tables (MAGs_tax_plot.csv: plotted values)
+│           └── MAGs_tax_plot.*                 # MAGs per phylum (.pdf/.svg/.png)
 ├── 05_arg_prediction/                          # ARG predictions
 │   ├── read_level/                             # Read-level ARG
 │   │   ├── args_oap/                           # ARGs-OAP per sample (if args_oap_prediction=true)
@@ -1282,8 +1301,8 @@ results/
 │   │   │       └── *_contigs_deep_arg.out.mapping.ARG
 │   │   ├── summary/                            # ARG summary reports
 │   │   │   └── Contig_tax_and_arg_prediction.tsv
-│   │   └── figures/                            # ARG visualization
-│   │       └── *.png
+│   │   └── figures/                            # ARG blob plot per assembly
+│   │       └── {sample}_ARG_blob_plot.*        # (.pdf/.svg/.png, values in .csv; coassembly_* under co-assembly)
 │   └── bin_level/                              # Bin-level ARG (if arg_bin_clustering=true)
 │       ├── proteins/                           # Per-bin Pyrodigal proteins (shared gene calling, split by bin)
 │       │   └── {sample}/                       # (coassembly/ under co-assembly)
@@ -1300,8 +1319,8 @@ results/
 │   │       └── {sample}_report.tsv             # Clade report
 │   ├── genomad/                                # geNomad (if genomad_prediction=true)
 │   │   └── {sample}/                           # *_summary/ (plasmid/virus summaries, genes, sequences), *_aggregated_classification/, *_find_proviruses/, ...
-│   └── figures/                                # BlobTools plots
-│       └── *.png
+│   └── figures/                                # Phylum blob plot per assembly
+│       └── {sample}_Phylum_blob_plot.*         # (.pdf/.svg/.png, values in .csv; coassembly_* under co-assembly)
 └── 07_functional_annotation/                   # Functional annotation
     ├── gene_calling/                           # Pyrodigal ORF predictions on contigs
     │   └── {sample}/ or coassembly/            # (if contig_tax_and_arg, arg_bin_clustering or contig_level_functional)
@@ -1808,11 +1827,14 @@ Large studies are often run in batches (one results directory each). `bin/result
 published results only, so it merges finished batches without rerunning any tool. Sample names must be unique
 across batches; taxa are matched by genome/taxon ID, and all batches must use the same taxonomy database.
 
-The script needs Python 3 with pandas, numpy and matplotlib 3.7 or newer (its figure legends use a placement
-older versions lack); openpyxl or xlsxwriter adds the Excel workbook, which is skipped with a warning without
-them. The pipeline runs it with Python 3.13, pandas 3.1.0, numpy 2.5.4, matplotlib 3.11.2 and openpyxl 3.1.5
+The script needs Python 3 with pandas, numpy, matplotlib 3.7 or newer (its figure legends use a placement
+older versions lack), Jinja2 and PyYAML; openpyxl or xlsxwriter adds the Excel workbook, Typst the PDF, Altair with
+vl-convert-python the interactive figures and font-inter the figures' font (each is skipped with a warning when
+missing). The pipeline runs it with Python 3.13, pandas 3.1.0, numpy 2.5.4, matplotlib 3.11.2, openpyxl 3.1.5,
+Typst 0.15.1, Jinja2 3.1.6, Altair 6.3.0, vl-convert-python 1.9.0.post1, Inter 4.1 and PyYAML 6.0.3
 (`modules/local/results_summary/main.nf`; every report process uses this image), and it also runs with pandas 2. Run it from a BugBuster checkout: it imports the `summary_*.py`
-modules next to it in `bin/` and reads its default tier rules and watchlist from `assets/`. Either way works:
+modules next to it in `bin/` and reads its default tier rules, watchlist and report templates from `assets/`.
+Either way works:
 
 **With the pipeline's container image**, which has everything installed:
 
@@ -1830,7 +1852,8 @@ docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -
 Under Singularity/Apptainer, use `singularity exec -B /path/to/BugBuster:/bb oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:2ce015cec686e756 python /bb/bin/results_summary.py ...`.
 
 **With a local Python** that has the packages above (for example
-`conda install -c conda-forge pandas numpy "matplotlib-base>=3.7" openpyxl`):
+`conda install -c conda-forge pandas numpy "matplotlib-base>=3.7" openpyxl jinja2 pyyaml typst altair
+vl-convert-python font-inter`):
 
 ```bash
 python /path/to/BugBuster/bin/results_summary.py \

@@ -345,7 +345,7 @@ The pipeline generates organized output with numbered prefixes:
 ```
 results/
 ├── pipeline_info/              # Execution reports, logs, contig filtering summary
-├── 00_summary/                 # Run-level summary (if results_summary=true): results_summary.html, results_summary.xlsx, README.md/.docx, LLM_GUIDE.md, tables/, figures/
+├── 00_summary/                 # Run-level summary (if results_summary=true): report/ (HTML report), results_summary.pdf, results_summary.xlsx, README.md, LLM_GUIDE.md, tables/, figures/
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
 ├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports
