@@ -70,6 +70,7 @@ flowchart TD
     ContigTax -.-> RESULTS_SUMMARY
     BinARG -.-> RESULTS_SUMMARY
     FUNCTIONAL_ANNOTATION -.-> RESULTS_SUMMARY
+    DEEPARG_CONTIGS -.->|with contig_level_functional| RESULTS_SUMMARY
     RESULTS_SUMMARY["RESULTS_SUMMARY<br/>results_summary (default)<br/>00_summary/: tables, Excel, figures,<br/>HTML report, PDF, README, LLM guide"]
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
@@ -111,6 +112,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `DEEPARG_CONTIGS` | (`contig_tax_and_arg` or `arg_bin_clustering`) and an assembly | — |
 | `BIN_CONTIG_LABELS` | `include_binning` and (`contig_tax_and_arg` or `arg_bin_clustering`) | — |
 | `NFCORE_GENOMAD_ENDTOEND` | `genomad_prediction` and an assembly (assemblies without contigs skipped) | needs an assembly |
+| `DEEPARG_CONTIGS` hits in the summary (`.mapping.ARG`, ARG gene abundance) | `DEEPARG_CONTIGS` runs and `contig_level_functional` | — |
 | Contig taxonomy + ARG (`METABULI_CLASSIFY` … `ARG_BLOBPLOT`) | `contig_tax_and_arg` and an assembly | needs an assembly |
 | Bin-level ARG clustering | `arg_bin_clustering` and `include_binning` | `arg_bin_clustering` needs `include_binning` |
 | `MICROBECENSUS` | `microbecensus` (default `true`) and (`contig_level_functional` with an assembly, or `read_level_functional != 'none'`) | — |
@@ -338,12 +340,15 @@ flowchart TD
     BLOBTOOLS --> BLOBPLOT["BLOBPLOT<br/>phylum blob plot per assembly"]
 
     Contigs -->|genomad_prediction| NFCORE_GENOMAD_ENDTOEND["NFCORE_GENOMAD_ENDTOEND<br/>geNomad 1.13.0, DB v1.9"]
-    Bins(["refined bins + GTDB-Tk<br/>(include_binning)"]) --> BIN_CONTIG_LABELS
+    Bins(["BINNING<br/>(include_binning)"]) -->|refined bins| BIN_CONTIG_LABELS
+    Bins -->|"GTDB-Tk summaries:<br/>bin_gtdb_classification"| ARG_CONTIG_LEVEL_REPORT
 
     DEEPARG_CONTIGS & BLOBTOOLS & METABULI_CLASSIFY --> ARG_CONTIG_LEVEL_REPORT["ARG_CONTIG_LEVEL_REPORT<br/>Contig_tax_and_arg_prediction.tsv"]
-    BIN_CONTIG_LABELS -->|"bin, bin_gtdb_classification"| ARG_CONTIG_LEVEL_REPORT
+    BIN_CONTIG_LABELS -->|bin| ARG_CONTIG_LEVEL_REPORT
     NFCORE_GENOMAD_ENDTOEND -->|"mobile_class columns<br/>(+ Pyrodigal GFF)"| ARG_CONTIG_LEVEL_REPORT
     ARG_CONTIG_LEVEL_REPORT --> ARG_BLOBPLOT["ARG_BLOBPLOT<br/>ARG blob plot per assembly"]
+    ARG_CONTIG_LEVEL_REPORT -.-> RESULTS_SUMMARY
+    DEEPARG_CONTIGS -.->|"contig_level_functional:<br/>.mapping.ARG (ARG gene abundance)"| RESULTS_SUMMARY
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
@@ -428,8 +433,9 @@ flowchart TD
     class SOFTWARE_VERSIONS,RESULTS_SUMMARY on
 ```
 
-Every input is optional: a stage that did not run gives an empty list, and the summary leaves
-its section out. The same script (`bin/results_summary.py`) also merges several finished
+The stage inputs are optional: a stage that did not run gives an empty list, and the summary
+leaves its section out. The reads report, `software_versions.yml`, the ARG priority table, the
+watchlist and `assets/report` are always given (the two tables default to files in `assets/`). The same script (`bin/results_summary.py`) also merges several finished
 results directories outside the pipeline (manual, Example 13).
 
 ---

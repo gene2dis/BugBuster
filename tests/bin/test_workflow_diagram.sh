@@ -2,9 +2,10 @@
 #
 # Keeps docs/WORKFLOW_DIAGRAM.md in step with the code (roadmap D1): every process
 # or subworkflow that main.nf or a local subworkflow includes (under its alias,
-# e.g. NFCORE_SAMTOOLS_INDEX) must be named in the file, and every process name
-# the file writes in backticks must still be included somewhere. Functions
-# (flagOn, validateParameters, ...) are camelCase and are not checked.
+# e.g. NFCORE_SAMTOOLS_INDEX) must be named in one of the file's Mermaid
+# diagrams or tables (prose does not count), and every upper-case name the file
+# writes in backticks must still be included somewhere. Functions (flagOn,
+# validateParameters, ...) are camelCase and are not checked.
 #
 set -euo pipefail
 
@@ -39,19 +40,21 @@ included_names() {
 # check_doc <doc>: prints one line per missing or stale name, returns 1 if any
 check_doc() {
     local doc="$1" bad=0 name
+    # the Mermaid blocks and the table rows
+    awk '/^```mermaid/ { m = 1; next } m && /^```/ { m = 0 } m || /^\|/' "${doc}" > "${TMP_DIR}/named.txt"
     while read -r name; do
-        if ! grep -qw -- "${name}" "${doc}"; then
-            echo "missing: ${name} is included by the code but not named in ${doc##*/}"
+        if ! grep -qw -- "${name}" "${TMP_DIR}/named.txt"; then
+            echo "missing: ${name} is included by the code but not in a diagram or table of ${doc##*/}"
             bad=1
         fi
     done < "${TMP_DIR}/included.txt"
-    # backticked upper-case names with an underscore are process / subworkflow names
+    # backticked upper-case names are process / subworkflow names
     while read -r name; do
         if ! grep -qx -- "${name}" "${TMP_DIR}/included.txt"; then
             echo "stale: ${doc##*/} names \`${name}\`, which the code no longer includes"
             bad=1
         fi
-    done < <(grep -oE '`[A-Z][A-Z0-9]*_[A-Z0-9_]*`' "${doc}" | tr -d '`' | sort -u)
+    done < <(grep -oE '`[A-Z][A-Z0-9_]+`' "${doc}" | tr -d '`' | sort -u)
     return "${bad}"
 }
 
@@ -89,12 +92,25 @@ else
     echo "✗ removing MICROBECENSUS from the document was not reported"
     FAIL=$((FAIL + 1))
 fi
-{ cat "${DOC}"; echo 'Old step: `PRODIGAL_CONTIGS`'; } > "${TMP_DIR}/stale.md"
-if ! check_doc "${TMP_DIR}/stale.md" > "${TMP_DIR}/stale.log" && grep -q 'stale: .*PRODIGAL_CONTIGS' "${TMP_DIR}/stale.log"; then
-    echo "✓ a process the code no longer includes is reported"
+for stale in PRODIGAL_CONTIGS KARGA; do
+    { cat "${DOC}"; echo "Old step: \`${stale}\`"; } > "${TMP_DIR}/stale.md"
+    if ! check_doc "${TMP_DIR}/stale.md" > "${TMP_DIR}/stale.log" && grep -q "stale: .*${stale}" "${TMP_DIR}/stale.log"; then
+        echo "✓ ${stale}, which the code no longer includes, is reported"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ a stale \`${stale}\` was not reported"
+        FAIL=$((FAIL + 1))
+    fi
+done
+# A name left only in prose (QFILTER taken out of every diagram and table, then
+# mentioned in a sentence) counts as missing
+sed -E '/^\|/ s/\bQFILTER\b/QF/g; /^```mermaid/,/^```/ s/\bQFILTER\b/QF/g' "${DOC}" > "${TMP_DIR}/prose.md"
+echo 'QFILTER is mentioned in prose only.' >> "${TMP_DIR}/prose.md"
+if ! check_doc "${TMP_DIR}/prose.md" > "${TMP_DIR}/prose.log" && grep -q 'missing: QFILTER' "${TMP_DIR}/prose.log"; then
+    echo "✓ a process named only in prose is reported"
     PASS=$((PASS + 1))
 else
-    echo "✗ a stale \`PRODIGAL_CONTIGS\` was not reported"
+    echo "✗ QFILTER named only in prose was not reported"
     FAIL=$((FAIL + 1))
 fi
 
