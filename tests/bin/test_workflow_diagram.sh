@@ -3,9 +3,11 @@
 # Keeps docs/WORKFLOW_DIAGRAM.md in step with the code (roadmap D1): every process
 # or subworkflow that main.nf or a local subworkflow includes (under its alias,
 # e.g. NFCORE_SAMTOOLS_INDEX) must be named in one of the file's Mermaid
-# diagrams or tables (prose does not count), and every upper-case name the file
-# writes in backticks must still be included somewhere. Functions (flagOn,
-# validateParameters, ...) are camelCase and are not checked.
+# diagrams or tables (prose does not count), and every process the file shows
+# (an upper-case Mermaid node id, or a backticked name in a table's first
+# column) must still be included somewhere. Functions (flagOn,
+# validateParameters, ...) are camelCase and are not checked; acronyms in prose
+# or labels (`TPM`, CARD) are not process names.
 #
 set -euo pipefail
 
@@ -48,13 +50,21 @@ check_doc() {
             bad=1
         fi
     done < "${TMP_DIR}/included.txt"
-    # backticked upper-case names are process / subworkflow names
+    # the processes the file shows: Mermaid node ids (labels, edge texts and
+    # style lines removed) and the backticked names of a table's first column
+    {
+        awk '/^```mermaid/ { m = 1; next } m && /^```/ { m = 0 } m' "${doc}" \
+            | grep -vE '^[[:space:]]*(%%|classDef|class|flowchart|direction|subgraph|end)\b' \
+            | sed -E 's/"[^"]*"//g; s/\|[^|]*\|//g; s/\[[^]]*\]//g; s/\([^)]*\)//g; s/\{[^}]*\}//g' \
+            | grep -oE '\b[A-Z][A-Z0-9_]+\b' || true
+        awk -F'|' '/^\|/ { print $2 }' "${doc}" | grep -oE '`[A-Z][A-Z0-9_]+`' | tr -d '`' || true
+    } | sort -u > "${TMP_DIR}/shown.txt"
     while read -r name; do
         if ! grep -qx -- "${name}" "${TMP_DIR}/included.txt"; then
-            echo "stale: ${doc##*/} names \`${name}\`, which the code no longer includes"
+            echo "stale: ${doc##*/} shows ${name}, which the code no longer includes"
             bad=1
         fi
-    done < <(grep -oE '`[A-Z][A-Z0-9_]+`' "${doc}" | tr -d '`' | sort -u)
+    done < "${TMP_DIR}/shown.txt"
     return "${bad}"
 }
 
@@ -92,16 +102,29 @@ else
     echo "✗ removing MICROBECENSUS from the document was not reported"
     FAIL=$((FAIL + 1))
 fi
-for stale in PRODIGAL_CONTIGS KARGA; do
-    { cat "${DOC}"; echo "Old step: \`${stale}\`"; } > "${TMP_DIR}/stale.md"
-    if ! check_doc "${TMP_DIR}/stale.md" > "${TMP_DIR}/stale.log" && grep -q "stale: .*${stale}" "${TMP_DIR}/stale.log"; then
-        echo "✓ ${stale}, which the code no longer includes, is reported"
+# A box left in a diagram and a row left in a table after the code drops the
+# process are reported; an acronym in backticks in prose is not a process
+awk '{ print } /^```mermaid/ && !done { print "    BRACKEN --> KRAKEN_REPORT_OLD[\"KRAKEN_REPORT_OLD\"]"; done = 1 }' "${DOC}" > "${TMP_DIR}/stale_box.md"
+{ cat "${DOC}"; printf '\n| `KARGA` / `KARGVA` | removed tools |\n'; } > "${TMP_DIR}/stale_row.md"
+for case in "stale_box.md KRAKEN_REPORT_OLD" "stale_row.md KARGA"; do
+    set -- ${case}
+    if ! check_doc "${TMP_DIR}/$1" > "${TMP_DIR}/stale.log" && grep -q "stale: .*shows $2," "${TMP_DIR}/stale.log"; then
+        echo "✓ $2, which the code no longer includes, is reported ($1)"
         PASS=$((PASS + 1))
     else
-        echo "✗ a stale \`${stale}\` was not reported"
+        echo "✗ a stale $2 was not reported ($1)"
         FAIL=$((FAIL + 1))
     fi
 done
+{ cat "${DOC}"; echo 'Abundances are in `TPM` and `CPGE`, from `KO` terms.'; } > "${TMP_DIR}/acronym.md"
+if check_doc "${TMP_DIR}/acronym.md" > "${TMP_DIR}/acronym.log"; then
+    echo "✓ acronyms in backticks in prose are not taken for processes"
+    PASS=$((PASS + 1))
+else
+    echo "✗ an acronym in prose was reported:"
+    sed 's/^/    /' "${TMP_DIR}/acronym.log"
+    FAIL=$((FAIL + 1))
+fi
 # A name left only in prose (QFILTER taken out of every diagram and table, then
 # mentioned in a sentence) counts as missing
 sed -E '/^\|/ s/\bQFILTER\b/QF/g; /^```mermaid/,/^```/ s/\bQFILTER\b/QF/g' "${DOC}" > "${TMP_DIR}/prose.md"

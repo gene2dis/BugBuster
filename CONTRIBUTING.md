@@ -328,6 +328,18 @@ name), `description`, `input` and `output`. `tests/bin/test_module_meta.sh` (run
 checks every local module against these rules and that every process has a `tag` and a
 `label`.
 
+### Workflow diagrams
+
+A process or subworkflow you include in `main.nf` or a subworkflow must also appear in
+`docs/WORKFLOW_DIAGRAM.md`: as a box in its stage's diagram (with the parameter that gates
+it as the edge label) and as a row of the module reference. When you remove one, remove it
+there too. `tests/bin/test_workflow_diagram.sh` (run in CI) fails on an included name the
+file does not show, and on a diagram box or table row whose process the code no longer
+includes. Render the Mermaid blocks to check they parse, e.g.
+`docker run --rm -u $(id -u):$(id -g) -v $PWD/docs:/data minlag/mermaid-cli:11.17.1 -i /data/WORKFLOW_DIAGRAM.md -o /tmp/out.md`.
+If the change alters the overview figure (`docs/images/bugbuster_overview.svg`, hand-written),
+edit it and run `docs/images/render_overview.sh`.
+
 ## Testing
 
 ### Local Testing

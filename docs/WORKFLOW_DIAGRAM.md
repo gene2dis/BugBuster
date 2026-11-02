@@ -32,7 +32,7 @@ flowchart TD
     %% Read-level branches
     Clean -->|"taxonomic_profiler != 'none'<br/>(default sylph)"| TAXONOMY["TAXONOMY<br/>sylph | kraken2 + Bracken | sourmash"]
     Clean -->|"args_oap_prediction<br/>(or deprecated read_arg_prediction)"| ARGS_OAP["ARGS_OAP → ARGS_OAP_REPORT<br/>SARG, stage one + two"]
-    Clean -->|rgi_prediction| RGI["RGI_BWT → RGI_KMER → RGI_REPORT<br/>CARD + pathogen of origin"]
+    Clean -->|rgi_prediction| RgiSteps["RGI_BWT → RGI_KMER → RGI_REPORT<br/>CARD + pathogen of origin"]
     Clean -->|kmarvel_prediction| KMARVEL["KMARVEL → KMARVEL_REPORT<br/>CARD ARG assembly from reads"]
     Clean -->|"microbecensus (default)<br/>and a contig or read<br/>functional branch"| MICROBECENSUS["MICROBECENSUS<br/>average genome size"]
     Clean -->|"read_level_functional != 'none'"| READ_FUNCTIONAL["READ_FUNCTIONAL<br/>woltka | superfocus | humann"]
@@ -61,7 +61,7 @@ flowchart TD
     QC -.-> RESULTS_SUMMARY
     TAXONOMY -.-> RESULTS_SUMMARY
     ARGS_OAP -.-> RESULTS_SUMMARY
-    RGI -.-> RESULTS_SUMMARY
+    RgiSteps -.-> RESULTS_SUMMARY
     KMARVEL -.-> RESULTS_SUMMARY
     MICROBECENSUS -.-> RESULTS_SUMMARY
     READ_FUNCTIONAL -.-> RESULTS_SUMMARY
@@ -77,7 +77,7 @@ flowchart TD
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     classDef data fill:#FFF8E6,stroke:#E69F00,stroke-width:1.5px,color:#111
     class INPUT_CHECK,PREPARE_DATABASES,QC,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
-    class ARGS_OAP,RGI,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
+    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
     class Input,Clean,Versions data
 ```
 
@@ -100,7 +100,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `TAXONOMY` | `taxonomic_profiler != 'none'` (default `sylph`) | `custom_sylph_db` and `custom_sylph_taxonomy` given together |
 | `ARGS_OAP`, `ARGS_OAP_REPORT` | `args_oap_prediction` or `read_arg_prediction` (deprecated alias, with a warning) | — |
 | `RGI_BWT`, `RGI_REPORT` | `rgi_prediction` | — |
-| `RGI_KMER` | `rgi_prediction` and (`custom_rgi_card_db` with the k-mer files, or `rgi_include_wildcard`, default `true`) | — |
+| `RGI_KMER` | `rgi_prediction` and: with `custom_rgi_card_db`, its k-mer files for `rgi_kmer_size` present or `custom_rgi_wildcard` given; without, `rgi_include_wildcard` (default `true`) | — |
 | `KMARVEL`, `KMARVEL_REPORT` | `kmarvel_prediction` | — |
 | `ASSEMBLY` | `assembly_mode != 'none'` (default `assembly`) | — |
 | `BBNORM` | `assembly_read_reduction == 'normalize'` (default `none`) | needs an assembly |
@@ -129,7 +129,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 
 ```mermaid
 flowchart LR
-    CSV[Samplesheet CSV] --> Validate[Validate columns<br/>and that files exist]
+    Sheet[Samplesheet CSV] --> Validate[Validate columns<br/>and that files exist]
     Validate --> Meta["meta.id = sample<br/>reads = r1, r2, s (optional)"]
     Meta --> Reads(["channel: [meta, reads]"])
 ```
@@ -197,6 +197,7 @@ flowchart TD
     Decon -->|"bwamem3 (default)"| BWAMEM3_DECONTAMINATE
     Decon -->|bowtie2| BOWTIE2_DECONTAMINATE
     BWAMEM3_DECONTAMINATE & BOWTIE2_DECONTAMINATE -->|"one pass vs the combined<br/>phiX + host index"| READS_REPORT
+    QFILTER -->|"per-sample read counts<br/>(raw, after fastp)"| READS_REPORT
     Q -->|false| COUNT_READS["COUNT_READS<br/>counts only"]
     COUNT_READS --> READS_REPORT["READS_REPORT<br/>Reads_report.csv + Box_plot_reads"]
     BWAMEM3_DECONTAMINATE & BOWTIE2_DECONTAMINATE & COUNT_READS --> Clean(["clean reads"])
@@ -239,7 +240,7 @@ flowchart TD
     ARGS_OAP --> ARGS_OAP_REPORT["ARGS_OAP_REPORT<br/>args_oap_long.tsv, args_oap_cells.tsv"]
 
     Clean -->|rgi_prediction| RGI_BWT["RGI_BWT<br/>KMA vs CARD (+ WildCARD)"]
-    RGI_BWT -->|"rgi_include_wildcard (default)<br/>or custom DB with k-mers"| RGI_KMER["RGI_KMER<br/>pathogen of origin"]
+    RGI_BWT -->|"rgi_include_wildcard (default);<br/>custom_rgi_card_db: its k-mer files<br/>or custom_rgi_wildcard"| RGI_KMER["RGI_KMER<br/>pathogen of origin"]
     RGI_BWT --> RGI_REPORT
     RGI_KMER --> RGI_REPORT
 
@@ -303,11 +304,15 @@ flowchart TD
     BINETTE & CHECKM2_BATCH --> Bins(["refined_bins"])
     Bins --> GTDB_TK_BATCH["GTDB_TK_BATCH<br/>all samples in one run"]
 
-    GTDB_TK_BATCH --> Mode{assembly_mode}
-    Mode -->|assembly| BIN_QUALITY_REPORT & BIN_TAX_REPORT
-    Mode -->|coassembly| BIN_CONTIG_TABLE["BIN_CONTIG_TABLE<br/>contig → bin<br/>(skipped without bins)"]
+    BINETTE & CHECKM2_BATCH --> Quality(["CheckM2 reports"])
+
+    Quality -->|assembly| BIN_QUALITY_REPORT
+    GTDB_TK_BATCH -->|assembly| BIN_TAX_REPORT
+    Bins -->|coassembly| BIN_CONTIG_TABLE["BIN_CONTIG_TABLE<br/>contig → bin<br/>(skipped without bins)"]
     BIN_CONTIG_TABLE --> BEDTOOLS_BIN_DEPTH["BEDTOOLS_BIN_DEPTH<br/>each sample's BAM<br/>over each bin"]
-    BEDTOOLS_BIN_DEPTH --> BIN_SUMMARY
+    BEDTOOLS_BIN_DEPTH -->|coassembly| BIN_SUMMARY
+    GTDB_TK_BATCH -->|coassembly| BIN_SUMMARY
+    Quality -->|"coassembly<br/>(refined bins' reports)"| BIN_SUMMARY
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
@@ -387,7 +392,7 @@ flowchart TD
     Prot -->|"contig_level_functional and<br/>functional_cazy (default)"| RUN_DBCAN["RUN_DBCAN<br/>run_dbcan v5 CAZy"]
     BAMs(["counting_bam"]) --> FEATURECOUNTS_GENES
     Prot -->|"GFF; coassembly: one GFF<br/>for every sample"| FEATURECOUNTS_GENES
-    MC(["MICROBECENSUS AGS<br/>(optional, non-fatal)"]) --> AGGREGATE_FUNCTIONS
+    Ags(["MICROBECENSUS AGS<br/>(optional, non-fatal)"]) --> AGGREGATE_FUNCTIONS
     EGGNOG_MAPPER_ANNOTATE & RUN_DBCAN & FEATURECOUNTS_GENES --> AGGREGATE_FUNCTIONS["AGGREGATE_FUNCTIONS<br/>TPM + CPGE tables<br/>(KO, COG, EC, Pfam, CAZy)"]
 
     Bins(["refined bins"]) -->|"mag_level_functional<br/>(include_binning, ≥ 2 binners)"| BAKTA_BAKTA["BAKTA_BAKTA<br/>one task per bin"]
@@ -408,7 +413,7 @@ flowchart TD
     B -->|superfocus| SUPERFOCUS["SUPERFOCUS<br/>DIAMOND or MMseqs2 vs DB_90<br/>SEED levels 1-3"]
     B -->|humann| HUMANN["HUMANN<br/>HUMAnN 4.0.0a2 + MetaPhlAn 4.1.2<br/>KO, EC, MetaCyc (RPK)"]
     WOLTKA_CLASSIFY & SUPERFOCUS & HUMANN --> AGGREGATE_READ_FUNCTIONS["AGGREGATE_READ_FUNCTIONS<br/>read_* tables, source = reads"]
-    MC(["MICROBECENSUS AGS<br/>(CPGE for woltka, humann)"]) --> AGGREGATE_READ_FUNCTIONS
+    Ags(["MICROBECENSUS AGS<br/>(CPGE for woltka, humann)"]) --> AGGREGATE_READ_FUNCTIONS
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class WOLTKA_ALIGN,WOLTKA_CLASSIFY,SUPERFOCUS,HUMANN,AGGREGATE_READ_FUNCTIONS opt
@@ -418,8 +423,8 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    V1(["versions.yml files<br/>(local modules)"]) --> SOFTWARE_VERSIONS
-    V2(["channel.topic('versions')<br/>(current nf-core modules)"]) --> SOFTWARE_VERSIONS["SOFTWARE_VERSIONS<br/>pipeline_info/software_versions.yml"]
+    VersionFiles(["versions.yml files<br/>(local modules)"]) --> SOFTWARE_VERSIONS
+    VersionTopic(["channel.topic('versions')<br/>(current nf-core modules)"]) --> SOFTWARE_VERSIONS["SOFTWARE_VERSIONS<br/>pipeline_info/software_versions.yml"]
 
     SOFTWARE_VERSIONS --> RESULTS_SUMMARY
     QCin(["Reads_report.csv (taxonomy's copy with a profiler)<br/>+ fastp JSON"]) --> RESULTS_SUMMARY
