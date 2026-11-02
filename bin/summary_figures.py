@@ -16,6 +16,7 @@ from matplotlib.colors import ListedColormap  # noqa: E402
 from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
+from summary_args import METHOD_LABELS  # noqa: E402
 from summary_common import NA_NOT_RUN, strip_gtdb  # noqa: E402
 from summary_taxonomy import genus_rank, species_rank  # noqa: E402
 
@@ -445,7 +446,6 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
 
 
 TIER_COLORS = {1: "#D55E00", 2: "#E69F00", 3: "#56B4E9", 4: "#9A9A9A"}
-METHOD_NAMES = {"kmarvel": "K-MARVEL", "rgi": "RGI"}
 
 
 def fig_method_upset(fw, comp, gene_sets, methods):
@@ -457,7 +457,7 @@ def fig_method_upset(fw, comp, gene_sets, methods):
     for g, ms in gene_sets.items():
         inter.setdefault(ms, []).append(g)
     combos = sorted(inter, key=lambda c: (-len(inter[c]), -len(c)))
-    names = [METHOD_NAMES.get(m, m) for m in methods]
+    names = [METHOD_LABELS.get(m, m) for m in methods]
     nc = len(combos)
     fig = plt.figure(figsize=fs.figsize("single", 55 + 4 * len(methods)), layout="constrained")
     gs = fig.add_gridspec(2, 2, width_ratios=[1, max(1.6, 0.7 * nc)], height_ratios=[3, 0.3 * len(methods) + 0.2])
@@ -469,7 +469,7 @@ def fig_method_upset(fw, comp, gene_sets, methods):
     for t in (1, 2, 3, 4):
         h = np.array([sum(1 for g in inter[c] if tier.get(g) == t) for c in combos])
         for c, v in zip(combos, h):
-            rows.append({"methods": " + ".join(METHOD_NAMES.get(m, m) for m in methods if m in c), "tier": t,
+            rows.append({"methods": " + ".join(METHOD_LABELS.get(m, m) for m in methods if m in c), "tier": t,
                          "genes": int(v)})
         if h.any():
             bar.bar(range(nc), h, bottom=bottom, color=TIER_COLORS[t], width=0.6, label=f"tier {t}", lw=0)
@@ -520,15 +520,15 @@ def fig_method_by_category(fw, comp, methods):
     flags["below"] = comp.groupby("gene")["rgi_below_cutoff"].any() if "rgi_below_cutoff" in comp else False
     flags["label"] = "T" + flags["tier"].astype(str) + " " + flags["category"]
     allm = flags[methods].all(axis=1)
-    parts = [(" + ".join(METHOD_NAMES.get(m, m) for m in methods), allm, "#333333", None)]
+    parts = [(" + ".join(METHOD_LABELS.get(m, m) for m in methods), allm, "#333333", None)]
     colors = [fs.CATEGORY[0], fs.CATEGORY[1], fs.CATEGORY[2], fs.CATEGORY[3]]
     for i, m in enumerate(methods):
         only = flags[m] & ~flags[[x for x in methods if x != m]].any(axis=1)
         if m == "kmarvel" and "rgi" in methods:
-            parts.append((f"{METHOD_NAMES[m]} only, RGI below cutoff", only & flags["below"], colors[i], "////"))
-            parts.append((f"{METHOD_NAMES[m]} only, RGI no reads", only & ~flags["below"], colors[i], None))
+            parts.append((f"{METHOD_LABELS[m]} only, RGI below cutoff", only & flags["below"], colors[i], "////"))
+            parts.append((f"{METHOD_LABELS[m]} only, RGI no reads", only & ~flags["below"], colors[i], None))
         else:
-            parts.append((f"{METHOD_NAMES.get(m, m)} only", only, colors[i], None))
+            parts.append((f"{METHOD_LABELS.get(m, m)} only", only, colors[i], None))
     cats = flags.groupby("label").agg(tier=("tier", "first"), n=("tier", "size"))
     cats = cats.sort_values(["tier", "n"], ascending=[True, False])
     labels = list(cats.index)

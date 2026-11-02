@@ -12,8 +12,8 @@
 #   - and the happy paths still produce their real outputs,
 #   - bin/arg_contig_level_report.py writes a real TSV, and bin/arg_blobplot.py
 #     plots only the ARG-carrying contigs (contigs without an ARG were "Other"),
-#   - bin/blobplot.py and bin/arg_blobplot.py pickle their figure without
-#     error (design doc T9 finding: lambda tick formatters broke pickle.dump).
+#   - bin/blobplot.py and bin/arg_blobplot.py write one figure per assembly
+#     (an assembly with no contigs gets a placeholder, the others still plot).
 #
 # The scripts run inside the same pinned images the report processes use.
 #
@@ -445,8 +445,13 @@ RUN_IMG="${REPORT_IMG}"
 BP_WORK="${WORK}/blobplot"
 mkdir -p "${BP_WORK}"
 cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" "${BP_WORK}/"
+# an assembly whose table has its header and no contig
+head -n 11 "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+    > "${BP_WORK}/empty_asm_Blob_table.empty_asm.blobDB.table.txt"
 NEXT_WORKDIR="${BP_WORK}"
 expect_pass "blobplot: real BlobTools table plotted" blobplot.py
+check_grep "blobplot: an assembly with no contigs gets a placeholder" "../blobplot.log" "empty_asm_Phylum_blob_plot: no contigs"
+check_file "blobplot: empty_asm_Phylum_blob_plot.pdf written" "empty_asm_Phylum_blob_plot.pdf"
 for ext in pdf svg png csv; do
     check_file "blobplot: test_sample2_Phylum_blob_plot.${ext} written" "test_sample2_Phylum_blob_plot.${ext}"
 done

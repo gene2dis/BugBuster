@@ -89,6 +89,10 @@ def main():
     for path in files:
         assembly = Path(path).name.split("_Blob_table")[0]
         data, order = label_phyla(read_blob_table(path))
+        if data.empty:
+            fs.placeholder(".", f"{assembly}_Phylum_blob_plot", f"{assembly}: no contigs in the BlobTools table")
+            print(f"{assembly}_Phylum_blob_plot: no contigs")
+            continue
         span = data.groupby("group")["length_bp"].sum()
         share = (span / span.sum() * 100).to_dict()
         fig = blob_figure(data, order, "phylum", "% of contig length", share)

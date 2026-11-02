@@ -885,9 +885,10 @@ def main(argv=None):
     model = summary_report.build(ctx, args.report_assets)
     pdf = None if args.no_pdf else write_pdf(outdir, model, args.report_assets, figs.dir)
     ctx["pdf_written"] = model["run"]["pdf"] = pdf is not None
-    stale = outdir / "results_summary.pdf"
-    if pdf is None and stale.exists():
-        stale.unlink()  # an earlier run's PDF in a reused output directory would not match these tables
+    # an earlier run's files in a reused output directory would not match these tables (README.docx is retired)
+    for stale in ([] if pdf else [outdir / "results_summary.pdf"]) + [outdir / "README.docx"]:
+        if stale.exists():
+            stale.unlink()
     write_site(outdir, model, args.report_assets)
     write_docs(outdir, ctx)
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")

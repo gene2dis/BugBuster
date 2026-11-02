@@ -5,6 +5,7 @@ sortable and filterable (assets/report/static/tables.js, no library); the large 
 SVG / PDF / PNG and its CSV in ../figures/. Nothing is loaded from the network, so the site works from file://.
 <outdir>/results_summary.html sends the browser to report/index.html."""
 
+import html as htmlmod
 import shutil
 import time
 from pathlib import Path
@@ -54,6 +55,6 @@ def write_site(outdir, model, assets):
         html = env.get_template(f"{sec['id']}.html").render(run=model["run"], s=sec, nav=nav, specs=specs,
                                                             bundle=bundle, sections=model["sections"])
         (site / sec["page"]).write_text(html)
-    (outdir / "results_summary.html").write_text(REDIRECT.format(title=model["run"]["title"]))
+    (outdir / "results_summary.html").write_text(REDIRECT.format(title=htmlmod.escape(model["run"]["title"])))
     print(f"report/ written: {len(model['sections'])} pages ({time.time() - t0:.1f} s)")
     return site

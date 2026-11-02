@@ -14,6 +14,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from summary_args import METHOD_LABELS
 from summary_common import NA_LOW_DEPTH, die, generated_date, warn
 from summary_docs import TIER_MEANING, table_doc, tier_categories
 from summary_figures import short_count
@@ -397,7 +398,7 @@ def build(ctx, assets):
         for k in ("arg_priority_heatmap", "arg_drug_class_heatmap", "arg_vs_depth"):
             ar.fig(k)
         al = t["arg_long"][0]
-        al = al[al["method"].map(lambda m: {"kmarvel": "K-MARVEL", "rgi": "RGI"}.get(m, m)) == primary]
+        al = al[al["method"].map(lambda m: METHOD_LABELS.get(m, m)) == primary]
         t1 = ctx.get("tier1_view")
         if t1 is not None and not t1.empty:
             ar.table("tier1", t1, "arg_long", "Tier 1 (clinical priority) calls with the other method's evidence. "
@@ -424,7 +425,7 @@ def build(ctx, assets):
     if comp is not None:
         co = Section("compare", nums, records)
         co.facts = {"rgi_cov": f"{ctx['rgi_min_coverage']:g}",
-                    "methods": " + ".join({"kmarvel": "K-MARVEL", "rgi": "RGI"}.get(m, m) for m in comp["methods"])}
+                    "methods": " + ".join(METHOD_LABELS.get(m, m) for m in comp["methods"])}
         co.fig("arg_method_upset")
         co.fig("arg_method_by_category")
         co.table("overlap", comp["overlap"], "arg_method_overlap", "Distinct genes by the methods that found them.")

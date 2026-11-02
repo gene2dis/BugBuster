@@ -15,6 +15,17 @@ from summary_common import warn
 FONT_FACES = ("Regular", "Bold", "Italic", "BoldItalic", "Medium", "SemiBold")
 
 
+def pdf_view(model):
+    """The model without what only the HTML reads: figures' interactive data and the tables' HTML rows (the PDF
+    reads its own capped rows, t["pdf"])."""
+    secs = []
+    for sec in model["sections"]:
+        figs = {k: {a: v for a, v in f.items() if a != "interactive"} for k, f in sec["figures"].items()}
+        tabs = {k: ({a: v for a, v in t.items() if a != "rows"} if t else t) for k, t in sec["tables"].items()}
+        secs.append({**sec, "figures": figs, "tables": tabs})
+    return {**model, "sections": secs}
+
+
 def write_pdf(outdir, model, assets, fig_dir, keep_build=None):
     """Compile <outdir>/results_summary.pdf; returns its path, or None (with a warning) when typst is missing or
     fails, so the rest of the summary is still written."""
@@ -37,14 +48,7 @@ def write_pdf(outdir, model, assets, fig_dir, keep_build=None):
             shutil.copy(Path(fig_dir) / f"{key}.svg", build / "figures" / f"{key}.svg")
     methods = next((s for s in model["sections"] if s["id"] == "methods"), None)
     (build / "references.bib").write_text(methods["facts"].get("bibtex", "") if methods else "")
-    data = json.loads(json.dumps(model, default=str))
-    for sec in data["sections"]:
-        for f in sec["figures"].values():
-            f.pop("interactive", None)  # the HTML's data, not the PDF's
-        for t in sec["tables"].values():
-            if t:
-                t.pop("rows", None)  # the PDF reads its own capped rows (t["pdf"])
-    (build / "data.json").write_text(json.dumps(data))
+    (build / "data.json").write_text(json.dumps(pdf_view(model), default=str))
     out = Path(outdir).resolve() / "results_summary.pdf"
     t0 = time.time()
     env = dict(os.environ)

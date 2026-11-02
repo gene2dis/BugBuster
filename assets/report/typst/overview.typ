@@ -13,7 +13,12 @@ This summary covers #f.n_samples samples from #f.n_batches results director#if f
   ]
 ]
 
-#datatable(s, "stages", widths: (30%,) + (12%,) * (s.tables.stages.pdf.header.len() - 2) + (1fr,))
+// stage, one column per results directory (sharing at most 48 %), what the summary takes; capped tables lose the last
+#let sh = s.tables.stages.pdf.header
+#let nb = sh.len() - 2
+#datatable(s, "stages", widths: if sh.last() == "In this summary" {
+  (24%,) + (calc.min(12%, 48% / nb),) * nb + (1fr,)
+} else { auto })
 
 == Samples and sequencing depth
 #f.n_low of #f.n_samples samples have fewer than #f.min_pairs clean read pairs#if f.n_low > 0 [ (#f.low_samples)]#[;] a gene or taxon missing from a low-depth sample is unknown, not absent (#figref(s, "qc_read_fate"), #tabref(s, "samples")).

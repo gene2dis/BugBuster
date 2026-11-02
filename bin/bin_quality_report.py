@@ -134,10 +134,12 @@ def main():
         for quality in ['Low', 'Mid', 'High']:
             subset = data_subset[data_subset['Quality classify'] == quality]
             if len(subset) > 0:
+                # a bin without a contamination value is not drawn (and not taken as contaminated)
                 inside = subset['Contamination'] <= xmax
+                above = subset['Contamination'] > xmax
                 ax.scatter(subset.loc[inside, 'Contamination'], subset.loc[inside, 'Completeness'],
                            color=colors[quality], s=6, lw=0, alpha=0.8)
-                ax.scatter([xmax] * int((~inside).sum()), subset.loc[~inside, 'Completeness'], marker='>',
+                ax.scatter([xmax] * int(above.sum()), subset.loc[above, 'Completeness'], marker='>',
                            color=colors[quality], s=10, lw=0, clip_on=False)
         ax.axvline(x=5, color='#555555', linestyle=':', linewidth=0.5, zorder=0)
         for y in (50, 90):
