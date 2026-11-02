@@ -11,8 +11,8 @@ process BIN_QUALITY_REPORT {
     path(reports)
 
     output:
-    path("*.png")      , emit: plots
-    path("*.csv")      , emit: tables
+    path("Total_bins_quality_plot.{pdf,svg,png,csv}"), emit: plots   // the figure, with its plotted values
+    path("{Mag_quality_summary,All_Mag_quality_table,Refined_Mag_quality_table}.csv"), emit: tables
     path "versions.yml", emit: versions
 
     when:
@@ -20,6 +20,7 @@ process BIN_QUALITY_REPORT {
 
     script:
     """
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     bin_quality_report.py
     
     cat <<-END_VERSIONS > versions.yml
@@ -32,8 +33,10 @@ process BIN_QUALITY_REPORT {
 
     stub:
     """
-    touch bin_quality_report.png
-    touch bin_quality_report.csv
+    touch Total_bins_quality_plot.pdf Total_bins_quality_plot.svg Total_bins_quality_plot.png Total_bins_quality_plot.csv
+    touch Mag_quality_summary.csv
+    touch All_Mag_quality_table.csv
+    touch Refined_Mag_quality_table.csv
     touch versions.yml
     """
 }

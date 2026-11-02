@@ -27,12 +27,12 @@ input:
 output:
   - plots:
       type: file
-      description: Completeness vs contamination scatter plot, raw and refined (Binette) panels (Total_bins_quality_plot.png)
-      pattern: "*.png"
+      description: Completeness vs contamination scatter plot, raw and refined (Binette) panels, Total_bins_quality_plot.pdf / .svg / .png (600 dpi) with its plotted values as .csv
+      pattern: "Total_bins_quality_plot.{pdf,svg,png,csv}"
   - tables:
       type: file
       description: Bin counts per binner and quality class (Mag_quality_summary.csv), all bins (All_Mag_quality_table.csv) and Binette-refined bins only (Refined_Mag_quality_table.csv)
-      pattern: "*.csv"
+      pattern: "{Mag_quality_summary,All_Mag_quality_table,Refined_Mag_quality_table}.csv"
   - versions:
       type: file
       description: Software versions

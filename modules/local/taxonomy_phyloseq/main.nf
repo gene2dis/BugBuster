@@ -20,7 +20,7 @@ process TAXONOMY_PHYLOSEQ {
     path("*_sample_metadata.tsv"), emit: sample_metadata
     path("*_phyloseq_data.h5"), emit: phyloseq_h5, optional: true
     path("*_read_counts.tsv"), emit: read_counts, optional: true  // sylph: estimated read pairs per genome
-    path("*.png"), emit: plots, optional: true
+    path("*_bar.{pdf,svg,png,csv}"), emit: plots, optional: true  // with their plotted values
     path("versions.yml"), emit: versions
     
     when:
@@ -32,6 +32,7 @@ process TAXONOMY_PHYLOSEQ {
     def top_n_arg = top_n ?: 10
     def format_arg = task.ext.format ?: 'both'
     """
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     taxonomy_phyloseq.py \\
         --profiler ${profiler} \\
         --input-files ${input_files} \\

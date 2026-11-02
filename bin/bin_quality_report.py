@@ -5,13 +5,19 @@ Creates scatter plots and summary tables for bin quality assessment.
 Python migration of Bin_checkm_general_plot.R
 """
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend
 import glob
 import sys
-import numpy as np
+from pathlib import Path
+
+import pandas as pd
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import figure_style as fs  # noqa: E402
+
+fs.setup()
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.lines import Line2D  # noqa: E402
 
 
 # Columns of Mag_quality_summary.csv and of the two per-MAG tables
@@ -76,13 +82,8 @@ def main():
         pd.DataFrame(columns=SUMMARY_COLUMNS).to_csv('Mag_quality_summary.csv', index=False)
         pd.DataFrame(columns=TABLE_COLUMNS).to_csv('All_Mag_quality_table.csv', index=False)
         pd.DataFrame(columns=TABLE_COLUMNS).to_csv('Refined_Mag_quality_table.csv', index=False)
-        fig, ax = plt.subplots(figsize=(16, 8))
-        ax.text(0.5, 0.5, 'No bins were assessed', ha='center', va='center', fontsize=25)
-        ax.axis('off')
-        fig.patch.set_facecolor('white')
-        plt.savefig('Total_bins_quality_plot.png', dpi=100, bbox_inches='tight', facecolor='white')
-        plt.close()
-        print("Generated empty quality tables and a placeholder Total_bins_quality_plot.png")
+        fs.placeholder('.', 'Total_bins_quality_plot', 'No bins were assessed')
+        print("Generated empty quality tables and a placeholder Total_bins_quality_plot")
         return
     
     # Combine all reports
@@ -119,76 +120,55 @@ def main():
     
     refined_data = all_data[all_data['Binner'] == 'Binette'].copy()
     
-    # Create the plot
-    fig, axes = plt.subplots(1, 2, figsize=(16, 8), sharey=True)
-    
-    # Define colors
-    colors = {'Low': '#d16678', 'Mid': '#6baed6', 'High': '#78b33e'}
-    
-    # Plot for each bin type
-    for idx, bin_type in enumerate(['Raw MAGs', 'Refined MAGs']):
-        ax = axes[idx]
+    # The plot: CheckM2 completeness against contamination, raw and refined bins side by side
+    fig, axes = plt.subplots(1, 2, figsize=fs.figsize('single', 62), sharey=True, layout='constrained')
+    colors = {'Low': '#9A9A9A', 'Mid': fs.CATEGORY[1], 'High': fs.CATEGORY[2]}
+    # a few very contaminated bins would squeeze every other bin against the axis: above 25 % they are drawn
+    # at the edge as triangles
+    worst = float(quality_data['Contamination'].max())
+    xmax = 25.0 if worst > 25 else max(10.0, worst * 1.05)
+    for ax, bin_type in zip(axes, ['Raw MAGs', 'Refined MAGs']):
         data_subset = quality_data[quality_data['Bin_type'] == bin_type]
-        
         if len(data_subset) == 0:
-            ax.text(0.5, 0.5, f'No {bin_type}', ha='center', va='center', fontsize=20)
-            ax.set_xlim(0, 20)
-            ax.set_ylim(0, 100)
-        else:
-            # Plot points for each quality class
-            for quality in ['Low', 'Mid', 'High']:
-                subset = data_subset[data_subset['Quality classify'] == quality]
-                if len(subset) > 0:
-                    ax.scatter(subset['Contamination'], subset['Completeness'],
-                             c=colors[quality], s=100, alpha=0.5, label=quality)
-            
-            # Add reference lines
-            ax.axvline(x=5, color='black', linestyle='--', linewidth=0.8)
-            ax.axhline(y=90, color='black', linestyle='--', linewidth=0.8)
-            ax.axhline(y=50, color='black', linestyle='--', linewidth=0.8)
-        
-        # Set labels and limits
-        ax.set_xlabel('Contamination', fontsize=18)
-        if idx == 0:
-            ax.set_ylabel('Completeness', fontsize=18)
-        ax.set_xlim(0, 20)
-        ax.set_ylim(0, 100)
-        ax.set_title(bin_type, fontsize=20, pad=10, 
-                    bbox=dict(boxstyle='round', facecolor='#CDDEFF', alpha=0.5))
-        
-        # Format axes
-        ax.tick_params(axis='both', labelsize=18)
-        ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda y, _: f'{int(y)}%'))
-        ax.xaxis.set_major_formatter(plt.FuncFormatter(lambda x, _: f'{int(x)}%'))
-        ax.grid(True, alpha=0.3)
-    
-    # Create legend
-    legend_labels = [
-        'Low\n(Completeness < 50% or Contamination > 5%)',
-        'Mid\n(Completeness ≥ 50% < 90%, Contamination ≤ 5%)',
-        'High\n(Completeness ≥ 90%, Contamination ≤ 5%)'
-    ]
-    handles = [plt.Line2D([0], [0], marker='o', color='w', 
-                         markerfacecolor=colors[q], markersize=15, alpha=0.5)
-              for q in ['Low', 'Mid', 'High']]
-    
-    fig.legend(handles, legend_labels, loc='upper right', 
-              fontsize=18, title='Quality classification',
-              title_fontsize=18, frameon=True, bbox_to_anchor=(0.98, 0.98))
-    
-    plt.tight_layout()
-    plt.savefig('Total_bins_quality_plot.png', dpi=300, bbox_inches='tight')
-    plt.close()
-    
-    print("Successfully generated Total_bins_quality_plot.png")
-    
-    
+            ax.text(0.5, 0.5, f'No {bin_type.lower()}', ha='center', va='center', transform=ax.transAxes)
+        for quality in ['Low', 'Mid', 'High']:
+            subset = data_subset[data_subset['Quality classify'] == quality]
+            if len(subset) > 0:
+                inside = subset['Contamination'] <= xmax
+                ax.scatter(subset.loc[inside, 'Contamination'], subset.loc[inside, 'Completeness'],
+                           color=colors[quality], s=6, lw=0, alpha=0.8)
+                ax.scatter([xmax] * int((~inside).sum()), subset.loc[~inside, 'Completeness'], marker='>',
+                           color=colors[quality], s=10, lw=0, clip_on=False)
+        ax.axvline(x=5, color='#555555', linestyle=':', linewidth=0.5, zorder=0)
+        for y in (50, 90):
+            ax.axhline(y=y, color='#555555', linestyle=':', linewidth=0.5, zorder=0)
+        ax.set_xlim(0, xmax)
+        ax.set_ylim(0, 101)
+        ax.set_xlabel('contamination (%)')
+        ax.set_title(f'{bin_type.split()[0].lower()} bins ({len(data_subset)})', fontsize=fs.BASE_PT,
+                     fontweight='normal')
+    axes[0].set_ylabel('completeness (%)')
+    legend_labels = ['High (completeness >= 90 %, contamination <= 5 %)',
+                     'Mid (completeness 50-90 %, contamination <= 5 %)',
+                     'Low (completeness < 50 % or contamination > 5 %)']
+    handles = [Line2D([], [], ls='', marker='o', markersize=3, color=colors[q], label=lab)
+               for q, lab in zip(['High', 'Mid', 'Low'], legend_labels)]
+    if worst > xmax:
+        handles.append(Line2D([], [], ls='', marker='>', markersize=3, color='#555555',
+                              label='contamination above 25 % (at the edge)'))
+    fig.legend(handles=handles, title='Quality class (not MIMAG)', loc='outside lower left', ncol=1,
+               alignment='left')
+    source = quality_data.rename(columns={'Name': 'Bin name'})[
+        ['Sample', 'Binner', 'Bin name', 'Bin_type', 'Quality classify', 'Completeness', 'Contamination']]
+    fs.save(fig, '.', 'Total_bins_quality_plot', source)
+    print("Successfully generated Total_bins_quality_plot")
+
     # Write output files
     mag_summary.to_csv('Mag_quality_summary.csv', index=False)
     all_data.to_csv('All_Mag_quality_table.csv', index=False)
     refined_data.to_csv('Refined_Mag_quality_table.csv', index=False)
     
-    print(f"Successfully generated quality reports:")
+    print("Successfully generated quality reports:")
     print(f"  - Mag_quality_summary.csv ({len(mag_summary)} rows)")
     print(f"  - All_Mag_quality_table.csv ({len(all_data)} MAGs)")
     print(f"  - Refined_Mag_quality_table.csv ({len(refined_data)} refined MAGs)")

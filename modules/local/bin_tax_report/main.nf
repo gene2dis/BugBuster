@@ -11,8 +11,8 @@ process BIN_TAX_REPORT {
     path(gtdbtk_tax)
 
     output:
-    path("*.png")      , emit: gtdb_tax
-    path("*.csv")      , emit: mag_report
+    path("MAGs_tax_plot.{pdf,svg,png,csv}"), emit: gtdb_tax   // the figure, with its plotted values
+    path("MAGs_tax_summary.csv"), emit: mag_report
     path "versions.yml", emit: versions
 
     when:
@@ -20,6 +20,7 @@ process BIN_TAX_REPORT {
 
     script:
     """
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     bin_tax_report.py
     
     cat <<-END_VERSIONS > versions.yml
@@ -32,8 +33,8 @@ process BIN_TAX_REPORT {
 
     stub:
     """
-    touch bin_tax_report.png
-    touch bin_tax_report.csv
+    touch MAGs_tax_plot.pdf MAGs_tax_plot.svg MAGs_tax_plot.png MAGs_tax_plot.csv
+    touch MAGs_tax_summary.csv
     touch versions.yml
     """
 }

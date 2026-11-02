@@ -23,22 +23,18 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import pandas as pd
 import h5py
-import matplotlib.pyplot as plt
-import seaborn as sns
-from matplotlib import rcParams
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import re
 
-# natural_key is shared with bin/results_summary.py (bin/summary_common.py)
+# natural_key is shared with bin/results_summary.py (bin/summary_common.py); the figure style with every
+# BugBuster figure (bin/figure_style.py)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from summary_common import natural_key  # noqa: E402
+import figure_style as fs  # noqa: E402
 
-
-# Set matplotlib parameters
-rcParams['font.size'] = 20
-rcParams['axes.linewidth'] = 1.5
-rcParams['figure.dpi'] = 300
+fs.setup()
+import matplotlib.pyplot as plt  # noqa: E402
 
 PROFILERS = ['kraken2', 'sourmash', 'sylph']
 
@@ -548,70 +544,44 @@ class PhyloseqTableGenerator:
             
             top_taxa = self.select_plot_taxa(rel_abundance)
             
-            # Samples top to bottom in natural order (V2 before V10)
-            samples = sorted(rel_abundance.columns, key=natural_key, reverse=True)
+            # Samples top to bottom in natural order (V2 before V10); height and labels follow the sample count
+            samples = sorted(rel_abundance.columns, key=natural_key)
             plot_data = rel_abundance.loc[top_taxa, samples]
-            
-            # Add "Other" category
             other = rel_abundance.loc[~rel_abundance.index.isin(top_taxa), samples].sum(axis=0)
             plot_data.loc['Other'] = other
-            
-            # Create plot; height and label size follow the number of samples
             n_samples = len(samples)
-            fig, ax = plt.subplots(figsize=(16, max(6, 0.3 * n_samples + 2)))
-            
-            # Generate color palette; "Other" is grey
-            palette = "tab10" if len(top_taxa) <= 10 else "tab20"
-            colors = sns.color_palette(palette, len(top_taxa)) + [(0.8, 0.8, 0.8)]
-            
-            # Create stacked bar plot
-            plot_data.T.plot(
-                kind='barh',
-                stacked=True,
-                ax=ax,
-                color=colors,
-                edgecolor='black',
-                linewidth=0.5,
-                width=0.9
-            )
-            
-            # Customize plot
-            ax.set_xlabel('Relative Abundance (%)', fontsize=20)
-            ax.set_ylabel('Samples', fontsize=20)
-            ax.set_title(
-                f'Relative Abundance {tax_level} Plot from {self.db_name.upper()}',
-                fontsize=22,
-                pad=20
-            )
-            
-            # Format x-axis
+            lay = fs.sample_layout(n_samples)
+            names = list(plot_data.index)
+            pal = fs.category_colors(names)
+            n_leg_rows = -(-len(names) // 3)
+            fig, ax = plt.subplots(figsize=fs.figsize(fs.width_class(n_samples),
+                                                      n_samples * lay['cell_mm'] + 20 + 3.2 * n_leg_rows),
+                                   layout='constrained')
+            y = range(n_samples)
+            left = [0.0] * n_samples
+            for taxon in names:
+                vals = plot_data.loc[taxon].values
+                ax.barh(y, vals, left=left, color=pal[taxon], height=0.85, lw=0, label=taxon)
+                left = [a + b for a, b in zip(left, vals)]
+            fs.sample_ticks(ax, samples, set(), 'y', lay['fs'])
+            ax.tick_params(axis='y', length=0)
+            ax.set_ylim(n_samples - 0.5, -0.5)
             ax.set_xlim(0, 100)
-            ax.tick_params(axis='x', labelsize=18)
-            ax.tick_params(axis='y', labelsize=max(6, min(18, 500 / max(n_samples, 1))))
-            
-            # Legend
-            ax.legend(
-                bbox_to_anchor=(1.05, 1),
-                loc='upper left',
-                fontsize=12,
-                frameon=True
-            )
-            
-            # Style
-            ax.spines['top'].set_visible(False)
-            ax.spines['right'].set_visible(False)
-            ax.grid(False)
-            
-            plt.tight_layout()
-            
-            # Save plot
-            plot_path = self.output_dir / f"{self.profiler}_{self.db_name}_{tax_level.lower()}_bar.png"
-            plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-            plt.close()
-            
-            print(f"Created {tax_level} abundance plot: {plot_path}")
+            ax.set_xlabel(f'relative abundance (%), {tax_level.lower()}')
+            leg = fig.legend(loc='outside lower center', ncol=3, handlelength=1.0, handleheight=0.8,
+                             columnspacing=0.8, title=f'{tax_level} ({self.db_name})')
+            if tax_level.lower() in ('genus', 'species'):
+                for t in leg.get_texts():
+                    if t.get_text() != 'Other':
+                        t.set_fontstyle('italic')
+            key = f"{self.profiler}_{self.db_name}_{tax_level.lower()}_bar"
+            source = plot_data.rename_axis(tax_level.lower()).reset_index().melt(
+                id_vars=tax_level.lower(), var_name='sample', value_name='relative_abundance_pct')
+            fs.save(fig, self.output_dir, key, source)
+            plot_path = self.output_dir / f"{key}.png"
+            print(f"Created {tax_level} abundance plot: {key}.pdf / .svg / .png")
             return plot_path
-            
+
         except Exception as e:
             print(f"Warning: Failed to create {tax_level} plot: {e}", file=sys.stderr)
             return None

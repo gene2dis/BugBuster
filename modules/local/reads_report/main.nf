@@ -14,11 +14,12 @@ process READS_REPORT {
 
     output:
         path("Reads_report.csv"), emit: report
-        path("Box_plot_reads.png"), emit: plot, optional: true
+        path("Box_plot_reads.{pdf,svg,png,csv}"), emit: plot, optional: true  // with its plotted values
         path "versions.yml", emit: versions
 
     script:
         """
+        export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
         report_unify.py ${args}
 
         cat <<-END_VERSIONS > versions.yml
@@ -31,7 +32,7 @@ process READS_REPORT {
     stub:
         """
         touch Reads_report.csv
-        touch Box_plot_reads.png
+        touch Box_plot_reads.pdf Box_plot_reads.svg Box_plot_reads.png Box_plot_reads.csv
 
         cat <<-END_VERSIONS > versions.yml
         "${task.process}":

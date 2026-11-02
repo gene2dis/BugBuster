@@ -43,9 +43,10 @@ nextflow_process {
             assert lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed)"
             assert lines[1] == "s1,1000,900,850"
 
-            // filtered mode also draws the boxplot
+            // filtered mode also draws the boxplot: PDF, SVG, PNG and its plotted values
             assert process.out.plot.size() == 1
-            assert file(process.out.plot.get(0)).name == "Box_plot_reads.png"
+            assert process.out.plot.get(0).collect { f -> file(f).name }.sort() ==
+                ["Box_plot_reads.csv", "Box_plot_reads.pdf", "Box_plot_reads.png", "Box_plot_reads.svg"]
         }
     }
 

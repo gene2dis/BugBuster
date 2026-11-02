@@ -1,5 +1,5 @@
 name: blobplot
-description: Multi-panel phylum blob plot (contig GC vs coverage, coloured by phylum) across all samples from the BlobTools tables, drawn by bin/blobplot.py
+description: Phylum blob plot per assembly (contig GC vs coverage, coloured by phylum, and each phylum's share of the contig length) from the BlobTools tables, drawn by bin/blobplot.py in the shared figure style (bin/figure_style.py)
 keywords:
   - blob plot
   - contig taxonomy
@@ -12,7 +12,7 @@ tools:
       documentation: https://pandas.pydata.org/docs/
       licence: ["BSD-3-Clause"]
   - matplotlib:
-      description: Python plotting library used by bin/blobplot.py to draw and pickle the figure
+      description: Python plotting library used by bin/blobplot.py to draw the figures
       homepage: https://matplotlib.org
       documentation: https://matplotlib.org/stable/
 
@@ -25,12 +25,8 @@ input:
 output:
   - plots:
       type: file
-      description: Phylum blob plot (Phylum_blob_plot.png, 300 dpi)
-      pattern: "*.png"
-  - pickle:
-      type: file
-      description: Pickled matplotlib figure of the same plot (Phylum_final_blobplot.pkl)
-      pattern: "*.pkl"
+      description: One figure per assembly, <assembly>_Phylum_blob_plot.pdf / .svg / .png (600 dpi), with its plotted values as .csv
+      pattern: "*_Phylum_blob_plot.{pdf,svg,png,csv}"
   - versions:
       type: file
       description: Software versions (python, pandas, matplotlib)

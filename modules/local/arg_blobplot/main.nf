@@ -11,8 +11,7 @@ process ARG_BLOBPLOT {
     path(arg_contig_data)
 
     output:
-    path("*.png")      , emit: plots
-    path("*.pkl")      , emit: pickle
+    path("*_ARG_blob_plot.{pdf,svg,png,csv}"), emit: plots   // one figure per assembly, with its plotted values
     path "versions.yml", emit: versions
 
     when:
@@ -20,6 +19,7 @@ process ARG_BLOBPLOT {
 
     script:
     """
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     arg_blobplot.py
     
     cat <<-END_VERSIONS > versions.yml
@@ -32,8 +32,15 @@ process ARG_BLOBPLOT {
 
     stub:
     """
-    touch arg_blobplot.png
-    touch arg_blobplot_data.pkl
-    touch versions.yml
+    for ext in pdf svg png csv; do
+        touch stub_ARG_blob_plot.\$ext
+    done
+
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+        matplotlib: 3.11.2
+    END_VERSIONS
     """
 }

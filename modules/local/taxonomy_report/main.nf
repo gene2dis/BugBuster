@@ -18,7 +18,7 @@ process TAXONOMY_REPORT {
     
     output:
     path("Reads_report.csv"), emit: report
-    path("*.png"), emit: plots, optional: true
+    path("{Kraken_plot,sourmash_tax_classified_reads,sylph_tax_classified_reads}.{pdf,svg,png,csv}"), emit: plots, optional: true
     path("versions.yml"), emit: versions
     
     when:
@@ -27,6 +27,7 @@ process TAXONOMY_REPORT {
     script:
     def args = task.ext.args ?: ''
     """
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     taxonomy_report.py \\
         --profiler ${profiler} \\
         --reports ${reports} \\

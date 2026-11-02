@@ -10,13 +10,20 @@ Migrated to Python for QC subworkflow simplification.
 
 import sys
 import glob
-import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib.ticker import FuncFormatter, MaxNLocator
-import seaborn as sns
-import numpy as np
-from pathlib import Path
 import warnings
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import figure_style as fs  # noqa: E402
+
+fs.setup()
+import matplotlib.pyplot as plt  # noqa: E402
+from matplotlib.ticker import FuncFormatter, MaxNLocator  # noqa: E402
+
 warnings.filterwarnings('ignore')
 
 
@@ -127,109 +134,40 @@ def process_reports_no_filtering():
     return fastp_reports, None
 
 
-def create_boxplot(data_plot, output_file="Box_plot_reads.png"):
-    """Create high-quality scientific boxplot matching R ggplot2 style."""
+def create_boxplot(data_plot, key="Box_plot_reads"):
+    """Reads per sample after each step (box and points), one panel per read type, in the shared figure style:
+    <key>.pdf / .svg / .png and the plotted values as <key>.csv."""
     if data_plot is None or data_plot.empty:
         print("Warning: No data to plot", file=sys.stderr)
         return
-    
-    # Calculate y-axis limits
-    max_reads = data_plot['Reads'].max()
-    max_round = np.ceil(max_reads / 5000000) * 5000000
-    
-    # Set publication-quality style
-    plt.rcParams['font.size'] = 20
-    plt.rcParams['axes.linewidth'] = 1.0
-    plt.rcParams['xtick.major.size'] = 5
-    plt.rcParams['ytick.major.size'] = 5
-    plt.rcParams['xtick.major.width'] = 1.0
-    plt.rcParams['ytick.major.width'] = 1.0
-    
-    # Create figure with facets
-    read_types = data_plot['Read_type'].unique()
-    n_facets = len(read_types)
-    
-    fig, axes = plt.subplots(1, n_facets, figsize=(16, 8), sharey=True)
-    if n_facets == 1:
-        axes = [axes]
-    
-    # Get unique processes for color palette
-    processes = data_plot['Process'].cat.categories
-    colors = sns.color_palette("husl", len(processes))
-    color_map = dict(zip(processes, colors))
-    
-    for idx, read_type in enumerate(sorted(read_types)):
-        ax = axes[idx]
+    read_types = sorted(data_plot['Read_type'].unique())
+    processes = list(data_plot['Process'].cat.categories)
+    pal = dict(zip(processes, (fs.CATEGORY * 3)[:len(processes)]))
+    width = "single" if len(read_types) * len(processes) <= 8 else "double"
+    fig, axes = plt.subplots(1, len(read_types), figsize=fs.figsize(width, 62), sharey=True, layout="constrained",
+                             squeeze=False)
+    rng = np.random.default_rng(1)  # fixed jitter: a rerun draws the same figure
+    for ax, read_type in zip(axes[0], read_types):
         subset = data_plot[data_plot['Read_type'] == read_type]
-        
-        # Create boxplot
-        positions = range(len(processes))
-        box_data = [subset[subset['Process'] == proc]['Reads'].values 
-                   for proc in processes]
-        
-        bp = ax.boxplot(
-            box_data,
-            positions=positions,
-            widths=0.6,
-            patch_artist=True,
-            showfliers=True,
-            flierprops=dict(marker='o', markerfacecolor='blue', markersize=8, 
-                          linestyle='none', markeredgecolor='blue', alpha=0.6),
-            boxprops=dict(linewidth=1.5),
-            whiskerprops=dict(linewidth=1.5),
-            capprops=dict(linewidth=1.5),
-            medianprops=dict(linewidth=2, color='black')
-        )
-        
-        # Color boxes
+        box_data = [subset[subset['Process'] == proc]['Reads'].values for proc in processes]
+        bp = ax.boxplot(box_data, positions=range(len(processes)), widths=0.55, patch_artist=True,
+                        showfliers=False, boxprops={"linewidth": 0.5}, whiskerprops={"linewidth": 0.5},
+                        capprops={"linewidth": 0.5}, medianprops={"linewidth": 0.8, "color": "black"})
         for patch, process in zip(bp['boxes'], processes):
-            patch.set_facecolor(color_map[process])
-            patch.set_alpha(0.7)
-        
-        # Add jittered points
+            patch.set_facecolor(pal[process])
+            patch.set_alpha(0.35)
         for i, process in enumerate(processes):
-            y_data = subset[subset['Process'] == process]['Reads'].values
-            if len(y_data) > 0:
-                x_data = np.random.normal(i, 0.04, size=len(y_data))
-                ax.scatter(x_data, y_data, alpha=0.4, s=80, 
-                         color=color_map[process], zorder=3)
-        
-        # Styling
-        ax.set_xlabel('Process', fontsize=20, fontweight='normal')
-        if idx == 0:
-            ax.set_ylabel('Total reads', fontsize=20, fontweight='normal')
-        
-        # Y-axis formatting
-        # A fixed 5M step gave dozens of overlapping labels on deep runs
-        ax.set_ylim(0, max_round)
-        ax.yaxis.set_major_locator(MaxNLocator(nbins=8, steps=[1, 2, 2.5, 5, 10]))
-        ax.yaxis.set_major_formatter(FuncFormatter(
-            lambda y, _: f'{y / 1e6:g}M' if y >= 1e6 or y == 0 else f'{y / 1e3:g}K'))
-        
-        # X-axis
-        ax.set_xticks(positions)
-        ax.set_xticklabels(processes, rotation=60, ha='right', va='top')
-        
-        # Facet label with custom background
-        ax.text(0.5, 1.02, read_type, transform=ax.transAxes,
-               fontsize=20, ha='center', va='bottom',
-               bbox=dict(boxstyle='round,pad=0.5', 
-                       facecolor='#CDDEFF', edgecolor='#CDDEFF', linewidth=0))
-        
-        # Grid and spines
-        ax.grid(True, axis='y', alpha=0.3, linestyle='-', linewidth=0.5)
-        ax.set_axisbelow(True)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        ax.spines['left'].set_linewidth(1.0)
-        ax.spines['bottom'].set_linewidth(1.0)
-    
-    plt.tight_layout()
-    plt.savefig(output_file, dpi=300, bbox_inches='tight', facecolor='white')
-    plt.close()
-    
-    print(f"Boxplot saved to {output_file}")
-    
+            y = subset[subset['Process'] == process]['Reads'].values
+            if len(y):
+                ax.scatter(i + rng.uniform(-0.12, 0.12, len(y)), y, s=5, lw=0, color=pal[process], zorder=3)
+        ax.set_ylim(bottom=0)
+        ax.yaxis.set_major_locator(MaxNLocator(nbins=6, steps=[1, 2, 2.5, 5, 10]))
+        ax.yaxis.set_major_formatter(FuncFormatter(lambda y, _: fs.short_count(y) if y else "0"))
+        ax.set_xticks(range(len(processes)), processes, rotation=45, ha="right")
+        ax.set_title(str(read_type), fontsize=fs.BASE_PT, fontweight="normal")
+    axes[0][0].set_ylabel("reads per sample")
+    fs.save(fig, ".", key, data_plot[["Id", "Process", "Read_type", "Reads"]] if "Id" in data_plot else data_plot)
+    print(f"Boxplot saved to {key}.png / .pdf / .svg")
 
 
 def main():

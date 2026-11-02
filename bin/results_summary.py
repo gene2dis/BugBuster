@@ -79,8 +79,9 @@ from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
 from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
                              contig_mobile_table, has_genomad, load_arg_gene_abundance, load_contig_table)
-from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category, fig_sarg,  # noqa: E402
-                             fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
+from summary_figures import (FigureWriter, fig_args, fig_arg_contig_hosts, fig_cog, fig_mag_abundance,  # noqa: E402
+                             fig_mag_quality, fig_method_by_category, fig_method_upset, fig_qc, fig_sarg,
+                             fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_html, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
 
@@ -495,7 +496,16 @@ def main(argv=None):
     key_meta = [c for c in (args.group_by, args.order_by) if c]
     order = sample_order(samples, args.group_by, args.order_by)
     samples = samples.loc[order]
-    groups = [samples.at[s, args.group_by] if args.group_by else "" for s in order]
+    # figures: samples by group (--group-by, else the batch when several results directories are merged), then in
+    # the table order; the tables keep their own order
+    if args.group_by:
+        fig_cols, fig_groups = order, [samples.at[s, args.group_by] for s in order]
+    elif len(batches) > 1:
+        rank = {b["label"]: i for i, b in enumerate(batches)}
+        fig_cols = sorted(order, key=lambda s: rank[samples.at[s, "batch"]])
+        fig_groups = [samples.at[s, "batch"] for s in fig_cols]
+    else:
+        fig_cols, fig_groups = order, [""] * len(order)
 
     # ---- QC
     reads = [b["reads"] for b in batches if b["reads"] is not None]
@@ -515,7 +525,7 @@ def main(argv=None):
     low = set(samples.index[samples["low_depth"].fillna(False).astype(bool)]) if "low_depth" in samples else set()
 
     tables = {}
-    figs = FigureWriter(outdir)
+    figs = FigureWriter(outdir, args.min_clean_pairs)
     summary = {"n_samples": len(order), "n_batches": len(batches), "n_low_depth": len(low),
                "low_depth_samples": [s for s in order if s in low]}
     if "clean_pairs" in samples:
@@ -558,8 +568,8 @@ def main(argv=None):
         if watch is not None:
             wl_wide, wl_long = watchlist_table(tx, watch)
             tables["watchlist"] = (mark_low_depth(wl_wide, low, tcols_all), False)
-        tcols = [s for s in order if s in tx["rel"].columns]
-        tgroups = [samples.at[s, args.group_by] if args.group_by else "" for s in tcols]
+        tcols = [s for s in fig_cols if s in tx["rel"].columns]
+        tgroups = [g for s, g in zip(fig_cols, fig_groups) if s in tx["rel"].columns]
         fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
         fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name)
 
@@ -635,8 +645,8 @@ def main(argv=None):
             hit1 = arg[arg["tier"] == 1]
             summary["n_tier1"] = int(hit1["sample"].nunique())
             summary["n_tier1_genes"] = int(hit1["gene"].nunique())
-            fig_args(figs, arg[arg["gene_representative"]], mats, samples, order, groups, low, status, args.top_n,
-                     METHOD_LABELS[primary])
+            fig_args(figs, arg[arg["gene_representative"]], mats, samples, fig_cols, fig_groups, low, status,
+                     args.top_n, METHOD_LABELS[primary])
         # arg_long: every method's calls, the primary method first
         lead = ["sample", "batch"] + meta_cols + ["method", "tier", "category", "gene", "aro_full_name", "aro_id",
                                                    "gene_family", "drug_class", "resistance_mechanism", "model",
@@ -689,7 +699,7 @@ def main(argv=None):
         tables["arg_sarg_long"] = (with_meta(sub, samples, meta_cols, order, ["sarg_type", "sarg_subtype"]), False)
         for name, df in sarg_tables(sarg, order, sstatus).items():
             tables[name] = (df, True)
-        fig_sarg(figs, tables.get("arg_sarg_type_cpc", (None,))[0], order, groups, low,
+        fig_sarg(figs, tables.get("arg_sarg_type_cpc", (None,))[0], fig_cols, fig_groups, low,
                  {s for s in order if sstatus[s] != "ok"})
         sarg_ctx = {"n_samples": len(sarg_ran & set(order)), "n_types": int(sub["sarg_type"].nunique()),
                     "n_subtypes": int(sub["sarg_subtype"].nunique()),
@@ -719,7 +729,7 @@ def main(argv=None):
             table_units[f"function_read_{ont}"] = unit
         cog, cog_unit = cog_matrix(ftables, order)
         if cog is not None:
-            fig_cog(figs, cog, cog_unit, order, groups, low,
+            fig_cog(figs, cog, cog_unit, fig_cols, fig_groups, low,
                     {s for s in order if fstatus[s] != "ok" or cog[s].isna().all()}, func["backend"])
         func_ctx = {"backend": func["backend"], "ontologies": sorted(ftables),
                     "unit": next(iter(ftables.values()))[1] if ftables else "",
@@ -748,6 +758,7 @@ def main(argv=None):
     mags = mags_table(mag_parts)
     if mags is not None:
         tables["mags"] = (mags, False)
+        fig_mag_quality(figs, mags)
         mc_bases = (mc.drop_duplicates("sample").set_index("sample")["mc_total_bases"] if mc is not None
                     else pd.Series(dtype=float))
         bases = {}
@@ -762,12 +773,14 @@ def main(argv=None):
             ab = with_meta(ab.drop(columns="batch"), samples, meta_cols, order, ["assembly", "bin"])
             lead = ["assembly", "batch", "bin", "sample"]
             tables["mag_abundance"] = (ab[lead + [c for c in ab.columns if c not in lead]], False)
+            fig_mag_abundance(figs, tables["mag_abundance"][0], mags, fig_cols, fig_groups, low)
 
     # ---- contig ARGs with their taxon and bin (linkage), and their abundance per sample
     clong = arg_contig_long_table([(b["label"], b["contig_args"]) for b in batches], mags)
     if clong is not None:
         tables["arg_contig_long"] = (clong, False)
         tables["arg_contig_hosts"] = (arg_contig_hosts_table(clong), False)
+        fig_arg_contig_hosts(figs, tables["arg_contig_hosts"][0])
     abund = [b["arg_abund"].assign(batch=b["label"]) for b in batches if b["arg_abund"] is not None]
     if abund:
         abund = pd.concat(abund, ignore_index=True).drop(columns="batch")
@@ -797,6 +810,11 @@ def main(argv=None):
         ccols = contig_function_sample_columns(cfunc, order)
         for c in ccols.columns:
             samples[c] = ccols[c]
+        ccog, ccog_unit = cog_matrix(ctables, order)
+        if ccog is not None:
+            fig_cog(figs, ccog, ccog_unit, fig_cols, fig_groups, low,
+                    {s for s in order if cstatus[s] != "ok" or ccog[s].isna().all()}, "eggNOG-mapper",
+                    key="function_contig_cog_heatmap", section="contig_functional", level="contig")
         cfunc_ctx = {"ontologies": sorted(ctables), "unit": next(iter(ctables.values()))[1] if ctables else "",
                      "n_samples": len(cfunc["ran"] & set(order))}
 
@@ -811,7 +829,7 @@ def main(argv=None):
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]
     tables = {"samples_qc": (qc.reset_index(), False), **tables}
-    fig_qc(figs, samples, order, groups, low, args.min_clean_pairs, depth_marks)
+    fig_qc(figs, samples, fig_cols, fig_groups, low, args.min_clean_pairs, depth_marks)
 
     write_tables(outdir, tables)
     if not args.no_excel:
