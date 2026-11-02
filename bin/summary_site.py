@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 
 import figure_style as fs
+import summary_interactive
 from summary_common import die, warn
 
 WOFF2_FACES = ("Regular", "Bold", "Italic", "SemiBold")
@@ -36,7 +37,16 @@ def write_site(outdir, model, assets):
         shutil.copy(f, site / "assets" / f.name)
     for f in fs.font_files(WOFF2_FACES, "woff2"):
         shutil.copy(f, site / "assets" / "fonts" / f.name)
-    specs, bundle = {}, False  # interactive figures: bin/summary_interactive.py (next commit)
+    interactive = summary_interactive.available()
+    if not interactive:
+        warn("altair / vl-convert not installed: the HTML report shows static figures only")
+    specs = {}
+    for sec in model["sections"]:
+        for key, f in sec["figures"].items():
+            specs[key] = summary_interactive.spec_json(key, f.get("interactive")) if interactive else None
+    bundle = any(specs.values())
+    if bundle:
+        (site / "assets" / "vega-bundle.js").write_text(summary_interactive.javascript_bundle())
     env = Environment(loader=FileSystemLoader(str(Path(assets) / "html")), autoescape=select_autoescape(["html"]),
                       undefined=StrictUndefined, trim_blocks=True, lstrip_blocks=True, keep_trailing_newline=True)
     nav = [(s["page"], s["title"]) for s in model["sections"]]
