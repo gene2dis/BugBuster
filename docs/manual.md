@@ -1817,7 +1817,7 @@ modules next to it in `bin/` and reads its default tier rules and watchlist from
 **With the pipeline's container image**, which has everything installed:
 
 ```bash
-IMG=community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9
+IMG=community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:6bff5ca407ba1454
 docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -v /dbs:/dbs:ro -w $PWD $IMG \
     python /bb/bin/results_summary.py \
         --results batch1/results batch2/results batch3/results \
@@ -1827,7 +1827,7 @@ docker run --rm -u $(id -u):$(id -g) -v $PWD:$PWD -v /path/to/BugBuster:/bb:ro -
         --card-prevalence /dbs/rgi/wildcard/card_prevalence.txt
 ```
 
-Under Singularity/Apptainer, use `singularity exec -B /path/to/BugBuster:/bb oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:cd89ac4e30745df7 python /bb/bin/results_summary.py ...`.
+Under Singularity/Apptainer, use `singularity exec -B /path/to/BugBuster:/bb oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:2ce015cec686e756 python /bb/bin/results_summary.py ...`.
 
 **With a local Python** that has the packages above (for example
 `conda install -c conda-forge pandas numpy "matplotlib-base>=3.7" openpyxl`):

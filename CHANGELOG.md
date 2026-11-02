@@ -458,6 +458,14 @@ next release is tagged.
 
 ### Changed
 
+- **Report image adds the document and figure tools**: the 18 report and
+  aggregation processes move to
+  `community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:6bff5ca407ba1454`
+  (its `oras://` build `2ce015cec686e756` under Singularity and Apptainer):
+  the same Python 3.13 stack plus Typst 0.15.1, Jinja2 3.1.6, Altair 6.3.0,
+  vl-convert-python 1.9.0.post1, the Inter 4.1 font and PyYAML 6.0.3, for the
+  run summary's PDF, HTML site and figures. The image is 1.12 GB (sif
+  428 MB), against 895 MB (338 MB)
 - **eggNOG-mapper's search runs DIAMOND in `fast` mode**: `EGGNOG_MAPPER_SEARCH`
   passes `--dmnd_sensmode fast` (eggNOG-mapper's default is `sensitive`). This
   changes results slightly: on one test-data assembly (4,442 proteins) 67 of
