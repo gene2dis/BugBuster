@@ -11,16 +11,16 @@ Nothing is wired into the pipeline. Only this document is committed; the prototy
 
 **Outcome (recommendations):**
 
-- **(P1) Engine (b): Typst for the PDF, Python/Jinja for the HTML site.** Its PDF was correct on the first render: long tables break across pages with the header repeated, numbers are right-aligned, wide tables go on landscape pages, figures and tables are numbered and cross-referenced, and the bibliography uses Typst's built-in Nature style. A whole report took 4-9 s (Typst itself 0.7-2.5 s). Quarto (a) needed workarounds for four of the five problems below, and one (3) was still open at the end, so its PDF never fully worked:
+- **(P1) Engine (b): Typst for the PDF, Python/Jinja for the HTML site.** Its PDF was correct on the first render: long tables break across pages with the header repeated, numbers are right-aligned, wide tables go on landscape pages, figures and tables are numbered and cross-referenced, and the bibliography uses Typst's built-in Nature style. A whole report took 4-9 s (Typst itself 0.7-2.5 s). Of the five problems below, Quarto (a) needed workarounds for three (1, 4, 5), problem 2 went away only by dropping the book format for the plain `typst` format, and problem 3 was still open at the end, so its PDF never fully worked:
   1. Tables are wrapped in figures of kind `quarto-float-tbl` that do not break across pages, so the rows past the page end were printed on top of each other. The fix is a raw Typst rule, `#show figure: set block(breakable: true)`.
   2. The book format's bundled `orange-book` template ignores `mainfont` (body text in Libertinus Serif), inserts blank pages before chapters, and fails to compile without an `author`.
   3. **(Open.)** pandoc gives the table columns widths in proportion to the text, so short columns wrap into four lines and the wide SARG table overprints even on a landscape page. Quarto's per-table `tbl-colwidths` sets the widths by hand, but on the one table where it was tried, words joined by underscores still ran into the next column and the numbers stayed left-aligned. The wide table was not fixed.
   4. The conda package works only with its activation variables set (`QUARTO_*`, one of them pointing at a path from the package's own build). Nextflow does not source activation scripts, so the module would have to set them.
   5. Under Apptainer, Quarto needs `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `DENO_DIR` in the task directory, or it stops with `Read-only file system: mkdir '~/.cache/quarto'`.
 
-  Quarto's HTML site is also not offline as configured. Its theme `@import`s Google Fonts. Opened from disk (`file://`), the browser blocks its module scripts (`quarto.js`, `tabsets.js`), so search and the page tools stop working. Its HTML render took 39-56 s (188-219 s at 120 samples), and its image is 645 MB larger than today's report image. Engine (b)'s site works from `file://` with no failed request. The cost of (b) is maintenance: each section exists twice, as a Jinja template and a Typst file (11-26 lines each here). The HTML reference list and the figure and table numbers come from Python, not from a citation processor. Phase 11d can limit the duplication by keeping every number, caption and table in the shared Python layer, as the prototype does, so that only the short prose is written twice.
+  Quarto's HTML site is also not offline as configured. Its theme `@import`s Google Fonts. Opened from disk (`file://`), the browser blocks its module scripts (`quarto.js`, `tabsets.js`), so search and the page tools stop working. Its HTML render took 39-56 s (188-219 s at 120 samples), and its image is 755 MB larger than today's report image (645 MB for the engine alone, without the figure libraries). Engine (b)'s site works from `file://` with no failed request. The cost of (b) is maintenance: each section exists twice, as a Jinja template and a Typst file (11-26 lines each here). The HTML reference list and the figure and table numbers come from Python, not from a citation processor. Phase 11d can limit the duplication by keeping every number, caption and table in the shared Python layer, as the prototype does, so that only the short prose is written twice.
 - **Typst's own HTML export is not usable for (b)'s HTML yet.** Typst 0.15.0 (2026-06-15) added an experimental "bundle" target for multi-file sites, and "the rest of HTML export remains feature-flagged". Typst 0.15.1 (2026-07-17) left that status unchanged and only fixed details: inline SVGs from `html.frame` now respect `--pretty`, and the bundle target picks Content-Type headers for more file extensions. The HTML reference page still says it is "very incomplete and only available for experimentation behind a feature flag. Do not use this feature for production use cases", and that Typst "does not output CSS style sheets". Compiling engine (b)'s sources with `--features html` gave one 2.4 MB page that ignored every page, alignment and page-break rule.
-- **(P2) (i): matplotlib for the canonical static figures, Vega-Lite (Altair) for the interactive versions of the large figures only.** Both backends met the basic style: Inter embedded in PDF and SVG, the Okabe-Ito and viridis palettes, PNG at 600 dpi, a source CSV beside each figure, and widths of exactly 89 and 183 mm. The static paper needs are what separates them:
+- **(P2) (i): matplotlib for the canonical static figures, Vega-Lite (Altair) for the interactive versions of the large figures only.** Both backends met the basic style: Inter embedded in PDF and SVG, the Okabe-Ito and viridis palettes, PNG at 600 dpi, a source CSV beside each figure, and the 89 and 183 mm widths (matplotlib exactly; Vega-Lite to within 0.1 mm, and only after the refit loop below). The static paper needs are what separates them:
   - Vega-Lite has no fill patterns. A low-depth heatmap column can be striped with one diagonal rule per cell, but a bar cannot be hatched (grey only).
   - Vega-Lite sizes the plot area, not the figure. An exact width took a measure-and-refit loop of 2 to 10 renders, and the height is not controlled: at 120 samples the heatmaps came out 252-260 mm tall, more than the 247 mm page.
   - Legend placement is coarser. A legend beside a strip widens that sub-chart, and a facet of a concatenated chart is not allowed.
@@ -28,7 +28,7 @@ Nothing is wired into the pipeline. Only this document is committed; the prototy
 
   With (i), matplotlib keeps exact sizes, hatching and legend control for the paper figures, and Altair adds hover, group filtering and zoom only where the HTML gains from them. Phase 11d's interactivity scope is the large figures only, so the second implementation stays small.
 - **Plotly is out:** its static export (kaleido 1.5.0) raised `RuntimeError` asking for Google Chrome, in an image with no browser.
-- **Image for 11d** (if (b) and (i) are chosen): the current report stack plus `typst=0.15.1`, `jinja2=3.1.6`, `altair=6.3.0`, `vl-convert-python=1.9.0.post1`, `font-inter=4.1` and `pyyaml=6.0.3`. It is 1.12 GB as a docker image and 428 MB as a sif, against 895 MB and 338 MB today. Its Seqera docker image and sif twin are built, and both ran every render here.
+- **Image for 11d:** the current report stack plus `typst=0.15.1`, `jinja2=3.1.6`, `altair=6.3.0`, `vl-convert-python=1.9.0.post1`, `font-inter=4.1` and `pyyaml=6.0.3`. It is 1.12 GB as a docker image and 428 MB as a sif, against 895 MB and 338 MB today. Its Seqera docker image and sif twin are built, and both ran every render here.
 
 ## Summary
 
@@ -38,7 +38,7 @@ Nothing is wired into the pipeline. Only this document is committed; the prototy
 | PDF after fixes | tables break (raw Typst `breakable` rule); hand-set `tbl-colwidths` still leave colliding cells and left-aligned numbers; the wide landscape table still overprints | 12 / 16 pages (4 / 120 samples), 0.5 / 1.7 MB | (b) |
 | Render time, whole report (4 / 120 samples) | HTML 39-56 / 188-219 s; PDF 19-36 / 52-79 s | 4-6 / 6-9 s (Typst 0.7-1.3 / 1.7-2.5 s) | (b) |
 | Image (docker / sif) | 1.65 GB / 578 MB (engine alone +645 MB) | 1.12 GB / 428 MB (engine alone +115 MB) | (b) |
-| Apptainer (read-only, no network, no home) | works with `QUARTO_*` activation variables and `XDG_*`/`DENO_DIR` in the task directory (2 MB written there) | works unchanged | (b) |
+| Apptainer (read-only, no network, no home) | works with `QUARTO_*` activation variables and `XDG_*`/`DENO_DIR` in the task directory (2 MB written there) | works unchanged (an `XDG_CACHE_HOME` in the task directory silences a fontconfig warning) | (b) |
 | HTML offline | Google Fonts `@import`; module scripts blocked from `file://` | no external request, works from `file://` | (b) |
 | Numbering, cross-references | native (`@fig-`, `@tbl-`, chapter-prefixed in the book) | Typst labels in the PDF; Python counters in the HTML (same numbers) | either |
 | Methods and references | citeproc with a shipped `nature.csl` | Typst `bibliography()` (built-in `nature` style); hand-formatted list in the HTML | either |
@@ -56,7 +56,7 @@ The rest of this document gives the setup and the measurements behind each row.
 - **"4 samples"**: the real tables with the samples renamed A-D. The asm run has 4 samples, not 3, and none below the 1 M clean-pair cutoff, so the prototype raised the cutoff to 3 M to put two samples (2.9 M and 1.4 M pairs) in low depth and exercise the hatching. This run was started with `--quality_control false`, so its read-fate bars are 100 % clean.
 - **"120 samples"**: synthetic, in four groups of 30. Each group is based on one real sample, with log-normal noise and 15 % dropouts. 10 samples are below 1 M clean pairs, and the QC and decontamination fractions are synthetic. The long tables are copies of the real rows: 4,916 method-comparison rows, 9,715 contig ARGs and 4,942 contig-host rows.
 
-The methods section reads the run's own `software_versions.yml` (140 lines, 51 tools and databases). Thirteen references were checked against PubMed: Nextflow, sylph, CARD 2023, DeepARG, geNomad, MEGAHIT, DIAMOND, GTDB-Tk v2, CheckM2, MicrobeCensus, SAMtools, ARGs-OAP v2.0 and Metabuli. No PubMed record was found for a newer ARGs-OAP release (a title/abstract search for "ARGs-OAP" returned three records, the latest from 2020), so the v2.0 paper stood in for the 4.0.0 the pipeline runs. Phase 11d needs a curated tool → reference table.
+The methods section reads the run's own `software_versions.yml` (140 lines, 51 tools and databases). Thirteen references were checked against PubMed: Nextflow, sylph, CARD 2023, DeepARG, geNomad, MEGAHIT, DIAMOND, GTDB-Tk v2, CheckM2, MicrobeCensus, SAMtools, ARGs-OAP v2.0 and Metabuli. No PubMed record was found for a newer ARGs-OAP release (a title/abstract search for "ARGs-OAP" returned three records, the latest from 2020), so the prototype cited the v2.0 paper. A v3.0 paper exists outside PubMed (Yin et al., *Engineering* 27, 234-241, 2023, doi:10.1016/j.eng.2022.10.011, checked on Crossref) and is the better citation for the 4.0.0 the pipeline runs. Phase 11d needs a curated tool → reference table, checked beyond PubMed.
 
 **Both engines got the same inputs.** A shared Python layer (140 lines) selects the columns, formats the numbers, caps every PDF table at 60 rows with a note pointing to the TSV and the HTML, and turns `software_versions.yml` into a tools table with reference keys. Both HTML sites use the same 27-line table script (click a header to sort, type to filter; no library) and the same Vega-Lite specs with the Vega libraries bundled. Both PDFs embed the same matplotlib SVGs.
 
@@ -117,16 +117,17 @@ Both images ran read-only with no network, no home directory and a clean environ
 - **(b)** needed nothing. The only message was fontconfig's "No writable cache directories", which goes away with `XDG_CACHE_HOME` in the task directory. Typst uses no packages here (`@preview` imports would download at compile time), and its fonts come from `--font-path` with `--ignore-system-fonts`.
 - **(a)** needed `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `DENO_DIR` in the task directory, where it wrote 2 MB. Without them it stopped with `Read-only file system (os error 30): mkdir '/home/…/.cache/quarto'`. It also needed the conda activation variables (`QUARTO_DENO`, `QUARTO_PANDOC`, `QUARTO_TYPST`, `QUARTO_SHARE_PATH`, …), because a container started by Nextflow does not source `etc/conda/activate.d/quarto.sh`. That script's `QUARTO_DENO_DOM` points into the package's build directory and has to be overridden with `$CONDA_PREFIX/lib/deno_dom.so`. The `orange-book` Typst package used by the book format is bundled with Quarto, so nothing was downloaded.
 
-Docker and Apptainer gave byte-identical Vega-Lite specs, interactive HTML, Vega-Lite SVGs and source CSVs. Some PNGs differed only by sub-pixel antialiasing (largest channel difference 64 for vl-convert), and matplotlib's PDF and SVG differed by their timestamps until `metadata={"CreationDate": None}` / `{"Date": None}` was set.
+Docker and Apptainer gave byte-identical Vega-Lite specs, interactive HTML, Vega-Lite SVGs and source CSVs. Some PNGs differed at glyph and bar edges (0.1-1.3 % of pixels; largest channel difference 64 of 255 for vl-convert, 255 for one matplotlib figure laid out a pixel apart), invisible at print size but enough to fail a byte or pixel-identity test across engines, and matplotlib's PDF and SVG differed by their timestamps until `metadata={"CreationDate": None}` / `{"Date": None}` was set.
 
 ### Adding a section, maintenance
 
 | | (a) Quarto | (b) Typst + Jinja |
 | --- | --- | --- |
 | Per section | one `.qmd` (54 lines each here): prose once, Python cells, and each table and figure emitted twice (`content-visible when-format="html"` / `unless-format="html"`, because the PDF gets the capped table and the static figure) | one Typst file (19-26 lines) and one Jinja template (11-18 lines): prose twice, data and captions once in Python |
-| Project code | `_quarto.yml` 51 + pre-render 37 + helpers 38 + render script 25 lines | `build.py` 119 + `lib.typ` 42 + `base.html`/`macros.html` 26 lines |
+| Project code | `_quarto.yml` 51 + pre-render 37 + helpers 38 + render script 25 lines, plus the shared layer | `build.py` 119 + `lib.typ` 42 + `base.html`/`macros.html` 26 lines, plus the shared layer |
+| Shared by both | data layer 140 lines, table script 27 lines, figure style and figures 591 lines | same |
 | Moving parts | Quarto, Deno, pandoc, dart-sass, esbuild, Jupyter kernel, Typst, the `orange-book` template, a CSL file | Typst, Jinja2 |
-| Known traps | the problems above (four worked around, one open); table layout lives in pandoc and in raw Typst injected through `include-in-header` | none found; the HTML references and numbering are hand-written (about 15 lines) |
+| Known traps | the problems above (three worked around, one avoided by changing format, one open); table layout lives in pandoc and in raw Typst injected through `include-in-header` | two, both fixed in one line: Typst picks `InterVariable` unless `--font-path` points at a folder of static TTFs, and fontconfig warns unless `XDG_CACHE_HOME` is in the task directory; the HTML references and numbering are hand-written (about 15 lines) |
 
 ## P2: figures
 
@@ -135,7 +136,7 @@ Docker and Apptainer gave byte-identical Vega-Lite specs, interactive HTML, Vega
 The prototype's style module (114 lines) sets:
 
 - **Widths:** 89 mm (single column) up to 14 samples, 183 mm (double) above; heights follow the content, at most 247 mm.
-- **Type:** Inter 4.1 (conda-forge `font-inter`, static TTFs) at 7 pt base and 6 pt ticks. Sample labels use 5 pt from 61 to 100 samples and 4.5 pt above 100 (see below: 5 pt would fit up to about 110).
+- **Type:** Inter 4.1 (conda-forge `font-inter`, static TTFs) at 7 pt base and 6 pt ticks. Sample labels use 5 pt from 61 to 100 samples and 4.5 pt above 100 in the prototype; 5 pt would fit up to about 110 (see below), so 11d should switch there.
 - **Font embedding:** TrueType (type 42) in PDF. In SVG the text stays text, and the font is added as WOFF2 `@font-face` data URIs, so the file looks the same without the font installed and stays editable. The three faces add about 430 KB per SVG, so 11d could embed only the faces a figure uses.
 - **Colour:** Okabe-Ito for categories (phyla, read fates); viridis for quantities, with its top 5 % dropped; light grey for "not detected"; vermillion for low-depth labels and the cutoff line.
 - **Files:** PDF, SVG, 600 dpi PNG and a source CSV (the plotted values, long format) for every figure.
@@ -177,10 +178,10 @@ A size budget for 11d: at 120 samples the largest inline spec is 877 KB. A budge
 
 ## What Phase 11d would carry over
 
-If the recommendations are taken:
+With the recommendations taken (owner, 2026-11-02):
 
 - **Image:** the "(b) + figures" image above, re-pinned everywhere the shared report image appears.
 - **Fonts:** the static Inter TTFs only, registered explicitly in matplotlib (font list filtered), Typst (`--font-path`, `--ignore-system-fonts`) and vl-convert (`register_font_directory`). `XDG_CACHE_HOME` goes in the task directory.
-- **Figures:** deterministic metadata (`CreationDate`/`Date` set to `None`); 89 / 183 mm; samples as rows above 60; a split or group-only labels above about 110.
+- **Figures:** deterministic metadata (`CreationDate`/`Date` set to `None`); 89 / 183 mm; samples as rows above 60; 5 pt sample labels up to about 110 samples (the prototype switched to 4.5 pt at 100, below Nature's minimum), and a split or group-only labels above that.
 - **PDF:** the 60-row cap with a pointer to the TSV, landscape pages for wide tables, and a curated tool → reference table for the methods section.
 - **HTML:** interactive Vega-Lite for the read-fate and heatmap figures, the static figure above the size budget, and the bundled Vega script.
