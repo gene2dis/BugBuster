@@ -11,15 +11,15 @@ Nothing is wired into the pipeline. Only this document is committed; the prototy
 
 **Outcome (recommendations):**
 
-- **(P1) Engine (b): Typst for the PDF, Python/Jinja for the HTML site.** Its PDF was correct on the first render: long tables break across pages with the header repeated, numbers are right-aligned, wide tables go on landscape pages, figures and tables are numbered and cross-referenced, and the bibliography uses Typst's built-in Nature style. A whole report took 4-7 s (Typst itself 0.7-1.9 s). Quarto (a) needed four workarounds before its PDF was usable, and a fifth problem was still open at the end:
+- **(P1) Engine (b): Typst for the PDF, Python/Jinja for the HTML site.** Its PDF was correct on the first render: long tables break across pages with the header repeated, numbers are right-aligned, wide tables go on landscape pages, figures and tables are numbered and cross-referenced, and the bibliography uses Typst's built-in Nature style. A whole report took 4-9 s (Typst itself 0.7-2.5 s). Quarto (a) needed four workarounds before its PDF was usable, and a fifth problem was still open at the end:
   1. Tables are wrapped in figures of kind `quarto-float-tbl` that do not break across pages, so the rows past the page end were printed on top of each other. The fix is a raw Typst rule, `#show figure: set block(breakable: true)`.
   2. The book format's bundled `orange-book` template ignores `mainfont` (body text in Libertinus Serif), inserts blank pages before chapters, and fails to compile without an `author`.
-  3. pandoc gives the table columns widths in proportion to the text, so short columns wrap into four lines and the wide SARG table overprints even on a landscape page. This one was still open.
+  3. pandoc gives the table columns widths in proportion to the text, so short columns wrap into four lines and the wide SARG table overprints even on a landscape page. Quarto's per-table `tbl-colwidths` sets the widths by hand, but on the one table where it was tried, words joined by underscores still ran into the next column and the numbers stayed left-aligned. The wide table was not fixed.
   4. The conda package works only with its activation variables set (`QUARTO_*`, one of them pointing at a path from the package's own build). Nextflow does not source activation scripts, so the module would have to set them.
   5. Under Apptainer, Quarto needs `XDG_CACHE_HOME`, `XDG_DATA_HOME` and `DENO_DIR` in the task directory, or it stops with `Read-only file system: mkdir '~/.cache/quarto'`.
 
-  Quarto's HTML site is also not offline as configured. Its theme `@import`s Google Fonts. Opened from disk (`file://`), the browser blocks its module scripts (`quarto.js`, `tabsets.js`), so search and the page tools stop working. It took 39-49 s per run (188-219 s at 120 samples), and its image is 645 MB larger than today's report image. Engine (b)'s site works from `file://` with no failed request. The cost of (b) is maintenance: each section exists twice, as a Jinja template and a Typst file (about 20 lines each here). The HTML reference list and the figure and table numbers come from Python, not from a citation processor. Phase 11d can limit the duplication by keeping every number, caption and table in the shared Python layer, as the prototype does, so that only the short prose is written twice.
-- **Typst's own HTML export is not usable for (b)'s HTML yet.** Typst 0.15.0 (2026-06-15) added an experimental "bundle" target for multi-file sites, and "the rest of HTML export remains feature-flagged". Typst 0.15.1 (2026-07-17) changed nothing in HTML export. The HTML reference page still says it is "very incomplete and only available for experimentation behind a feature flag. Do not use this feature for production use cases", and that Typst "does not output CSS style sheets". Compiling engine (b)'s sources with `--features html` gave one 2.4 MB page that ignored every page, alignment and page-break rule.
+  Quarto's HTML site is also not offline as configured. Its theme `@import`s Google Fonts. Opened from disk (`file://`), the browser blocks its module scripts (`quarto.js`, `tabsets.js`), so search and the page tools stop working. Its HTML render took 39-56 s (188-219 s at 120 samples), and its image is 645 MB larger than today's report image. Engine (b)'s site works from `file://` with no failed request. The cost of (b) is maintenance: each section exists twice, as a Jinja template and a Typst file (about 20 lines each here). The HTML reference list and the figure and table numbers come from Python, not from a citation processor. Phase 11d can limit the duplication by keeping every number, caption and table in the shared Python layer, as the prototype does, so that only the short prose is written twice.
+- **Typst's own HTML export is not usable for (b)'s HTML yet.** Typst 0.15.0 (2026-06-15) added an experimental "bundle" target for multi-file sites, and "the rest of HTML export remains feature-flagged". Typst 0.15.1 (2026-07-17) left that status unchanged and only fixed details: inline SVGs from `html.frame` now respect `--pretty`, and the bundle target picks Content-Type headers for more file extensions. The HTML reference page still says it is "very incomplete and only available for experimentation behind a feature flag. Do not use this feature for production use cases", and that Typst "does not output CSS style sheets". Compiling engine (b)'s sources with `--features html` gave one 2.4 MB page that ignored every page, alignment and page-break rule.
 - **(P2) (i): matplotlib for the canonical static figures, Vega-Lite (Altair) for the interactive versions of the large figures only.** Both backends met the basic style: Inter embedded in PDF and SVG, the Okabe-Ito and viridis palettes, PNG at 600 dpi, a source CSV beside each figure, and widths of exactly 89 and 183 mm. The static paper needs are what separates them:
   - Vega-Lite has no fill patterns. A low-depth heatmap column can be striped with one diagonal rule per cell, but a bar cannot be hatched (grey only).
   - Vega-Lite sizes the plot area, not the figure. An exact width took a measure-and-refit loop of 2 to 10 renders, and the height is not controlled: at 120 samples the heatmaps came out 252-260 mm tall, more than the 247 mm page.
@@ -34,9 +34,9 @@ Nothing is wired into the pipeline. Only this document is committed; the prototy
 
 | Question | (a) Quarto 1.10.19 (Typst 0.15.1) | (b) Typst 0.15.1 + Python/Jinja | Recommendation |
 | --- | --- | --- | --- |
-| PDF out of the box | book: serif body (template ignores `mainfont`), blank pages, tables overprinted at page ends, empty "References" plus a "Bibliography" heading; plain `typst` format: fixed font, same table problem | correct on the first render | (b) |
-| PDF after fixes | tables break (raw Typst `breakable` rule); column widths and the wide landscape table still wrong | 12 / 16 pages (4 / 120 samples), 0.5 / 1.7 MB | (b) |
-| Render time, whole report (4 / 120 samples) | HTML 39-49 / 188-219 s; PDF 19-36 / 52-79 s | 4-6 / 6-8 s (Typst 0.7 / 1.8 s) | (b) |
+| PDF out of the box | book: serif body (template ignores `mainfont`), blank pages, tables overprinted at page ends, an empty "References" heading next to Quarto's own "Bibliography" (the HTML `#refs` idiom; configurable); plain `typst` format: fixed font, same table problem | correct on the first render | (b) |
+| PDF after fixes | tables break (raw Typst `breakable` rule); hand-set `tbl-colwidths` still leave colliding cells and left-aligned numbers; the wide landscape table still overprints | 12 / 16 pages (4 / 120 samples), 0.5 / 1.7 MB | (b) |
+| Render time, whole report (4 / 120 samples) | HTML 39-56 / 188-219 s; PDF 19-36 / 52-79 s | 4-6 / 6-9 s (Typst 0.7-1.3 / 1.7-2.5 s) | (b) |
 | Image (docker / sif) | 1.65 GB / 578 MB (engine alone +645 MB) | 1.12 GB / 428 MB (engine alone +115 MB) | (b) |
 | Apptainer (read-only, no network, no home) | works with `QUARTO_*` activation variables and `XDG_*`/`DENO_DIR` in the task directory (2 MB written there) | works unchanged | (b) |
 | HTML offline | Google Fonts `@import`; module scripts blocked from `file://` | no external request, works from `file://` | (b) |
@@ -56,7 +56,7 @@ The rest of this document gives the setup and the measurements behind each row.
 - **"4 samples"**: the real tables with the samples renamed A-D. The asm run has 4 samples, not 3, and none below the 1 M clean-pair cutoff, so the prototype raised the cutoff to 3 M to put two samples (2.9 M and 1.4 M pairs) in low depth and exercise the hatching. This run was started with `--quality_control false`, so its read-fate bars are 100 % clean.
 - **"120 samples"**: synthetic, in four groups of 30. Each group is based on one real sample, with log-normal noise and 15 % dropouts. 10 samples are below 1 M clean pairs, and the QC and decontamination fractions are synthetic. The long tables are copies of the real rows: 4,916 method-comparison rows, 9,715 contig ARGs and 4,942 contig-host rows.
 
-The methods section reads the run's own `software_versions.yml` (140 lines, 51 tools and databases). Thirteen references were checked against PubMed: Nextflow, sylph, CARD 2023, DeepARG, geNomad, MEGAHIT, DIAMOND, GTDB-Tk v2, CheckM2, MicrobeCensus, SAMtools, ARGs-OAP v2.0 and Metabuli. The ARGs-OAP 4.0 the pipeline runs has no PubMed record of its own, so the v2.0 paper stood in. Phase 11d needs a curated tool → reference table.
+The methods section reads the run's own `software_versions.yml` (140 lines, 51 tools and databases). Thirteen references were checked against PubMed: Nextflow, sylph, CARD 2023, DeepARG, geNomad, MEGAHIT, DIAMOND, GTDB-Tk v2, CheckM2, MicrobeCensus, SAMtools, ARGs-OAP v2.0 and Metabuli. No PubMed record was found for a newer ARGs-OAP release (a title/abstract search for "ARGs-OAP" returned three records, the latest from 2020), so the v2.0 paper stood in for the 4.0.0 the pipeline runs. Phase 11d needs a curated tool → reference table.
 
 **Both engines got the same inputs.** A shared Python layer (140 lines) selects the columns, formats the numbers, caps every PDF table at 60 rows with a note pointing to the TSV and the HTML, and turns `software_versions.yml` into a tools table with reference keys. Both HTML sites use the same 27-line table script (click a header to sort, type to filter; no library) and the same Vega-Lite specs with the Vega libraries bundled. Both PDFs embed the same matplotlib SVGs.
 
@@ -79,32 +79,32 @@ Both sif twins (Amazon Linux 2023) have every command the renders call (`typst`,
 
 | | (a) book (`orange-book`) | (a2) plain `typst` format | (b) Typst templates |
 | --- | --- | --- | --- |
-| Pages, 4 / 120 samples | 21 / 29 | 15 / 21 | 12 / 16 |
+| Pages, 4 / 120 samples | 21 / 29 (19 / 29 with `tbl-colwidths` on one table) | 15 / 21 (14 / 22) | 12 / 16 |
 | PDF size | 480 KB / 1.6 MB | 452 KB / 1.6 MB | 489 KB / 1.7 MB |
 | Body font | Libertinus Serif (template); Inter only in tables and figures | Inter | Inter |
 | Fonts embedded (`pdffonts`) | yes, all | yes, all | yes, all (static Inter TTFs given with `--font-path`) |
 | Long tables | overprinted at the page end until `#show figure: set block(breakable: true)`; then break with a repeated header | same | break with a repeated header (`table.header`), zebra rows |
-| Column widths | from pandoc's text widths: short columns wrap ("K-MAR-VEL + RGI" over four lines) | same | automatic; numbers right-aligned |
+| Column widths | from pandoc's text widths: short columns wrap ("K-MAR-VEL + RGI" over four lines); with `tbl-colwidths` (tried on one table) the widths are exact, but `methicillin_mec` runs into the next column, numbers stay left-aligned and justified cells spread "K-MARVEL + RGI" | same | automatic; numbers right-aligned |
 | Wide tables (12 genera × samples, 21 SARG types × samples) | `.landscape` ignored in the book | landscape pages work; the SARG table still overprints | landscape pages (`page(flipped: true)`); long SARG names wrap at `_` |
 | Captions, numbering | chapter-prefixed ("Table 2.2"), caption above tables | "Table 5", above | "Table 5", above; figures "Figure 2" below |
 | Cross-references | `@fig-`, `@tbl-` resolve | resolve | Typst labels resolve; the HTML uses the same numbers from Python |
-| References | citeproc, Nature CSL (shipped with the project); an empty "References" heading plus a separate "Bibliography" | same | `bibliography(style: "nature")`, numbered in citation order |
+| References | citeproc, Nature CSL (shipped with the project); Quarto's Typst writer prints its own "Bibliography" section, so the `#refs` placeholder the HTML uses left an empty "References" heading (a configuration to adapt per format) | same | `bibliography(style: "nature")`, numbered in citation order |
 | Blank pages | yes (chapters start on odd pages) | no | no |
 
 Engine (b)'s PDF has a contents page, running headers, page numbers ("3 / 12") and section numbering, all from 42 lines of `lib.typ`. The matplotlib SVGs keep their text as text, and Typst renders it with the bundled Inter, so the figures match the body type.
 
-In the HTML, Quarto gives more page furniture for free: a sidebar, search and a per-page table of contents. That furniture needs its own scripts, and those fail from `file://`. Its long tables are not in a scroll box, so the ARG page at 120 samples is 439,028 px tall. Engine (b)'s pages are plain by design: a sticky top navigation and a fact row, with tables in scroll boxes (520 px) with a filter box and sortable headers. Every figure has its interactive version followed by links to its SVG, PDF, 600 dpi PNG and source CSV.
+In the HTML, Quarto gives more page furniture for free: a sidebar, search and a per-page table of contents. That furniture needs its own scripts, and those fail from `file://`. Its long tables were not in a scroll box (the prototype's CSS rule did not match Quarto's markup; fixable), so the ARG page at 120 samples is 439,028 px tall. Engine (b)'s pages are plain by design: a sticky top navigation and a fact row, with tables in scroll boxes (520 px) with a filter box and sortable headers. Every figure has its interactive version followed by links to its SVG, PDF, 600 dpi PNG and source CSV.
 
 ### Render time and size
 
-Wall time in docker (`--network none`) on a shared 80-core host, two or three runs each. The figures were rendered beforehand and are not included.
+Wall time on a shared 80-core host, two to four runs each: docker (`--network none`) and Apptainer together, since the two did not differ beyond run-to-run noise (Apptainer runs were at the top of each range). The figures were rendered beforehand and are not included.
 
 | | 4 samples | 120 samples |
 | --- | --- | --- |
-| (b) whole report (Typst PDF + Jinja site) | 3.6-5.8 s (Typst 0.7 s) | 5.6-8.2 s (Typst 1.7-2.5 s) |
+| (b) whole report (Typst PDF + Jinja site) | 3.6-6.4 s (Typst 0.7-1.3 s) | 5.6-8.5 s (Typst 1.7-2.5 s) |
 | (a) HTML site | 39-56 s | 188-219 s |
 | (a) PDF, book | 28-36 s | 58-79 s |
-| (a) PDF, plain | 19-24 s | 52-69 s |
+| (a) PDF, plain | 19-25 s | 52-74 s |
 | Site size, (a) / (b) | 5.2 / 3.8 MB | 13.0 / 8.7 MB |
 | Largest page, (a) / (b) | 174 / 63 KB | 2.3 / 1.1 MB |
 
