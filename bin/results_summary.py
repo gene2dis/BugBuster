@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BugBuster results summary: consolidated, cross-batch tables, figures and an HTML report.
+BugBuster results summary: consolidated, cross-batch tables, figures, an HTML report and a PDF.
 
 Usage:
   results_summary.py --results RUN1/results [RUN2/results ...] --outdir summary
@@ -20,8 +20,8 @@ rerunning any tool, and merges any number of results directories (one per batch)
   07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
   07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
   pipeline_info/software_versions.yml             tool and database versions; which stages ran
-Each section is skipped when its inputs are absent; README.md, README.docx and LLM_GUIDE.md list every
-pipeline stage and whether it ran.
+Each section is skipped when its inputs are absent; README.md and LLM_GUIDE.md list every pipeline stage and
+whether it ran.
 
 Units: Reads_report.csv counts single reads (both mates); every count here is in read
 pairs (= reads / 2), the unit K-MARVEL and sylph use. ARG abundance is normalised to the
@@ -37,15 +37,16 @@ mutation_data lists every difference from the reference, so a variant-model hit 
 resistance call only when a known resistance mutation is among them.
 
 Outputs (in --outdir): tables/*.tsv, results_summary.xlsx (if openpyxl or xlsxwriter
-is installed), figures/*.{png,pdf,svg}, results_summary.html (self-contained, works offline),
-README.md and README.docx (what is in the summary) and LLM_GUIDE.md (the summary folder and every
-column, for a language model or a script). These name no local path: the summary folder is the part
+is installed), figures/*.{pdf,svg,png,csv} (bin/figure_style.py), report/ (a multi-page HTML report from
+assets/report/html, works offline; results_summary.html opens it), results_summary.pdf (Typst, assets/report/typst),
+README.md (what is in the summary) and LLM_GUIDE.md (the summary folder and every column, for a language model or a
+script). These name no local path: the summary folder is the part
 that is shared, so paths are relative to it and inputs are shown by file name.
 
-Requirements: Python 3 with pandas, numpy and matplotlib >= 3.7; openpyxl or xlsxwriter for the
-Excel workbook (optional). The pipeline's RESULTS_SUMMARY image has them all. Run the script from
-a BugBuster checkout: it imports the summary_*.py modules next to it and reads its default tier
-rules and watchlist from ../assets/.
+Requirements: Python 3 with pandas, numpy, matplotlib >= 3.7, jinja2 and pyyaml; optional: openpyxl or xlsxwriter
+(Excel workbook), typst (PDF), altair + vl-convert-python (interactive figures), font-inter (the figures' font). The
+pipeline's RESULTS_SUMMARY image has them all. Run the script from a BugBuster checkout: it imports the summary_*.py
+modules next to it and reads its default tier rules, watchlist and report templates from ../assets/.
 """
 
 import argparse
@@ -82,12 +83,16 @@ from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_
 from summary_figures import (FigureWriter, fig_args, fig_arg_contig_hosts, fig_cog, fig_mag_abundance,  # noqa: E402
                              fig_mag_quality, fig_method_by_category, fig_method_upset, fig_qc, fig_sarg,
                              fig_taxonomy, fig_watchlist, short_count)
-from summary_html import write_excel, write_html, write_tables  # noqa: E402
+from summary_html import write_excel, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
+import summary_report  # noqa: E402
+from summary_pdf import write_pdf  # noqa: E402
+from summary_site import write_site  # noqa: E402
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ASSETS = SCRIPT_DIR.parent / "assets"
+DEFAULT_REPORT_ASSETS = DEFAULT_ASSETS / "report"
 
 
 def batch_label(path):
@@ -391,6 +396,9 @@ def parse_args(argv=None):
     p.add_argument("--top-n", type=int, default=40, help="maximum rows in the ARG heatmap (default 40)")
     p.add_argument("--title", default="BugBuster results summary", help="HTML report title")
     p.add_argument("--no-excel", action="store_true", help="do not write the Excel workbook")
+    p.add_argument("--report-assets", default=str(DEFAULT_REPORT_ASSETS),
+                   help="templates, styles and references of the PDF and HTML report (default: assets/report)")
+    p.add_argument("--no-pdf", action="store_true", help="do not write results_summary.pdf")
     return p.parse_args(argv)
 
 
@@ -874,7 +882,10 @@ def main(argv=None):
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
     }
     ctx["method_notes"] = method_notes(ctx)
-    write_html(outdir, args.title, ctx)
+    model = summary_report.build(ctx, args.report_assets)
+    write_site(outdir, model, args.report_assets)
+    if not args.no_pdf:
+        write_pdf(outdir, model, args.report_assets, figs.dir)
     write_docs(outdir, ctx)
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 

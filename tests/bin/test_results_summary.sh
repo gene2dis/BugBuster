@@ -20,7 +20,7 @@
 #     per cell, the cell estimates in samples_qc, low-depth and not-normalised cells
 #   - read functional and MicrobeCensus (tests/data/summary/functional/): CPGE
 #     tables against the source, COG names, NA_no_ags without MicrobeCensus
-#   - README.md / README.docx (well-formed WordprocessingML) / LLM_GUIDE.md, the
+#   - README.md / LLM_GUIDE.md (no README.docx any more), the
 #     stages read from an invalid software_versions.yml, "ran, no table found"
 #   - contig ARGs on geNomad's plasmids / viruses / proviruses
 #     (tests/data/summary/contig/): arg_contig_mobile per assembly and class
@@ -60,6 +60,7 @@ py() {
         PYTHONDONTWRITEBYTECODE=1 python3 "$@"
     else
         docker run --rm -i -u "$(id -u):$(id -g)" -e HOME=/tmp -e MPLCONFIGDIR=/tmp -e PYTHONDONTWRITEBYTECODE=1 \
+            -e XDG_CACHE_HOME=/tmp -e SOURCE_DATE_EPOCH \
             -v "${REPO_DIR}:${REPO_DIR}:ro" -v "${TMP_DIR}:${TMP_DIR}" -w "$(pwd)" \
             "${SUMMARY_IMG}" python3 "$@"
     fi
@@ -67,6 +68,12 @@ py() {
 
 PASS=0
 FAIL=0
+no_external() {
+    # no_external <summary dir>: no page or stylesheet of the HTML report loads anything over the network
+    # (src/href to http(s) or //, CSS url() or @import of one); the references print DOIs as text
+    ! grep -REq '(src|href)=["'"'"']?(https?:)?//|url\(["'"'"']?(https?:)?//|@import' \
+        "$1/report" --include='*.html' --include='*.css'
+}
 check() {
     local desc="$1"
     shift
@@ -144,8 +151,11 @@ for f in samples_qc taxonomy_long taxonomy_species_wide taxonomy_species_prevale
     check "table ${f}.tsv written" test -s "out/tables/${f}.tsv"
 done
 check "Excel workbook written" test -s out/results_summary.xlsx
-check "HTML report written" test -s out/results_summary.html
-check "HTML has no external URLs" fails grep -Eq '(src|href)="https?://' out/results_summary.html
+check "HTML report written: a page per section, the entry page links to it" \
+    test -s out/report/index.html -a -s out/report/args.html -a -s out/report/methods.html -a -s out/report/dictionary.html
+check "results_summary.html sends the browser to the report" grep -q 'url=report/index.html' out/results_summary.html
+check "HTML report loads nothing from the network" no_external out
+check "PDF report written" test -s out/results_summary.pdf
 check "QC, taxonomy and ARG figures written" test -s out/figures/qc_read_fate.png -a -s out/figures/taxonomy_species_heatmap.svg -a -s out/figures/arg_priority_heatmap.pdf
 
 check "table contents" py - "${KM}" <<'PYEOF'
@@ -271,9 +281,8 @@ ko = pd.read_csv("lowmin/tables/function_read_ko.tsv", sep="\t", index_col=0)
 assert set(ko["sampleB"]) == {"NA_no_ags"} and pd.to_numeric(ko["sampleA"]).gt(0).any()
 PYEOF
 
-check "README.md, README.docx and LLM_GUIDE.md" py - <<'PYEOF'
-import os, re, zipfile
-from xml.dom import minidom
+check "README.md and LLM_GUIDE.md" py - <<'PYEOF'
+import os, re
 md = open("out/README.md").read()
 for text in ("## What ran", "## Tables", "## Figures", "## Units and missing values", "## ARG reporting tiers",
              "`tables/arg_long.tsv`", "`tables/arg_sarg_long.tsv`", "## Software versions", "ARGs-OAP"):
@@ -284,18 +293,13 @@ assert "| ran |" in row, row
 assert re.search(r"\| Assembly \(MEGAHIT\) \| not run \|", md)
 # versions read line by line from the invalid YAML
 assert "| KARGVA | kargva | 1.0 |" in md and "| RGI_BWT | kma | unknown |" in md
-z = zipfile.ZipFile("out/README.docx")
-assert {"[Content_Types].xml", "word/document.xml", "word/styles.xml", "word/numbering.xml"} <= set(z.namelist())
-for name in z.namelist():
-    minidom.parseString(z.read(name))
-doc = z.read("word/document.xml").decode()
-assert 'w:val="Heading2"' in doc and "What ran" in doc and "<w:tbl>" in doc
+assert not os.path.exists("out/README.docx")
 guide = open("out/LLM_GUIDE.md").read()
 for text in ("## Run facts", "n_samples: 2", "## Pitfalls", "### arg_long.tsv", "### arg_sarg_long.tsv", "### samples_qc.tsv",
              "`tables/samples_qc.tsv`", "## Figures (figures/)", "### Binning and MAGs", "## Recipes"):
     assert text in guide, text
 # the summary folder is what gets shared: paths relative to it, no local path, inputs by file name
-html = open("out/results_summary.html").read()
+html = "".join(open(p).read() for p in sorted(__import__("glob").glob("out/report/*.html")))
 for doc in (md, guide, html):
     assert os.getcwd() not in doc and "00_summary/" not in doc and "results_dir" not in doc
     assert not re.search(r"--[a-z-]+ /\w", doc)  # a flag followed by an absolute path
@@ -345,12 +349,13 @@ assert got == (2, 4, 1), got
 assert qc.at["sampleB", "n_genes_rgi"] == 0
 # depth classes: --min-clean-pairs 10000 and the default marks (10M, 20M)
 assert qc.at["sampleA", "depth_class"] == "10k-10M" and qc.at["sampleB", "depth_class"] == "<10k"
-html = open("out/results_summary.html").read()
+html = "".join(open(p).read() for p in sorted(__import__("glob").glob("out/report/*.html")))
 assert "Comparison of ARG methods" in html and "possibly a related gene of a commensal" in html
-assert "samples with &gt;=10M clean pairs" in html
-# the reading guide comes before the first figure, and explains tiers and both methods
-assert html.index("Reading this report</h2>") < html.index("<figure>")
-assert "ARG reporting tiers" in html and "RGI k-mer (pathogen of origin)" in html
+assert "samples with &gt;= 10M clean pairs" in html
+# the methods page explains tiers and both methods
+methods = open("out/report/methods.html").read()
+assert "Reading this report</h2>" in methods and "ARG reporting tiers" in methods
+assert "RGI k-mer (pathogen of origin)" in methods
 import os
 for gone in ("taxonomy_diversity", "taxonomy_pcoa", "group_timeline", "arg_tier1_timeline"):
     assert not os.path.exists(f"out/figures/{gone}.png"), gone
@@ -421,7 +426,7 @@ assert comp.at["CTX-M", "detected_by"] == "K-MARVEL + RGI"
 PYEOF
 check "--taxa-per-sample 1 draws one species row" \
     py "${SUMMARY}" --results run1/results --outdir top1 --min-clean-pairs 10000 --taxa-per-sample 1 --no-excel
-check "species heatmap caption gives one row" grep -q "most abundant species taxa (1 row)" top1/results_summary.html
+check "species heatmap caption gives one row" grep -q "most abundant species taxa (1 row)" top1/report/taxonomy.html
 
 # Edge cases that used to crash the report: no tier 1-2 gene in any group, an empty watchlist,
 # metadata columns named like summary columns
@@ -454,7 +459,7 @@ assert set(pd.read_csv("rgi1/tables/arg_long.tsv", sep="\t")["method"]) == {"rgi
 panel = pd.read_csv("rgi1/tables/arg_priority_panel.tsv", sep="\t", index_col=0)
 assert {"KPC", "cfrE", "poxtA"} <= set(panel.index), panel.index
 assert not os.path.exists("rgi1/tables/arg_method_comparison.tsv")
-assert "Antimicrobial resistance genes (RGI)" in open("rgi1/results_summary.html").read()
+assert "Antimicrobial resistance genes (RGI)" in "".join(open(p).read() for p in sorted(__import__("glob").glob("rgi1/report/*.html")))
 PYEOF
 check "--arg-primary kmarvel without K-MARVEL output fails" \
     fails py "${SUMMARY}" --results rgionly/results --outdir bad --arg-primary kmarvel --no-excel
@@ -697,7 +702,7 @@ typ = pd.read_csv("nonorm_out/tables/arg_sarg_type_cpc.tsv", sep="\t", index_col
 assert typ["sampleB"].isna().all() and (pd.to_numeric(typ["sampleA"]) > 0).all(), typ
 qc = pd.read_csv("nonorm_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"]) and qc.at["sampleB", "args_oap_ncell"] == 0
-assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_out/results_summary.html").read()
+assert "No 16S or cell estimate, so nothing normalised: sampleB" in "".join(open(p).read() for p in sorted(__import__("glob").glob("nonorm_out/report/*.html")))
 PYEOF
 # the same sample at low depth (--min-clean-pairs 10000): still blank, not 0 or NA_low_depth
 check "low-depth ARGs-OAP sample without a cell estimate" \
@@ -709,7 +714,7 @@ assert typ["sampleB"].isna().all(), typ
 qc = pd.read_csv("nonorm_low/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert qc.at["sampleB", "low_depth"] and pd.isna(qc.at["sampleB", "sarg_copies_per_cell"])
 assert pd.isna(qc.at["sampleB", "sarg_n_subtypes"])
-assert "No 16S or cell estimate, so nothing normalised: sampleB" in open("nonorm_low/results_summary.html").read()
+assert "No 16S or cell estimate, so nothing normalised: sampleB" in "".join(open(p).read() for p in sorted(__import__("glob").glob("nonorm_low/report/*.html")))
 PYEOF
 
 # a 0 cutoff is recorded in the README's inputs, not dropped as if it were unset
@@ -731,7 +736,7 @@ check "header lists tier 1 calls of samples outside the method comparison" py - 
 import pandas as pd
 arg = pd.read_csv("mixed_out/tables/arg_long.tsv", sep="\t")
 t1 = arg[(arg["tier"] == 1) & (arg["sample"] == "sampleB") & arg["gene_representative"]]
-html = open("mixed_out/results_summary.html").read()
+html = "".join(open(p).read() for p in sorted(__import__("glob").glob("mixed_out/report/*.html")))
 assert set(t1["gene"]) == {"KPC"}, set(t1["gene"])
 # KPC: RGI only in sampleA (both methods ran), K-MARVEL in sampleB (RGI did not run there)
 assert "KPC: 2 samples (sampleA, sampleB)" in html and "K-MARVEL (not every method ran) / RGI only" in html
@@ -852,6 +857,85 @@ assert len(num) and ((pd.to_numeric(rpkg.loc[num.index, "sampleA"]) - num * f).a
 r1 = pd.read_csv("out/tables/arg_gene_rpkg.tsv", sep="\t", index_col=0, keep_default_na=False)
 assert set(r1["sampleB"]) <= {"NA_no_ags", "NA_low_depth"}, set(r1["sampleB"])
 PYEOF
+
+# ---- the report documents (roadmap Phase 11d): a PDF and an HTML site with a page per section that ran
+pages() { (cd "$1/report" && ls -- *.html | sort | tr '\n' ' '); }
+check "QC only: the report has the overview, methods and dictionary pages only" \
+    test "$(pages qc)" = "dictionary.html index.html methods.html "
+check "run1: a page per stage that ran (taxonomy, ARGs, comparison, SARG, read functions, contig ARGs)" \
+    test "$(pages out)" = "args.html compare.html contig_args.html dictionary.html functional.html index.html methods.html sarg.html taxonomy.html "
+check "RGI only: no comparison page" fails test -e rgi1/report/compare.html
+has_pages() {
+    # has_pages <summary dir> <page...>: every page is in the report
+    local d="$1" p; shift
+    for p in "$@"; do [ -s "$d/report/$p" ] || { echo "    missing: $d/report/$p"; return 1; }; done
+}
+check "per-sample assembly tree: assembly, MAG, contig ARG, bin ARG and contig function pages" \
+    has_pages st_asm_out assembly.html mags.html contig_args.html bin_args.html contig_functional.html
+check "co-assembly tree: the same pages" \
+    has_pages st_co_out assembly.html mags.html contig_args.html bin_args.html contig_functional.html
+check "merged trees (batch mode): PDF and site" test -s st_merge/results_summary.pdf -a -s st_merge/report/mags.html
+check "merged trees: MAG figures drawn" test -s st_merge/figures/mag_quality.svg -a -s st_merge/figures/mag_abundance_heatmap.pdf
+check "every figure has its PDF, SVG, PNG and source CSV" py - <<'PYEOF'
+import glob, os
+for d in ("out", "st_merge", "st_asm_out"):
+    keys = {os.path.basename(p)[:-4] for p in glob.glob(f"{d}/figures/*.pdf")}
+    assert keys, d
+    for k in keys:
+        for ext in ("svg", "png", "csv"):
+            assert os.path.getsize(f"{d}/figures/{k}.{ext}") > 0, (d, k, ext)
+PYEOF
+check "figure PNGs at 600 dpi and 89 or 183 mm wide" py - <<'PYEOF'
+import glob, struct
+for p in glob.glob("out/figures/*.png") + glob.glob("st_merge/figures/*.png"):
+    data = open(p, "rb").read()
+    width = struct.unpack(">I", data[16:20])[0]
+    i = data.index(b"pHYs")
+    ppm = struct.unpack(">I", data[i + 4:i + 8])[0]
+    dpi = round(ppm * 0.0254)
+    mm = width / dpi * 25.4
+    assert dpi == 600, (p, dpi)
+    assert min(abs(mm - 89), abs(mm - 183)) < 0.2, (p, mm)
+PYEOF
+POPPLER_IMG=community.wave.seqera.io/library/poppler:26.10.0--96c1e0f2336a684e
+poppler() {
+    docker run --rm -i -u "$(id -u):$(id -g)" -v "${TMP_DIR}:${TMP_DIR}" -w "$(pwd)" "${POPPLER_IMG}" "$@"
+}
+fonts_embedded() {
+    # fonts_embedded <pdf...>: every font of every PDF is embedded (pdffonts' emb column), and the text is Inter
+    # (Typst's own DejaVu Sans Mono for the inputs block)
+    local f
+    for f in "$@"; do
+        poppler pdffonts "$f" | awk 'NR > 2 { n++; if ($(NF-4) != "yes") bad = 1; if ($1 !~ /Inter|DejaVuSansMono/) bad = 1 }
+                                    END { exit (bad || n == 0) }' || { echo "    not embedded or not Inter: $f"; return 1; }
+    done
+}
+check "fonts embedded in the report PDF (Inter)" fonts_embedded out/results_summary.pdf st_merge/results_summary.pdf
+check "fonts embedded in every figure PDF (Inter, TrueType)" fonts_embedded out/figures/*.pdf st_merge/figures/*.pdf
+poppler pdftotext -layout out/results_summary.pdf out/report.txt
+poppler pdftotext -layout st_merge/results_summary.pdf st_merge/report.txt
+check "figure and table numbers and titles are the same in the PDF and the HTML" py - <<'PYEOF'
+import glob, html, re, subprocess
+def labels(text):
+    text = re.sub(r"\s+", " ", text)
+    return {(k, int(n)): t[:10] for k, n, t in re.findall(r"\b(Figure|Table) (\d+)\. (\S[^.]{0,40})", text)}
+for d in ("out", "st_merge"):
+    pdf = open(f"{d}/report.txt").read()
+    site = html.unescape(re.sub(r"<[^>]+>", " ", "".join(open(p).read() for p in glob.glob(f"{d}/report/*.html"))))
+    a, b = labels(pdf), labels(site)
+    assert a and a == b, (d, set(a.items()) ^ set(b.items()))
+PYEOF
+
+rerun_identical() {
+    # two runs with SOURCE_DATE_EPOCH set: the same bytes in every file (no Excel: openpyxl stamps the time)
+    local o
+    for o in det1 det2; do
+        SOURCE_DATE_EPOCH=1700000000 py "${SUMMARY}" --results run1/results --outdir "$o" --metadata "${FIX}/metadata.tsv" \
+            --group-by subject --order-by visit --min-clean-pairs 10000 --no-excel > "$o.log" 2>&1 || return 1
+    done
+    diff -r det1 det2 > det.diff || { head -5 det.diff; return 1; }
+}
+check "a rerun with SOURCE_DATE_EPOCH writes the same bytes (tables, figures, PDF, site)" rerun_identical
 check "every process of summary_catalog.py exists in the pipeline" py - "${REPO_DIR}" <<'PYEOF'
 import re, sys
 from pathlib import Path

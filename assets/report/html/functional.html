@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% set f = s.facts %}
+{% block body %}
+<h1>Functional profile (read level)</h1>
+<p>{{ f.backend }} profiled {{ f.n_samples }} samples ({{ f.ontologies }}) in {{ f.unit }}. A gene can carry several terms, so the terms of an ontology do not add up to the annotated reads; every ontology is a table (function_read_&lt;ontology&gt;.tsv). This profile is reported apart from the contig-level one ({{ m.figref(s, "function_cog_heatmap") }}, {{ m.tabref(s, "per_sample") }}).</p>
+{{ m.figure(s, "function_cog_heatmap", specs) }}
+{{ m.table(s, "per_sample") }}
+{{ m.table(s, "ko") }}
+{% endblock %}

@@ -1,7 +1,9 @@
 """Shared constants and helpers of bin/results_summary.py."""
 
+import os
 import re
 import sys
+from datetime import datetime, timezone
 
 
 NA_LOW_DEPTH = "NA_low_depth"
@@ -77,3 +79,11 @@ def strip_gtdb(name):
 
 def norm_taxon(name):
     return strip_gtdb(name).strip().lower() if isinstance(name, str) else ""
+
+
+def generated_date():
+    """The date the summary documents carry: SOURCE_DATE_EPOCH when set (reproducible builds), else today."""
+    epoch = os.environ.get("SOURCE_DATE_EPOCH", "").strip()
+    if epoch.isdigit():
+        return datetime.fromtimestamp(int(epoch), tz=timezone.utc).date().isoformat()
+    return datetime.now().date().isoformat()

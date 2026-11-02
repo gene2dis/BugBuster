@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% set f = s.facts %}
+{% block body %}
+<h1>{{ run.title }}</h1>
+<p class="lede">{{ f.n_samples }} samples from {{ f.n_batches }} results director{{ "y" if f.n_batches == 1 else "ies" }} ({{ f.batches }}){% if f.median_clean is defined %}, median {{ f.median_clean }} clean read pairs{% endif %}. {{ f.stages_ran }} of {{ f.stages_total }} pipeline stages ran.</p>
+<div class="cards">{% for c in s.lists.cards %}<div class="card{% if c.warn %} warn{% endif %}"><b>{{ c.value }}</b><span>{{ c.label }}</span></div>{% endfor %}</div>
+{% if s.lists.attention %}
+<details class="attention" open><summary>Attention</summary>
+<p class="note">Tiers, ARG methods and the RGI host are explained in <a href="methods.html">Methods</a>.</p>
+<ul>{% for a in s.lists.attention %}<li class="{{ a.kind }}"><b>{{ a.title }}</b><ul>{% for i in a["items"] %}<li><a href="{{ i.page }}">{{ i.text }}</a></li>{% endfor %}</ul></li>{% endfor %}</ul>
+</details>
+{% endif %}
+<h2>Pipeline stages</h2>
+<p>{{ m.tabref(s, "stages") }} lists every stage, whether it ran and what this summary takes from it; a section of this report appears only when its stage ran.</p>
+{{ m.table(s, "stages") }}
+<h2 id="qc">Samples and sequencing depth</h2>
+<p>{{ f.n_low }} of {{ f.n_samples }} samples have fewer than {{ f.min_pairs }} clean read pairs{% if f.n_low %} ({{ f.low_samples }}){% endif %}; a gene or taxon missing from a low-depth sample is unknown, not absent ({{ m.figref(s, "qc_read_fate") }}, {{ m.tabref(s, "samples") }}).</p>
+{{ m.figure(s, "qc_read_fate", specs) }}
+{{ m.table(s, "samples") }}
+{% endblock %}

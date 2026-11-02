@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block body %}
+<h1>Assembly</h1>
+<p>{{ s.facts.n_assemblies }} MEGAHIT assembl{{ "y" if s.facts.n_assemblies == 1 else "ies" }} ({{ m.tabref(s, "stats") }}). Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table ({{ m.tabref(s, "read_use") }}).</p>
+{{ m.table(s, "stats") }}
+{{ m.table(s, "read_use") }}
+{% endblock %}

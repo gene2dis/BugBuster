@@ -1,0 +1,35 @@
+{% macro table(s, slot) -%}
+{% set t = s.tables.get(slot) %}
+{% if t %}
+<figure class="table" id="tab-{{ t.no }}"><figcaption><b>Table {{ t.no }}.</b> {{ t.caption }}{% if t.tsv %} <span class="src">({{ t.tsv }})</span>{% endif %}</figcaption>
+{% if t.rows %}
+<div class="tablewrap"><table class="data"><thead><tr>{% for h in t.header %}<th>{{ h }}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for r in t.rows %}<tr>{% for c in r %}<td{% if c.startswith("NA_") %} class="na"{% endif %}>{{ c }}</td>{% endfor %}</tr>
+{% endfor %}
+</tbody></table></div>
+{% if t.html_note %}<p class="note">{{ t.html_note }}</p>{% endif %}
+{% else %}<p class="note">No rows.</p>{% endif %}
+</figure>
+{% endif %}
+{%- endmacro %}
+
+{% macro figure(s, key, specs) -%}
+{% set f = s.figures.get(key) %}
+{% if f %}
+<figure class="fig" id="fig-{{ f.no }}">
+{% if specs.get(key) %}
+<div class="vis" id="vis-{{ key }}"></div>
+<noscript><img class="static" src="../figures/{{ key }}.svg" alt="{{ f.title }}"></noscript>
+<script>document.fonts.ready.then(function () { vegaEmbed("#vis-{{ key }}", {{ specs[key] | safe }}, {actions: false, renderer: "svg"}); });</script>
+{% else %}
+<img class="static" src="../figures/{{ key }}.svg" alt="{{ f.title }}" style="max-width: {{ (f.width_mm * 3.78 * 1.4) | round | int }}px">
+{% endif %}
+<figcaption><b>Figure {{ f.no }}. {{ f.title }}.</b> {{ f.caption }}{% if specs.get(key) %} <i>Interactive: hover for values{% if f.interactive and f.interactive.kind == "read_fate" %}, drag or scroll the right panel to zoom{% endif %}{% if f.interactive and (f.interactive.groups | select | list) %}, pick a group in the menu{% endif %}.</i>{% endif %}</figcaption>
+<p class="downloads">Static figure: <a href="../figures/{{ key }}.svg">SVG</a> <a href="../figures/{{ key }}.pdf">PDF</a> <a href="../figures/{{ key }}.png">PNG (600 dpi)</a> · <a href="../figures/{{ key }}.csv">source data (CSV)</a></p>
+</figure>
+{% endif %}
+{%- endmacro %}
+
+{% macro figref(s, key) -%}{% if s.figures.get(key) %}<a href="#fig-{{ s.figures[key].no }}">Figure {{ s.figures[key].no }}</a>{% endif %}{%- endmacro %}
+{% macro tabref(s, slot) -%}{% if s.tables.get(slot) %}<a href="#tab-{{ s.tables[slot].no }}">Table {{ s.tables[slot].no }}</a>{% endif %}{%- endmacro %}

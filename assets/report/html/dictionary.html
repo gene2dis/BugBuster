@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block body %}
+<h1>Data dictionary</h1>
+<p>Every table of this summary (<code>tables/&lt;name&gt;.tsv</code>, and one sheet each in <code>results_summary.xlsx</code>) with its columns.</p>
+<ul class="toc">{% for t in s.lists.tables %}<li><a href="#{{ t.name }}">{{ t.name }}</a></li>{% endfor %}</ul>
+{% for t in s.lists.tables %}
+<section class="dict" id="{{ t.name }}"><h2>{{ t.name }}</h2><p><b>{{ t.title }}.</b> {{ t.description }}</p>
+<table class="cols"><tbody>{% for c in t.columns %}<tr><th>{{ c.name }}</th><td>{{ c.text }}</td></tr>{% endfor %}</tbody></table></section>
+{% endfor %}
+{% endblock %}

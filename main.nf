@@ -949,6 +949,7 @@ workflow {
             params.card_prevalence ? file(params.card_prevalence, checkIfExists: true) : [],
             file(params.arg_priority_table, checkIfExists: true),
             file(params.summary_watchlist, checkIfExists: true),
+            file("${projectDir}/assets/report", checkIfExists: true),
             ch_summary_reports.toSortedList { a, b -> a.name <=> b.name }
         )
     }

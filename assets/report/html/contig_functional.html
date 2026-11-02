@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% set f = s.facts %}
+{% block body %}
+<h1>Functional profile (contig level)</h1>
+<p>eggNOG-mapper and dbCAN annotated the predicted genes of the assemblies; featureCounts counted them per sample ({{ f.n_samples }} samples; {{ f.ontologies }}) in {{ f.unit }}. TPM is relative to the reads on predicted genes, and a gene with several terms counts for each. Not comparable row by row with the read-level profile ({{ m.figref(s, "function_contig_cog_heatmap") }}, {{ m.tabref(s, "per_sample") }}).</p>
+{{ m.figure(s, "function_contig_cog_heatmap", specs) }}
+{{ m.table(s, "per_sample") }}
+{{ m.table(s, "cog") }}
+{{ m.table(s, "ko") }}
+{% endblock %}

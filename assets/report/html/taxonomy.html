@@ -1,0 +1,16 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block body %}
+<h1>Taxonomy</h1>
+<p>Community composition from {{ s.facts.db }}{% if s.facts.n_species is not none %}; {{ s.facts.n_species }} species were detected in at least one sample{% endif %}. The heatmaps show the union of each sample's most abundant taxa on a log scale ({{ m.figref(s, "taxonomy_species_heatmap") }}, {{ m.figref(s, "taxonomy_genus_heatmap") }}); the bars show proportions ({{ m.figref(s, "taxonomy_genus_bars") }}).</p>
+{{ m.figure(s, "taxonomy_species_heatmap", specs) }}
+{{ m.figure(s, "taxonomy_genus_heatmap", specs) }}
+{{ m.figure(s, "taxonomy_genus_bars", specs) }}
+{% if s.figures.get("watchlist") %}
+<h2>Watchlist</h2>
+<p>Priority pathogens and other watchlist taxa found in the samples ({{ m.figref(s, "watchlist") }}, {{ m.tabref(s, "watchlist") }}). Detection is not culture.</p>
+{% endif %}
+{{ m.figure(s, "watchlist", specs) }}
+{{ m.table(s, "watchlist") }}
+<h2>Prevalence</h2>
+{{ m.table(s, "prevalence") }}
+{% endblock %}

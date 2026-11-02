@@ -21,15 +21,17 @@ process RESULTS_SUMMARY {
     path(card_prevalence)                           // optional WildCARD card_prevalence.txt; []
     path(arg_priority)                              // ARG tier rule table
     path(watchlist)                                 // watchlist taxa
+    path(report_assets, stageAs: 'report_assets')   // assets/report: Typst and Jinja templates, styles, references
     path(stage_reports, stageAs: 'in_reports/*')   // run-level tables of other stages, by file name (see the case below); []
 
     output:
-    path("results_summary.html"), emit: html
+    path("results_summary.html"), emit: html        // a link to report/index.html
+    path("report")              , emit: site        // the multi-page HTML report
+    path("results_summary.pdf") , emit: pdf
     path("results_summary.xlsx"), emit: xlsx, optional: true
     path("tables/*.tsv")        , emit: tables
     path("figures/*")           , emit: figures, optional: true
     path("README.md")           , emit: readme
-    path("README.docx")         , emit: readme_docx
     path("LLM_GUIDE.md")        , emit: llm_guide
     path "versions.yml"         , emit: versions
 
@@ -154,14 +156,19 @@ process RESULTS_SUMMARY {
         pandas: \$(python -c "import pandas; print(pandas.__version__)")
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
         openpyxl: \$(python -c "import openpyxl; print(openpyxl.__version__)")
+        typst: \$(typst --version | sed 's/typst //; s/ .*//')
+        jinja2: \$(python -c "import jinja2; print(jinja2.__version__)")
+        altair: \$(python -c "import altair; print(altair.__version__)")
+        vl-convert: \$(python -c "import vl_convert; print(vl_convert.__version__)")
     END_VERSIONS
     """
 
     stub:
     """
-    mkdir -p tables figures
-    touch results_summary.html results_summary.xlsx tables/samples_qc.tsv figures/qc_read_fate.png
-    touch README.md README.docx LLM_GUIDE.md
+    mkdir -p tables figures report/assets
+    touch results_summary.html results_summary.pdf results_summary.xlsx tables/samples_qc.tsv
+    touch figures/qc_read_fate.png figures/qc_read_fate.pdf figures/qc_read_fate.svg figures/qc_read_fate.csv
+    touch report/index.html report/methods.html report/assets/site.css README.md LLM_GUIDE.md
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -169,6 +176,10 @@ process RESULTS_SUMMARY {
         pandas: 3.1.0
         matplotlib: 3.11.2
         openpyxl: 3.1.5
+        typst: 0.15.1
+        jinja2: 3.1.6
+        altair: 6.3.0
+        vl-convert: 1.9.0
     END_VERSIONS
     """
 }
