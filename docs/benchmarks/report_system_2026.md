@@ -7,7 +7,7 @@ Prototype run 2026-11-01 to 2026-11-02 (roadmap Phase 11c, items P1 and P2), on 
 
 Nothing is wired into the pipeline. Only this document is committed; the prototype code and renders stay outside the repository, kept beside the Phase 11a reference results (location in the roadmap's Phase 11c entry) for Phase 11d to start from.
 
-**Decision (owner):** pending.
+**Decision (owner, 2026-11-02):** the recommendations below are taken. **(P1) (b):** Typst for the PDF and a Python/Jinja multi-page HTML site, not Quarto. **(P2) (i):** matplotlib for every static figure and Vega-Lite (Altair) for the interactive versions of the large figures, not one Vega-Lite spec for both. Plotly is out. Phase 11d applies this with the image listed under the recommendations.
 
 **Outcome (recommendations):**
 
