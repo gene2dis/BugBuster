@@ -2,6 +2,10 @@
 
 **Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible**
 
+[![BugBuster overview: reads go through quality control, then read-level taxonomy, ARG and functional profiling, assembly with binning into MAGs, and contig-level ARG, taxonomy, mobile-element and functional branches; every stage feeds the run summary. Green boxes run by default, dashed boxes are optional.](images/bugbuster_overview.svg)](images/bugbuster_overview.png)
+
+Green boxes run by default; dashed boxes are switched on by a parameter. Every stage and its switch: [WORKFLOW_DIAGRAM.md](WORKFLOW_DIAGRAM.md).
+
 ---
 
 ## Table of Contents
@@ -36,28 +40,7 @@ BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysi
 
 ### Pipeline Workflow
 
-```
-Reads → QC (FastP) → Host Removal (bwa-mem3) → Taxonomy (Kraken2/Sourmash/Sylph)
-                                            ├──→ Read-level functions (Woltka/WoLr2, SUPER-FOCUS/SEED or HUMAnN 4, optional)
-                                            ↓
-                                      Assembly (MEGAHIT)
-                                            ↓
-                                      Contig Filtering (BBMap)
-                                            ↓
-                              ┌─────────────┴─────────────┐
-                              ↓                           ↓
-                      Binning (SemiBin;           Contig Analysis
-                       + MetaBAT2/COMEBin)         (Metabuli, BlobTools, DeepARG;
-                                                    geNomad, optional)
-                              ↓
-                      Refinement (Binette, ≥2 binners)
-                              ↓
-                      Quality (CheckM2)
-                              ↓
-                      Taxonomy (GTDB-TK)
-                              ↓
-                      MAG Annotation (Bakta, optional)
-```
+The figure at the top of this manual shows the stages from reads to results. [WORKFLOW_DIAGRAM.md](WORKFLOW_DIAGRAM.md) has one diagram per stage, with the parameter that switches each step on.
 
 ---
 

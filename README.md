@@ -4,6 +4,10 @@
 [![run with docker](https://img.shields.io/badge/run%20with-docker-0db7ed?logo=docker)](https://www.docker.com/)
 [![run with singularity](https://img.shields.io/badge/run%20with-singularity-1d355c.svg)](https://sylabs.io/docs/)
 
+[![BugBuster overview: reads go through quality control, then read-level taxonomy, ARG and functional profiling, assembly with binning into MAGs, and contig-level ARG, taxonomy, mobile-element and functional branches; every stage feeds the run summary. Green boxes run by default, dashed boxes are optional.](docs/images/bugbuster_overview.svg)](docs/images/bugbuster_overview.png)
+
+Green boxes run by default; dashed boxes are switched on by a parameter. Every stage and its switch: [docs/WORKFLOW_DIAGRAM.md](docs/WORKFLOW_DIAGRAM.md).
+
 ## Introduction
 
 **Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible** 
@@ -21,8 +25,6 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 - **Resource optimization**: Dynamic resource allocation with retry strategies
 
 ## Pipeline summary
-![Diagrama_BugBuster drawio](https://github.com/user-attachments/assets/40d02c04-e84e-48b4-b517-c93dccd68abc)
-
 
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Optionally remove samples that fall below a minimum read count after quality filtering (`--min_read_sample`, default `0` = filter disabled).

@@ -12,6 +12,16 @@ next release is tagged.
 
 ### Added
 
+- **Pipeline overview figure and up-to-date workflow diagrams** (docs only).
+  `docs/images/bugbuster_overview.svg` (hand-written, Inter embedded, Okabe-Ito
+  accents) and its PNG, rendered by `docs/images/render_overview.sh` in pinned
+  containers, open README.md and docs/manual.md; they replace the README's old
+  drawio diagram, which still showed KARGA/KARGVA, MetaWRAP and MetaCerberus.
+  `docs/WORKFLOW_DIAGRAM.md` now has every stage with its `main.nf` gate, one
+  diagram per stage (including PREPARE_DATABASES, the read-level ARG tools,
+  the contig branches, SOFTWARE_VERSIONS and RESULTS_SUMMARY) and a gate
+  table; `tests/bin/test_workflow_diagram.sh` (CI) fails when a process or
+  subworkflow the code includes is not named there.
 - **Run summary covers the assembly-based stages** (`00_summary/`): new
   tables for the six stages the summary did not read yet. Existing tables are
   unchanged; `samples_qc` gains columns at its end.
