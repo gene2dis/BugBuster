@@ -50,15 +50,17 @@ def write_pdf(outdir, model, assets, fig_dir, keep_build=None):
     env = dict(os.environ)
     if not env.get("SOURCE_DATE_EPOCH", "").strip().isdigit():
         env.pop("SOURCE_DATE_EPOCH", None)  # typst (and fontconfig) reject an empty or malformed value
-    res = subprocess.run([typst, "compile", "--ignore-system-fonts", "--font-path", "fonts", "report.typ", str(out)],
-                         cwd=build, capture_output=True, text=True, env=env)
+    try:
+        res = subprocess.run([typst, "compile", "--ignore-system-fonts", "--font-path", "fonts", "report.typ",
+                              str(out)], cwd=build, capture_output=True, text=True, env=env)
+    finally:
+        if not keep_build:  # the build holds the whole model as data.json: never leave it in the shared folder
+            shutil.rmtree(build, ignore_errors=True)
     if res.returncode != 0:
         warn(f"typst failed, no results_summary.pdf:\n{res.stderr.strip()}")
         return None
     for line in res.stderr.strip().splitlines():
         if line.strip():
             warn(f"typst: {line}")
-    if not keep_build:
-        shutil.rmtree(build)
     print(f"results_summary.pdf written ({time.time() - t0:.1f} s)")
     return out

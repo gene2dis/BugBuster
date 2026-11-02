@@ -80,7 +80,10 @@ nextflow_process {
             def lines = path(process.out.report.get(0)).readLines()
             assert lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed),Sylph DB,Unclassified,Classified"
             assert lines.contains("sample1,120000,110000,100000,gtdb,0.2404,0.7596")
-            assert file(process.out.plots.get(0)).name == "sylph_tax_classified_reads.png"
+            // the classification plot as PDF, SVG, PNG and its plotted values
+            assert process.out.plots.get(0).collect { f -> file(f).name }.sort() ==
+                ["sylph_tax_classified_reads.csv", "sylph_tax_classified_reads.pdf", "sylph_tax_classified_reads.png",
+                 "sylph_tax_classified_reads.svg"]
         }
     }
 

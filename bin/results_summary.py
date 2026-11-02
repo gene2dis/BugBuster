@@ -883,9 +883,12 @@ def main(argv=None):
     }
     ctx["method_notes"] = method_notes(ctx)
     model = summary_report.build(ctx, args.report_assets)
+    pdf = None if args.no_pdf else write_pdf(outdir, model, args.report_assets, figs.dir)
+    ctx["pdf_written"] = model["run"]["pdf"] = pdf is not None
+    stale = outdir / "results_summary.pdf"
+    if pdf is None and stale.exists():
+        stale.unlink()  # an earlier run's PDF in a reused output directory would not match these tables
     write_site(outdir, model, args.report_assets)
-    if not args.no_pdf:
-        write_pdf(outdir, model, args.report_assets, figs.dir)
     write_docs(outdir, ctx)
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 

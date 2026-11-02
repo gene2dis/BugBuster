@@ -926,6 +926,21 @@ for d in ("out", "st_merge"):
     assert a and a == b, (d, set(a.items()) ^ set(b.items()))
 PYEOF
 
+check "inline Vega-Lite specs escape '<', '>' and '&' (a label with </script> cannot end the block)" py - "${REPO_DIR}" <<'PYEOF'
+import json, sys
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1] + "/bin")
+import pandas as pd
+import summary_interactive as si
+label = "a</script><b>&"
+f = pd.DataFrame({"feature": [label], "sample": ["s1"], "group": [""], "low_depth": [False], "hatched": [False],
+                  "value": [1.0]})
+spec = si.spec_json("k", {"kind": "heatmap", "frame": f, "feature": "feature", "value": "value", "features": [label],
+                          "samples": ["s1"], "groups": [""], "low": [], "domain": [-1, 1], "legend": "x",
+                          "row_group": None})
+assert spec and not set("<>&") & set(spec), spec[:200]
+assert label in json.dumps(json.loads(spec))
+PYEOF
 rerun_identical() {
     # two runs with SOURCE_DATE_EPOCH set: the same bytes in every file (no Excel: openpyxl stamps the time)
     local o

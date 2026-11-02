@@ -56,8 +56,9 @@ nextflow_process {
             assert process.out.sample_metadata.size() == 1
             assert process.out.phyloseq_h5.size() == 1
 
-            // abundance plots land in the output root and are emitted
-            assert process.out.plots.get(0).size() == 4
+            // abundance plots land in the output root and are emitted: 4 levels x PDF, SVG, PNG and CSV
+            assert process.out.plots.get(0).size() == 16
+            assert process.out.plots.get(0).count { f -> file(f).name.endsWith("_bar.png") } == 4
         }
     }
 

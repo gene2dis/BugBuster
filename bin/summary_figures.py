@@ -37,12 +37,7 @@ class FigureWriter:
                              "interactive": interactive})
 
 
-def short_count(n):
-    """10000000 -> '10M', 1500000 -> '1.5M', 250000 -> '250k' (the depth classes of samples_qc)."""
-    for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
-        if n >= div:
-            return f"{n / div:.3g}{suffix}"
-    return f"{n:.0f}"
+short_count = fs.short_count  # also the depth classes of samples_qc (results_summary.py)
 
 
 def display_names(names):
@@ -640,12 +635,18 @@ def fig_mag_abundance(fw, ab, mags, cols, groups, low, max_rows=80):
         return
     a = ab.copy()
     a["pct_sample_bases"] = pd.to_numeric(a["pct_sample_bases"], errors="coerce")
-    a["mag"] = a["assembly"].astype(str) + " " + a["bin"].astype(str)
+    # a MAG is batch + assembly + bin: two merged co-assemblies are both called 'coassembly'
+    multi = mags["batch"].nunique() > 1
+
+    def mag_key(d):
+        key = d["assembly"].astype(str) + " " + d["bin"].astype(str)
+        return d["batch"].astype(str) + ": " + key if multi else key
+    a["mag"] = mag_key(a)
     mat = a.pivot_table(index="mag", columns="sample", values="pct_sample_bases", aggfunc="first")
     mat = mat.reindex(columns=[c for c in cols if c in mat.columns])
     if mat.empty or mat.fillna(0).le(0).all().all():
         return
-    info = mags.assign(mag=mags["assembly"].astype(str) + " " + mags["bin"].astype(str)).set_index("mag")
+    info = mags.assign(mag=mag_key(mags)).drop_duplicates("mag").set_index("mag")
     top = mat.max(axis=1).sort_values(ascending=False, kind="stable").index[:max_rows]
     ph = {k: (strip_gtdb(str(info.at[k, "phylum"])) if k in info.index and str(info.at[k, "phylum"]) not in
               ("", "nan") else "unclassified") for k in top}

@@ -140,10 +140,11 @@ def category_colors(names, other=("Other", "other", "no-hit", "unassigned", "unc
 
 
 def short_count(n):
-    """10000000 -> '10 M', 1500000 -> '1.5 M', 250000 -> '250 k'."""
+    """10000000 -> '10M', 1500000 -> '1.5M', 250000 -> '250k': the form of samples_qc's depth classes, so figures,
+    report and tables write a count the same way."""
     for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
         if abs(n) >= div:
-            return f"{n / div:.3g} {suffix}"
+            return f"{n / div:.3g}{suffix}"
     return f"{n:.0f}"
 
 

@@ -27,7 +27,7 @@ process RESULTS_SUMMARY {
     output:
     path("results_summary.html"), emit: html        // a link to report/index.html
     path("report")              , emit: site        // the multi-page HTML report
-    path("results_summary.pdf") , emit: pdf
+    path("results_summary.pdf") , emit: pdf, optional: true  // none when typst fails (a warning) or with --no-pdf
     path("results_summary.xlsx"), emit: xlsx, optional: true
     path("tables/*.tsv")        , emit: tables
     path("figures/*")           , emit: figures, optional: true
@@ -139,12 +139,15 @@ process RESULTS_SUMMARY {
         ln -s "\$PWD/\$f" "\$dest/"
     done
 
+    # matplotlib's and fontconfig's caches in the task directory (a read-only image, maybe no home)
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     results_summary.py \\
         --results ${run_dir} \\
         --batch-labels '${batch_label}' \\
         --outdir . \\
         --arg-priority ${arg_priority} \\
         --watchlist ${watchlist} \\
+        --report-assets report_assets \\
         ${kmarvel_db_arg} \\
         ${metadata_arg} \\
         ${prevalence_arg} \\

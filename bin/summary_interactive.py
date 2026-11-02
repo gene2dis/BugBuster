@@ -17,7 +17,7 @@ SCALE = 1.8
 
 def available():
     try:
-        import altair  # noqa: F401
+        import altair  # noqa: F401 (availability check)
         import vl_convert  # noqa: F401
     except ImportError:
         return False
@@ -195,7 +195,10 @@ def spec_json(key, data):
     spec = BUILDERS[data["kind"]](data).to_dict()
     spec["config"] = config()
     spec["padding"] = {"left": 12, "top": 4, "right": 4, "bottom": 4}
-    text = json.dumps(spec, separators=(",", ":"), default=str)
+    # inline in a <script>: no '<', '>' or '&' may appear raw (a label with '</script>' would end the block);
+    # \u escapes stay valid JSON and JavaScript
+    text = (json.dumps(spec, separators=(",", ":"), default=str)
+            .replace("<", "\\u003c").replace(">", "\\u003e").replace("&", "\\u0026"))
     if len(text) > SPEC_BUDGET:
         warn(f"{key}: interactive spec {len(text) / 1e6:.1f} MB is above the {SPEC_BUDGET / 1e6:g} MB budget; the "
              "HTML shows the static figure")

@@ -12,6 +12,6 @@
 <main>
 {% block body %}{% endblock %}
 </main>
-<footer>Generated {{ run.generated }}{% if run.pipeline_version %} by BugBuster {{ run.pipeline_version }}{% endif %} · {{ run.n_samples }} samples from {{ run.batches | join(", ") }} · the tables are in <code>tables/</code>, the figures in <code>figures/</code> and the PDF is <code>results_summary.pdf</code>, next to this folder.</footer>
+<footer>Generated {{ run.generated }}{% if run.pipeline_version %} by BugBuster {{ run.pipeline_version }}{% endif %} · {{ run.n_samples }} samples from {{ run.batches | join(", ") }} · the tables are in <code>tables/</code>, the figures in <code>figures/</code>{% if run.pdf %} and the PDF is <code>results_summary.pdf</code>{% endif %}, next to this folder.</footer>
 <script src="assets/tables.js"></script>
 </body></html>

@@ -768,7 +768,8 @@ def readme_blocks(ctx):
               ("p", f"BugBuster run-level summary generated on {generated_date()}: {s['n_samples']} samples "
                     f"from {s['n_batches']} results director{'y' if s['n_batches'] == 1 else 'ies'}. Open "
                     "`report/index.html` (or `results_summary.html`) for the report with interactive figures and "
-                    "tables, or `results_summary.pdf` for the typeset version; the tables are in `tables/` (TSV) and in "
+                    "tables" + (", or `results_summary.pdf` for the typeset version" if ctx.get("pdf_written") else "")
+                    + "; the tables are in `tables/` (TSV) and in "
                     "`results_summary.xlsx` (one sheet each, plus a README sheet with every column). "
                     "`LLM_GUIDE.md` describes this folder for a language model or a script.")]
     labels, rows = stage_rows(ctx["stage_status"])
@@ -859,7 +860,8 @@ def llm_guide(ctx):
             "Contents: `tables/` (one TSV per table), `figures/` (each figure as PDF, SVG and PNG, with its plotted "
             "values as `<figure>.csv`), `results_summary.xlsx` (the same tables, one sheet each, plus a README sheet), "
             "`report/` (the HTML report, one page per section, opened at `report/index.html`; "
-            "`results_summary.html` links to it), `results_summary.pdf` (the same report typeset), `README.md` (the "
+            "`results_summary.html` links to it), "
+            + ("`results_summary.pdf` (the same report typeset), " if ctx.get("pdf_written") else "") + "`README.md` (the "
             "folder's contents for people) and this guide.", "",
             "1. Start from `tables/samples_qc.tsv` (one row per sample): depth, low-depth flag "
             "(`low_depth`) and per-method counts. Treat low-depth samples as uninformative for absence.",
