@@ -177,6 +177,10 @@ jobs:
         run: |
           tests/bin/test_emapper_ogs_fix.sh
 
+      - name: Check docs/WORKFLOW_DIAGRAM.md names every process (roadmap D1)
+        run: |
+          tests/bin/test_workflow_diagram.sh
+
       - name: Check module meta.yml descriptors against the process declarations
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml > /dev/null
