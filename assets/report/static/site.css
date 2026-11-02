@@ -1,0 +1,62 @@
+/* BugBuster run summary, HTML report. Inter is bundled (assets/fonts); nothing is loaded from the network. */
+@font-face { font-family: "Inter"; font-weight: 400; font-style: normal; src: url("fonts/Inter-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 600; font-style: normal; src: url("fonts/Inter-SemiBold.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 700; font-style: normal; src: url("fonts/Inter-Bold.woff2") format("woff2"); }
+@font-face { font-family: "Inter"; font-weight: 400; font-style: italic; src: url("fonts/Inter-Italic.woff2") format("woff2"); }
+:root { --fg: #1d1f23; --muted: #5f6368; --rule: #d9dbe0; --accent: #0072B2; --warn: #b8470b; --bg: #ffffff; --panel: #f5f6f8; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; font: 15px/1.55 Inter, system-ui, sans-serif; color: var(--fg); background: var(--bg); }
+header.top { position: sticky; top: 0; background: var(--bg); border-bottom: 1px solid var(--rule); z-index: 5; }
+header.top nav { max-width: 1200px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 4px 16px; flex-wrap: wrap; align-items: baseline; font-size: 13.5px; }
+header.top a { color: var(--fg); text-decoration: none; white-space: nowrap; }
+header.top a.brand { font-weight: 700; margin-right: 8px; }
+header.top a.on { color: var(--accent); font-weight: 600; }
+main { max-width: 1200px; margin: 0 auto; padding: 8px 16px 48px; }
+footer { max-width: 1200px; margin: 0 auto; padding: 16px; border-top: 1px solid var(--rule); color: var(--muted); font-size: 12.5px; }
+h1 { font-size: 26px; margin: 20px 0 6px; line-height: 1.25; }
+h2 { font-size: 19px; margin: 34px 0 8px; border-bottom: 1px solid var(--rule); padding-bottom: 4px; }
+p.lede { color: var(--muted); margin-top: 0; }
+a { color: var(--accent); }
+code, pre { font-size: 12.5px; }
+pre { background: var(--panel); border: 1px solid var(--rule); border-radius: 6px; padding: 10px; overflow-x: auto; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 14px 0; }
+.card { background: var(--panel); border-radius: 6px; padding: 10px 12px; }
+.card b { display: block; font-size: 21px; }
+.card span { color: var(--muted); font-size: 13px; }
+.card.warn b { color: var(--warn); }
+details.attention { background: var(--panel); border-radius: 6px; padding: 8px 14px; margin: 6px 0 10px; }
+details.attention summary { font-weight: 600; cursor: pointer; }
+details.attention > ul { margin: 6px 0; padding-left: 18px; }
+details.attention ul ul { padding-left: 18px; font-size: 14px; }
+details.attention li.homolog > b, details.attention li.single > b { color: var(--warn); }
+details.attention a { color: inherit; text-decoration: none; }
+details.attention a:hover { text-decoration: underline; }
+figure { margin: 22px 0; }
+figure.fig { overflow-x: auto; }
+figcaption { font-size: 13px; color: var(--muted); margin: 6px 0 4px; max-width: 980px; }
+figcaption b { color: var(--fg); }
+figcaption .src { white-space: nowrap; }
+img.static { display: block; width: 100%; height: auto; }
+.vis { overflow-x: auto; }
+.vis form.vega-bindings { font-size: 13px; margin-top: 4px; }
+.downloads { font-size: 12.5px; margin: 2px 0 0; color: var(--muted); }
+.downloads a { margin-right: 8px; }
+.tablewrap { overflow: auto; max-height: 520px; border: 1px solid var(--rule); border-radius: 4px; }
+table.data { border-collapse: collapse; font-size: 12.5px; width: 100%; font-variant-numeric: tabular-nums; }
+table.data th, table.data td { padding: 4px 8px; border-bottom: 1px solid #eceef1; text-align: left; white-space: nowrap; }
+table.data thead th { position: sticky; top: 0; background: var(--panel); cursor: pointer; user-select: none; }
+table.data th[data-dir="asc"]::after { content: " \25B2"; }
+table.data th[data-dir="desc"]::after { content: " \25BC"; }
+table.data td.na { color: var(--muted); font-style: italic; }
+input.filter { margin: 6px 8px 6px 0; padding: 5px 8px; font: inherit; font-size: 13px; border: 1px solid var(--rule); border-radius: 4px; width: 260px; max-width: 100%; }
+span.count { font-size: 12px; color: var(--muted); }
+p.note { font-size: 12.5px; color: var(--muted); }
+ul.caveats li { margin: 5px 0; }
+ol.refs li { margin-bottom: 4px; font-size: 14px; }
+ul.toc { columns: 3 220px; font-size: 13.5px; }
+table.cols { border-collapse: collapse; font-size: 13px; width: 100%; }
+table.cols th { text-align: left; vertical-align: top; padding: 3px 12px 3px 0; white-space: nowrap; font-weight: 600; width: 1%; }
+table.cols td { padding: 3px 0; border-bottom: 1px solid #eceef1; }
+@media (max-width: 640px) { body { font-size: 14px; } h1 { font-size: 22px; } }
+@media print { header.top { position: static; } .tablewrap { max-height: none; } }

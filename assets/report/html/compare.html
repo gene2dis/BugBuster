@@ -1,0 +1,9 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block body %}
+<h1>Comparison of ARG methods</h1>
+<p>{{ s.facts.methods }} on the same samples, gene by gene, with allele numbers removed (KPC-2 and KPC-97 are both KPC). K-MARVEL reports calls; RGI bwt reports every gene with a mapped read, so an RGI gene counts when reads cover at least {{ s.facts.rgi_cov }} % of its best reference sequence, and "RGI below cutoff" marks K-MARVEL genes RGI saw with partial coverage, which is not absence. ARGs-OAP uses SARG, whose names differ from CARD's, and is not compared here ({{ m.figref(s, "arg_method_upset") }}, {{ m.figref(s, "arg_method_by_category") }}, {{ m.tabref(s, "overlap") }}).</p>
+{{ m.figure(s, "arg_method_upset", specs) }}
+{{ m.figure(s, "arg_method_by_category", specs) }}
+{{ m.table(s, "overlap") }}
+{{ m.table(s, "comparison") }}
+{% endblock %}

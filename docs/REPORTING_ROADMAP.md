@@ -24,7 +24,7 @@ These problems were found on real data in the Sylph and K-MARVEL outputs. They a
 - **Low-depth flag.** "Not detected" in a shallow sample is unknown, not absent (`NA_low_depth` in the summary).
 - **Names, not IDs.** Name the rows of a table by taxon or gene, not by accession or taxid.
 - **"Other" in bar plots.** Picking the global top N by mean abundance hides taxa that dominate a few samples. Use the union of each sample's top-k, and use heatmaps for detail.
-- **Figure layout.** Use natural sample order (V2 before V10), height that scales with the sample count, and the legend outside the plot.
+- **Figure layout.** Use natural sample order (V2 before V10), height that scales with the sample count, and the legend outside the plot. Since Phase 11d every figure follows `bin/figure_style.py` (journal widths, Inter, Okabe-Ito / viridis, 600 dpi PNG, a CSV of the plotted values, samples as rows above 60).
 - **Mutation-dependent ARG hits.** Detecting the gene is not detecting resistance. Check the mutations against CARD `snps.txt` (or the database's equivalent).
 - **Alleles share reads.** Close alleles of one gene take the same reads, so represent the gene by its best-supported allele and never sum them.
 - **Cross-batch merge.** Large studies run in batches: a summary must outer-join taxa and genes across results directories.
@@ -128,7 +128,8 @@ Still open:
   belongs in tier 1 at all for gut metagenomes.
 - **Tier 4 for RGI.** `rgi bwt` reports homolog matches; mutation-dependent genes get `not_checked_rgi`.
 - **RGI_REPORT plots pool all samples.** `value_counts()` counts sample x gene rows, and the per-sample bar is in
-  alphabetical order. The summary's figures cover the per-sample view; consider dropping these plots.
+  alphabetical order. The summary's figures cover the per-sample view; consider dropping these plots. Left as they
+  are in Phase 11d (owner): they are drawn by inline Python in the module, not on the shared figure style.
 - **No MAPQ filter.** Reads mapping equally well to several WildCARD sequences are counted for one of them by KMA.
 
 ## Contig-level ARG and taxonomy: DeepARG + Metabuli/BlobTools (verified 2026-11-01)
@@ -138,14 +139,15 @@ Phase 9b). `bin/arg_blobplot.py` and `bin/blobplot.py` draw the blob plots.
 
 - **Fixed and verified on real runs:** the table is tab-separated, and `ARG_blob_plot.png` shows only the
   ARG-carrying contigs.
-- **A contig with several ARGs is plotted once per ARG: verified** (co-assembly: 301 hits on 228 contigs, 44
-  contigs with more than one). Deferred to roadmap Phase 11d (figure redesign).
-- **Blob plots pool all samples: verified** (the phylum plot draws every assembly in one panel and never uses its
-  `Sample` column). Deferred to Phase 11d, with:
-  - `blobplot.py` shows 8 phyla (`<=` threshold) and `no-hit` takes a colour slot: verified.
-  - `arg_blobplot.py` keeps the top 9 ARG classes by summed contig length, not by count, and writes `MLS` as `Mls`
-    (found 2026-11-01).
-  - Percentages are of contigs or rows, not of length or coverage: verified.
+- **A contig with several ARGs is plotted once per ARG: verified, fixed (roadmap Phase 11d).** The ARG blob plot
+  draws each contig once; a contig with hits in several classes is "multiple classes".
+- **Blob plots pool all samples: verified, fixed (Phase 11d).** One phylum and one ARG blob plot per assembly
+  (`<assembly>_Phylum_blob_plot.*`, `<assembly>_ARG_blob_plot.*`), with:
+  - `blobplot.py`: the 8 phyla with the most contig length plus "other"; `no-hit` is grey and takes no colour slot.
+  - `arg_blobplot.py`: the 8 ARG classes with the most contigs (was by summed length); class names as DeepARG writes
+    them (`MLS`).
+  - The bars say what they count: the phylum plot's share of the contig length, the ARG plot's share of the
+    ARG-carrying contigs.
 - **Coverage is raw: verified** (BlobTools `bam0`; under co-assembly pooled over all samples). The summary's
   `arg_contig_long` says so, and `arg_contig_abundance` gives each sample's reads on the gene (featureCounts).
 - **Fragile contig names: dropped** (fixed earlier: everything before the last `_` of the gene id).
@@ -168,7 +170,8 @@ The binning reports are `bin/bin_quality_report.py`, `bin/bin_tax_report.py` and
     says "or".
 - **Missing dimensions: verified, superseded.** `Mag_quality_summary.csv` has no sample and `Bin_summary.csv` no
   quality class; the summary's `mags` table has both, in both assembly modes.
-- **Taxonomy plot drops bins: verified in code, not exercised** (every reference MAG had a GTDB phylum). Open.
+- **Taxonomy plot drops bins: verified in code, fixed (Phase 11d).** A bin without a GTDB phylum is counted as
+  "unclassified" in `MAGs_tax_plot` (the table was already complete).
 - **Coverage is an unweighted mean of per-contig mean depths: verified**, and only under co-assembly. The summary
   keeps it as published, says so, and adds `pct_sample_bases`; under per-sample assembly `mag_abundance` uses the
   length-weighted contig coverage of the contig table. The bowtie2 cross-bin item is not testable on the bwa-mem3
@@ -202,7 +205,8 @@ The tables in `07_functional_annotation/summary/` follow the design doc. There a
   genome equivalents count both mates too.
 - **Summary work: fixed (Phase 11b)** as tables: `function_contig_long` and `function_contig_<ontology>` (CPGE when
   MicrobeCensus ran, else TPM), the annotated fraction in `samples_qc`, never merged with the read branch; and
-  read-level ARGs per genome equivalent (`arg_*_rpkg`). The heatmap is left to Phase 11d.
+  read-level ARGs per genome equivalent (`arg_*_rpkg`). **Fixed (Phase 11d):** `function_contig_cog_heatmap`, with
+  `mag_quality`, `mag_abundance_heatmap` and `arg_contig_hosts`.
 
 ## Out of scope
 

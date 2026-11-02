@@ -43,8 +43,8 @@ output:
       pattern: "Reads_report.csv"
   - plots:
       type: file
-      description: Classification visualization plots
-      pattern: "*.png"
+      description: Classified / unclassified reads per sample (Kraken_plot, sourmash_tax_classified_reads or sylph_tax_classified_reads) as .pdf / .svg / .png (600 dpi), with its plotted values as .csv
+      pattern: "{Kraken_plot,sourmash_tax_classified_reads,sylph_tax_classified_reads}.{pdf,svg,png,csv}"
 
 authors:
   - "@ffuentessantander"

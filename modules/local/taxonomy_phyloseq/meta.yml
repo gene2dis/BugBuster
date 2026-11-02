@@ -62,8 +62,8 @@ output:
       pattern: "*_read_counts.tsv"
   - plots:
       type: file
-      description: Relative abundance plots at various taxonomic levels
-      pattern: "*.png"
+      description: Relative abundance bars per taxonomic level (<profiler>_<db>_<level>_bar) as .pdf / .svg / .png (600 dpi), with their plotted values as .csv
+      pattern: "*_bar.{pdf,svg,png,csv}"
 
 authors:
   - "@ffuentessantander"

@@ -2,10 +2,10 @@ process RESULTS_SUMMARY {
     tag "results_summary"
     label 'process_single'
 
-    conda "conda-forge::python=3.13 conda-forge::pandas=3.1.0 conda-forge::numpy=2.5.4 conda-forge::matplotlib-base=3.11.2 conda-forge::seaborn-base=0.13.2 conda-forge::h5py=3.16.0 conda-forge::openpyxl=3.1.5 conda-forge::biopython=1.88"
+    conda "conda-forge::python=3.13 conda-forge::pandas=3.1.0 conda-forge::numpy=2.5.4 conda-forge::matplotlib-base=3.11.2 conda-forge::seaborn-base=0.13.2 conda-forge::h5py=3.16.0 conda-forge::openpyxl=3.1.5 conda-forge::biopython=1.88 conda-forge::typst=0.15.1 conda-forge::jinja2=3.1.6 conda-forge::altair=6.3.0 conda-forge::vl-convert-python=1.9.0.post1 conda-forge::font-inter=4.1 conda-forge::pyyaml=6.0.3"
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
-        'oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:cd89ac4e30745df7' :
-        'community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:a1f6f67b03eef1d9' }"
+        'oras://community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:2ce015cec686e756' :
+        'community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:6bff5ca407ba1454' }"
 
     input:
     path(reads_report, stageAs: 'in_qc/*')          // Reads_report.csv (TAXONOMY_REPORT's, with the classified fraction, when a profiler ran)
@@ -21,15 +21,19 @@ process RESULTS_SUMMARY {
     path(card_prevalence)                           // optional WildCARD card_prevalence.txt; []
     path(arg_priority)                              // ARG tier rule table
     path(watchlist)                                 // watchlist taxa
+    // assets/report (Typst and Jinja templates, styles, references) and a hash of its files' contents, which
+    // makes an edited template rerun the task on -resume (a directory is cached by its own path, size and mtime)
+    tuple path(report_assets, stageAs: 'report_assets'), val(report_assets_hash)
     path(stage_reports, stageAs: 'in_reports/*')   // run-level tables of other stages, by file name (see the case below); []
 
     output:
-    path("results_summary.html"), emit: html
+    path("results_summary.html"), emit: html        // a link to report/index.html
+    path("report")              , emit: site        // the multi-page HTML report
+    path("results_summary.pdf") , emit: pdf, optional: true  // none when typst fails (a warning) or with --no-pdf
     path("results_summary.xlsx"), emit: xlsx, optional: true
     path("tables/*.tsv")        , emit: tables
     path("figures/*")           , emit: figures, optional: true
     path("README.md")           , emit: readme
-    path("README.docx")         , emit: readme_docx
     path("LLM_GUIDE.md")        , emit: llm_guide
     path "versions.yml"         , emit: versions
 
@@ -137,12 +141,15 @@ process RESULTS_SUMMARY {
         ln -s "\$PWD/\$f" "\$dest/"
     done
 
+    # matplotlib's and fontconfig's caches in the task directory (a read-only image, maybe no home)
+    export MPLCONFIGDIR="\$PWD/.mplconfig" XDG_CACHE_HOME="\$PWD/.cache"
     results_summary.py \\
         --results ${run_dir} \\
         --batch-labels '${batch_label}' \\
         --outdir . \\
         --arg-priority ${arg_priority} \\
         --watchlist ${watchlist} \\
+        --report-assets report_assets \\
         ${kmarvel_db_arg} \\
         ${metadata_arg} \\
         ${prevalence_arg} \\
@@ -154,14 +161,19 @@ process RESULTS_SUMMARY {
         pandas: \$(python -c "import pandas; print(pandas.__version__)")
         matplotlib: \$(python -c "import matplotlib; print(matplotlib.__version__)")
         openpyxl: \$(python -c "import openpyxl; print(openpyxl.__version__)")
+        typst: \$(typst --version | sed 's/typst //; s/ .*//')
+        jinja2: \$(python -c "import jinja2; print(jinja2.__version__)")
+        altair: \$(python -c "import altair; print(altair.__version__)")
+        vl-convert: \$(python -c "import vl_convert; print(vl_convert.__version__)")
     END_VERSIONS
     """
 
     stub:
     """
-    mkdir -p tables figures
-    touch results_summary.html results_summary.xlsx tables/samples_qc.tsv figures/qc_read_fate.png
-    touch README.md README.docx LLM_GUIDE.md
+    mkdir -p tables figures report/assets
+    touch results_summary.html results_summary.pdf results_summary.xlsx tables/samples_qc.tsv
+    touch figures/qc_read_fate.png figures/qc_read_fate.pdf figures/qc_read_fate.svg figures/qc_read_fate.csv
+    touch report/index.html report/methods.html report/assets/site.css README.md LLM_GUIDE.md
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -169,6 +181,10 @@ process RESULTS_SUMMARY {
         pandas: 3.1.0
         matplotlib: 3.11.2
         openpyxl: 3.1.5
+        typst: 0.15.1
+        jinja2: 3.1.6
+        altair: 6.3.0
+        vl-convert: 1.9.0
     END_VERSIONS
     """
 }

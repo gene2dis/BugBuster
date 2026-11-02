@@ -74,6 +74,12 @@ input:
       type: file
       description: Watchlist taxa (default assets/summary_watchlist.tsv)
       pattern: "*.tsv"
+  - report_assets:
+      type: directory
+      description: The report's templates, styles and references (assets/report - Typst templates, Jinja HTML templates, site.css and tables.js, references.yml and tool_references.tsv); a tuple with report_assets_hash
+  - report_assets_hash:
+      type: string
+      description: Hash of the contents of report_assets' files (main.nf). A directory input is cached by its own path, size and mtime, so this is what makes an edited template rerun the task on -resume
   - stage_reports:
       type: file
       description: Run-level tables of other stages, laid out at their published paths by file name - ARGS_OAP_REPORT's args_oap_long.tsv and args_oap_cells.tsv, AGGREGATE_READ_FUNCTIONS' read_function_abundance.tsv, read_annotated_fraction.tsv and read_sample_summary.tsv, MicrobeCensus <sample>.ags.tsv, and ARG_CONTIG_LEVEL_REPORT's Contig_tax_and_arg_prediction.tsv (arg_contig_mobile); [] when none ran
@@ -82,8 +88,16 @@ input:
 output:
   - html:
       type: file
-      description: Self-contained HTML report (inline SVG figures, sortable tables; no network access needed)
+      description: Entry page that opens the HTML report (report/index.html)
       pattern: "results_summary.html"
+  - site:
+      type: directory
+      description: Multi-page offline HTML report - an overview, one page per section whose stage ran, methods (tool versions and references) and a data dictionary; interactive Vega-Lite versions of the large figures, sortable and filterable tables, the Vega libraries bundled once, nothing loaded from the network
+      pattern: "report"
+  - pdf:
+      type: file
+      description: The same report typeset by Typst (long tables capped with a pointer to the TSV, methods with tool versions and references in Nature style; fonts embedded)
+      pattern: "results_summary.pdf"
   - xlsx:
       type: file
       description: Excel workbook with every table and a README sheet defining the columns
@@ -94,23 +108,19 @@ output:
       pattern: "tables/*.tsv"
   - figures:
       type: file
-      description: QC read fate (with depth marks), species and genus heatmaps, genus bars, watchlist, ARG heatmaps, ARG detection versus depth, and, when K-MARVEL and RGI both ran, the method comparison (UpSet plot and agreement by tier and category), ARGs-OAP copies per cell by SARG type and the COG categories of the read functional profile; PNG, PDF and SVG
+      description: QC read fate (with depth marks), species and genus heatmaps, genus bars, watchlist, ARG heatmaps, ARG detection versus depth, and, when K-MARVEL and RGI both ran, the method comparison (UpSet plot and agreement by tier and category), ARGs-OAP copies per cell by SARG type, the COG categories of the read and contig functional profiles, MAG quality and abundance, and ARG genes on contigs by host; each as PDF, SVG and PNG (600 dpi) at 89 or 183 mm wide, with its plotted values as CSV
       pattern: "figures/*"
   - readme:
       type: file
       description: What the summary holds - stages run per results directory, tables, figures, units, tiers, caveats and software versions
       pattern: "README.md"
-  - readme_docx:
-      type: file
-      description: README.md as a Word document (written with the Python standard library)
-      pattern: "README.docx"
   - llm_guide:
       type: file
       description: Guide for a language model or a script - run facts (YAML), the stages that ran, methods, every table column and figure, pitfalls and recipes; paths relative to the summary folder, no local path
       pattern: "LLM_GUIDE.md"
   - versions:
       type: file
-      description: Software versions (python, pandas, matplotlib, openpyxl)
+      description: Software versions (python, pandas, matplotlib, openpyxl, typst, jinja2, altair, vl-convert)
       pattern: "versions.yml"
 
 authors:

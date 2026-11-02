@@ -1,0 +1,492 @@
+# BugBuster methods references. Each entry verified against PubMed (efetch) or Crossref (DOI lookup).
+
+alcock2023:
+  type: "article"
+  author: "Alcock, Brian P and Huynh, William and Chalil, Romeo and Smith, Keaton W and Raphenya, Amogelang R and Wlodarski, Mateusz A and Edalatmand, Arman and Petkau, Aaron and Syed, Sohaib A and Tsang, Kara K and others"
+  title: "CARD 2023: expanded curation, support for machine learning, and resistome prediction at the Comprehensive Antibiotic Resistance Database"
+  journal: "Nucleic Acids Research"
+  year: 2023
+  volume: "51"
+  number: "D1"
+  pages: "D690--D699"
+  doi: "10.1093/nar/gkac920"
+arangoargoty2018:
+  type: "article"
+  author: "Arango-Argoty, Gustavo and Garner, Emily and Pruden, Amy and Heath, Lenwood S and Vikesland, Peter and Zhang, Liqing"
+  title: "DeepARG: a deep learning approach for predicting antibiotic resistance genes from metagenomic data"
+  journal: "Microbiome"
+  year: 2018
+  volume: "6"
+  number: "1"
+  pages: "23"
+  doi: "10.1186/s40168-018-0401-z"
+balaban2024:
+  type: "article"
+  author: "Balaban, Metin and Jiang, Yueyu and Zhu, Qiyun and McDonald, Daniel and Knight, Rob and Mirarab, Siavash"
+  title: "Generation of accurate, expandable phylogenomic trees with uDance"
+  journal: "Nature Biotechnology"
+  year: 2024
+  volume: "42"
+  number: "5"
+  pages: "768--777"
+  doi: "10.1038/s41587-023-01868-8"
+beghini2021:
+  type: "article"
+  author: "Beghini, Francesco and McIver, Lauren J and Blanco-Míguez, Aitor and Dubois, Leonard and Asnicar, Francesco and Maharjan, Sagun and Mailyan, Ana and Manghi, Paolo and Scholz, Matthias and Thomas, Andrew Maltez and others"
+  title: "Integrating taxonomic, functional, and strain-level profiling of diverse microbial communities with bioBakery 3"
+  journal: "eLife"
+  year: 2021
+  volume: "10"
+  pages: "e65088"
+  doi: "10.7554/eLife.65088"
+blancomiguez2023:
+  type: "article"
+  author: "Blanco-Míguez, Aitor and Beghini, Francesco and Cumbo, Fabio and McIver, Lauren J and Thompson, Kelsey N and Zolfo, Moreno and Manghi, Paolo and Dubois, Leonard and Huang, Kun D and Thomas, Andrew Maltez and others"
+  title: "Extending and improving metagenomic taxonomic profiling with uncharacterized species using MetaPhlAn 4"
+  journal: "Nature Biotechnology"
+  year: 2023
+  volume: "41"
+  number: "11"
+  pages: "1633--1644"
+  doi: "10.1038/s41587-023-01688-w"
+buchfink2021:
+  type: "article"
+  author: "Buchfink, Benjamin and Reuter, Klaus and Drost, Hajk-Georg"
+  title: "Sensitive protein alignments at tree-of-life scale using DIAMOND"
+  journal: "Nature Methods"
+  year: 2021
+  volume: "18"
+  number: "4"
+  pages: "366--368"
+  doi: "10.1038/s41592-021-01101-x"
+camacho2009:
+  type: "article"
+  author: "Camacho, Christiam and Coulouris, George and Avagyan, Vahram and Ma, Ning and Papadopoulos, Jason and Bealer, Kevin and Madden, Thomas L"
+  title: "BLAST+: architecture and applications"
+  journal: "BMC Bioinformatics"
+  year: 2009
+  volume: "10"
+  pages: "421"
+  doi: "10.1186/1471-2105-10-421"
+camargo2024:
+  type: "article"
+  author: "Camargo, Antonio Pedro and Roux, Simon and Schulz, Frederik and Babinski, Michal and Xu, Yan and Hu, Bin and Chain, Patrick S G and Nayfach, Stephen and Kyrpides, Nikos C"
+  title: "Identification of mobile genetic elements with geNomad"
+  journal: "Nature Biotechnology"
+  year: 2024
+  volume: "42"
+  number: "8"
+  pages: "1303--1312"
+  doi: "10.1038/s41587-023-01953-y"
+cantalapiedra2021:
+  type: "article"
+  author: "Cantalapiedra, Carlos P and Hernández-Plaza, Ana and Letunic, Ivica and Bork, Peer and Huerta-Cepas, Jaime"
+  title: "eggNOG-mapper v2: Functional Annotation, Orthology Assignments, and Domain Prediction at the Metagenomic Scale"
+  journal: "Molecular Biology and Evolution"
+  year: 2021
+  volume: "38"
+  number: "12"
+  pages: "5825--5829"
+  doi: "10.1093/molbev/msab293"
+chaumeil2022:
+  type: "article"
+  author: "Chaumeil, Pierre-Alain and Mussig, Aaron J and Hugenholtz, Philip and Parks, Donovan H"
+  title: "GTDB-Tk v2: memory friendly classification with the genome taxonomy database"
+  journal: "Bioinformatics"
+  year: 2022
+  volume: "38"
+  number: "23"
+  pages: "5315--5316"
+  doi: "10.1093/bioinformatics/btac672"
+chen2018:
+  type: "article"
+  author: "Chen, Shifu and Zhou, Yanqing and Chen, Yaru and Gu, Jia"
+  title: "fastp: an ultra-fast all-in-one FASTQ preprocessor"
+  journal: "Bioinformatics"
+  year: 2018
+  volume: "34"
+  number: "17"
+  pages: "i884--i890"
+  doi: "10.1093/bioinformatics/bty560"
+chen2025:
+  type: "article"
+  author: "Chen, Shifu"
+  title: "fastp 1.0: An ultra-fast all-round tool for FASTQ data quality control and preprocessing"
+  journal: "iMeta"
+  year: 2025
+  volume: "4"
+  number: "5"
+  pages: "e70078"
+  doi: "10.1002/imt2.70078"
+chklovski2023:
+  type: "article"
+  author: "Chklovski, Alex and Parks, Donovan H and Woodcroft, Ben J and Tyson, Gene W"
+  title: "CheckM2: a rapid, scalable and accurate tool for assessing microbial genome quality using machine learning"
+  journal: "Nature Methods"
+  year: 2023
+  volume: "20"
+  number: "8"
+  pages: "1203--1212"
+  doi: "10.1038/s41592-023-01940-w"
+clausen2018:
+  type: "article"
+  author: "Clausen, Philip T L C and Aarestrup, Frank M and Lund, Ole"
+  title: "Rapid and precise alignment of raw reads against redundant databases with KMA"
+  journal: "BMC Bioinformatics"
+  year: 2018
+  volume: "19"
+  number: "1"
+  pages: "307"
+  doi: "10.1186/s12859-018-2336-6"
+clausen2025:
+  type: "article"
+  author: "Clausen, Philip T L C and Hallgren, Malte B and Overballe-Petersen, Søren and Marcelino, Vanessa R and Hasman, Henrik and Aarestrup, Frank M"
+  title: "Assembly-free typing of Nanopore and Illumina data through proximity scoring with KMA"
+  journal: "NAR Genomics and Bioinformatics"
+  year: 2025
+  volume: "7"
+  number: "3"
+  pages: "lqaf116"
+  doi: "10.1093/nargab/lqaf116"
+danecek2021:
+  type: "article"
+  author: "Danecek, Petr and Bonfield, James K and Liddle, Jennifer and Marshall, John and Ohan, Valeriu and Pollard, Martin O and Whitwham, Andrew and Keane, Thomas and McCarthy, Shane A and Davies, Robert M and others"
+  title: "Twelve years of SAMtools and BCFtools"
+  journal: "GigaScience"
+  year: 2021
+  volume: "10"
+  number: "2"
+  pages: "giab008"
+  doi: "10.1093/gigascience/giab008"
+ditommaso2017:
+  type: "article"
+  author: "Di Tommaso, Paolo and Chatzou, Maria and Floden, Evan W and Barja, Pablo Prieto and Palumbo, Emilio and Notredame, Cedric"
+  title: "Nextflow enables reproducible computational workflows"
+  journal: "Nature Biotechnology"
+  year: 2017
+  volume: "35"
+  number: "4"
+  pages: "316--319"
+  doi: "10.1038/nbt.3820"
+galperin2025:
+  type: "article"
+  author: "Galperin, Michael Y and Vera Alvarez, Roberto and Karamycheva, Svetlana and Makarova, Kira S and Wolf, Yuri I and Landsman, David and Koonin, Eugene V"
+  title: "COG database update 2024"
+  journal: "Nucleic Acids Research"
+  year: 2025
+  volume: "53"
+  number: "D1"
+  pages: "D356--D363"
+  doi: "10.1093/nar/gkae983"
+hernandezplaza2023:
+  type: "article"
+  author: "Hernández-Plaza, Ana and Szklarczyk, Damian and Botas, Jorge and Cantalapiedra, Carlos P and Giner-Lamia, Joaquín and Mende, Daniel R and Kirsch, Rebecca and Rattei, Thomas and Letunic, Ivica and Jensen, Lars J and others"
+  title: "eggNOG 6.0: enabling comparative genomics across 12 535 organisms"
+  journal: "Nucleic Acids Research"
+  year: 2023
+  volume: "51"
+  number: "D1"
+  pages: "D389--D394"
+  doi: "10.1093/nar/gkac1022"
+hyatt2010:
+  type: "article"
+  author: "Hyatt, Doug and Chen, Gwo-Liang and Locascio, Philip F and Land, Miriam L and Larimer, Frank W and Hauser, Loren J"
+  title: "Prodigal: prokaryotic gene recognition and translation initiation site identification"
+  journal: "BMC Bioinformatics"
+  year: 2010
+  volume: "11"
+  pages: "119"
+  doi: "10.1186/1471-2105-11-119"
+irber2024:
+  type: "article"
+  author: "Irber, Luiz and Pierce-Ward, N. Tessa and Abuelanin, Mohamed and Alexander, Harriet and Anant, Abhishek and Barve, Keya and Baumler, Colton and Botvinnik, Olga and Brooks, Phillip and Dsouza, Daniel and others"
+  title: "sourmash v4: A multitool to quickly search, compare, and analyze genomic and metagenomic data sets"
+  journal: "Journal of Open Source Software"
+  year: 2024
+  volume: "9"
+  number: "98"
+  pages: "6830"
+  doi: "10.21105/joss.06830"
+kang2019:
+  type: "article"
+  author: "Kang, Dongwan D and Li, Feng and Kirton, Edward and Thomas, Ashleigh and Egan, Rob and An, Hong and Wang, Zhong"
+  title: "MetaBAT 2: an adaptive binning algorithm for robust and efficient genome reconstruction from metagenome assemblies"
+  journal: "PeerJ"
+  year: 2019
+  volume: "7"
+  pages: "e7359"
+  doi: "10.7717/peerj.7359"
+kim2024:
+  type: "article"
+  author: "Kim, Jaebeom and Steinegger, Martin"
+  title: "Metabuli: sensitive and specific metagenomic classification via joint analysis of amino acid and DNA"
+  journal: "Nature Methods"
+  year: 2024
+  volume: "21"
+  number: "6"
+  pages: "971--973"
+  doi: "10.1038/s41592-024-02273-y"
+laetsch2017:
+  type: "article"
+  author: "Laetsch, Dominik R. and Blaxter, Mark L."
+  title: "BlobTools: Interrogation of genome assemblies"
+  journal: "F1000Research"
+  year: 2017
+  volume: "6"
+  pages: "1287"
+  doi: "10.12688/f1000research.12232.1"
+langmead2012:
+  type: "article"
+  author: "Langmead, Ben and Salzberg, Steven L"
+  title: "Fast gapped-read alignment with Bowtie 2"
+  journal: "Nature Methods"
+  year: 2012
+  volume: "9"
+  number: "4"
+  pages: "357--359"
+  doi: "10.1038/nmeth.1923"
+langmead2019:
+  type: "article"
+  author: "Langmead, Ben and Wilks, Christopher and Antonescu, Valentin and Charles, Rone"
+  title: "Scaling read aligners to hundreds of threads on general-purpose processors"
+  journal: "Bioinformatics"
+  year: 2019
+  volume: "35"
+  number: "3"
+  pages: "421--432"
+  doi: "10.1093/bioinformatics/bty648"
+larralde2022:
+  type: "article"
+  author: "Larralde, Martin"
+  title: "Pyrodigal: Python bindings and interface to Prodigal, an efficient method for gene prediction in prokaryotes"
+  journal: "Journal of Open Source Software"
+  year: 2022
+  volume: "7"
+  number: "72"
+  pages: "4296"
+  doi: "10.21105/joss.04296"
+li2015:
+  type: "article"
+  author: "Li, Dinghua and Liu, Chi-Man and Luo, Ruibang and Sadakane, Kunihiko and Lam, Tak-Wah"
+  title: "MEGAHIT: an ultra-fast single-node solution for large and complex metagenomics assembly via succinct de Bruijn graph"
+  journal: "Bioinformatics"
+  year: 2015
+  volume: "31"
+  number: "10"
+  pages: "1674--1676"
+  doi: "10.1093/bioinformatics/btv033"
+li2016:
+  type: "article"
+  author: "Li, Dinghua and Luo, Ruibang and Liu, Chi-Man and Leung, Chi-Ming and Ting, Hing-Fung and Sadakane, Kunihiko and Yamashita, Hiroshi and Lam, Tak-Wah"
+  title: "MEGAHIT v1.0: A fast and scalable metagenome assembler driven by advanced methodologies and community practices"
+  journal: "Methods"
+  year: 2016
+  volume: "102"
+  pages: "3--11"
+  doi: "10.1016/j.ymeth.2016.02.020"
+liao2014:
+  type: "article"
+  author: "Liao, Yang and Smyth, Gordon K and Shi, Wei"
+  title: "featureCounts: an efficient general purpose program for assigning sequence reads to genomic features"
+  journal: "Bioinformatics"
+  year: 2014
+  volume: "30"
+  number: "7"
+  pages: "923--930"
+  doi: "10.1093/bioinformatics/btt656"
+lu2017:
+  type: "article"
+  author: "Lu, Jennifer and Breitwieser, Florian P and Thielen, Peter and Salzberg, Steven L"
+  title: "Bracken: estimating species abundance in metagenomics data"
+  journal: "PeerJ Computer Science"
+  year: 2017
+  volume: "3"
+  pages: "e104"
+  doi: "10.7717/peerj-cs.104"
+mahar2026:
+  type: "article"
+  author: "Mahar, Nirmal Singh and Branders, Sverre and Grabherr, Manfred G and Gupta, Ishaan and Ahmad, Rafi"
+  title: "K-MARVEL: K-Mer-based antimicrobial resistance virtual exploration lab"
+  journal: "Nature Communications"
+  year: 2026
+  volume: "17"
+  number: "1"
+  pages: "10505"
+  doi: "10.1038/s41467-026-77438-8"
+mainguy2024:
+  type: "article"
+  author: "Mainguy, Jean and Hoede, Claire"
+  title: "Binette: a fast and accurate bin refinement tool to construct high quality Metagenome Assembled Genomes"
+  journal: "Journal of Open Source Software"
+  year: 2024
+  volume: "9"
+  number: "102"
+  pages: "6782"
+  doi: "10.21105/joss.06782"
+mcmurdie2013:
+  type: "article"
+  author: "McMurdie, Paul J and Holmes, Susan"
+  title: "phyloseq: an R package for reproducible interactive analysis and graphics of microbiome census data"
+  journal: "PLoS ONE"
+  year: 2013
+  volume: "8"
+  number: "4"
+  pages: "e61217"
+  doi: "10.1371/journal.pone.0061217"
+nayfach2015:
+  type: "article"
+  author: "Nayfach, Stephen and Pollard, Katherine S"
+  title: "Average genome size estimation improves comparative metagenomics and sheds light on the functional ecology of the human microbiome"
+  journal: "Genome Biology"
+  year: 2015
+  volume: "16"
+  number: "1"
+  pages: "51"
+  doi: "10.1186/s13059-015-0611-7"
+pan2022:
+  type: "article"
+  author: "Pan, Shaojun and Zhu, Chengkai and Zhao, Xing-Ming and Coelho, Luis Pedro"
+  title: "A deep siamese neural network improves metagenome-assembled genomes in microbiome datasets across different environments"
+  journal: "Nature Communications"
+  year: 2022
+  volume: "13"
+  number: "1"
+  pages: "2326"
+  doi: "10.1038/s41467-022-29843-y"
+pan2023:
+  type: "article"
+  author: "Pan, Shaojun and Zhao, Xing-Ming and Coelho, Luis Pedro"
+  title: "SemiBin2: self-supervised contrastive learning leads to better MAGs for short- and long-read sequencing"
+  journal: "Bioinformatics"
+  year: 2023
+  volume: "39"
+  number: "Suppl 1"
+  pages: "i21--i29"
+  doi: "10.1093/bioinformatics/btad209"
+parks2026:
+  type: "article"
+  author: "Parks, Donovan H and Chaumeil, Pierre-Alain and Mussig, Aaron J and Rinke, Christian and Chuvochina, Maria and Hugenholtz, Philip"
+  title: "GTDB release 10: a complete and systematic taxonomy for 715 230 bacterial and 17 245 archaeal genomes"
+  journal: "Nucleic Acids Research"
+  year: 2026
+  volume: "54"
+  number: "D1"
+  pages: "D743--D754"
+  doi: "10.1093/nar/gkaf1040"
+quinlan2010:
+  type: "article"
+  author: "Quinlan, Aaron R and Hall, Ira M"
+  title: "BEDTools: a flexible suite of utilities for comparing genomic features"
+  journal: "Bioinformatics"
+  year: 2010
+  volume: "26"
+  number: "6"
+  pages: "841--842"
+  doi: "10.1093/bioinformatics/btq033"
+schwengers2021:
+  type: "article"
+  author: "Schwengers, Oliver and Jelonek, Lukas and Dieckmann, Marius Alfred and Beyvers, Sebastian and Blom, Jochen and Goesmann, Alexander"
+  title: "Bakta: rapid and standardized annotation of bacterial genomes via alignment-free sequence identification"
+  journal: "Microbial Genomics"
+  year: 2021
+  volume: "7"
+  number: "11"
+  pages: "000685"
+  doi: "10.1099/mgen.0.000685"
+shaw2025:
+  type: "article"
+  author: "Shaw, Jim and Yu, Yun William"
+  title: "Rapid species-level metagenome profiling and containment estimation with sylph"
+  journal: "Nature Biotechnology"
+  year: 2025
+  volume: "43"
+  number: "8"
+  pages: "1348--1359"
+  doi: "10.1038/s41587-024-02412-y"
+silva2016:
+  type: "article"
+  author: "Silva, Genivaldo Gueiros Z and Green, Kevin T and Dutilh, Bas E and Edwards, Robert A"
+  title: "SUPER-FOCUS: a tool for agile functional analysis of shotgun metagenomic data"
+  journal: "Bioinformatics"
+  year: 2016
+  volume: "32"
+  number: "3"
+  pages: "354--361"
+  doi: "10.1093/bioinformatics/btv584"
+steinegger2017:
+  type: "article"
+  author: "Steinegger, Martin and Söding, Johannes"
+  title: "MMseqs2 enables sensitive protein sequence searching for the analysis of massive data sets"
+  journal: "Nature Biotechnology"
+  year: 2017
+  volume: "35"
+  number: "11"
+  pages: "1026--1028"
+  doi: "10.1038/nbt.3988"
+vasimuddin2019:
+  type: "article"
+  author: "Vasimuddin, Md. and Misra, Sanchit and Li, Heng and Aluru, Srinivas"
+  title: "Efficient Architecture-Aware Acceleration of BWA-MEM for Multicore Systems"
+  journal: "2019 IEEE International Parallel and Distributed Processing Symposium (IPDPS)"
+  year: 2019
+  pages: "314--324"
+  doi: "10.1109/IPDPS.2019.00041"
+wang2024:
+  type: "article"
+  author: "Wang, Ziye and You, Ronghui and Han, Haitao and Liu, Wei and Sun, Fengzhu and Zhu, Shanfeng"
+  title: "Effective binning of metagenomic contigs using contrastive multi-view representation learning"
+  journal: "Nature Communications"
+  year: 2024
+  volume: "15"
+  number: "1"
+  pages: "585"
+  doi: "10.1038/s41467-023-44290-z"
+wood2019:
+  type: "article"
+  author: "Wood, Derrick E and Lu, Jennifer and Langmead, Ben"
+  title: "Improved metagenomic analysis with Kraken 2"
+  journal: "Genome Biology"
+  year: 2019
+  volume: "20"
+  number: "1"
+  pages: "257"
+  doi: "10.1186/s13059-019-1891-0"
+yin2023:
+  type: "article"
+  author: "Yin, Xiaole and Zheng, Xiawan and Li, Liguan and Zhang, An-Ni and Jiang, Xiao-Tao and Zhang, Tong"
+  title: "ARGs-OAP v3.0: Antibiotic-Resistance Gene Database Curation and Analysis Pipeline Optimization"
+  journal: "Engineering"
+  year: 2023
+  volume: "27"
+  pages: "234--241"
+  doi: "10.1016/j.eng.2022.10.011"
+zheng2023:
+  type: "article"
+  author: "Zheng, Jinfang and Ge, Qiwei and Yan, Yuchen and Zhang, Xinpeng and Huang, Le and Yin, Yanbin"
+  title: "dbCAN3: automated carbohydrate-active enzyme and substrate annotation"
+  journal: "Nucleic Acids Research"
+  year: 2023
+  volume: "51"
+  number: "W1"
+  pages: "W115--W121"
+  doi: "10.1093/nar/gkad328"
+zhu2019:
+  type: "article"
+  author: "Zhu, Qiyun and Mai, Uyen and Pfeiffer, Wayne and Janssen, Stefan and Asnicar, Francesco and Sanders, Jon G and Belda-Ferre, Pedro and Al-Ghalith, Gabriel A and Kopylova, Evguenia and McDonald, Daniel and others"
+  title: "Phylogenomics of 10,575 genomes reveals evolutionary proximity between domains Bacteria and Archaea"
+  journal: "Nature Communications"
+  year: 2019
+  volume: "10"
+  number: "1"
+  pages: "5477"
+  doi: "10.1038/s41467-019-13443-4"
+zhu2022:
+  type: "article"
+  author: "Zhu, Qiyun and Huang, Shi and Gonzalez, Antonio and McGrath, Imran and McDonald, Daniel and Haiminen, Niina and Armstrong, George and Vázquez-Baeza, Yoshiki and Yu, Julian and Kuczynski, Justin and others"
+  title: "Phylogeny-Aware Analysis of Metagenome Community Ecology Based on Matched Reference Genomes while Bypassing Taxonomy"
+  journal: "mSystems"
+  year: 2022
+  volume: "7"
+  number: "2"
+  pages: "e0016722"
+  doi: "10.1128/msystems.00167-22"

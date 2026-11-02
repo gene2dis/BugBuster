@@ -5,13 +5,19 @@ Creates bar plots and summary tables for MAG taxonomy at phylum level.
 Python migration of Bins_tax.R
 """
 
-import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend
 import glob
 import sys
+from pathlib import Path
+
 import numpy as np
+import pandas as pd
+
+sys.dont_write_bytecode = True
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import figure_style as fs  # noqa: E402
+
+fs.setup()
+import matplotlib.pyplot as plt  # noqa: E402
 
 
 # Columns of MAGs_tax_summary.csv
@@ -42,24 +48,6 @@ def parse_gtdb_taxonomy(classification):
             taxonomy[rank_name] = None
     
     return taxonomy
-
-
-def generate_colors(n):
-    """Generate a pastel color palette."""
-    # Use a colormap similar to rcartocolor Pastel
-    # (plt.get_cmap, not plt.cm.get_cmap: the latter was removed in matplotlib 3.9)
-    cmap = plt.get_cmap('Pastel1')
-    if n <= 9:
-        colors = [cmap(i) for i in np.linspace(0, 1, 9)][:n]
-    else:
-        # For more colors, use Set3 which has more variety
-        cmap = plt.get_cmap('Set3')
-        colors = [cmap(i) for i in np.linspace(0, 1, min(n, 12))]
-        if n > 12:
-            # Generate additional colors
-            cmap2 = plt.get_cmap('Pastel2')
-            colors.extend([cmap2(i) for i in np.linspace(0, 1, n - 12)])
-    return colors[:n]
 
 
 def main():
@@ -112,13 +100,8 @@ def main():
             file=sys.stderr
         )
         pd.DataFrame(columns=SUMMARY_COLUMNS).to_csv('MAGs_tax_summary.csv', index=False)
-        fig, ax = plt.subplots(figsize=(16, 8))
-        ax.text(0.5, 0.5, 'No MAGs were classified', ha='center', va='center', fontsize=25)
-        ax.axis('off')
-        fig.patch.set_facecolor('white')
-        plt.savefig('MAGs_tax_plot.png', dpi=100, bbox_inches='tight', facecolor='white')
-        plt.close()
-        print("Generated an empty MAGs_tax_summary.csv and a placeholder MAGs_tax_plot.png")
+        fs.placeholder('.', 'MAGs_tax_plot', 'No MAGs were classified')
+        print("Generated an empty MAGs_tax_summary.csv and a placeholder MAGs_tax_plot")
         return
 
     # Combine all reports
@@ -131,55 +114,30 @@ def main():
     ]].rename(columns={'user_genome': 'bin_name'})
     assert list(all_tax_bin_reports_csv.columns) == SUMMARY_COLUMNS
     
-    # Count bins by phylum
-    phylum_counts = all_tax_bin_reports_csv.groupby('Phylum').size().reset_index(name='Bin count')
-    phylum_counts = phylum_counts.sort_values('Bin count', ascending=False, kind='stable')
-    
     # Write CSV output
     all_tax_bin_reports_csv.to_csv('MAGs_tax_summary.csv', index=False)
-    
-    # Create the plot
-    fig, ax = plt.subplots(figsize=(16, 8))
-    
-    # Generate colors
+
+    # Bins per GTDB phylum; a bin without a phylum is counted as unclassified, not dropped
+    phyla = all_tax_bin_reports_csv['Phylum'].fillna('unclassified').replace('', 'unclassified')
+    phylum_counts = phyla.value_counts().rename_axis('Phylum').reset_index(name='Bin count')
+    phylum_counts = phylum_counts.sort_values(['Bin count', 'Phylum'], ascending=[False, True], kind='stable')
+    phylum_counts = pd.concat([phylum_counts[phylum_counts['Phylum'] != 'unclassified'],
+                               phylum_counts[phylum_counts['Phylum'] == 'unclassified']], ignore_index=True)
     n_phyla = len(phylum_counts)
-    colors = generate_colors(n_phyla)
-    color_map = dict(zip(phylum_counts['Phylum'], colors))
-    
-    # Create bar plot
-    bars = ax.bar(range(len(phylum_counts)), phylum_counts['Bin count'],
-                  color=[color_map[p] for p in phylum_counts['Phylum']],
-                  edgecolor='black', linewidth=1)
-    
-    # Add value labels on top of bars
-    for i, (idx, row) in enumerate(phylum_counts.iterrows()):
-        ax.text(i, row['Bin count'], str(row['Bin count']),
-               ha='center', va='bottom', fontsize=20)
-    
-    # Set labels and formatting
-    ax.set_xticks(range(len(phylum_counts)))
-    ax.set_xticklabels(phylum_counts['Phylum'], rotation=40, ha='right', fontsize=20)
-    ax.set_ylabel('MAGs Count', fontsize=25)
-    ax.set_xlabel(None)
-    
-    # Style the plot
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    ax.grid(axis='y', linestyle='--', alpha=0.7, color='gray')
-    ax.set_axisbelow(True)
-    ax.tick_params(axis='y', labelsize=18)
-    
-    # Set background
-    ax.set_facecolor('white')
-    fig.patch.set_facecolor('white')
-    
-    plt.tight_layout()
-    plt.savefig('MAGs_tax_plot.png', dpi=300, bbox_inches='tight', facecolor='white')
-    plt.close()
-    
-    print("Successfully generated MAGs_tax_plot.png")
-    
-    
+    fig, ax = plt.subplots(figsize=fs.figsize('single', n_phyla * 3.2 + 16), layout='constrained')
+    y = np.arange(n_phyla)
+    colors = [fs.OTHER if p == 'unclassified' else fs.CATEGORY[0] for p in phylum_counts['Phylum']]
+    ax.barh(y, phylum_counts['Bin count'], color=colors, height=0.7, lw=0)
+    for i, v in enumerate(phylum_counts['Bin count']):
+        ax.text(v, i, f" {v}", va='center', fontsize=fs.SMALL_PT)
+    ax.set_yticks(y, phylum_counts['Phylum'])
+    ax.set_ylim(n_phyla - 0.5, -0.5)
+    ax.tick_params(axis='y', length=0)
+    ax.set_xlabel('MAGs (GTDB-Tk phylum)')
+    ax.set_xlim(0, phylum_counts['Bin count'].max() * 1.15)
+    fs.save(fig, '.', 'MAGs_tax_plot', phylum_counts.rename(columns={'Bin count': 'mags'}))
+    print("Successfully generated MAGs_tax_plot")
+
     print(f"Successfully generated MAGs_tax_summary.csv with {len(all_tax_bin_reports_csv)} MAGs")
     print(f"  - Unique phyla: {n_phyla}")
     print(f"  - Phylum distribution: {dict(zip(phylum_counts['Phylum'], phylum_counts['Bin count']))}")

@@ -1,16 +1,14 @@
 """Documentation of bin/results_summary.py's outputs: the column dictionary (one source for the Excel README
-sheet, README.md / README.docx and LLM_GUIDE.md), the tier explanations, and the README / guide writers
-(Markdown, and DOCX from the Python standard library: no python-docx or pandoc needed).
+sheet, README.md, LLM_GUIDE.md and the report's data dictionary), the tier explanations, and the README / guide
+writers (Markdown).
 """
 
 import re
-import zipfile
-from datetime import date
-from xml.sax.saxutils import escape
 
 import pandas as pd
 
 from summary_catalog import STAGES
+from summary_common import generated_date
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -653,7 +651,7 @@ def tier_categories(rules_path):
 
 # ---------------------------------------------------------------------------------------------------------------
 # Document model: [("h", level, text) | ("p", text) | ("ul", [text]) | ("table", [header], [[cell]]) |
-# ("code", text)], rendered to Markdown and to DOCX
+# ("code", text)], rendered to Markdown
 # ---------------------------------------------------------------------------------------------------------------
 
 def _md_cell(text):
@@ -678,137 +676,6 @@ def render_markdown(blocks):
         elif kind == "code":
             out.append("```\n" + b[1].rstrip("\n") + "\n```")
     return "\n\n".join(out) + "\n"
-
-
-_W = 'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
-
-
-def _run(text, bold=False, mono=False, size=None):
-    props = ""
-    if bold or mono or size:
-        props = "<w:rPr>" + ("<w:b/>" if bold else "") + \
-                ('<w:rFonts w:ascii="Consolas" w:hAnsi="Consolas" w:cs="Consolas"/>' if mono else "") + \
-                (f'<w:sz w:val="{size}"/><w:szCs w:val="{size}"/>' if size else "") + "</w:rPr>"
-    return f'<w:r>{props}<w:t xml:space="preserve">{escape(str(text))}</w:t></w:r>'
-
-
-def _inline(text, size=None):
-    """**bold** and `code` spans of a Markdown line as runs."""
-    runs = []
-    for part in re.split(r"(\*\*[^*]+\*\*|`[^`]+`)", str(text)):
-        if not part:
-            continue
-        if part.startswith("**") and part.endswith("**"):
-            runs.append(_run(part[2:-2], bold=True, size=size))
-        elif part.startswith("`") and part.endswith("`"):
-            runs.append(_run(part[1:-1], mono=True, size=size))
-        else:
-            runs.append(_run(part, size=size))
-    return "".join(runs)
-
-
-def _para(text, style=None, size=None):
-    ppr = f'<w:pPr><w:pStyle w:val="{style}"/></w:pPr>' if style else ""
-    return f"<w:p>{ppr}{_inline(text, size)}</w:p>"
-
-
-def render_docx(blocks, path, title):
-    """A .docx (WordprocessingML in a zip) with headings, paragraphs, bullet lists, tables and code blocks."""
-    body = []
-    for b in blocks:
-        kind = b[0]
-        if kind == "h":
-            body.append(_para(b[2], style=f"Heading{min(b[1], 3)}"))
-        elif kind == "p":
-            body.append(_para(b[1]))
-        elif kind == "ul":
-            body += [_para(item, style="ListBullet") for item in b[1]]
-        elif kind == "code":
-            body += [f'<w:p><w:pPr><w:pStyle w:val="Code"/></w:pPr>{_run(line, mono=True, size=16)}</w:p>'
-                     for line in b[1].rstrip("\n").split("\n")]
-        elif kind == "table":
-            head, rows = b[1], b[2]
-            grid = "".join("<w:gridCol/>" for _ in head)
-
-            def row(cells, header=False):
-                tcs = "".join(f"<w:tc><w:tcPr><w:tcW w:w=\"0\" w:type=\"auto\"/></w:tcPr>"
-                              f"<w:p>{_run(c, bold=header, size=16) if header else _inline(c, 16)}</w:p></w:tc>"
-                              for c in cells)
-                return f"<w:tr>{'<w:trPr><w:tblHeader/></w:trPr>' if header else ''}{tcs}</w:tr>"
-            body.append('<w:tbl><w:tblPr><w:tblStyle w:val="TableGrid"/><w:tblW w:w="5000" w:type="pct"/>'
-                        f'</w:tblPr><w:tblGrid>{grid}</w:tblGrid>{row(head, True)}'
-                        + "".join(row([str(c) for c in r]) for r in rows) + "</w:tbl>")
-            body.append("<w:p/>")
-    document = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document {_W}><w:body>'
-                + "".join(body) + '<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="1134" w:right="1134" '
-                'w:bottom="1134" w:left="1134" w:header="709" w:footer="709" w:gutter="0"/></w:sectPr></w:body>'
-                '</w:document>')
-    border = "".join(f'<w:{s} w:val="single" w:sz="4" w:space="0" w:color="BFBFBF"/>'
-                     for s in ("top", "left", "bottom", "right", "insideH", "insideV"))
-    styles = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles {_W}>'
-              '<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:cs="Calibri"/>'
-              '<w:sz w:val="21"/><w:szCs w:val="21"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr>'
-              '<w:spacing w:after="100" w:line="264" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'
-              '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/></w:style>'
-              + "".join(f'<w:style w:type="paragraph" w:styleId="Heading{i}"><w:name w:val="heading {i}"/>'
-                        f'<w:basedOn w:val="Normal"/><w:next w:val="Normal"/><w:qFormat/><w:pPr><w:keepNext/>'
-                        f'<w:spacing w:before="{300 - 60 * i}" w:after="80"/><w:outlineLvl w:val="{i - 1}"/></w:pPr>'
-                        f'<w:rPr><w:b/><w:color w:val="1F4E79"/><w:sz w:val="{36 - 4 * i}"/></w:rPr></w:style>'
-                        for i in (1, 2, 3))
-              + '<w:style w:type="paragraph" w:styleId="ListBullet"><w:name w:val="List Bullet"/>'
-              '<w:basedOn w:val="Normal"/><w:pPr><w:numPr><w:ilvl w:val="0"/><w:numId w:val="1"/></w:numPr>'
-              '<w:spacing w:after="40"/><w:ind w:left="360" w:hanging="360"/></w:pPr></w:style>'
-              '<w:style w:type="paragraph" w:styleId="Code"><w:name w:val="Code"/><w:basedOn w:val="Normal"/>'
-              '<w:pPr><w:spacing w:after="0" w:line="240" w:lineRule="auto"/><w:shd w:val="clear" w:fill="F2F2F2"/>'
-              '</w:pPr></w:style>'
-              f'<w:style w:type="table" w:styleId="TableGrid"><w:name w:val="Table Grid"/><w:tblPr><w:tblBorders>'
-              f'{border}</w:tblBorders><w:tblCellMar><w:left w:w="80" w:type="dxa"/><w:right w:w="80" w:type="dxa"/>'
-              '</w:tblCellMar></w:tblPr></w:style></w:styles>')
-    numbering = (f'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:numbering {_W}>'
-                 '<w:abstractNum w:abstractNumId="0"><w:lvl w:ilvl="0"><w:start w:val="1"/><w:numFmt w:val="bullet"/>'
-                 '<w:lvlText w:val="\u2022"/><w:lvlJc w:val="left"/><w:pPr><w:ind w:left="360" w:hanging="360"/>'
-                 '</w:pPr></w:lvl></w:abstractNum><w:num w:numId="1"><w:abstractNumId w:val="0"/></w:num>'
-                 '</w:numbering>')
-    content_types = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-                     '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
-                     '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
-                     '<Default Extension="xml" ContentType="application/xml"/>'
-                     '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-'
-                     'officedocument.wordprocessingml.document.main+xml"/>'
-                     '<Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-'
-                     'officedocument.wordprocessingml.styles+xml"/>'
-                     '<Override PartName="/word/numbering.xml" ContentType="application/vnd.openxmlformats-'
-                     'officedocument.wordprocessingml.numbering+xml"/>'
-                     '<Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-'
-                     'package.core-properties+xml"/></Types>')
-    rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-            '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
-            'officeDocument" Target="word/document.xml"/>'
-            '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/'
-            'core-properties" Target="docProps/core.xml"/></Relationships>')
-    doc_rels = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-                '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
-                '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
-                'styles" Target="styles.xml"/>'
-                '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'
-                'numbering" Target="numbering.xml"/></Relationships>')
-    core = ('<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
-            '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
-            'xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" '
-            'xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">'
-            f'<dc:title>{escape(title)}</dc:title><dc:creator>BugBuster results_summary.py</dc:creator>'
-            f'<dcterms:created xsi:type="dcterms:W3CDTF">{date.today().isoformat()}T00:00:00Z</dcterms:created>'
-            '</cp:coreProperties>')
-    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as z:
-        z.writestr("[Content_Types].xml", content_types)
-        z.writestr("_rels/.rels", rels)
-        z.writestr("word/_rels/document.xml.rels", doc_rels)
-        z.writestr("word/document.xml", document)
-        z.writestr("word/styles.xml", styles)
-        z.writestr("word/numbering.xml", numbering)
-        z.writestr("docProps/core.xml", core)
-    return path
 
 
 # ---------------------------------------------------------------------------------------------------------------
@@ -894,13 +761,15 @@ def stage_rows(stage_status_by_batch):
 
 
 def readme_blocks(ctx):
-    """README.md / README.docx content."""
+    """README.md content."""
     s = ctx["summary"]
     tables, figs = ctx["tables"], ctx["figures"]
     blocks = [("h", 1, ctx["title"]),
-              ("p", f"BugBuster run-level summary generated on {date.today().isoformat()}: {s['n_samples']} samples "
+              ("p", f"BugBuster run-level summary generated on {generated_date()}: {s['n_samples']} samples "
                     f"from {s['n_batches']} results director{'y' if s['n_batches'] == 1 else 'ies'}. Open "
-                    "`results_summary.html` for the report with figures; the tables are in `tables/` (TSV) and in "
+                    "`report/index.html` (or `results_summary.html`) for the report with interactive figures and "
+                    "tables" + (", or `results_summary.pdf` for the typeset version" if ctx.get("pdf_written") else "")
+                    + "; the tables are in `tables/` (TSV) and in "
                     "`results_summary.xlsx` (one sheet each, plus a README sheet with every column). "
                     "`LLM_GUIDE.md` describes this folder for a language model or a script.")]
     labels, rows = stage_rows(ctx["stage_status"])
@@ -936,7 +805,7 @@ def readme_blocks(ctx):
                         "`LLM_GUIDE.md`."))
     if figs.records:
         blocks += [("h", 2, "Figures"),
-                   ("p", "Each figure is in `figures/` as PNG, PDF and SVG."),
+                   ("p", "Each figure is in `figures/` as PDF, SVG and PNG (600 dpi), with its plotted values as CSV."),
                    ("table", ["File", "Figure", "How to read it"],
                     [[f"`figures/{r['key']}.*`", r["title"], r["caption"]] for r in figs.records])]
     blocks += [("h", 2, "Units and missing values"), ("table", ["Term", "Meaning"], [list(u) for u in UNITS])]
@@ -972,7 +841,7 @@ def llm_guide(ctx):
            "as batches) so that a model or a script can read its tables and figures without guessing. Every path "
            "below is relative to this folder.", "",
            "## Run facts", "", "```yaml",
-           f"generated: {date.today().isoformat()}",
+           f"generated: {generated_date()}",
            f"n_samples: {s['n_samples']}",
            f"n_batches: {s['n_batches']}",
            "batches:"]
@@ -988,10 +857,12 @@ def llm_guide(ctx):
             f"group_by: {ctx.get('group_by') or 'none'}",
             "```", "",
             "## How to use this folder", "",
-            "Contents: `tables/` (one TSV per table), `figures/` (each figure as PNG, PDF and SVG), "
-            "`results_summary.xlsx` (the same tables, one sheet each, plus a README sheet), `results_summary.html` "
-            "(the report with figures and methods), `README.md` / `README.docx` (the same content for people) and "
-            "this guide.", "",
+            "Contents: `tables/` (one TSV per table), `figures/` (each figure as PDF, SVG and PNG, with its plotted "
+            "values as `<figure>.csv`), `results_summary.xlsx` (the same tables, one sheet each, plus a README sheet), "
+            "`report/` (the HTML report, one page per section, opened at `report/index.html`; "
+            "`results_summary.html` links to it), "
+            + ("`results_summary.pdf` (the same report typeset), " if ctx.get("pdf_written") else "") + "`README.md` (the "
+            "folder's contents for people) and this guide.", "",
             "1. Start from `tables/samples_qc.tsv` (one row per sample): depth, low-depth flag "
             "(`low_depth`) and per-method counts. Treat low-depth samples as uninformative for absence.",
             "2. Long tables (`*_long.tsv`) hold one row per sample and feature with every annotation column; wide "
@@ -1039,7 +910,7 @@ def llm_guide(ctx):
         out.append("")
     if ctx["figures"].records:
         out += ["## Figures (figures/)", ""]
-        out += [f"- `figures/{r['key']}.png` (.pdf, .svg): {r['title']}. {r['caption']}"
+        out += [f"- `figures/{r['key']}.png` (.pdf, .svg; values in .csv): {r['title']}. {r['caption']}"
                 for r in ctx["figures"].records]
         out.append("")
     out += ["## Recipes", "",
@@ -1065,5 +936,4 @@ def llm_guide(ctx):
 def write_docs(outdir, ctx):
     blocks = readme_blocks(ctx)
     (outdir / "README.md").write_text(render_markdown(blocks))
-    render_docx(blocks, outdir / "README.docx", ctx["title"])
     (outdir / "LLM_GUIDE.md").write_text(llm_guide(ctx))

@@ -1,0 +1,7 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block body %}
+<h1>ARGs of MAGs</h1>
+<p>The {{ s.facts.n_genes }} ARG genes of the MAGs were clustered at 90-100 % identity; {{ s.facts.n_shared }} clusters at 90 % are found in more than one MAG ({{ m.tabref(s, "sharing") }}). A cluster in several MAGs is the same sequence in different genomes: consistent with transfer, not evidence of it alone.</p>
+{{ m.table(s, "sharing") }}
+{{ m.table(s, "long") }}
+{% endblock %}

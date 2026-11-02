@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ s.title }} · {{ run.title }}</title>
+<link rel="stylesheet" href="assets/site.css">
+{% if bundle %}<script src="assets/vega-bundle.js"></script>
+{% endif %}
+</head><body>
+<header class="top"><nav><a class="brand" href="index.html">{{ run.title }}</a>
+{% for page, title in nav %}<a href="{{ page }}"{% if page == s.page %} class="on"{% endif %}>{{ title }}</a>
+{% endfor %}
+</nav></header>
+<main>
+{% block body %}{% endblock %}
+</main>
+<footer>Generated {{ run.generated }}{% if run.pipeline_version %} by BugBuster {{ run.pipeline_version }}{% endif %} · {{ run.n_samples }} samples from {{ run.batches | join(", ") }} · the tables are in <code>tables/</code>, the figures in <code>figures/</code>{% if run.pdf %} and the PDF is <code>results_summary.pdf</code>{% endif %}, next to this folder.</footer>
+<script src="assets/tables.js"></script>
+</body></html>

@@ -1,0 +1,15 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% set f = s.facts %}
+{% block body %}
+<h1>{{ s.title }}</h1>
+<p>The ARG figures and matrices use {{ f.primary }}{% if f.others %}; the calls of {{ f.others }} are in arg_long.tsv{% if f.comparison %} and in the <a href="compare.html">comparison of methods</a>{% endif %}{% endif %}. RGI genes count when reads cover at least {{ f.rgi_cov }} % of their best reference sequence. {% if f.n_tier1_samples is not none %}{{ f.n_tier1_samples }} samples carry a tier 1 (clinical priority) gene; {{ f.n_tier1_genes }} distinct tier 1 genes.{% endif %} Tiers are explained in <a href="methods.html">Methods</a>.</p>
+{{ m.figure(s, "arg_priority_heatmap", specs) }}
+{{ m.figure(s, "arg_drug_class_heatmap", specs) }}
+{{ m.figure(s, "arg_vs_depth", specs) }}
+<h2>Tier 1 calls</h2>
+{% if s.tables.get("tier1") %}{{ m.table(s, "tier1") }}{% else %}<p class="note">{{ f.primary }} found no tier 1 gene{% if f.others and f.comparison %}; tier 1 genes found only by {{ f.others }} are in the <a href="compare.html">comparison of ARG methods</a> and the Attention list{% endif %}.</p>{% endif %}
+{{ m.table(s, "group") }}
+<h2>Mutation-dependent hits and tier 2</h2>
+{{ m.table(s, "tier4") }}
+{{ m.table(s, "tier2") }}
+{% endblock %}

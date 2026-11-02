@@ -143,8 +143,8 @@ next release is tagged.
     (`NA_no_ags` without a MicrobeCensus estimate), a COG-category heatmap,
     and reads assigned, annotated fraction, average genome size and genome
     equivalents in `samples_qc`
-  - `README.md` and `README.docx` (standard-library writer, no new
-    dependency) and `LLM_GUIDE.md` in `00_summary/`: the stages that ran per
+  - `README.md` and `LLM_GUIDE.md` in `00_summary/` (a `README.docx` was
+    added too and retired again with the HTML and PDF report, see Removed): the stages that ran per
     results directory (from `software_versions.yml`, read line by line as it
     is not always valid YAML), every table and figure, units, tiers, caveats,
     versions; the guide covers the stages that ran, methods, every table
@@ -458,6 +458,69 @@ next release is tagged.
 
 ### Changed
 
+- **Run summary report: a multi-page HTML site and a PDF** (`00_summary/`).
+  The one-page `results_summary.html` is replaced by an offline HTML report in
+  `report/` (`results_summary.html` now opens `report/index.html`): an
+  overview (facts, the attention list, the stages, read fate and the
+  per-sample table), one page per section whose stage ran (taxonomy, ARGs and
+  the method comparison, ARGs-OAP, read and contig functional profiles,
+  assembly, MAGs, contig ARGs, bin ARG clusters), a methods page (reading
+  guide, tiers, caveats, inputs, every tool and database with its version and
+  reference) and a data dictionary of every table. Heatmaps and the read fate
+  figure are interactive Vega-Lite there (hover, a group menu, zoom on the
+  quantitative axis; above about 1 MB of data the static figure is shown),
+  tables sort and filter, and every figure links its PDF, SVG, PNG and CSV.
+  The Vega libraries and the Inter font are bundled: nothing is loaded from the
+  network and the site works from the file system. `results_summary.pdf` is
+  the same report typeset by Typst (fonts embedded, long tables capped at 60
+  rows with a pointer to the TSV, wide tables on landscape pages, references
+  in Nature style). Both are built from one report model
+  (`bin/summary_report.py`), so their numbers, captions and figure and table
+  numbering agree; templates, styles and the curated tool references
+  (`references.yml`, 50 papers checked on PubMed or Crossref) are in
+  `assets/report/`. The batch mode builds them for merged results too. The
+  module gets that folder with a hash of its files' contents, so an edited
+  template reruns the summary on `-resume`. The summary tables are unchanged (byte-identical on the reference runs)
+- **One figure style for every figure** (`bin/figure_style.py`): the summary
+  figures and the stage figures (read counts, taxonomy classification and
+  abundance bars, blob plots, bin quality, MAG taxonomy) are drawn 89 or
+  183 mm wide at their exact size, in Inter (TrueType in the PDF; in the SVG
+  the text stays text, with the faces it uses embedded), with the Okabe-Ito
+  and viridis palettes, PNG at 600 dpi (was 200-300), no timestamps in the
+  files, and a CSV of the plotted values beside each figure. Samples are in
+  natural order inside their group (`--summary_group_by`, else the batch when
+  several results directories are merged), low-depth samples are hatched and
+  marked with a dagger, and above 60 samples heatmaps put samples on rows
+  (sample labels drop above about 110 samples, where only the groups are
+  labelled). Figure content changes by design: titles move into the captions,
+  colours and sizes change, and the stage figures are also written as PDF
+  and SVG
+- **Blob plots per assembly** (`06_contig_taxonomy/figures/`,
+  `05_arg_prediction/contig_level/figures/`): `Phylum_blob_plot.png` and
+  `ARG_blob_plot.png`, which pooled every assembly in one panel, become
+  `<assembly>_Phylum_blob_plot.*` and `<assembly>_ARG_blob_plot.*`. The ARG
+  plot draws a contig once (it was drawn once per ARG hit; a contig with
+  hits in several classes is 'multiple classes'), ranks the classes by
+  contigs (was by summed length) and keeps DeepARG's spelling (`MLS`, was
+  `Mls`); the phylum plot shows the 8 phyla with the most contig length plus
+  'other', with `no-hit` grey instead of taking a colour, and its bars give
+  each phylum's share of the contig length (was of the contigs)
+- **New summary figures**: `mag_quality` (CheckM2 completeness against
+  contamination by MIMAG tier), `mag_abundance_heatmap` (each MAG's share of
+  each sample's bases), `arg_contig_hosts` (ARG genes on contigs per host
+  genus by ARG class) and `function_contig_cog_heatmap` (COG categories of the
+  contig functional profile)
+- **MAG taxonomy plot counts unclassified bins**: a refined bin without a
+  GTDB-Tk phylum was left out of `MAGs_tax_plot`; it is now counted as
+  'unclassified' (`MAGs_tax_summary.csv` is unchanged)
+- **Report image adds the document and figure tools**: the 18 report and
+  aggregation processes move to
+  `community.wave.seqera.io/library/python_pandas_numpy_matplotlib-base_pruned:6bff5ca407ba1454`
+  (its `oras://` build `2ce015cec686e756` under Singularity and Apptainer):
+  the same Python 3.13 stack plus Typst 0.15.1, Jinja2 3.1.6, Altair 6.3.0,
+  vl-convert-python 1.9.0.post1, the Inter 4.1 font and PyYAML 6.0.3, for the
+  run summary's PDF, HTML site and figures. The image is 1.12 GB (sif
+  428 MB), against 895 MB (338 MB)
 - **eggNOG-mapper's search runs DIAMOND in `fast` mode**: `EGGNOG_MAPPER_SEARCH`
   passes `--dmnd_sensmode fast` (eggNOG-mapper's default is `sensitive`). This
   changes results slightly: on one test-data assembly (4,442 proteins) 67 of
@@ -1021,6 +1084,10 @@ next release is tagged.
 
 ### Removed
 
+- `00_summary/README.docx`: the run summary's README is `README.md`, and the
+  report itself is the HTML site and `results_summary.pdf`
+- The pickled figures of BLOBPLOT and ARG_BLOBPLOT (`*_final_blobplot.pkl`,
+  never published)
 - **Breaking**: megablast against NCBI nt for contig taxonomy (`NT_BLASTN`,
   `FORMAT_NT_BLAST_DB`, `FORMAT_TAXDUMP_FILES`, `bin/blast_nt_reformat.sh`,
   `bin/tax_files_reformat.sh`) and its parameters `--blast_db`,

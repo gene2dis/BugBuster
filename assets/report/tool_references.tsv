@@ -1,0 +1,79 @@
+# software_versions.yml tool name -> display name, kind (tool | database | helper: not listed in Methods) and the
+# citekeys of assets/report/references.yml (";"-separated). evidence: where each reference was checked.
+tool	name	kind	references	evidence
+nextflow	Nextflow	tool	ditommaso2017	PMID 28398311
+fastp	fastp	tool	chen2025;chen2018	PMID 41112039 (fastp 1.0 paper); PMID 30423086 (original); README lists both
+bwamem3	bwa-mem3	tool	vasimuddin2019	crossref; no own paper, README asks to cite bwa-mem2 (IPDPS 2019)
+bowtie2	Bowtie 2	tool	langmead2012;langmead2019	PMID 22388286; PMID 30020410 (README Publications)
+samtools	SAMtools	tool	danecek2021	PMID 33590861
+sylph	sylph	tool	shaw2025	PMID 39379646
+sylph-tax	sylph-tax	tool	shaw2025	PMID 39379646; same as sylph (README gives no separate paper)
+kraken2	Kraken 2	tool	wood2019	PMID 31779668
+bracken	Bracken	tool	lu2017	PMID 40271438
+sourmash	sourmash	tool	irber2024	crossref; JOSS sourmash v4 paper named in README
+args_oap	ARGs-OAP	tool	yin2023	crossref; ARGs-OAP v3.0 paper (v4.0 adds no database or pipeline changes)
+rgi	RGI	tool	alcock2023	PMID 36263822 (README citation)
+card	CARD (database)	database	alcock2023	PMID 36263822
+kma	KMA	tool	clausen2025;clausen2018	PMID 40918069 (README please-cite); PMID 30157759
+kmarvel	K-MARVEL	tool	mahar2026	PMID 42834095 (published version of bioRxiv 10.1101/2025.10.08.681127)
+megahit	MEGAHIT	tool	li2015;li2016	PMID 25609793; PMID 27012178 (README Publications)
+bbmap	BBMap	tool		no paper (sourceforge)
+metabat2	MetaBAT 2	tool	kang2019	PMID 31388474
+semibin	SemiBin2	tool	pan2023;pan2022	PMID 37387171 (SemiBin2 method); PMID 35484115 (README please-cite)
+comebin	COMEBin	tool	wang2024	PMID 38233391
+binette	Binette	tool	mainguy2024	crossref; JOSS
+checkm2	CheckM2	tool	chklovski2023	PMID 37500759
+gtdbtk	GTDB-Tk	tool	chaumeil2022	PMID 36218463 (GTDB-Tk v2)
+gtdbtk_db	GTDB (database)	database	parks2026	PMID 41123020 (GTDB R10 paper, newest; pipeline uses R232)
+sylph_db	GTDB (database)	database	parks2026	PMID 41123020 (GTDB R10 paper, newest; pipeline uses R232)
+mmseqs	MMseqs2	tool	steinegger2017	PMID 29035372
+blobtools	BlobTools	tool	laetsch2017	crossref; F1000Research, not in PubMed
+metabuli	Metabuli	tool	kim2024	PMID 38769467
+deeparg	DeepARG	tool	arangoargoty2018	PMID 29391044
+diamond	DIAMOND	tool	buchfink2021	PMID 33828273 (README: v2 paper; 2015 paper only up to v0.9.25)
+genomad	geNomad	tool	camargo2024	PMID 37735266
+pyrodigal	Pyrodigal	tool	larralde2022;hyatt2010	crossref (Pyrodigal JOSS); PMID 20211023 (Prodigal); README asks for both
+eggnog-mapper	eggNOG-mapper	tool	cantalapiedra2021	PMID 34597405; no v3 paper found
+eggnog_db	eggNOG (database)	database	hernandezplaza2023	PMID 36399505 (eggNOG 6.0)
+run_dbcan	run_dbcan	tool	zheng2023	PMID 37125649 (dbCAN3)
+dbcan_db	dbCAN (database)	database	zheng2023	PMID 37125649 (dbCAN3)
+subread	featureCounts (Subread)	tool	liao2014	PMID 24227677
+bakta	Bakta	tool	schwengers2021	PMID 34739369
+bakta_db	Bakta (database)	database	schwengers2021	PMID 34739369; no separate database paper
+microbecensus	MicrobeCensus	tool	nayfach2015	PMID 25853934
+woltka	Woltka	tool	zhu2022	PMID 35369727
+wol_db	Web of Life 2 (database)	database	zhu2019;balaban2024	PMID 31792218 (WoL2 README citation); PMID 37500914 (uDance, WoL2 phylogeny)
+cog_def	COG (database)	database	galperin2025	PMID 39494517 (COG update 2024)
+bedtools	BEDTools	tool	quinlan2010	PMID 20110278
+blast	BLAST+	tool	camacho2009	PMID 20003500
+humann	HUMAnN	tool	beghini2021	PMID 33944776; README asks for HUMAnN 3 paper, no HUMAnN 4 paper found
+metaphlan	MetaPhlAn 4	tool	blancomiguez2023	PMID 36823356
+superfocus	SUPER-FOCUS	tool	silva2016	PMID 26454280
+superfocus_db	SUPER-FOCUS (database)	database	silva2016	PMID 26454280; cite the tool
+metabuli_db	Metabuli RefSeq (database)	database	kim2024	PMID 38769467; no separate database paper
+checkm2_db	CheckM2 (database)	database	chklovski2023	PMID 37500759; cite the tool
+deeparg_db	DeepARG (database)	database	arangoargoty2018	PMID 29391044; cite the tool
+humann_db	HUMAnN (database)	database	beghini2021	PMID 33944776; cite the tool
+kmarvel_db	K-MARVEL CARD (database)	database	alcock2023	PMID 36263822; built from CARD data
+genomad_db	geNomad (database)	database	camargo2024	PMID 37735266; cite the tool
+bioconductor-phyloseq	phyloseq	tool	mcmurdie2013	PMID 23630581
+bash	Bash	helper		helper
+gzip	gzip	helper		helper
+pigz	pigz	helper		helper
+busybox	BusyBox	helper		helper
+python	Python	helper		helper
+pandas	pandas	helper		helper
+numpy	NumPy	helper		helper
+matplotlib	Matplotlib	helper		helper
+h5py	h5py	helper		helper
+openpyxl	openpyxl	helper		helper
+biopython	Biopython	helper		helper
+r-base	R	helper		helper
+mmseqs2	MMseqs2	tool	steinegger2017	PMID 29035372 (same tool, other version key)
+sylph_taxonomy	GTDB taxonomy for sylph (database)	database	parks2026	PMID 41123020
+pipeline	BugBuster	helper		shown in the report header
+typst	Typst	helper		helper
+jinja2	Jinja2	helper		helper
+altair	Altair	helper		helper
+vl-convert	vl-convert	helper		helper
+seaborn	seaborn	helper		helper

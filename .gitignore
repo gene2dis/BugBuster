@@ -33,3 +33,6 @@ null/
 /work_*/
 /results_*/
 
+# Python bytecode (bin/ scripts run in containers can leave a root-owned bin/__pycache__/)
+__pycache__/
+*.pyc

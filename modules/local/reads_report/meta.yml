@@ -11,13 +11,8 @@ tools:
       homepage: https://pandas.pydata.org
       documentation: https://pandas.pydata.org/docs/
       licence: ["BSD-3-Clause"]
-  - seaborn:
-      description: Python statistical plotting library used by bin/report_unify.py for the box plot
-      homepage: https://seaborn.pydata.org
-      documentation: https://seaborn.pydata.org/
-      licence: ["BSD-3-Clause"]
   - matplotlib:
-      description: Python plotting library used by bin/report_unify.py to render the box plot
+      description: Python plotting library used by bin/report_unify.py to render the box plot (shared style of bin/figure_style.py)
       homepage: https://matplotlib.org
       documentation: https://matplotlib.org/stable/
 
@@ -37,8 +32,8 @@ output:
       pattern: "Reads_report.csv"
   - plot:
       type: file
-      description: Box plot of read counts per step (optional; not produced in 'none' mode)
-      pattern: "Box_plot_reads.png"
+      description: Box plot of read counts per step, Box_plot_reads.pdf / .svg / .png (600 dpi) with its plotted values as .csv (optional; not produced in 'none' mode)
+      pattern: "Box_plot_reads.{pdf,svg,png,csv}"
   - versions:
       type: file
       description: Software versions (python, pandas)

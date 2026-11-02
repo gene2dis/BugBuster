@@ -1,0 +1,22 @@
+{% extends "base.html" %}{% import "macros.html" as m %}
+{% block body %}
+<h1>Methods</h1>
+<h2>Reading this report</h2>
+<ul>{% for u in s.lists.units %}<li>{{ u }}</li>{% endfor %}</ul>
+{% if s.lists.arg_methods %}
+<p><b>ARG methods.</b> The ARG figures and matrices use {{ s.facts.primary }}.</p>
+<ul>{% for a in s.lists.arg_methods %}<li><b>{{ a.term }}</b> {{ a.text }}</li>{% endfor %}</ul>
+{% endif %}
+{{ m.table(s, "tiers") }}
+<h2>Caveats</h2>
+<ul class="caveats">{% for c in s.lists.caveats %}<li>{{ c }}</li>{% endfor %}</ul>
+<h2>Inputs</h2>
+<pre>{{ s.lists.inputs | join("\n") }}</pre>
+<h2>Software and databases</h2>
+{{ m.table(s, "tools") }}
+{{ m.table(s, "watchlist") }}
+{% if s.lists.references %}
+<h2>References</h2>
+<ol class="refs">{% for r in s.lists.references %}<li id="ref-{{ r.no }}">{{ r.text }}</li>{% endfor %}</ol>
+{% endif %}
+{% endblock %}

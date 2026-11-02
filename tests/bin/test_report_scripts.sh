@@ -12,8 +12,8 @@
 #   - and the happy paths still produce their real outputs,
 #   - bin/arg_contig_level_report.py writes a real TSV, and bin/arg_blobplot.py
 #     plots only the ARG-carrying contigs (contigs without an ARG were "Other"),
-#   - bin/blobplot.py and bin/arg_blobplot.py pickle their figure without
-#     error (design doc T9 finding: lambda tick formatters broke pickle.dump).
+#   - bin/blobplot.py and bin/arg_blobplot.py write one figure per assembly
+#     (an assembly with no contigs gets a placeholder, the others still plot).
 #
 # The scripts run inside the same pinned images the report processes use.
 #
@@ -166,6 +166,7 @@ check_grep "report_unify: merged report header" "Reads_report.csv" \
     "Id,Raw reads,Fastp,Clean reads (contaminants removed)"
 check_grep "report_unify: merged report row" "Reads_report.csv" "^s1,1000,900,850$"
 check_file "report_unify: boxplot created" "Box_plot_reads.png"
+check_file "report_unify: boxplot source data" "Box_plot_reads.csv"
 
 RU_NONE="${WORK}/report_unify_none"
 mkdir -p "${RU_NONE}"
@@ -215,6 +216,7 @@ check_grep "bin_quality: summary counts High semibin MAG" "Mag_quality_summary.c
 check_grep "bin_quality: all-MAGs table row" "All_Mag_quality_table.csv" "^sampleA,Semibin,bin.1,High,95.0,2.0$"
 check_grep "bin_quality: refined table has Binette MAG" "Refined_Mag_quality_table.csv" "^sampleA,Binette,bin.1,High,96.0,1.0$"
 check_file "bin_quality: quality plot created" "Total_bins_quality_plot.png"
+check_file "bin_quality: quality plot as PDF" "Total_bins_quality_plot.pdf"
 
 BQ_EMPTY="${WORK}/bin_quality_empty"
 mkdir -p "${BQ_EMPTY}"
@@ -251,6 +253,7 @@ expect_pass "bin_tax: real GTDB-Tk 2.7 summary parsed" bin_tax_report.py
 check_grep "bin_tax: MAG row with parsed ranks" "MAGs_tax_summary.csv" \
     "^sampleA,bin.1,GCF_000009045.1,Bacteria,Bacillota,Bacilli,Bacillales,Bacillaceae,Bacillus,Bacillus subtilis$"
 check_file "bin_tax: taxonomy plot created" "MAGs_tax_plot.png"
+check_file "bin_tax: taxonomy plot source data" "MAGs_tax_plot.csv"
 
 BT_LEGACY="${WORK}/bin_tax_legacy"
 mkdir -p "${BT_LEGACY}"
@@ -433,46 +436,44 @@ NEXT_WORKDIR="${AO_BAD}"
 expect_fail "args_oap_report: a directory not named <sample>_args_oap fails" args_oap_report.py sampleE_out
 
 #
-# blobplot.py / arg_blobplot.py (design doc T9 finding, 2026-10-09): the
-# figure is also pickled, and lambda tick formatters made pickle.dump fail
-# after the PNG was written. Fixtures are cut from a real T9 run (BlobTools
-# 1.1.1 table, ARG_CONTIG_LEVEL_REPORT output).
+# blobplot.py / arg_blobplot.py: one figure per assembly in the shared style (roadmap Phase 11d), each as PDF, SVG
+# and PNG with its plotted values as CSV. Fixtures are cut from a real T9 run (BlobTools 1.1.1 table,
+# ARG_CONTIG_LEVEL_REPORT output).
 #
 echo "--- blobplot.py / arg_blobplot.py ---"
 RUN_IMG="${REPORT_IMG}"
-check_pickle() {
-    # check_pickle <desc> <script-module> <pkl> — the pickled figure loads back
-    if docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -e MPLCONFIGDIR=/tmp \
-        -v "${REPO_DIR}/bin:/pipeline_bin:ro" -v "${LAST_WORKDIR}:/repwork" -w /repwork \
-        -e PYTHONPATH=/pipeline_bin "${RUN_IMG}" python3 -c \
-        "import pickle, sys; sys.modules['__main__'] = __import__('$2'); fig = pickle.load(open('$3', 'rb')); assert len(fig.axes) == 2" \
-        > /dev/null 2>&1; then
-        echo "✓ $1"
-        PASS=$((PASS + 1))
-    else
-        echo "✗ $1"
-        FAIL=$((FAIL + 1))
-    fi
-}
 BP_WORK="${WORK}/blobplot"
 mkdir -p "${BP_WORK}"
 cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" "${BP_WORK}/"
+# an assembly whose table has its header and no contig
+head -n 11 "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+    > "${BP_WORK}/empty_asm_Blob_table.empty_asm.blobDB.table.txt"
 NEXT_WORKDIR="${BP_WORK}"
-expect_pass "blobplot: real BlobTools table plotted and pickled" blobplot.py
-check_file "blobplot: PNG created" "Phylum_blob_plot.png"
-check_pickle "blobplot: pickled figure loads back" blobplot "Phylum_final_blobplot.pkl"
+expect_pass "blobplot: real BlobTools table plotted" blobplot.py
+check_grep "blobplot: an assembly with no contigs gets a placeholder" "../blobplot.log" "empty_asm_Phylum_blob_plot: no contigs"
+check_file "blobplot: empty_asm_Phylum_blob_plot.pdf written" "empty_asm_Phylum_blob_plot.pdf"
+for ext in pdf svg png csv; do
+    check_file "blobplot: test_sample2_Phylum_blob_plot.${ext} written" "test_sample2_Phylum_blob_plot.${ext}"
+done
+check_grep "blobplot: every contig of the table (28) plotted" "../blobplot.log" "test_sample2_Phylum_blob_plot: 28 contigs"
 ABP_WORK="${WORK}/arg_blobplot"
 mkdir -p "${ABP_WORK}"
 cp "${REPO_DIR}/tests/data/reports/Contig_tax_and_arg_prediction.tsv" "${ABP_WORK}/"
+# a second ARG hit on k141_29 (beta-lactam) in another class: the contig is one point, 'multiple classes'
+awk -F'\t' 'BEGIN{OFS="\t"} {print} $2 == "k141_29" {$15 = "MEXF"; $16 = "MLS"; print}' \
+    "${REPO_DIR}/tests/data/reports/Contig_tax_and_arg_prediction.tsv" > "${ABP_WORK}/Contig_tax_and_arg_prediction.tsv"
 NEXT_WORKDIR="${ABP_WORK}"
-expect_pass "arg_blobplot: contig ARG table plotted and pickled" arg_blobplot.py
-check_file "arg_blobplot: PNG created" "ARG_blob_plot.png"
-check_pickle "arg_blobplot: pickled figure loads back" arg_blobplot "ARG_final_blobplot.pkl"
-# The fixture has 7 ARG-carrying contigs out of 40 in 5 classes; the 33
-# contigs without an ARG used to be plotted as "Other"
-check_grep "arg_blobplot: only the ARG-carrying contigs are plotted" "../arg_blobplot.log" "Total contigs: 7$"
-check_grep "arg_blobplot: five ARG classes and no 'Other'" "../arg_blobplot.log" \
-    "Class distribution: {'Aminoglycoside': 14.29, 'Beta-Lactam': 28.57, 'Fosmidomycin': 14.29, 'Multidrug': 28.57, 'Tetracycline': 14.29}$"
+expect_pass "arg_blobplot: contig ARG table plotted" arg_blobplot.py
+for ext in pdf svg png csv; do
+    check_file "arg_blobplot: test_sample1_ARG_blob_plot.${ext} written" "test_sample1_ARG_blob_plot.${ext}"
+done
+# 8 ARG rows on 7 contigs (the 33 contigs without an ARG are left out); classes ranked by contigs, names as
+# DeepARG writes them (MLS, not Mls)
+check_grep "arg_blobplot: one point per ARG-carrying contig, a two-class contig is 'multiple classes'" \
+    "../arg_blobplot.log" \
+    "test_sample1_ARG_blob_plot: 7 ARG-carrying contigs, classes shown: multidrug, aminoglycoside, beta-lactam, fosmidomycin, tetracycline, multiple classes$"
+check_grep "arg_blobplot: the two classes of the contig in the source data" "test_sample1_ARG_blob_plot.csv" \
+    "^k141_29,.*,MLS;beta-lactam,multiple classes,test_sample1$"
 
 #
 # arg_contig_level_report.py: the contig table is written tab-separated, as

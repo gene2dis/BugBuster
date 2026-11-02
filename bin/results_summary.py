@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-BugBuster results summary: consolidated, cross-batch tables, figures and an HTML report.
+BugBuster results summary: consolidated, cross-batch tables, figures, an HTML report and a PDF.
 
 Usage:
   results_summary.py --results RUN1/results [RUN2/results ...] --outdir summary
@@ -20,8 +20,8 @@ rerunning any tool, and merges any number of results directories (one per batch)
   07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
   07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
   pipeline_info/software_versions.yml             tool and database versions; which stages ran
-Each section is skipped when its inputs are absent; README.md, README.docx and LLM_GUIDE.md list every
-pipeline stage and whether it ran.
+Each section is skipped when its inputs are absent; README.md and LLM_GUIDE.md list every pipeline stage and
+whether it ran.
 
 Units: Reads_report.csv counts single reads (both mates); every count here is in read
 pairs (= reads / 2), the unit K-MARVEL and sylph use. ARG abundance is normalised to the
@@ -37,15 +37,16 @@ mutation_data lists every difference from the reference, so a variant-model hit 
 resistance call only when a known resistance mutation is among them.
 
 Outputs (in --outdir): tables/*.tsv, results_summary.xlsx (if openpyxl or xlsxwriter
-is installed), figures/*.{png,pdf,svg}, results_summary.html (self-contained, works offline),
-README.md and README.docx (what is in the summary) and LLM_GUIDE.md (the summary folder and every
-column, for a language model or a script). These name no local path: the summary folder is the part
+is installed), figures/*.{pdf,svg,png,csv} (bin/figure_style.py), report/ (a multi-page HTML report from
+assets/report/html, works offline; results_summary.html opens it), results_summary.pdf (Typst, assets/report/typst),
+README.md (what is in the summary) and LLM_GUIDE.md (the summary folder and every column, for a language model or a
+script). These name no local path: the summary folder is the part
 that is shared, so paths are relative to it and inputs are shown by file name.
 
-Requirements: Python 3 with pandas, numpy and matplotlib >= 3.7; openpyxl or xlsxwriter for the
-Excel workbook (optional). The pipeline's RESULTS_SUMMARY image has them all. Run the script from
-a BugBuster checkout: it imports the summary_*.py modules next to it and reads its default tier
-rules and watchlist from ../assets/.
+Requirements: Python 3 with pandas, numpy, matplotlib >= 3.7, jinja2 and pyyaml; optional: openpyxl or xlsxwriter
+(Excel workbook), typst (PDF), altair + vl-convert-python (interactive figures), font-inter (the figures' font). The
+pipeline's RESULTS_SUMMARY image has them all. Run the script from a BugBuster checkout: it imports the summary_*.py
+modules next to it and reads its default tier rules, watchlist and report templates from ../assets/.
 """
 
 import argparse
@@ -79,14 +80,19 @@ from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
 from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
                              contig_mobile_table, has_genomad, load_arg_gene_abundance, load_contig_table)
-from summary_figures import (FigureWriter, fig_args, fig_cog, fig_method_by_category, fig_sarg,  # noqa: E402
-                             fig_method_upset, fig_qc, fig_taxonomy, fig_watchlist, short_count)
-from summary_html import write_excel, write_html, write_tables  # noqa: E402
+from summary_figures import (FigureWriter, fig_args, fig_arg_contig_hosts, fig_cog, fig_mag_abundance,  # noqa: E402
+                             fig_mag_quality, fig_method_by_category, fig_method_upset, fig_qc, fig_sarg,
+                             fig_taxonomy, fig_watchlist, short_count)
+from summary_html import write_excel, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
+import summary_report  # noqa: E402
+from summary_pdf import write_pdf  # noqa: E402
+from summary_site import write_site  # noqa: E402
 
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 DEFAULT_ASSETS = SCRIPT_DIR.parent / "assets"
+DEFAULT_REPORT_ASSETS = DEFAULT_ASSETS / "report"
 
 
 def batch_label(path):
@@ -390,6 +396,9 @@ def parse_args(argv=None):
     p.add_argument("--top-n", type=int, default=40, help="maximum rows in the ARG heatmap (default 40)")
     p.add_argument("--title", default="BugBuster results summary", help="HTML report title")
     p.add_argument("--no-excel", action="store_true", help="do not write the Excel workbook")
+    p.add_argument("--report-assets", default=str(DEFAULT_REPORT_ASSETS),
+                   help="templates, styles and references of the PDF and HTML report (default: assets/report)")
+    p.add_argument("--no-pdf", action="store_true", help="do not write results_summary.pdf")
     return p.parse_args(argv)
 
 
@@ -495,7 +504,16 @@ def main(argv=None):
     key_meta = [c for c in (args.group_by, args.order_by) if c]
     order = sample_order(samples, args.group_by, args.order_by)
     samples = samples.loc[order]
-    groups = [samples.at[s, args.group_by] if args.group_by else "" for s in order]
+    # figures: samples by group (--group-by, else the batch when several results directories are merged), then in
+    # the table order; the tables keep their own order
+    if args.group_by:
+        fig_cols, fig_groups = order, [samples.at[s, args.group_by] for s in order]
+    elif len(batches) > 1:
+        rank = {b["label"]: i for i, b in enumerate(batches)}
+        fig_cols = sorted(order, key=lambda s: rank[samples.at[s, "batch"]])
+        fig_groups = [samples.at[s, "batch"] for s in fig_cols]
+    else:
+        fig_cols, fig_groups = order, [""] * len(order)
 
     # ---- QC
     reads = [b["reads"] for b in batches if b["reads"] is not None]
@@ -515,7 +533,7 @@ def main(argv=None):
     low = set(samples.index[samples["low_depth"].fillna(False).astype(bool)]) if "low_depth" in samples else set()
 
     tables = {}
-    figs = FigureWriter(outdir)
+    figs = FigureWriter(outdir, args.min_clean_pairs)
     summary = {"n_samples": len(order), "n_batches": len(batches), "n_low_depth": len(low),
                "low_depth_samples": [s for s in order if s in low]}
     if "clean_pairs" in samples:
@@ -558,8 +576,8 @@ def main(argv=None):
         if watch is not None:
             wl_wide, wl_long = watchlist_table(tx, watch)
             tables["watchlist"] = (mark_low_depth(wl_wide, low, tcols_all), False)
-        tcols = [s for s in order if s in tx["rel"].columns]
-        tgroups = [samples.at[s, args.group_by] if args.group_by else "" for s in tcols]
+        tcols = [s for s in fig_cols if s in tx["rel"].columns]
+        tgroups = [g for s, g in zip(fig_cols, fig_groups) if s in tx["rel"].columns]
         fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
         fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name)
 
@@ -635,8 +653,8 @@ def main(argv=None):
             hit1 = arg[arg["tier"] == 1]
             summary["n_tier1"] = int(hit1["sample"].nunique())
             summary["n_tier1_genes"] = int(hit1["gene"].nunique())
-            fig_args(figs, arg[arg["gene_representative"]], mats, samples, order, groups, low, status, args.top_n,
-                     METHOD_LABELS[primary])
+            fig_args(figs, arg[arg["gene_representative"]], mats, samples, fig_cols, fig_groups, low, status,
+                     args.top_n, METHOD_LABELS[primary])
         # arg_long: every method's calls, the primary method first
         lead = ["sample", "batch"] + meta_cols + ["method", "tier", "category", "gene", "aro_full_name", "aro_id",
                                                    "gene_family", "drug_class", "resistance_mechanism", "model",
@@ -689,7 +707,7 @@ def main(argv=None):
         tables["arg_sarg_long"] = (with_meta(sub, samples, meta_cols, order, ["sarg_type", "sarg_subtype"]), False)
         for name, df in sarg_tables(sarg, order, sstatus).items():
             tables[name] = (df, True)
-        fig_sarg(figs, tables.get("arg_sarg_type_cpc", (None,))[0], order, groups, low,
+        fig_sarg(figs, tables.get("arg_sarg_type_cpc", (None,))[0], fig_cols, fig_groups, low,
                  {s for s in order if sstatus[s] != "ok"})
         sarg_ctx = {"n_samples": len(sarg_ran & set(order)), "n_types": int(sub["sarg_type"].nunique()),
                     "n_subtypes": int(sub["sarg_subtype"].nunique()),
@@ -719,7 +737,7 @@ def main(argv=None):
             table_units[f"function_read_{ont}"] = unit
         cog, cog_unit = cog_matrix(ftables, order)
         if cog is not None:
-            fig_cog(figs, cog, cog_unit, order, groups, low,
+            fig_cog(figs, cog, cog_unit, fig_cols, fig_groups, low,
                     {s for s in order if fstatus[s] != "ok" or cog[s].isna().all()}, func["backend"])
         func_ctx = {"backend": func["backend"], "ontologies": sorted(ftables),
                     "unit": next(iter(ftables.values()))[1] if ftables else "",
@@ -748,6 +766,7 @@ def main(argv=None):
     mags = mags_table(mag_parts)
     if mags is not None:
         tables["mags"] = (mags, False)
+        fig_mag_quality(figs, mags)
         mc_bases = (mc.drop_duplicates("sample").set_index("sample")["mc_total_bases"] if mc is not None
                     else pd.Series(dtype=float))
         bases = {}
@@ -762,12 +781,14 @@ def main(argv=None):
             ab = with_meta(ab.drop(columns="batch"), samples, meta_cols, order, ["assembly", "bin"])
             lead = ["assembly", "batch", "bin", "sample"]
             tables["mag_abundance"] = (ab[lead + [c for c in ab.columns if c not in lead]], False)
+            fig_mag_abundance(figs, tables["mag_abundance"][0], mags, fig_cols, fig_groups, low)
 
     # ---- contig ARGs with their taxon and bin (linkage), and their abundance per sample
     clong = arg_contig_long_table([(b["label"], b["contig_args"]) for b in batches], mags)
     if clong is not None:
         tables["arg_contig_long"] = (clong, False)
         tables["arg_contig_hosts"] = (arg_contig_hosts_table(clong), False)
+        fig_arg_contig_hosts(figs, tables["arg_contig_hosts"][0])
     abund = [b["arg_abund"].assign(batch=b["label"]) for b in batches if b["arg_abund"] is not None]
     if abund:
         abund = pd.concat(abund, ignore_index=True).drop(columns="batch")
@@ -797,6 +818,11 @@ def main(argv=None):
         ccols = contig_function_sample_columns(cfunc, order)
         for c in ccols.columns:
             samples[c] = ccols[c]
+        ccog, ccog_unit = cog_matrix(ctables, order)
+        if ccog is not None:
+            fig_cog(figs, ccog, ccog_unit, fig_cols, fig_groups, low,
+                    {s for s in order if cstatus[s] != "ok" or ccog[s].isna().all()}, "eggNOG-mapper",
+                    key="function_contig_cog_heatmap", section="contig_functional", level="contig")
         cfunc_ctx = {"ontologies": sorted(ctables), "unit": next(iter(ctables.values()))[1] if ctables else "",
                      "n_samples": len(cfunc["ran"] & set(order))}
 
@@ -811,7 +837,7 @@ def main(argv=None):
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]
     tables = {"samples_qc": (qc.reset_index(), False), **tables}
-    fig_qc(figs, samples, order, groups, low, args.min_clean_pairs, depth_marks)
+    fig_qc(figs, samples, fig_cols, fig_groups, low, args.min_clean_pairs, depth_marks)
 
     write_tables(outdir, tables)
     if not args.no_excel:
@@ -856,7 +882,14 @@ def main(argv=None):
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
     }
     ctx["method_notes"] = method_notes(ctx)
-    write_html(outdir, args.title, ctx)
+    model = summary_report.build(ctx, args.report_assets)
+    pdf = None if args.no_pdf else write_pdf(outdir, model, args.report_assets, figs.dir)
+    ctx["pdf_written"] = model["run"]["pdf"] = pdf is not None
+    # an earlier run's files in a reused output directory would not match these tables (README.docx is retired)
+    for stale in ([] if pdf else [outdir / "results_summary.pdf"]) + [outdir / "README.docx"]:
+        if stale.exists():
+            stale.unlink()
+    write_site(outdir, model, args.report_assets)
     write_docs(outdir, ctx)
     print(f"{len(order)} samples; {len(tables)} tables, {len(figs.records)} figures written to {outdir}")
 

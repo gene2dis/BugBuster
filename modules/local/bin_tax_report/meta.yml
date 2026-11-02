@@ -27,12 +27,12 @@ input:
 output:
   - gtdb_tax:
       type: file
-      description: Bar plot of MAG counts per phylum (MAGs_tax_plot.png)
-      pattern: "*.png"
+      description: Bar plot of MAG counts per GTDB phylum, bins without a phylum counted as unclassified; MAGs_tax_plot.pdf / .svg / .png (600 dpi) with its plotted values as .csv
+      pattern: "MAGs_tax_plot.{pdf,svg,png,csv}"
   - mag_report:
       type: file
       description: Per-bin table with sample, bin_name, closest_genome_reference and Domain to Species ranks (MAGs_tax_summary.csv)
-      pattern: "*.csv"
+      pattern: "MAGs_tax_summary.csv"
   - versions:
       type: file
       description: Software versions

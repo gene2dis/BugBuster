@@ -15,20 +15,16 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
-from matplotlib import rcParams
 
-# natural_key is shared with bin/results_summary.py (bin/summary_common.py)
+# natural_key is shared with bin/results_summary.py (bin/summary_common.py); the figure style with every
+# BugBuster figure (bin/figure_style.py)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from summary_common import natural_key  # noqa: E402
+import figure_style as fs  # noqa: E402
 
-# Set matplotlib parameters for publication-quality plots
-rcParams['font.size'] = 20
-rcParams['axes.linewidth'] = 1.5
-rcParams['xtick.major.width'] = 1.5
-rcParams['ytick.major.width'] = 1.5
+fs.setup()
+import matplotlib.pyplot as plt  # noqa: E402
 
 # Per profiler: plot title label, database column in Reads_report.csv, plot file
 PROFILERS = {
@@ -232,68 +228,35 @@ class TaxonomyReportGenerator:
             plot_data['Classified'] = plot_data['Classified'] / 100.0
             plot_data['Unclassified'] = plot_data['Unclassified'] / 100.0
         
-        # Samples top to bottom in natural order (V2 before V10); figure height
-        # and label size follow the number of samples so labels never overlap
+        # Samples top to bottom in natural order (V2 before V10); height and label size follow the sample count
         samples = sorted(plot_data['Id'].unique(), key=natural_key)
         n_samples = len(samples)
-        fig, ax = plt.subplots(figsize=(16, max(6, 0.3 * n_samples + 2)))
-        y_positions = range(n_samples)
-        
-        # Plot stacked bars
-        unclassified_vals = []
-        classified_vals = []
-        
-        for sample in samples:
-            sample_data = plot_data[plot_data['Id'] == sample]
-            if len(sample_data) > 0:
-                unclassified_vals.append(sample_data['Unclassified'].iloc[0])
-                classified_vals.append(sample_data['Classified'].iloc[0])
-            else:
-                unclassified_vals.append(0)
-                classified_vals.append(0)
-        
-        # Create stacked horizontal bars
-        ax.barh(y_positions, classified_vals, color='#6baed6', 
-                edgecolor='black', linewidth=1.5, label='Classified')
-        ax.barh(y_positions, unclassified_vals, left=classified_vals, 
-                color='#d16678', edgecolor='black', linewidth=1.5, label='Unclassified')
-        
-        # Customize plot
-        ax.set_yticks(y_positions)
-        ax.set_yticklabels(samples, fontsize=max(6, min(18, 500 / max(n_samples, 1))))
+        lay = fs.sample_layout(n_samples)
+        rows = plot_data.drop_duplicates('Id').set_index('Id').reindex(samples)
+        classified = rows['Classified'].fillna(0).values * 100
+        unclassified = rows['Unclassified'].fillna(0).values * 100
+        width = fs.width_class(n_samples)
+        fig, ax = plt.subplots(figsize=fs.figsize(width, n_samples * lay['cell_mm'] + 24), layout='constrained')
+        y = range(n_samples)
+        ax.barh(y, classified, color=fs.CATEGORY[0], height=0.8, lw=0, label='classified')
+        ax.barh(y, unclassified, left=classified, color=fs.NOT_DETECTED, height=0.8, lw=0, label='unclassified')
+        fs.sample_ticks(ax, samples, set(), 'y', lay['fs'])
+        ax.tick_params(axis='y', length=0)
         ax.set_ylim(n_samples - 0.5, -0.5)
-        ax.set_xlabel('Reads Classified', fontsize=20)
-        ax.set_ylabel('Samples', fontsize=20)
-        
-        # Format x-axis as percentage
-        ax.set_xlim(0, 1.0)
-        ax.set_xticks([0, 0.25, 0.5, 0.75, 1.0])
-        ax.set_xticklabels(['0%', '25%', '50%', '75%', '100%'], fontsize=18)
-        
-        # Add legend
-        # outside the axes: inside, it covered the bars of the top samples
-        ax.legend(loc='upper left', bbox_to_anchor=(1.01, 1), fontsize=16, frameon=False)
-        
-        # Add grid
-        ax.grid(False)
-        ax.spines['top'].set_visible(False)
-        ax.spines['right'].set_visible(False)
-        
-        # Add title if multiple databases
+        ax.set_xlim(0, 100)
+        ax.set_xlabel('% of reads')
+        db = ''
         if db_col in plot_data.columns:
-            db_names = plot_data[db_col].unique()
-            if len(db_names) > 1:
-                title = f'{plot_title_prefix} Classification Results'
-            else:
-                title = f'{plot_title_prefix} Classification Results - {db_names[0].upper()}'
-            ax.set_title(title, fontsize=22, pad=20)
-        
-        plt.tight_layout()
-        plt.savefig(output_path, dpi=300, bbox_inches='tight')
-        plt.close()
-        
-        print(f"Created classification plot: {output_path}")
-    
+            db_names = plot_data[db_col].astype(str).unique()
+            db = db_names[0] if len(db_names) == 1 else ', '.join(db_names)
+        fig.legend(loc='outside lower center', ncol=2, handlelength=1.2,
+                   title=f'{plot_title_prefix}{f" ({db})" if db else ""}')
+        source = pd.DataFrame({'sample': samples, 'pct_classified': classified, 'pct_unclassified': unclassified})
+        if db:
+            source['database'] = db
+        fs.save(fig, output_path.parent, output_path.stem, source)
+        print(f"Created classification plot: {output_path.stem}.pdf / .svg / .png")
+
     def generate_report(
         self,
         report_files: List[Path],

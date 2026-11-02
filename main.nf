@@ -925,7 +925,7 @@ workflow {
     //
     // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG
     // (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus tables,
-    // Excel workbook, figures, HTML report, README (MD/DOCX) and LLM guide.
+    // Excel workbook, figures, HTML report and PDF, README and LLM guide.
     // It reads the aggregated software_versions.yml, so its own versions.yml
     // is not part of that file.
     //
@@ -935,6 +935,14 @@ workflow {
         ch_summary_reads_report = params.taxonomic_profiler != 'none'
             ? ch_summary_tax_report
             : ch_reads_report.flatten().filter { report -> report.name.endsWith('.csv') }.first()
+        // assets/report goes in with a hash of its files' contents: a directory input is cached by its own path,
+        // size and mtime, so without it an edited template, style or reference would not rerun the summary on -resume
+        def report_assets = file("${projectDir}/assets/report", checkIfExists: true)
+        def report_assets_hash = files("${report_assets}/**", type: 'file')
+            .collect { f -> "${report_assets.relativize(f)} ${f.bytes.md5()}" }
+            .sort()
+            .join('\n')
+            .md5()
         RESULTS_SUMMARY(
             ch_summary_reads_report,
             QC.out.fastp_json.toSortedList { a, b -> a.name <=> b.name },
@@ -949,6 +957,7 @@ workflow {
             params.card_prevalence ? file(params.card_prevalence, checkIfExists: true) : [],
             file(params.arg_priority_table, checkIfExists: true),
             file(params.summary_watchlist, checkIfExists: true),
+            [report_assets, report_assets_hash],
             ch_summary_reports.toSortedList { a, b -> a.name <=> b.name }
         )
     }

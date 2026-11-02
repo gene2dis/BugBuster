@@ -576,8 +576,9 @@ profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
 ## Results Summary Parameters
 
 The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level ARG (K-MARVEL, RGI,
-ARGs-OAP), read functional and MicrobeCensus results into TSV tables, an Excel workbook, figures, a
-self-contained HTML report, a README (`README.md`, `README.docx`) and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
+ARGs-OAP), read functional and MicrobeCensus results, and the assembly-based stages, into TSV tables, an Excel
+workbook, figures (PDF, SVG, PNG and their values as CSV), a multi-page offline HTML report (`report/`), the same
+report as a PDF (`results_summary.pdf`), a `README.md` and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
 clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.17, for how the results are reported.
 
 ### `--results_summary`
