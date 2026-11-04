@@ -1136,6 +1136,12 @@ next release is tagged.
   depot.galaxyproject.org image only when the engine was `singularity`, so
   under apptainer they pulled and converted the docker image instead; the
   default `-B /tmp:/tmp` bind had the same test. Tool versions are unchanged.
+- **Bakta could hang forever under singularity/apptainer**: tRNAscan-SE, which
+  Bakta runs, names its temp files `/tmp/tscan<PID>`. Every container task has
+  its own process numbering but shares the host `/tmp`, so two Bakta tasks
+  running side by side can get the same PID; the second then finds the first
+  one's files and waits on an overwrite prompt that never gets an answer. Bakta
+  now runs with `TMPDIR` in its task directory.
 - **A custom Kraken2 or sourmash database was labelled as the registry
   default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
   the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the
