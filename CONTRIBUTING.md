@@ -159,6 +159,10 @@ feat(modules): add DIAMOND module for protein alignment
   every command the script calls, and run the process once under apptainer. Also remember
   that a singularity/apptainer image is read-only: a tool must not write inside its own
   install directory
+- A container directive or config setting that picks the singularity image tests
+  `workflow.containerEngine in ['singularity', 'apptainer']`, never `== 'singularity'`:
+  `-profile apptainer` sets the engine to `apptainer`, and an equality test silently sends
+  it the docker URI instead (`tests/bin/test_module_meta.sh` checks modules and configs)
 - Upstream bugs are worked around in `bin/`, never by editing an image:
   `bin/run_microbe_census_py3fix.py` and `bin/emapper_ogs_fix.py` replace a broken (or,
   for MicrobeCensus' base count, slow) function and then run the stock CLI with the same

@@ -24,7 +24,7 @@ process CHECKM2_BATCH {
     tag "batch_all_samples"
     label 'process_medium'
     
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/checkm2:1.1.0--pyh7e72e81_1' :
         'quay.io/biocontainers/checkm2:1.1.0--pyh7e72e81_1' }"
 

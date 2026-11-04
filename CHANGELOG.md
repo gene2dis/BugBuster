@@ -1129,6 +1129,13 @@ next release is tagged.
 
 ### Fixed
 
+- **`-profile apptainer` now uses the same images as `-profile singularity`**:
+  18 modules (BBMap, BBNorm, Binette, MetaBAT2 and its depth step, CheckM2,
+  MMseqs2 clustering, COMEBin, the two ubuntu helpers, the Bakta database
+  format step, GTDB-Tk, MEGAHIT, the four RGI processes, SemiBin2) chose their
+  depot.galaxyproject.org image only when the engine was `singularity`, so
+  under apptainer they pulled and converted the docker image instead; the
+  default `-B /tmp:/tmp` bind had the same test. Tool versions are unchanged.
 - **A custom Kraken2 or sourmash database was labelled as the registry
   default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
   the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the

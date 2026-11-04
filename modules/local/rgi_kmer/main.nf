@@ -1,5 +1,5 @@
 process RGI_KMER {
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/rgi:6.0.8--pyh05cac1d_0' :
         'quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0' }"
     

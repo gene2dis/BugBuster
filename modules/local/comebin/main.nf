@@ -21,7 +21,7 @@ process COMEBIN {
     tag "${meta.id}"
     label 'process_high'
 
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/comebin:1.1.0--hdfd78af_2' :
         'quay.io/biocontainers/comebin:1.1.0--hdfd78af_2' }"
 

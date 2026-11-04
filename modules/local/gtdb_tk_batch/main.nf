@@ -23,7 +23,7 @@ process GTDB_TK_BATCH {
     label 'process_high'
     label 'process_high_memory'
     
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/gtdbtk:2.8.0--pyhdfd78af_0' :
         'quay.io/biocontainers/gtdbtk:2.8.0--pyhdfd78af_0' }"
 
