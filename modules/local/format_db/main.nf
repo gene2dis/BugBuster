@@ -276,11 +276,13 @@ process FORMAT_DBCAN_DB {
 
 process FORMAT_BAKTA_DB {
     tag "format_bakta_db"
-    // Runs in the SAME pinned bakta container the BAKTA_BAKTA module uses
-    // (not the shared wget image): provisioning must run amrfinder_update —
+    // Runs in the same Bakta 1.12.2 biocontainers build the BAKTA_BAKTA module
+    // uses (quay image; under singularity/apptainer its depot sif, while
+    // BAKTA_BAKTA's override keeps the quay URI for every engine), not the
+    // shared wget image: provisioning must run amrfinder_update —
     // the official DB tarball bundles an AMRFinderPlus DB too old for the
     // container's AMRFinderPlus binary (T7 acceptance finding, 2026-10-06) —
-    // and using the identical image guarantees the refreshed DB matches the
+    // and using the same build guarantees the refreshed DB matches the
     // binary that will consume it. wget/tar/xz verified present in the image
     // (busybox tar; -xJf --strip-components extraction verified live).
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?

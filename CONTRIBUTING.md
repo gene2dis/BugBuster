@@ -166,8 +166,10 @@ feat(modules): add DIAMOND module for protein alignment
 - Under singularity/apptainer every task has its own PID namespace (PIDs repeat from task
   to task) but shares the host `/tmp`. A tool that names its temp files by PID (tRNAscan-SE's
   `/tmp/tscan<PID>`, inside Bakta) can collide with a task running beside it, so give such a
-  process a `TMPDIR` in its task directory (`beforeScript = 'mkdir -p tmp && export
-  TMPDIR=$PWD/tmp'` in `config/modules.config`; the launcher forwards `TMPDIR` into the container)
+  process a `TMPDIR` in its task directory: `containerOptions` with `--env TMPDIR=$PWD` in its
+  `config/modules.config` block (see BAKTA_BAKTA). Not a `beforeScript`, which would replace the
+  `module load` an HPC config puts there, and repeat base.config's `-B /tmp:/tmp`, which a
+  `withName` `containerOptions` replaces
 - Upstream bugs are worked around in `bin/`, never by editing an image:
   `bin/run_microbe_census_py3fix.py` and `bin/emapper_ogs_fix.py` replace a broken (or,
   for MicrobeCensus' base count, slow) function and then run the stock CLI with the same

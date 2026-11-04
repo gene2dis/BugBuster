@@ -1142,6 +1142,10 @@ next release is tagged.
   running side by side can get the same PID; the second then finds the first
   one's files and waits on an overwrite prompt that never gets an answer. Bakta
   now runs with `TMPDIR` in its task directory.
+- **`-profile slurm,apptainer` ignored the SLURM image settings**: `conf/slurm.config`
+  and `conf/institutional.config` set the cache directory
+  (`--singularity_cache`), the 60 min pull timeout and `--singularity_run_options`
+  for singularity only; apptainer now gets the same.
 - **A custom Kraken2 or sourmash database was labelled as the registry
   default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
   the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the

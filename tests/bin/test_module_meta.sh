@@ -9,8 +9,9 @@
 #     maps plus every val/path variable, in order) and the output entries
 #     are exactly the process `emit:` names (plus optional meta entries),
 #   - every process in the file has a tag and a label,
-#   - no module or config file tests `workflow.containerEngine == ...`: the
-#     singularity and apptainer engines take the same image (CONTRIBUTING.md).
+#   - no module, workflow or config file tests `workflow.containerEngine`
+#     == or != 'singularity' / 'apptainer' alone: both engines take the same
+#     image (CONTRIBUTING.md).
 # Single-process files use top-level input/output; multi-process files use a
 # `processes:` list (name, description, input, output).
 #
@@ -93,9 +94,6 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
             problems.append(f'{d.name}/{pname}: no tag')
         if not re.search(r'^\s*label\s', body, re.M):
             problems.append(f'{d.name}/{pname}: no label')
-        if re.search(r'containerEngine\s*==', body):
-            problems.append(f"{d.name}/{pname}: containerEngine == ...; test "
-                            f"containerEngine in ['singularity', 'apptainer']")
         pd = documented.get(pname)
         if pd is None:
             continue
@@ -109,13 +107,18 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
         if sorted(got_out) != sorted(want_out):
             problems.append(f'{d.name}/{pname}: output {sorted(got_out)} != emits {sorted(want_out)}')
 
-# the config files choose engine-specific settings the same way
+# modules, workflows and config files choose the singularity image the same
+# way for both engines (an == or != against one of them leaves the other out)
 repo = root.parent.parent
-for cfg in sorted([repo / 'nextflow.config', *repo.glob('conf/*.config'), *repo.glob('config/*.config')]):
-    for n, line in enumerate(cfg.read_text().splitlines(), 1):
-        if re.search(r'containerEngine\s*==', line):
-            problems.append(f"{cfg.relative_to(repo)}:{n}: containerEngine == ...; test "
-                            f"containerEngine in ['singularity', 'apptainer']")
+engine_eq = re.compile(r"containerEngine\s*[!=]=\s*['\"](singularity|apptainer)")
+files = [repo / 'main.nf', repo / 'nextflow.config', *repo.glob('modules/local/*/main.nf'),
+         *repo.glob('subworkflows/local/*.nf'), *repo.glob('conf/**/*.config'),
+         *repo.glob('config/**/*.config')]
+for f in sorted(files):
+    for n, line in enumerate(f.read_text().splitlines(), 1):
+        if not line.lstrip().startswith('//') and engine_eq.search(line):
+            problems.append(f"{f.relative_to(repo)}:{n}: containerEngine == / != a single "
+                            f"engine; test containerEngine in ['singularity', 'apptainer']")
 
 checked = sum(1 for d in root.iterdir() if (d / 'main.nf').exists())
 for p in problems:
