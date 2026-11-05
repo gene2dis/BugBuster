@@ -206,6 +206,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--output` | *required* | Output directory |
 | `--quality_control` | `true` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
+| `--coassembly_group_by` | — | A `--sample_metadata` column: one co-assembly per value (with `coassembly`) |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, or `none` (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | Enable binning and refinement |
 | `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables Binette refinement) |
@@ -360,10 +361,10 @@ results/
 │   └── figures/                # Taxonomy plots
 ├── 03_assembly/                # Genome assembly (if assembly_mode != 'none')
 │   ├── per_sample/             # Per-sample assemblies
-│   └── coassembly/             # Co-assembly results
+│   └── coassembly/             # Co-assembly results (coassembly/{group}/ per group with --coassembly_group_by)
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK)
-│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/
+│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/ (MAG depth)
+│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/ (coassembly/{group}/ per group)
 │   ├── quality/summary/        # Aggregated quality reports (assembly mode)
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions

@@ -103,6 +103,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `RGI_KMER` | `rgi_prediction` and: with `custom_rgi_card_db`, its k-mer files for `rgi_kmer_size` present or `custom_rgi_wildcard` given; without, `rgi_include_wildcard` (default `true`) | — |
 | `KMARVEL`, `KMARVEL_REPORT` | `kmarvel_prediction` | — |
 | `ASSEMBLY` | `assembly_mode != 'none'` (default `assembly`) | — |
+| One co-assembly per group | `coassembly_group_by` (a `sample_metadata` column) with `assembly_mode == 'coassembly'` | needs `coassembly` and `sample_metadata`; the column exists; every sample has a value; labels distinct, not a sample id or `coassembly` |
 | `BBNORM` | `assembly_read_reduction == 'normalize'` (default `none`) | needs an assembly |
 | Reads → contigs alignment | `include_binning` or `contig_tax_and_arg` or `contig_level_functional` | — |
 | `NFCORE_SAMTOOLS_MERGE` (pooled co-assembly BAM) | `assembly_mode == 'coassembly'` and (`include_binning` or `contig_tax_and_arg`) | — |
@@ -255,15 +256,17 @@ flowchart TD
 
 ### 6. ASSEMBLY
 
-MEGAHIT runs per sample (`assembly`, default) or once on the pooled reads (`coassembly`).
-BBNorm, when selected, reduces only MEGAHIT's input: BBMap, the alignments and everything
-downstream use the full reads.
+MEGAHIT runs per sample (`assembly`, default) or once on the pooled reads (`coassembly`):
+once for every sample, or once per group of `--sample_metadata` with `coassembly_group_by`,
+each sample then aligned to its own group's co-assembly and every later step running per
+group. BBNorm, when selected, reduces only MEGAHIT's input: BBMap, the alignments and
+everything downstream use the full reads.
 
 ```mermaid
 flowchart TD
     Clean(["clean reads"]) --> Mode{assembly_mode}
     Mode -->|"assembly (default)<br/>per sample"| Red
-    Mode -->|"coassembly<br/>reads pooled"| Red
+    Mode -->|"coassembly<br/>reads pooled: all samples,<br/>or per coassembly_group_by group"| Red
     Red{assembly_read_reduction} -->|normalize| BBNORM["BBNORM<br/>assembler input only"]
     Red -->|"none (default)"| MEGAHIT
     BBNORM --> MEGAHIT
@@ -272,8 +275,8 @@ flowchart TD
     BBMAP -->|"include_binning or contig_tax_and_arg<br/>or contig_level_functional"| Aln{read_aligner}
     Aln -->|"bwamem3 (default)"| BWAMEM3_INDEX --> BWAMEM3_SAMTOOLS
     Aln -->|bowtie2| BOWTIE2_SAMTOOLS
-    BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS --> SampleBAM(["per-sample BAM<br/>assembly: vs its own contigs<br/>coassembly: each sample once<br/>vs the co-assembly"])
-    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM: SemiBin2,<br/>COMEBin, BlobTools"]
+    BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS --> SampleBAM(["per-sample BAM<br/>assembly: vs its own contigs<br/>coassembly: each sample once<br/>vs its co-assembly"])
+    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM per co-assembly:<br/>SemiBin2, COMEBin, BlobTools"]
     SampleBAM -->|"featureCounts, MetaBAT2 depths,<br/>bin depth (co-assembly)"| Out(["counting_bam"])
 
     BBMAP -->|filter reports| CONTIG_FILTER_SUMMARY
@@ -393,7 +396,7 @@ flowchart TD
     EGGNOG_MAPPER_SEARCH --> EGGNOG_MAPPER_ANNOTATE["EGGNOG_MAPPER_ANNOTATE<br/>eggNOG-mapper 3.0.0-beta6"]
     Prot -->|"contig_level_functional and<br/>functional_cazy (default)"| RUN_DBCAN["RUN_DBCAN<br/>run_dbcan v5 CAZy"]
     BAMs(["counting_bam"]) --> FEATURECOUNTS_GENES
-    Prot -->|"GFF; coassembly: one GFF<br/>for every sample"| FEATURECOUNTS_GENES
+    Prot -->|"GFF; coassembly: the co-assembly's<br/>GFF for each of its samples"| FEATURECOUNTS_GENES
     Ags(["MICROBECENSUS AGS<br/>(optional, non-fatal)"]) --> AGGREGATE_FUNCTIONS
     EGGNOG_MAPPER_ANNOTATE & RUN_DBCAN & FEATURECOUNTS_GENES --> AGGREGATE_FUNCTIONS["AGGREGATE_FUNCTIONS<br/>TPM + CPGE tables<br/>(KO, COG, EC, Pfam, CAZy)"]
 
@@ -578,7 +581,7 @@ results/
 ├── 01_quality_control/          # fastp reports, Reads_report.csv
 ├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
 │                                # phyloseq, figures
-├── 03_assembly/                 # per_sample/ or coassembly/: contigs, filtered contigs, stats
+├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
 ├── 04_binning/                  # Raw and refined bins, CheckM2 quality, GTDB-Tk taxonomy,
 │                                # coverage and summary (co-assembly)
 ├── 05_arg_prediction/           # read_level/ (args_oap, rgi, rgi_kmer, kmarvel + summaries),

@@ -473,6 +473,7 @@ breaks `-resume`.
 |-----------|---------|---------|-------------|
 | `--quality_control` | `true` | `true`, `false` | Enable QC and host filtering |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
+| `--coassembly_group_by` | — | a `--sample_metadata` column | With `coassembly`: one co-assembly per value of the column (see 6.7) |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
@@ -705,6 +706,43 @@ affected. Normalization pays off on deep co-assemblies; on a 19.4 M-pair
 co-assembly it cost more CPU time than it saved (see
 [the assembly benchmark](benchmarks/assembly_2026.md) and `docs/parameters.md`
 for the numbers behind each setting).
+
+**Co-assembly per group.** `--assembly_mode coassembly` pools every sample of
+the run into one co-assembly. To co-assemble groups of samples instead (one
+site, one subject, one time point), name a column of the metadata table with
+`--coassembly_group_by`; each distinct value gets its own co-assembly:
+
+```
+sample	site	visit
+S01	river north	V1
+S02	river north	V2
+S03	lake	V1
+```
+
+```bash
+nextflow run main.nf --input samplesheet.csv --output ./results \
+    --assembly_mode coassembly --sample_metadata samples.tsv --coassembly_group_by site \
+    --include_binning true -profile docker
+```
+
+This makes two co-assemblies, `river_north` (S01, S02) and `lake` (S03): the
+label is the value with characters other than letters, digits, `.`, `_` and
+`-` replaced by `_`. Every sample of the samplesheet needs a row with a value;
+rows for other samples are ignored, so one table can serve several batches.
+Each sample is aligned once, to its own group's co-assembly, and every later
+step (binning, MAG depth, contig taxonomy and ARGs, geNomad, the contig and MAG
+functional branches) runs per group. A group's outputs go under
+`<stage>/coassembly/<label>/` (for example `03_assembly/coassembly/lake/` and
+`04_binning/coassembly/lake/`), and `pipeline_info/coassembly_groups.tsv` lists
+each sample's group; in the run summary the `assembly` column holds the label.
+A one-sample group is allowed: it is that sample's assembly, binned like a
+co-assembly (SemiBin2's `--semibin_coassembly_env_model`). Without
+`--coassembly_group_by` nothing changes: one co-assembly called `coassembly`.
+
+**Keep each group's samples in one batch.** A co-assembly only sees the samples
+of its run: a group split across two runs is co-assembled twice, and the two
+co-assemblies' MAGs are not the same genomes. The summary of several batches
+keeps same-named groups of different batches apart by the `batch` column.
 
 ### 6.8 Binning Options
 
@@ -1700,6 +1738,20 @@ nextflow run main.nf \
     --include_binning true \
     --taxonomic_profiler kraken2 \
     --kraken2_db gtdb_220 \
+    -profile singularity
+```
+
+One co-assembly per site instead of one for every sample (the `site` column of
+the metadata table; see [Co-assembly per group](#67-assembly-options)):
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --assembly_mode coassembly \
+    --sample_metadata samples.tsv \
+    --coassembly_group_by site \
+    --include_binning true \
     -profile singularity
 ```
 

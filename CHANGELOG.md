@@ -12,6 +12,29 @@ next release is tagged.
 
 ### Added
 
+- **One co-assembly per sample group** (`--coassembly_group_by <column>`). With
+  `--assembly_mode coassembly`, a column of `--sample_metadata` (the table the
+  run summary reads) splits the samples into groups, and each group gets its
+  own co-assembly: MEGAHIT (and BBNorm), the contig index, one alignment per
+  sample against its own group's co-assembly, the pooled BAM, binning and MAG
+  depth over the group's samples, contig taxonomy and ARGs, geNomad, bin-level
+  ARG clustering, the contig functional branch (each sample's reads counted on
+  its group's genes) and Bakta. A group's outputs go under
+  `<stage>/coassembly/<label>/` (also in the folders named by the assembly,
+  such as `05_arg_prediction/contig_level/deeparg/coassembly/<label>/`), the
+  label being the value with characters outside `A-Za-z0-9._-` replaced by
+  `_`; `pipeline_info/coassembly_groups.tsv` lists each sample's group, and the
+  summary's `assembly` column holds the label. One-sample groups are allowed.
+  Startup errors: the option without `--assembly_mode coassembly` or
+  `--sample_metadata`, a missing column, samples with no row or no value (all
+  listed), two values with the same label, and a label equal to a sample id or
+  `coassembly` or not starting with a letter or digit. Without the option
+  nothing changes (one co-assembly called `coassembly`, same paths and
+  files), except that every co-assembly task's input now carries the group
+  fields, so `-resume` of a co-assembly work directory from an earlier release
+  reruns those tasks. Keep each group's samples in one run: a group split
+  across batches is co-assembled once per batch. Independent of
+  `--summary_group_by`, which only groups the summary's figures.
 - **Pipeline overview figure and up-to-date workflow diagrams** (docs only).
   `docs/images/bugbuster_overview.svg` (hand-written, Inter embedded, Okabe-Ito
   accents) and its PNG, rendered by `docs/images/render_overview.sh` in pinned
