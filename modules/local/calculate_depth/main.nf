@@ -62,11 +62,11 @@ process CALCULATE_DEPTH {
     prefix = meta.id
     """
     # Stub depth file: jgi's header, one depth and variance column per BAM
-    header="contigName\tcontigLen\ttotalAvgDepth"
+    header="contigName\\tcontigLen\\ttotalAvgDepth"
     for b in ${bam}; do
-        header="\${header}\t\$(basename "\$b" .bam)\t\$(basename "\$b" .bam)-var"
+        header="\${header}\\t\$(basename "\$b" .bam)\\t\$(basename "\$b" .bam)-var"
     done
-    printf "\${header}\n" > ${prefix}_depth.txt
+    printf "\${header}\\n" > ${prefix}_depth.txt
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
