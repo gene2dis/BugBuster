@@ -1151,6 +1151,11 @@ next release is tagged.
   sourmash match whose lineage stops above genus) now gets an empty bar with
   0% values in the plot's CSV, and a warning, instead of NaN from dividing by
   a zero total. The OTU and taxonomy tables are unchanged.
+- **Summary genus bars (`00_summary/figures/taxonomy_genus_bars`)**: the
+  figure no longer adds an "Other" legend entry at 0% when the named genera
+  already make up every sample (a run with few genera). Below 0.01 percentage
+  points the remainder is treated as the profiler's rounding. The caption then
+  says the genera make up every sample, and the figure's CSV has no Other rows.
 - **`-profile apptainer` now uses the same images as `-profile singularity`**:
   18 modules (BBMap, BBNorm, Binette, MetaBAT2 and its depth step, CheckM2,
   MMseqs2 clustering, COMEBin, the two ubuntu helpers, the Bakta database

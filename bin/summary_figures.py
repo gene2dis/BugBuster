@@ -285,6 +285,8 @@ def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
         return
     plot = wide.loc[taxa]
     other = (100 - plot.sum(axis=0)).clip(lower=0)
+    # no Other bar when the named taxa cover every sample (below 0.01 points the rest is the profiler's rounding)
+    has_other = bool((other >= 0.01).any())
     n = len(cols)
     lay = fs.sample_layout(n)
     width = fs.width_class(n)
@@ -297,7 +299,8 @@ def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
     for t, disp in zip(taxa, names):
         ax.barh(y, plot.loc[t].values, left=left, color=pal[disp], height=0.85, label=disp, lw=0)
         left += plot.loc[t].values
-    ax.barh(y, other.values, left=left, color=pal["Other"], height=0.85, label="Other", lw=0)
+    if has_other:
+        ax.barh(y, other.values, left=left, color=pal["Other"], height=0.85, label="Other", lw=0)
     ax.set_xlim(0, 100)
     ax.set_ylim(n - 0.5, -0.5)
     ax.set_xlabel("relative abundance (%)")
@@ -312,14 +315,16 @@ def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
             t.set_fontstyle("italic")
     src = plot.copy()
     src.index = names
-    src.loc["Other"] = other
+    if has_other:
+        src.loc["Other"] = other
     src = src.rename_axis(ge.lower()).reset_index().melt(id_vars=ge.lower(), var_name="sample",
                                                          value_name="relative_abundance_pct")
     src.insert(2, "group", src["sample"].map(dict(zip(cols, groups))))
+    rest = "everything else is 'Other'" if has_other else "together they make up every sample"
     fw.save(fig, "taxonomy_genus_bars", f"{ge} composition ({label})",
             f"Stacked {ge.lower()} abundance on a linear scale: the {len(taxa)} {ge.lower()} taxa are the union of "
-            f"each sample's 3 most abundant (at most 12, by maximum abundance), each with one colour; everything "
-            f"else is 'Other'. Unlike the log-scale heatmap, the bars show proportions: which {ge.lower()} dominates a "
+            f"each sample's 3 most abundant (at most 12, by maximum abundance), each with one colour; {rest}. "
+            f"Unlike the log-scale heatmap, the bars show proportions: which {ge.lower()} dominates a "
             "sample and how much of the community the named taxa cover.", src, "taxonomy")
 
 
