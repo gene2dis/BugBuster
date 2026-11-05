@@ -14,6 +14,8 @@
 #     genome rows of the .sylphmpa profiles, the estimated read pairs table
 #     from sequence_abundance x the report's Read pairs, skip a no-hit sample
 #     (SYLPH_TAXPROF's header-only fallback) and fail loudly otherwise.
+#   - the abundance plots add an Other bar only when some taxa are left out,
+#     and give a sample with nothing classified at a rank 0s, not NaN.
 #
 # The scripts run inside the same pinned image the report processes use,
 # against the committed fixtures in tests/data/taxonomy/.
@@ -106,6 +108,17 @@ check_grep() {
         PASS=$((PASS + 1))
     else
         echo "✗ $1 — pattern '$3' not found in $2"
+        FAIL=$((FAIL + 1))
+    fi
+}
+
+check_no_grep() {
+    # check_no_grep <desc> <path-relative-to-last-workdir> <pattern>; the file must exist
+    if [ -e "${LAST_WORKDIR}/$2" ] && ! grep -q "$3" "${LAST_WORKDIR}/$2"; then
+        echo "✓ $1"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ $1 — pattern '$3' found in $2 (or file missing)"
         FAIL=$((FAIL + 1))
     fi
 }
@@ -210,6 +223,20 @@ check_file "kraken2 phyloseq: sample metadata written" "kraken2_standard-8_sampl
 check_file "kraken2 phyloseq: HDF5 written" "kraken2_standard-8_phyloseq_data.h5"
 check_file "kraken2 phyloseq: species plot in output root" "kraken2_standard-8_species_bar.png"
 check_file "kraken2 phyloseq: phylum plot in output root" "kraken2_standard-8_phylum_bar.png"
+check_no_grep "kraken2 phyloseq: no Other bar when every phylum is shown" "kraken2_standard-8_phylum_bar.csv" \
+    "^Other,"
+
+# Fewer slots than species: the rest is pooled into Other
+PH_TOP1="${WORK}/taxonomy_phyloseq_kraken2_top1"
+mkdir -p "${PH_TOP1}"
+cp "${FIXTURES}/sample1.kraken2.report_bracken.txt" "${FIXTURES}/sample2.kraken2.report_bracken.txt" "${PH_TOP1}/"
+NEXT_WORKDIR="${PH_TOP1}"
+expect_pass "kraken2 phyloseq: top-n 1 plot" taxonomy_phyloseq.py --profiler kraken2 \
+    --input-files sample1.kraken2.report_bracken.txt sample2.kraken2.report_bracken.txt \
+    --db-name standard-8 --output-dir . --format tables \
+    --plot-levels Species --top-n 1
+check_grep "kraken2 phyloseq: species left out of the plot pooled into Other" "kraken2_standard-8_species_bar.csv" \
+    "^Other,sample1,[1-9]"
 
 # Garbled input must fail loudly
 GARBLED_PH="${WORK}/garbled_phyloseq"
@@ -264,6 +291,25 @@ check_grep "sourmash phyloseq: lineage split into ranks" "sourmash_gtdb_tax_tabl
     "^GCA_000000002.1	Bacteria	Bacillota	Bacilli	Bacillales	Bacillaceae	Bacillus	Bacillus subtilis$"
 check_grep "sourmash phyloseq: no-match sample warned and skipped" "../taxonomy_phyloseq_sourmash.log" \
     "no sourmash matches for sample sampleB"
+
+# A sample with no genus-level lineage: empty bar (0, not NaN) and a warning
+SMPH_NOGENUS="${WORK}/taxonomy_phyloseq_sourmash_nogenus"
+mkdir -p "${SMPH_NOGENUS}"
+cp "${FIXTURES}/sampleA_smgather_gtdb.with-lineages.csv" "${SMPH_NOGENUS}/"
+sed -e 's/sampleA/sampleC/g' -e 's/GCA_000000002/GCA_000000003/' -e 's/;c__Bacilli;.*$/;c__;o__;f__;g__;s__/' \
+    "${FIXTURES}/sampleA_smgather_gtdb.with-lineages.csv" | sed -n '1p;3p' \
+    > "${SMPH_NOGENUS}/sampleC_smgather_gtdb.with-lineages.csv"
+NEXT_WORKDIR="${SMPH_NOGENUS}"
+expect_pass "sourmash phyloseq: sample without genus ranks plotted" taxonomy_phyloseq.py --profiler sourmash \
+    --input-files sampleA_smgather_gtdb.with-lineages.csv sampleC_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Phylum,Genus --top-n 10
+check_grep "sourmash phyloseq: unclassified sample's genus bar is 0" "sourmash_gtdb_genus_bar.csv" \
+    "^Bacillus,sampleC,0.0$"
+check_no_grep "sourmash phyloseq: no NaN in the genus plot data" "sourmash_gtdb_genus_bar.csv" \
+    ",$"
+check_grep "sourmash phyloseq: sample without genus ranks warned" "../taxonomy_phyloseq_sourmash_nogenus.log" \
+    "no classified taxa at Genus level in sampleC"
 
 # All samples empty (the audit-requested no-matches unit test): loud failure
 SMPH_EMPTY="${WORK}/taxonomy_phyloseq_sourmash_empty"

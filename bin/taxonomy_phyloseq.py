@@ -539,8 +539,14 @@ class PhyloseqTableGenerator:
                 print(f"Warning: No classified taxa at {tax_level} level", file=sys.stderr)
                 return None
             
-            # Calculate relative abundance
-            rel_abundance = agg_table.div(agg_table.sum(axis=0), axis=1) * 100
+            # Calculate relative abundance; a sample with nothing classified at
+            # this rank keeps an empty bar (0, not NaN from dividing by zero)
+            totals = agg_table.sum(axis=0)
+            empty = sorted(totals.index[totals == 0], key=natural_key)
+            if empty:
+                print(f"Warning: no classified taxa at {tax_level} level in {', '.join(empty)} - "
+                      "empty bar in the plot", file=sys.stderr)
+            rel_abundance = (agg_table.div(totals.where(totals != 0), axis=1) * 100).fillna(0.0)
             
             top_taxa = self.select_plot_taxa(rel_abundance)
             
@@ -548,7 +554,8 @@ class PhyloseqTableGenerator:
             samples = sorted(rel_abundance.columns, key=natural_key)
             plot_data = rel_abundance.loc[top_taxa, samples]
             other = rel_abundance.loc[~rel_abundance.index.isin(top_taxa), samples].sum(axis=0)
-            plot_data.loc['Other'] = other
+            if (other > 0).any():
+                plot_data.loc['Other'] = other
             n_samples = len(samples)
             lay = fs.sample_layout(n_samples)
             names = list(plot_data.index)
