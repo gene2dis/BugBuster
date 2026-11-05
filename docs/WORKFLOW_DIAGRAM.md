@@ -293,9 +293,11 @@ BAM under co-assembly), `bam_meta`, `counting_bam` (one BAM per sample in both m
 
 ```mermaid
 flowchart TD
-    In(["[meta, contigs, bam]<br/>+ per-sample BAMs"]) --> Sel{binners<br/>default semibin}
+    In(["[meta, contigs, bam]<br/>+ per-sample BAMs"]) --> CALCULATE_DEPTH["CALCULATE_DEPTH<br/>jgi depths<br/>coassembly: one column per sample"]
+    In --> Sel{binners<br/>default semibin}
     Sel -->|"semibin (default)"| SEMIBIN["SEMIBIN<br/>per sample: human_gut model<br/>coassembly: pre-trained global"]
-    Sel -->|metabat2| CALCULATE_DEPTH["CALCULATE_DEPTH<br/>coassembly: one column per sample"] --> METABAT2
+    Sel -->|metabat2| METABAT2
+    CALCULATE_DEPTH --> METABAT2
     Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow"]
 
     SEMIBIN & METABAT2 & COMEBIN --> N{number of binners}
@@ -308,16 +310,16 @@ flowchart TD
 
     Quality -->|assembly| BIN_QUALITY_REPORT
     GTDB_TK_BATCH -->|assembly| BIN_TAX_REPORT
-    Bins -->|coassembly| BIN_CONTIG_TABLE["BIN_CONTIG_TABLE<br/>contig → bin<br/>(skipped without bins)"]
-    BIN_CONTIG_TABLE --> BEDTOOLS_BIN_DEPTH["BEDTOOLS_BIN_DEPTH<br/>each sample's BAM<br/>over each bin"]
-    BEDTOOLS_BIN_DEPTH -->|coassembly| BIN_SUMMARY
+    Bins --> BIN_DEPTH["BIN_DEPTH<br/>length-weighted MAG depth<br/>per sample (skipped without bins)"]
+    CALCULATE_DEPTH --> BIN_DEPTH
+    BIN_DEPTH -->|coassembly| BIN_SUMMARY
     GTDB_TK_BATCH -->|coassembly| BIN_SUMMARY
     Quality -->|"coassembly<br/>(refined bins' reports)"| BIN_SUMMARY
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT on
-    class CALCULATE_DEPTH,METABAT2,COMEBIN,BINETTE,BIN_CONTIG_TABLE,BEDTOOLS_BIN_DEPTH,BIN_SUMMARY opt
+    class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT,CALCULATE_DEPTH,BIN_DEPTH on
+    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY opt
 ```
 
 The whole subworkflow needs `include_binning` (default `false`); the green boxes are what a
@@ -516,13 +518,15 @@ results directories outside the pipeline (manual, Example 13).
 | Module | Condition | Description |
 |--------|-----------|-------------|
 | `SEMIBIN` | `semibin` in `binners` (default) | SemiBin2 (pre-trained `global` model under co-assembly) |
-| `CALCULATE_DEPTH` + `METABAT2` | `metabat2` in `binners` | Contig depths (one column per sample under co-assembly) and MetaBAT2 |
+| `CALCULATE_DEPTH` | always | jgi contig depths (one column per sample under co-assembly): MetaBAT2's input and the MAG depth |
+| `METABAT2` | `metabat2` in `binners` | MetaBAT2 |
 | `COMEBIN` | `comebin` in `binners` | COMEBin, CPU only |
 | `BINETTE` | ≥ 2 binners | Refinement, with CheckM2 of the raw and refined bins |
 | `CHECKM2_BATCH` | 1 binner | CheckM2 of the binner's bins |
 | `GTDB_TK_BATCH` | always | GTDB-Tk classification of every sample's bins in one run |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | `assembly` mode | Quality and taxonomy reports |
-| `BIN_CONTIG_TABLE` + `BEDTOOLS_BIN_DEPTH` / `BIN_SUMMARY` | `coassembly` mode | Bin depth per sample from the per-sample BAMs, and the bin summary |
+| `BIN_DEPTH` | always (a refined bin set) | MAG depth per sample: the length-weighted mean of its contigs' jgi depths |
+| `BIN_SUMMARY` | `coassembly` mode | Bin summary (quality, taxonomy, depth per sample) |
 
 ### Contig taxonomy, contig and bin ARGs
 | Module | Description |

@@ -721,11 +721,18 @@ for the numbers behind each setting).
 **Co-assembly coverage.** Under `--assembly_mode coassembly` each sample's reads
 are aligned once against the co-assembly. Those per-sample BAMs give MetaBAT2
 one depth column per sample, count genes for the functional branch and give
-each refined bin its per-sample coverage (`coverage/<sample>_bin_depth.tsv`);
-SemiBin2 (whose pre-trained models take one coverage column) and COMEBin get
-their `samtools merge`, the pooled BAM. On a five-sample co-assembly the
-per-sample depths raised MetaBAT2's MIMAG high-quality bins from 11 to 23
-(`docs/benchmarks/binning_2026.md`).
+each refined bin its per-sample depth; SemiBin2 (whose pre-trained models take
+one coverage column) and COMEBin get their `samtools merge`, the pooled BAM. On
+a five-sample co-assembly the per-sample depths raised MetaBAT2's MIMAG
+high-quality bins from 11 to 23 (`docs/benchmarks/binning_2026.md`).
+
+**MAG depth.** In both assembly modes `coverage/<sample>_bin_depth.tsv` gives
+each refined bin's mean read depth in each sample aligned to its assembly (its
+own sample under per-sample assembly, every sample under co-assembly): the
+contig depths MetaBAT2 bins on (`jgi_summarize_bam_contig_depths`: alignments
+at >= 97 % identity, 75 bp at each contig end left out), averaged over the
+bin's contigs weighted by their length. These depths are computed whenever
+binning runs, whether or not MetaBAT2 is one of the binners.
 
 > **COMEBin is costly.** It runs on CPU only (the pipeline has no GPU path; 8 CPUs
 > per sample) and took 38 CPU-hours (6 h wall) on a 37 Mbp per-sample assembly,
@@ -1018,7 +1025,7 @@ How the summary reports the results:
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
 - **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
 - **Assembly.** With an assembly, `assembly_stats` gives each assembly's contigs, length, N50 / L50, GC and the contigs the length filter kept, and `assembly_read_use` the share of each sample's reads on the contigs and on their predicted genes (with `--contig_level_functional`; `NA_not_run` otherwise). Reads not on contigs are outside every contig-based table.
-- **MAGs.** With binning, `mags` has one row per refined MAG: CheckM2 completeness and contamination, a MIMAG tier (`quality_tier`: high needs completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and at least 18 tRNA amino acids; medium completeness >= 50 %, contamination < 10 %), the GTDB-Tk lineage and, with `--mag_level_functional`, Bakta's rRNA, tRNA, CDS and CRISPR counts. Without Bakta the rRNA/tRNA part is unchecked and a MAG is at most medium (`tier_basis checkm2_only`). The High/Mid/Low classes of `04_binning/` are an older, different scheme. `mag_abundance` gives each MAG's depth per sample and `pct_sample_bases` (depth x MAG size / bases sequenced); under co-assembly the depth is BEDTOOLS_BIN_DEPTH's mean of per-contig depths (each contig weighted equally), under per-sample assembly the length-weighted contig coverage of the MAG's own sample (needs `--contig_tax_and_arg`).
+- **MAGs.** With binning, `mags` has one row per refined MAG: CheckM2 completeness and contamination, a MIMAG tier (`quality_tier`: high needs completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and at least 18 tRNA amino acids; medium completeness >= 50 %, contamination < 10 %), the GTDB-Tk lineage and, with `--mag_level_functional`, Bakta's rRNA, tRNA, CDS and CRISPR counts. Without Bakta the rRNA/tRNA part is unchecked and a MAG is at most medium (`tier_basis checkm2_only`). The High/Mid/Low classes of `04_binning/` are an older, different scheme. `mag_abundance` gives each MAG's depth per sample and `pct_sample_bases` (depth x MAG size / bases sequenced): the length-weighted mean of its contigs' MetaBAT2 depths (alignments at >= 97 % identity), for every sample under co-assembly and for the MAG's own sample under per-sample assembly.
 - **Contig ARGs (linkage).** With `--contig_tax_and_arg`, `arg_contig_long` lists every DeepARG hit with its contig's Metabuli taxon (lowest rank reached), bin, MIMAG tier and geNomad class, and `arg_contig_hosts` the ARG genes per host genus. The ARG and the taxon are on one assembled contig, unlike the read-level candidate hosts; the counts are genes on contigs, not read abundance. With `--contig_level_functional`, `arg_contig_abundance` adds each gene's reads per sample (count, TPM, CPGE).
 - **Bin-level ARG clusters.** With `--arg_bin_clustering`, `arg_mag_long` lists the ARG genes of the MAGs and their MMseqs2 cluster at 90, 95, 99 and 100 % identity, and `arg_cluster_sharing` the 90 % clusters found in more than one MAG. A shared cluster is the same sequence in different genomes: consistent with transfer, not evidence of it alone.
 - **Contig functional profile.** With `--contig_level_functional`, `function_contig_long` and `function_contig_<ontology>` (ko, cog, ec, pfam, cazy from eggNOG, cazy_dbcan from dbCAN) hold AGGREGATE_FUNCTIONS' tables, in CPGE when MicrobeCensus ran, else in TPM. TPM_i = RPK_i / (sum of RPK_j) x 1e6 is a share of the reads on predicted genes (compositional); CPGE_i = RPK_i / genome equivalents is copies per genome equivalent (not compositional). A gene with two terms of one ontology counts for each. COG categories and eggNOG CAZy families are named; KO, EC and Pfam keep their identifiers only. These tables are never merged with the read-level `function_read_*`.
@@ -1223,8 +1230,9 @@ results/
 │   │       ├── refined_bins/                   # Binette refined bins (if >= 2 binners)
 │   │       ├── quality/                        # CheckM2 quality reports
 │   │       │   └── checkm2/
-│   │       └── taxonomy/                       # GTDB-TK taxonomy
-│   │           └── gtdbtk/
+│   │       ├── taxonomy/                       # GTDB-TK taxonomy
+│   │       │   └── gtdbtk/
+│   │       └── coverage/                       # MAG depth in the sample ({sample}_bin_depth.tsv)
 │   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
 │   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
 │   │   ├── refined_bins/                       # Binette refined bins (if >= 2 binners)
@@ -1232,7 +1240,7 @@ results/
 │   │   │   └── checkm2/
 │   │   ├── taxonomy/                           # GTDB-TK taxonomy
 │   │   │   └── gtdbtk/
-│   │   ├── coverage/                           # Bin coverage per sample (<sample>_bin_depth.tsv)
+│   │   ├── coverage/                           # MAG depth per sample (<sample>_bin_depth.tsv)
 │   │   └── summary/                            # Bin summary statistics (quality, taxonomy, coverage)
 │   ├── quality/                                # Aggregated quality reports (if assembly_mode='assembly')
 │   │   └── summary/

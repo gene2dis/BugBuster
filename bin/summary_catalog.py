@@ -62,7 +62,7 @@ STAGES = [
         "key": "binning", "title": "Binning and MAGs (SemiBin2 / MetaBAT2 / COMEBin, Binette, CheckM2, GTDB-Tk)",
         "params": "--include_binning, --binners (Binette refinement with >= 2 binners)",
         "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "BINETTE", "CHECKM2_BATCH", "GTDB_TK_BATCH",
-                      "BEDTOOLS_BIN_DEPTH"],
+                      "CALCULATE_DEPTH", "BIN_DEPTH"],
         "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {

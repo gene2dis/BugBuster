@@ -121,7 +121,14 @@ process RESULTS_SUMMARY {
                 id=\${name%_contig.stats}
                 dest=${run_dir}/03_assembly/\$(asm_dir "\$id") ;;
             *_bin_depth.tsv)
-                dest=${run_dir}/04_binning/coassembly/coverage ;;
+                # <sample>_bin_depth.tsv: next to the sample's own assembly when it has one (per-sample
+                # mode, its <sample>_contig.stats is staged too), else the co-assembly's
+                s=\${name%_bin_depth.tsv}
+                if [ -e "in_reports/\${s}_contig.stats" ]; then
+                    dest=${run_dir}/04_binning/per_sample/\$s/coverage
+                else
+                    dest=${run_dir}/04_binning/coassembly/coverage
+                fi ;;
             *_gtdbtk_bac120.tsv|*_gtdbtk_ar53.tsv)
                 id=\${name%_gtdbtk_*}
                 dest=${run_dir}/04_binning/\$(asm_dir "\$id")/taxonomy/gtdbtk ;;

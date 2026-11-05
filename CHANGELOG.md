@@ -468,6 +468,21 @@ next release is tagged.
 
 ### Changed
 
+- **MAG depth has one definition in both assembly modes.** A MAG's depth in a
+  sample (`04_binning/.../coverage/<sample>_bin_depth.tsv`, `Bin_summary.csv`'s
+  `<sample>_avgcov` and the summary's `mag_abundance`) is now the mean of its
+  contigs' depths weighted by contig length, from the depths MetaBAT2 bins on
+  (`jgi_summarize_bam_contig_depths`: alignments at >= 97 % identity, 75 bp at
+  each contig end left out). Before, the co-assembly depth (BEDTOOLS_BIN_DEPTH)
+  counted every mapped read and weighted every contig equally, and per-sample
+  assemblies had a depth in the summary only with `--contig_tax_and_arg`
+  (from the contig table's coverage). A new `BIN_DEPTH` step replaces
+  `BIN_CONTIG_TABLE` + `BEDTOOLS_BIN_DEPTH`; `CALCULATE_DEPTH` now runs
+  whenever binning does, with or without MetaBAT2, and per-sample assemblies
+  publish `04_binning/per_sample/<sample>/coverage/<sample>_bin_depth.tsv`.
+  On the reference runs: per-sample assembly new/old median 0.998 (0.98-1.01,
+  45 MAGs); co-assembly median 0.993 (Spearman 0.993, 180 MAG x sample rows),
+  with the largest moves at depths below 0.1x (0.09-2.5x of the old value).
 - **Launch warning for the default per-sample SemiBin2 model.** Per-sample
   SemiBin2 uses a model pre-trained on one environment, `human_gut` unless
   `--semibin_env_model` says otherwise. When binning runs per sample with

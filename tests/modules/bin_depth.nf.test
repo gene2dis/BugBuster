@@ -1,0 +1,101 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BIN_DEPTH Module Test
+
+    MAG depth per sample from a jgi_summarize_bam_contig_depths table
+    (roadmap Phase 15, B1): the contig-length-weighted mean depth of each
+    bin's contigs. tests/data/bins/overlap_depth.txt has two sample columns
+    (s1, s2) for contigs c1 (1000 bp; depth 2 / 10), c2 (3000; 6 / 0),
+    c3 (100; 1 / 1) and cX (500, in no bin; 100 / 100).
+    tests/data/bins/overlap_bins:
+      - a.fa: c1 (header with a description), c2
+              -> s1 (1000*2 + 3000*6) / 4000 = 5, s2 10000 / 4000 = 2.5
+      - b.fa: c2 again (skipped: each contig counts once) and c3 -> 1, 1
+      - c.fa: empty bin -> 0 contigs, 0
+      - d.fa: only c1 again -> 0 contigs, 0
+    cX is in no bin and counts nowhere.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BIN_DEPTH Process"
+    script "../../modules/local/bin_depth/main.nf"
+    process "BIN_DEPTH"
+
+    test("length-weighted bin depth, one table per sample column") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly', coassembly: true, samples: ['s1', 's2'] ],
+                    file("${projectDir}/tests/data/bins/overlap_depth.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/bins/overlap_bins", checkIfExists: true),
+                    ['s2', 's1']
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.bin_depth.get(0)[1].collectEntries { f -> [(new File(f.toString()).name): path(f).readLines()] }
+            assert tables.keySet() == ['s1_bin_depth.tsv', 's2_bin_depth.tsv'] as Set
+            assert tables['s1_bin_depth.tsv'] == [
+                "sample\tbin_id\tTotal_contigs\taverage_cov",
+                "s1\ta\t2\t5",
+                "s1\tb\t1\t1",
+                "s1\tc\t0\t0",
+                "s1\td\t0\t0"
+            ]
+            assert tables['s2_bin_depth.tsv'] == [
+                "sample\tbin_id\tTotal_contigs\taverage_cov",
+                "s2\ta\t2\t2.5",
+                "s2\tb\t1\t1",
+                "s2\tc\t0\t0",
+                "s2\td\t0\t0"
+            ]
+            assert path(process.out.versions.get(0)).text.contains("busybox: 1.36.1")
+        }
+    }
+
+    test("fails when the depth columns are not the expected samples") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly', coassembly: true, samples: ['s1', 's3'] ],
+                    file("${projectDir}/tests/data/bins/overlap_depth.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/bins/overlap_bins", checkIfExists: true),
+                    ['s1', 's3']
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert process.stdout.join("\n").contains("is not one of the samples")
+        }
+    }
+
+    test("fails when a binned contig has no depth row") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleR' ],
+                    file("${projectDir}/tests/data/bins/overlap_depth.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/bins/real_bins", checkIfExists: true),
+                    ['s1', 's2']
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert process.stdout.join("\n").contains("binned contig(s) are not in the depth table")
+        }
+    }
+}

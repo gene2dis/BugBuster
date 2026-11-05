@@ -803,8 +803,9 @@ assert m.loc[("co", "coassembly", "binette_bin1"), "quality_tier"] == "high"
 assert m.loc[("asm", "sampleA", "binette_bin10"), "genus"] == "Senimuribacter"
 assert int(m.loc[("asm", "sampleA", "binette_bin10"), "cds"]) == 2291
 assert len(m) == 4 and "sampleB" not in m.index.get_level_values("assembly")
-# MAG depth: per-sample assembly = length-weighted contig coverage of the bin; co-assembly = the bin depth file
-# (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH wrote before)
+# MAG depth: per-sample assembly without a bin depth table (results before roadmap Phase 15) = length-weighted
+# contig coverage of the bin; co-assembly = the bin depth file (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH
+# wrote before Phase 11b)
 ct = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
                  sep="\t", keep_default_na=False)
 # one row per contig: the table repeats a contig per ARG hit
@@ -863,6 +864,21 @@ assert abs(cog.at["K", "sampleA"] - row["abundance_cpge"]) < 1e-9
 fl = t("st_asm_out", "function_contig_long")
 assert len(fl) == len(fa) and "abundance_native" not in fl.columns
 assert set(fl.loc[fl["backend"] == "run_dbcan", "ontology"]) == {"cazy_dbcan"}
+PYEOF
+# MAG depth from the per-sample bin depth table (roadmap Phase 15, B1: BIN_DEPTH in both modes), which takes the
+# place of the contig-table coverage the run above falls back to (results without that table)
+cp -r st_asm st_asm_bd
+mkdir -p st_asm_bd/results/04_binning/per_sample/sampleA/coverage
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\nsampleA\tbinette_bin10\t12\t7.25\nsampleA\tbinette_bin2\t3\t0.5\n' \
+    > st_asm_bd/results/04_binning/per_sample/sampleA/coverage/sampleA_bin_depth.tsv
+check "per-sample MAG depth from the bin depth table" \
+    documented st_asm_bd_out --results st_asm_bd/results --min-clean-pairs 10000
+check "per-sample bin depth table values reach mag_abundance" py - <<'PYEOF'
+import pandas as pd
+ab = pd.read_csv("st_asm_bd_out/tables/mag_abundance.tsv", sep="\t").set_index(["bin", "sample"])
+assert ab.at[("binette_bin10", "sampleA"), "mean_depth_x"] == 7.25, ab
+assert ab.at[("binette_bin2", "sampleA"), "mean_depth_x"] == 0.5, ab
+assert len(ab) == 2, ab
 PYEOF
 check "ARG RPKG = RPKM x clean pairs / 1e6 / genome equivalents (NA_no_ags without MicrobeCensus)" py - <<'PYEOF'
 import pandas as pd

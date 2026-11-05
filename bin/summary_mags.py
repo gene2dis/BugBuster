@@ -7,7 +7,9 @@ Published inputs, per assembly <id> (a sample name, or coassembly; its folder 04
   binner its CheckM2 report <id>_<binner>_quality_report.tsv;
 - taxonomy/gtdbtk/<id>_gtdbtk_{bac120,ar53}.tsv;
 - 07_functional_annotation/mags/<id>/<id>_<bin>.{tsv,txt} (Bakta, --mag_level_functional);
-- co-assembly: 04_binning/coassembly/coverage/<sample>_bin_depth.tsv (BEDTOOLS_BIN_DEPTH).
+- coverage/<sample>_bin_depth.tsv (BIN_DEPTH: each MAG's length-weighted mean depth from the jgi depths MetaBAT2
+  bins on, one table per sample aligned to the assembly; before roadmap Phase 15 co-assembly only, from
+  BEDTOOLS_BIN_DEPTH).
 
 MIMAG (Bowers et al. 2017): high = completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and >= 18 tRNA
 amino acids; medium = completeness >= 50 %, contamination < 10 %; low = the rest. Without Bakta the rRNA / tRNA
@@ -121,8 +123,8 @@ def mimag_tier(completeness, contamination, rrna_all, trna_aa, have_bakta):
 
 
 def load_mags(root):
-    """-> {"mags": DataFrame (one row per refined MAG of every assembly), "depth": DataFrame(sample, bin,
-    mean_depth_x) of the co-assembly or None, "bakta": bool} or None when binning did not run."""
+    """-> {"mags": DataFrame (one row per refined MAG of every assembly), "depth": DataFrame(assembly, sample, bin,
+    mean_depth_x) from the published bin depth tables or None, "bakta": bool} or None when binning did not run."""
     rows, have_bakta, reported = [], False, False
     for asm, adir in _assembly_dirs(root).items():
         q = _quality_report(asm, adir / "quality" / "checkm2")
@@ -168,16 +170,17 @@ def load_mags(root):
         return {"mags": pd.DataFrame(columns=[c for c in MAG_COLUMNS if c != "batch"]), "depth": None,
                 "bakta": False} if reported else None
     depth = None
-    cdir = root / "04_binning" / "coassembly" / "coverage"
     dparts = []
-    for p in sorted(cdir.glob("*_bin_depth.tsv")) if cdir.is_dir() else []:
-        # BEDTOOLS_BIN_DEPTH before roadmap Phase 11b padded its fields with spaces
-        df = pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False)
-        df = df.apply(lambda c: c.str.strip())
-        if not {"sample", "bin_id", "average_cov"} <= set(df.columns):
-            die(f"{p}: not a bin depth table (sample, bin_id, Total_contigs, average_cov)")
-        dparts.append(pd.DataFrame({"sample": df["sample"], "bin": df["bin_id"],
-                                    "mean_depth_x": pd.to_numeric(df["average_cov"], errors="coerce")}))
+    for asm, adir in _assembly_dirs(root).items():
+        cdir = adir / "coverage"
+        for p in sorted(cdir.glob("*_bin_depth.tsv")) if cdir.is_dir() else []:
+            # BEDTOOLS_BIN_DEPTH before roadmap Phase 11b padded its fields with spaces
+            df = pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False)
+            df = df.apply(lambda c: c.str.strip())
+            if not {"sample", "bin_id", "average_cov"} <= set(df.columns):
+                die(f"{p}: not a bin depth table (sample, bin_id, Total_contigs, average_cov)")
+            dparts.append(pd.DataFrame({"assembly": asm, "sample": df["sample"], "bin": df["bin_id"],
+                                        "mean_depth_x": pd.to_numeric(df["average_cov"], errors="coerce")}))
     if dparts:
         depth = pd.concat(dparts, ignore_index=True)
     return {"mags": pd.DataFrame(rows), "depth": depth, "bakta": have_bakta}
@@ -211,10 +214,11 @@ def mags_table(parts):
 def mag_abundance_frame(parts, contig_tables, sample_bases):
     """Per MAG and sample: mean read depth and the share of the sample's sequenced bases it holds
     (depth x genome size / sample bases x 100).
-    - co-assembly: BEDTOOLS_BIN_DEPTH's depth per sample (the mean of the per-contig mean depths, each contig
-      weighted equally, as published);
-    - per-sample assembly: the length-weighted mean of the contig table's coverage over the MAG's contigs, for
-      the MAG's own sample (--contig_tax_and_arg); NA_not_run without the contig table.
+    - the published bin depth tables (BIN_DEPTH, both modes): the length-weighted mean of the MAG's contig depths
+      from the jgi depths MetaBAT2 bins on, per sample aligned to the assembly;
+    - a per-sample assembly without them (results of releases before roadmap Phase 15): the length-weighted mean
+      of the contig table's coverage over the MAG's contigs, for its own sample (--contig_tax_and_arg);
+      NA_not_run without the contig table either.
     parts: [(batch label, load_mags result)]; contig_tables: {batch label: full contig table or None};
     sample_bases: {sample: bases sequenced}. -> DataFrame(assembly, batch, bin, sample, mean_depth_x,
     pct_sample_bases) or None."""
@@ -223,12 +227,14 @@ def mag_abundance_frame(parts, contig_tables, sample_bases):
         if p is None:
             continue
         size = {(r.assembly, r.bin): r.genome_size_mb * 1e6 for r in p["mags"].itertuples(index=False)}
-        if p["depth"] is not None and "coassembly" in set(p["mags"]["assembly"]):
+        with_depth = set()
+        if p["depth"] is not None:
             for r in p["depth"].itertuples(index=False):
-                if ("coassembly", r.bin) in size:
-                    rows.append(("coassembly", label, r.bin, r.sample, r.mean_depth_x, size[("coassembly", r.bin)]))
+                if (r.assembly, r.bin) in size:
+                    rows.append((r.assembly, label, r.bin, r.sample, r.mean_depth_x, size[(r.assembly, r.bin)]))
+                    with_depth.add(r.assembly)
         ct = contig_tables.get(label)
-        for asm in sorted(set(p["mags"]["assembly"]) - {"coassembly"}):
+        for asm in sorted(set(p["mags"]["assembly"]) - {"coassembly"} - with_depth):
             bins = [b for (a, b) in size if a == asm]
             if ct is None:
                 rows += [(asm, label, b, asm, NA_NOT_RUN, size[(asm, b)]) for b in bins]

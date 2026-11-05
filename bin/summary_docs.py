@@ -408,10 +408,10 @@ TABLE_DOCS = {
     "mag_abundance": {
         "title": "MAG depth per sample",
         "description": "Read depth of each MAG in each sample and the share of the sample's sequenced bases it holds. "
-                       "Under co-assembly every MAG has a row per sample (BEDTOOLS_BIN_DEPTH: the mean of its contigs' "
-                       "mean depths, each contig weighted equally); under per-sample assembly a MAG has a row for its "
-                       "own sample only (length-weighted contig coverage from the contig table, --contig_tax_and_arg; "
-                       "NA_not_run without it).",
+                       "The depth is the mean of its contigs' depths weighted by contig length, from the depths "
+                       "MetaBAT2 bins on (jgi_summarize_bam_contig_depths: alignments at >= 97 % identity, contig "
+                       "ends trimmed), in both assembly modes. Under co-assembly every MAG has a row per sample; "
+                       "under per-sample assembly a MAG has a row for its own sample only.",
         "columns": [
             ("assembly", "the assembly the MAG comes from: a sample name, or coassembly"),
             ("batch", "results directory (--batch-labels / --summary_batch_label)"),
@@ -421,8 +421,7 @@ TABLE_DOCS = {
             ("mean_depth_x", "mean read depth on the MAG's contigs (raw, not normalised)"),
             ("pct_sample_bases", "depth x MAG size / bases sequenced in the sample (MicrobeCensus total bases, all "
                                  "reads; else clean pairs x 2 x mean read length, without singletons) x 100: "
-                                 "comparable between samples of one assembly mode, unlike raw depth; not between "
-                                 "modes (co-assembly depth weights every contig equally, per-sample depth by length)"),
+                                 "comparable between samples, unlike raw depth"),
         ],
     },
     "arg_contig_long": {
@@ -743,8 +742,9 @@ PITFALLS = [
     "pooled over all samples; arg_contig_abundance gives each sample's reads on the gene.",
     "MAG quality: the mags quality_tier is MIMAG; the High/Mid/Low classes of the run's 04_binning plots and tables "
     "are another, older scheme. MAGs of different per-sample assemblies are not dereplicated.",
-    "Co-assembly MAG depth (mag_abundance) is the mean of its contigs' mean depths, each contig weighted equally; "
-    "compare samples with pct_sample_bases rather than raw depth.",
+    "MAG depth (mag_abundance) is MetaBAT2's contig depth (alignments at >= 97 % identity) averaged over the MAG's "
+    "contigs weighted by their length, the same in both assembly modes; compare samples with pct_sample_bases "
+    "rather than raw depth.",
     "An ARG cluster shared by MAGs of different samples or taxa (arg_cluster_sharing) is the same sequence at the "
     "stated identity; it is consistent with transfer, not evidence of it by itself.",
 ]

@@ -176,6 +176,8 @@ The binning reports are `bin/bin_quality_report.py`, `bin/bin_tax_report.py` and
   keeps it as published, says so, and adds `pct_sample_bases`; under per-sample assembly `mag_abundance` uses the
   length-weighted contig coverage of the contig table. The bowtie2 cross-bin item is not testable on the bwa-mem3
   reference. **Fixed:** the depth file's fields were padded with spaces.
+  **Replaced (roadmap Phase 15, B1):** the bin depth is now the length-weighted mean of MetaBAT2's jgi contig depths
+  (alignments at >= 97 % identity), in both assembly modes (`BIN_DEPTH`).
 
 ## Bin-level ARG clustering (verified 2026-11-01)
 

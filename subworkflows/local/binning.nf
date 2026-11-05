@@ -22,14 +22,15 @@
         versions: Tool version information
     
     WORKFLOW:
-        1. Calculate contig depth from BAM files (if MetaBAT2 selected; one
-           column per sample under co-assembly)
+        1. Calculate contig depth from BAM files (jgi; one column per sample
+           under co-assembly): MetaBAT2's input and the MAG depth
         2. Run selected binning tools in parallel (from: MetaBAT2, SemiBin, COMEBin)
         3. If >=2 binners selected, refine bins with Binette
         4. Assess quality with CheckM2 (Binette's own run when refined)
         5. Classify taxonomy with GTDB-Tk
-        6. Generate reports (mode-specific: simple reports for assembly, 
-           coverage analysis for co-assembly)
+        6. MAG depth per sample (BIN_DEPTH, both modes) and reports
+           (mode-specific: simple reports for assembly, bin summary for
+           co-assembly)
 ----------------------------------------------------------------------------------------
 */
 
@@ -41,8 +42,7 @@ include { COMEBIN                    } from '../../modules/local/comebin/main'
 include { BINETTE                    } from '../../modules/local/binette/main'
 include { CHECKM2_BATCH              } from '../../modules/local/checkm2_batch/main'
 include { GTDB_TK_BATCH              } from '../../modules/local/gtdb_tk_batch/main'
-include { BIN_CONTIG_TABLE           } from '../../modules/local/bedtools/main'
-include { BEDTOOLS_BIN_DEPTH         } from '../../modules/local/bedtools/main'
+include { BIN_DEPTH                  } from '../../modules/local/bin_depth/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
@@ -69,23 +69,32 @@ workflow BINNING {
     // Unified binning workflow - mode-agnostic
     //
     
-    // Calculate depth from BAM files (required for MetaBAT2). Under
-    // co-assembly MetaBAT2 gets one depth column per sample, from the
-    // per-sample BAMs in sample order (docs/benchmarks/binning_2026.md: MIMAG
-    // high-quality MetaBAT2 bins 11 -> 23); SemiBin2 and COMEBin keep the
-    // pooled BAM (SemiBin2's pre-trained models take one coverage column)
+    // Contig depth from the BAM files with jgi_summarize_bam_contig_depths:
+    // MetaBAT2's input and, with the refined bins, the MAG depth (BIN_DEPTH),
+    // so it runs whatever the binners. Under co-assembly it gets one depth
+    // column per sample, from the per-sample BAMs in sample order
+    // (docs/benchmarks/binning_2026.md: MIMAG high-quality MetaBAT2 bins
+    // 11 -> 23); SemiBin2 and COMEBin keep the pooled BAM (SemiBin2's
+    // pre-trained models take one coverage column)
+    ch_depth_input = params.assembly_mode == "coassembly"
+        ? contigs_and_bam
+            .map { meta, contigs, _bam -> [meta, contigs] }
+            .combine(
+                sample_bams
+                    .toSortedList { a, b -> a[0].id <=> b[0].id }
+                    .map { items -> [items.collect { item -> item[1] }] }
+            )
+        : contigs_and_bam
+    CALCULATE_DEPTH(ch_depth_input)
+    ch_versions = ch_versions.mix(CALCULATE_DEPTH.out.versions.first())
+    // the samples each depth table has a column for
+    ch_depth_samples = params.assembly_mode == "coassembly"
+        ? CALCULATE_DEPTH.out.depth
+            .combine(sample_bams.map { meta, _bam -> meta.id }.toSortedList().map { ids -> [ids] })
+            .map { meta, _contigs, depth, samples -> [meta.id, depth, samples] }
+        : CALCULATE_DEPTH.out.depth.map { meta, _contigs, depth -> [meta.id, depth, [meta.id]] }
+
     if (use_metabat2) {
-        ch_depth_input = params.assembly_mode == "coassembly"
-            ? contigs_and_bam
-                .map { meta, contigs, _bam -> [meta, contigs] }
-                .combine(
-                    sample_bams
-                        .toSortedList { a, b -> a[0].id <=> b[0].id }
-                        .map { items -> [items.collect { item -> item[1] }] }
-                )
-            : contigs_and_bam
-        CALCULATE_DEPTH(ch_depth_input)
-        ch_versions = ch_versions.mix(CALCULATE_DEPTH.out.versions.first())
         METABAT2(CALCULATE_DEPTH.out.depth)
         ch_versions = ch_versions.mix(METABAT2.out.versions.first())
     }
@@ -233,7 +242,31 @@ workflow BINNING {
             }
         }
 
-    ch_bin_depth = channel.empty()   // <sample>_bin_depth.tsv, co-assembly only
+    //
+    // MAG depth per sample, in both modes (roadmap Phase 15, B1): the
+    // length-weighted mean of each refined bin's contig depths from the jgi
+    // table MetaBAT2 bins on (alignments at >= 97 % identity). It needs at
+    // least one refined bin: a bin set can be empty (Binette or SemiBin
+    // write only SKIPPED.txt when nothing passes); BIN_SUMMARY then writes a
+    // header-only table from the empty quality/taxonomy reports
+    //
+    def ch_bins_for_depth = ch_refined_bins
+        .filter { meta, bins ->
+            def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
+            if ( !has_bins ) {
+                log.warn "No refined bins for ${meta.id}: skipping bin depth"
+            }
+            has_bins
+        }
+    BIN_DEPTH(
+        ch_bins_for_depth
+            .map { meta, bins -> [meta.id, meta, bins] }
+            .join(ch_depth_samples)
+            .map { _id, meta, bins, depth, samples -> [meta, depth, bins, samples] }
+    )
+    ch_versions = ch_versions.mix(BIN_DEPTH.out.versions.first())
+    // <sample>_bin_depth.tsv, one per sample and assembly
+    ch_bin_depth = BIN_DEPTH.out.bin_depth.map { _meta, tables -> tables }.flatten()
 
     //
     // Generate reports - mode-specific handling
@@ -244,32 +277,9 @@ workflow BINNING {
         BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
-        // Co-assembly mode: additional bin coverage analysis and summary report
-        // Bin depth needs at least one refined bin: a bin set can be empty
-        // (Binette or SemiBin write only SKIPPED.txt when nothing passes).
-        // BIN_SUMMARY then writes a header-only table from the empty
-        // quality/taxonomy reports
-        def ch_bins_for_depth = ch_refined_bins
-            .filter { meta, bins ->
-                def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
-                if ( !has_bins ) {
-                    log.warn "No refined bins for ${meta.id}: skipping bin depth"
-                }
-                has_bins
-            }
-        // Bin coverage per sample from its alignment against the co-assembly
-        // (the BAMs that give MetaBAT2 its depths and count genes; issue
-        // #28), over the contigs of each refined bin: no second alignment
-        BIN_CONTIG_TABLE(ch_bins_for_depth.map { _meta, bins -> bins })
-        ch_versions = ch_versions.mix(BIN_CONTIG_TABLE.out.versions)
-
-        BEDTOOLS_BIN_DEPTH(sample_bams.combine(BIN_CONTIG_TABLE.out.table))
-        def ch_bin_cov = BEDTOOLS_BIN_DEPTH.out.bin_depth
-        ch_bin_depth = ch_bin_cov
-        ch_versions = ch_versions.mix(BEDTOOLS_BIN_DEPTH.out.versions.first())
-
+        // Co-assembly mode: the bin summary (quality, taxonomy and depth per sample)
         BIN_SUMMARY(
-            ch_bin_cov.collect(sort: true).ifEmpty([])
+            ch_bin_depth.collect(sort: true).ifEmpty([])
                 .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
                 .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect(sort: true))
         )
@@ -280,6 +290,6 @@ workflow BINNING {
     refined_bins = ch_refined_bins    // channel: [ val(meta), path(bins) ]
     gtdbtk       = ch_gtdb_tk         // channel: [ val(meta), [ GTDB-Tk bac120/ar53 summaries ] ]
     refined_quality = ch_checkm_refined  // channel: [ val(meta), CheckM2 report(s) of the refined bins ]
-    bin_depth    = ch_bin_depth       // channel: path(<sample>_bin_depth.tsv), co-assembly only
+    bin_depth    = ch_bin_depth       // channel: path(<sample>_bin_depth.tsv), per sample and assembly
     versions     = ch_versions        // channel: path(versions.yml)
 }
