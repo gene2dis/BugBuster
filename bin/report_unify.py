@@ -4,7 +4,7 @@ Report Unify - Python Migration
 Consolidates QC reports from fastp and bowtie2 filtering steps.
 Generates CSV summary and high-quality scientific boxplot visualization.
 
-Original R script: Report_unify.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14)
+Python port of Report_unify.R
 Migrated to Python for QC subworkflow simplification.
 """
 

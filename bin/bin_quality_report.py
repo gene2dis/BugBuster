@@ -2,7 +2,7 @@
 """
 Bin Quality Report Generator
 Creates scatter plots and summary tables for bin quality assessment.
-Python migration of Bin_checkm_general_plot.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14)
+Python migration of Bin_checkm_general_plot.R
 """
 
 import glob

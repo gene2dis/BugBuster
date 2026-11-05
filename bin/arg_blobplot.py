@@ -8,6 +8,8 @@ One point per contig (the table has one row per ARG hit): a contig whose hits fa
 coverage (log scale), area scaled by contig length. Right: each class's share of the assembly's ARG-carrying
 contigs. An assembly without ARG hits gets a figure saying so. Drawn with blobplot.py's layout and the shared
 style of figure_style.py.
+
+Python port of ARG_blob_plot.R.
 """
 
 import sys

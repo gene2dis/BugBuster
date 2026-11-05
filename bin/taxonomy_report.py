@@ -3,7 +3,7 @@
 Unified Taxonomy Report Generator for BugBuster Pipeline
 
 Generates classification reports and plots for the Kraken2, Sourmash and Sylph taxonomic profilers.
-Replaces Tax_unify_report.R and SM_unify_report.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14).
+Replaces Tax_unify_report.R and SM_unify_report.R with improved performance and maintainability.
 
 Author: BugBuster Development Team
 License: MIT

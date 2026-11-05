@@ -2,7 +2,7 @@
 """
 Bin Summary Report Generator
 Combines bin quality, taxonomy, and depth information into a single summary table.
-Python migration of Bin_summary.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14)
+Python migration of Bin_summary.R
 """
 
 import pandas as pd
