@@ -3,7 +3,8 @@
 Phyloseq-Compatible Table Generator for BugBuster Pipeline
 
 Generates phyloseq-compatible tables and visualizations from Kraken2/Bracken, Sourmash and Sylph outputs.
-Replaces Tax_kraken_to_phyloseq.R, Tax_sourmash_to_phyloseq.R, and eliminates KRAKEN_BIOM process.
+Replaces Tax_kraken_to_phyloseq.R and Tax_sourmash_to_phyloseq.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14),
+and eliminates the KRAKEN_BIOM process.
 
 Outputs:
 - OTU/abundance tables (TSV)

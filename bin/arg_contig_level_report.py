@@ -10,7 +10,7 @@ score) and the DeepARG predictions. With binning, the contig's refined bin
 call of geNomad's summaries, else chromosome), its aggregated plasmid and
 virus scores, virus taxonomy and plasmid conjugation genes, and each ARG gene
 the provirus regions it overlaps (gene coordinates from the Pyrodigal GFF).
-Python migration of Contig_arg_unify.R
+Python migration of Contig_arg_unify.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14)
 """
 
 import pandas as pd

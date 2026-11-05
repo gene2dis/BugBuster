@@ -2,7 +2,7 @@
 """
 Bin Taxonomy Report Generator
 Creates bar plots and summary tables for MAG taxonomy at phylum level.
-Python migration of Bins_tax.R
+Python migration of Bins_tax.R (R original in git at 4bbde47:bin/r_scripts_temp/, removed in roadmap Phase 14)
 """
 
 import glob
