@@ -7,6 +7,8 @@ Left: each contig at its GC content and coverage (log scale), its area scaled by
 (the 8 phyla with the most contig length, the rest as 'other'; 'no-hit' is grey and takes no colour). Right: each
 phylum's share of the assembly's contig length. Coverage is BlobTools' read coverage (bam0; under co-assembly the
 pooled reads of every sample). Drawn in the shared style of figure_style.py.
+
+Python port of Blobplot.R.
 """
 
 import glob

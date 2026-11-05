@@ -1094,6 +1094,22 @@ next release is tagged.
 
 ### Removed
 
+- `bin/r_scripts_temp/`: the legacy R report scripts (and the Dockerfile of
+  the old `r_reports` image), kept as the reference for the R→Python port.
+  Where their inputs still exist, they were run against their Python
+  replacements on the same inputs: the tables match except for known
+  pipeline changes (Binette bins are labelled refined where R expected
+  MetaWRAP; contig ranks come from Metabuli, not BlobTools' `-undef` fills),
+  and every figure difference is a deliberate redesign or an R defect.
+  `Tax_unify_report.R`'s per-sample kraken2 summary is no longer written, so
+  it was checked through an input rebuilt from the raw kraken2 reports. Five
+  had no input left (KARGA/KARGVA, kraken-biom, per-bin mmseqs searches, the
+  old co-assembly naming, and the per-sample MetaWRAP/COMEBin quality plot,
+  which had no Python port) and were retired without comparison. Nothing
+  called them; outputs do not change. The ports' docstrings name their R
+  original, which stays in git history at
+  `4bbde470298d487f92fcff85bda5a8154957f654:bin/r_scripts_temp/`.
+  `bin/tables_to_phyloseq_simple.R` (`--create_phyloseq_rds`) stays
 - `00_summary/README.docx`: the run summary's README is `README.md`, and the
   report itself is the HTML site and `results_summary.pdf`
 - The pickled figures of BLOBPLOT and ARG_BLOBPLOT (`*_final_blobplot.pkl`,
