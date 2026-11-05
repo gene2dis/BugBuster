@@ -1129,6 +1129,12 @@ next release is tagged.
 
 ### Fixed
 
+- **Taxonomy bar plots (`02_taxonomy/figures/`, `bin/taxonomy_phyloseq.py`)**: the
+  plots no longer add an "Other" legend entry at 0% when every taxon at the
+  rank is already shown. A sample with no classified taxa at a rank (e.g. a
+  sourmash match whose lineage stops above genus) now gets an empty bar with
+  0% values in the plot's CSV, and a warning, instead of NaN from dividing by
+  a zero total. The OTU and taxonomy tables are unchanged.
 - **`-profile apptainer` now uses the same images as `-profile singularity`**:
   18 modules (BBMap, BBNorm, Binette, MetaBAT2 and its depth step, CheckM2,
   MMseqs2 clustering, COMEBin, the two ubuntu helpers, the Bakta database
