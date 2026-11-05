@@ -880,6 +880,44 @@ assert ab.at[("binette_bin10", "sampleA"), "mean_depth_x"] == 7.25, ab
 assert ab.at[("binette_bin2", "sampleA"), "mean_depth_x"] == 0.5, ab
 assert len(ab) == 2, ab
 PYEOF
+# co-assembly groups (--coassembly_group_by, roadmap Phase 15): the co-assembly fixture laid out as two groups,
+# g1 = sampleC and g2 = sampleD (stages/coassembly_groups, made by tests/bin/make_grouped_summary_tree.py), and a
+# second batch of the same groups with other sample names
+cp -r "${STG}/coassembly_groups" st_grp
+py "${REPO_DIR}/tests/bin/make_grouped_summary_tree.py" "${STG}/coassembly" st_grp2 sampleC=sampleE sampleD=sampleF
+check "co-assembly groups: every column documented" documented st_grp_out --results st_grp --min-clean-pairs 10000
+check "co-assembly groups of two batches merged" \
+    documented st_grp_merge --results st_grp st_grp2 --batch-labels ga gb --min-clean-pairs 10000
+check "co-assembly groups: one assembly per group, each sample with its own group" py - "${STG}" <<'PYEOF'
+import sys
+import pandas as pd
+stg = sys.argv[1]
+t = lambda out, name: pd.read_csv(f"{out}/tables/{name}.tsv", sep="\t", keep_default_na=False)  # noqa: E731
+a = t("st_grp_out", "assembly_stats").set_index("assembly")
+assert sorted(a.index) == ["g1", "g2"] and set(a["assembly_mode"]) == {"coassembly"}, a
+assert a.at["g1", "contigs_kept"] == 34888, a
+u = t("st_grp_out", "assembly_read_use").set_index("sample")
+assert u.at["sampleC", "assembly"] == "g1" and u.at["sampleD", "assembly"] == "g2", u
+m = t("st_grp_out", "mags")
+assert sorted(set(m["assembly"])) == ["g1", "g2"] and len(m) == 2 * len(m[m["assembly"] == "g1"]), m
+assert set(m.loc[m["bin"] == "binette_bin1", "quality_tier"]) == {"high"}, m  # Bakta found under mags/coassembly/<g>/
+ab = t("st_grp_out", "mag_abundance")
+assert set(zip(ab["assembly"], ab["sample"])) == {("g1", "sampleC"), ("g2", "sampleD")}, ab
+d = pd.read_csv(f"{stg}/coassembly/04_binning/coassembly/coverage/sampleD_bin_depth.tsv", sep="\t", dtype=str)
+d = d.apply(lambda c: c.str.strip())
+want = float(d.loc[d["bin_id"] == "binette_bin1", "average_cov"].iloc[0])
+assert ab.set_index(["assembly", "bin"]).at[("g2", "binette_bin1"), "mean_depth_x"] == want, (ab, want)
+ga = t("st_grp_out", "arg_contig_abundance")
+assert set(zip(ga["assembly"], ga["sample"])) == {("g1", "sampleC"), ("g2", "sampleD")}, ga
+cl = t("st_grp_out", "arg_contig_long")
+assert sorted(set(cl["assembly"])) == ["g1", "g2"], cl
+# two batches with groups of the same name stay apart by batch
+mm = t("st_grp_merge", "mags").set_index(["batch", "assembly", "bin"])
+assert ("ga", "g1", "binette_bin1") in mm.index and ("gb", "g1", "binette_bin1") in mm.index, mm.index
+ma = t("st_grp_merge", "mag_abundance")
+assert set(zip(ma["batch"], ma["assembly"], ma["sample"])) == {("ga", "g1", "sampleC"), ("ga", "g2", "sampleD"),
+                                                              ("gb", "g1", "sampleE"), ("gb", "g2", "sampleF")}, ma
+PYEOF
 check "ARG RPKG = RPKM x clean pairs / 1e6 / genome equivalents (NA_no_ags without MicrobeCensus)" py - <<'PYEOF'
 import pandas as pd
 rpkm = pd.read_csv("st_asm_out/tables/arg_gene_rpkm.tsv", sep="\t", index_col=0, keep_default_na=False)

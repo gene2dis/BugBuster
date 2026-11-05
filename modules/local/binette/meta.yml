@@ -17,7 +17,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id under co-assembly, 'coassembly' or its --coassembly_group_by group's label; meta.coassembly true)
   - bin_dirs:
       type: directory
       description: Two or three binner output directories for this sample; those without FASTA bins (only SKIPPED.txt / FAILED.txt) are left out

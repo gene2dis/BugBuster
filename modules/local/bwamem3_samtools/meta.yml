@@ -31,7 +31,7 @@ processes:
     input:
       - meta:
           type: map
-          description: Metadata (meta.id names the index; 'coassembly' for the co-assembly)
+          description: Metadata (meta.id names the index; the co-assembly's id, 'coassembly' or its group's label, for a co-assembly)
       - fasta:
           type: file
           description: Uncompressed FASTA to index

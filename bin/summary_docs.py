@@ -31,9 +31,11 @@ WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 /
                              "not detected; blank = a call without an RPKM; NA_no_ags = no MicrobeCensus estimate for "
                              "the sample; NA_low_depth / NA_not_run as in the other wide tables")
 
-ASSEMBLY_KEY = [("assembly", "the assembly: a sample name (--assembly_mode assembly), or coassembly"),
+ASSEMBLY_KEY = [("assembly", "the assembly: a sample name (--assembly_mode assembly), coassembly, or a co-assembly "
+                             "group's label (--coassembly_group_by)"),
                 ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with the "
-                          "assembly, the key: every co-assembly is called coassembly")]
+                          "assembly, the key: every ungrouped co-assembly is called coassembly, and two batches can "
+                          "have groups of the same name")]
 
 TABLE_DOCS = {
     "samples_qc": {
@@ -291,9 +293,11 @@ TABLE_DOCS = {
                        "contig_level/summary/Contig_tax_and_arg_prediction.tsv (mobile_class, plasmid_score, "
                        "virus_score, provirus).",
         "columns": [
-            ("assembly", "the assembly the contigs come from: a sample name, or coassembly"),
+            ("assembly", "the assembly the contigs come from: a sample name, coassembly, or a co-assembly group's "
+                         "label"),
             ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with "
-                      "the assembly, the key: every co-assembly is called coassembly"),
+                      "the assembly, the key: every ungrouped co-assembly is called coassembly, and two batches can "
+                      "have groups of the same name"),
             ("arg_class", "DeepARG predicted ARG class"),
             ("arg_genes", "ARG genes of the class on the assembly's contigs"),
             ("arg_genes_on_plasmid", "of those, genes on contigs geNomad calls plasmid"),
@@ -355,7 +359,8 @@ TABLE_DOCS = {
                        "length filter that every contig-based step uses (binning, contig taxonomy, ARGs, functions). "
                        "MEGAHIT is not reproducible run to run: the same reads give slightly different contigs.",
         "columns": ASSEMBLY_KEY + [
-            ("assembly_mode", "assembly (one per sample) or coassembly (all samples pooled)"),
+            ("assembly_mode", "assembly (one per sample) or coassembly (all samples, or one --coassembly_group_by "
+                              "group, pooled)"),
             ("contigs, assembly_length_mb", "contigs MEGAHIT wrote and their total length (Mb)"),
             ("n50_kb, l50", "N50 (kb): half of the assembly is in contigs at least this long; L50: how many contigs "
                             "that takes (BBMap prints them the other way round, as N/L50 = count/length)"),
@@ -368,11 +373,13 @@ TABLE_DOCS = {
     "assembly_read_use": {
         "title": "Reads on the assembly",
         "description": "Per sample, the share of its reads featureCounts placed on the contigs of its assembly (a "
-                       "co-assembly for every sample under --assembly_mode coassembly) and on their predicted genes. "
+                       "co-assembly under --assembly_mode coassembly, its group's with --coassembly_group_by) and on "
+                       "their predicted genes. "
                        "Reads not on contigs are outside every contig-based table. NA_not_run without "
                        "--contig_level_functional (featureCounts is part of it).",
         "columns": SAMPLE_KEY + [
-            ("assembly", "the assembly the sample's reads were aligned to: the sample itself, or coassembly"),
+            ("assembly", "the assembly the sample's reads were aligned to: the sample itself, coassembly, or its "
+                         "co-assembly group's label"),
             ("pct_reads_on_contigs", "% of the sample's reads (mates counted separately) aligned to a filtered contig"),
             ("pct_reads_on_genes", "% of its reads assigned to a predicted gene: the denominator of contig-level TPM"),
         ],
@@ -410,10 +417,12 @@ TABLE_DOCS = {
         "description": "Read depth of each MAG in each sample and the share of the sample's sequenced bases it holds. "
                        "The depth is the mean of its contigs' depths weighted by contig length, from the depths "
                        "MetaBAT2 bins on (jgi_summarize_bam_contig_depths: alignments at >= 97 % identity, contig "
-                       "ends trimmed), in both assembly modes. Under co-assembly every MAG has a row per sample; "
-                       "under per-sample assembly a MAG has a row for its own sample only.",
+                       "ends trimmed), in both assembly modes. Under co-assembly every MAG has a row per sample of "
+                       "its co-assembly (all samples, or its --coassembly_group_by group's); under per-sample "
+                       "assembly a MAG has a row for its own sample only.",
         "columns": [
-            ("assembly", "the assembly the MAG comes from: a sample name, or coassembly"),
+            ("assembly", "the assembly the MAG comes from: a sample name, coassembly, or a co-assembly group's "
+                         "label"),
             ("batch", "results directory (--batch-labels / --summary_batch_label)"),
             ("bin", "MAG name (mags)"),
             ("sample", "sample whose reads give the depth"),
@@ -464,7 +473,8 @@ TABLE_DOCS = {
                        "(--contig_level_functional): under co-assembly one row per gene and sample, under per-sample "
                        "assembly the gene's own sample only. TPM and CPGE as in the contig-level functional tables.",
         "columns": SAMPLE_KEY + [
-            ("assembly", "the assembly the gene was predicted on: a sample name, or coassembly"),
+            ("assembly", "the assembly the gene was predicted on: a sample name, coassembly, or a co-assembly "
+                         "group's label"),
             ("gene_id, contig", "Pyrodigal gene and its contig"),
             ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
             ("count", "reads featureCounts assigned to the gene (mates counted separately)"),

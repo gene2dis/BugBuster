@@ -95,7 +95,7 @@ nextflow_process {
             process {
                 """
                 input[0] = [
-                    [ id: 'coassembly' ],
+                    [ id: 'coassembly', coassembly: true ],
                     [
                         file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
                         file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true),
@@ -176,7 +176,7 @@ nextflow_process {
                     }
                 }
                 input[0] = [
-                    [ id: 'coassembly' ],
+                    [ id: 'coassembly', coassembly: true ],
                     ['sA', 'sB'].collectMany { id -> ['R1', 'R2', 'singleton'].collect { role -> raw.resolve("\${id}_\${role}.fastq.gz") } }
                 ]
                 """

@@ -38,6 +38,7 @@ nextflow_process {
                 input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
                 input[8] = "assembly"
                 input[9] = "recommended"
+                input[10] = []
                 """
             }
         }
@@ -98,6 +99,7 @@ nextflow_process {
                 input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
                 input[8] = "coassembly"
                 input[9] = "recommended"
+                input[10] = []
                 """
             }
         }
@@ -145,6 +147,7 @@ nextflow_process {
                 input[7] = file("${projectDir}/tests/data/functional/cog-fixture.def.tab", checkIfExists: true)
                 input[8] = "assembly"
                 input[9] = "recommended"
+                input[10] = []
                 """
             }
         }

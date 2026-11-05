@@ -53,7 +53,9 @@ STAGES = [
     },
     {
         "key": "assembly", "title": "Assembly (MEGAHIT)",
-        "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize), --megahit_k_list, --megahit_min_count",
+        "params": "--assembly_mode (assembly | coassembly | none), --coassembly_group_by (one co-assembly per "
+                  "--sample_metadata group), --assembly_read_reduction (none | normalize), --megahit_k_list, "
+                  "--megahit_min_count",
         "processes": ["BBNORM", "MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
         "summary": "assembly_stats (contigs, length, N50, contigs kept by the length filter); assembly_read_use (% "
                    "of reads on contigs and genes, with --contig_level_functional)",

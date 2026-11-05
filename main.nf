@@ -58,6 +58,7 @@ def printHelp() {
       --quality_control             Enable QC and host filtering (default: ${params.quality_control})
       --read_aligner                Aligner for host removal, reads->contigs and bin depth: 'bwamem3' (needs AVX2), 'bowtie2' (default: ${params.read_aligner})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
+      --coassembly_group_by         Column of --sample_metadata: one co-assembly per value (with --assembly_mode coassembly)
       --assembly_read_reduction     Reduce the assembler input only: 'none', 'normalize' (BBNorm) (default: ${params.assembly_read_reduction})
       --megahit_k_list              MEGAHIT --k-list, e.g. 21,41,61,81,101,121,141 (default: MEGAHIT's own list)
       --megahit_min_count           MEGAHIT --min-count (default: ${params.megahit_min_count})
@@ -173,6 +174,7 @@ include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/mai
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
+include { coassemblyGroups         } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
 /*
@@ -314,6 +316,11 @@ workflow {
     if (!(params.read_level_functional in valid_read_functional)) {
         error("Invalid --read_level_functional '${params.read_level_functional}'. Valid options: ${valid_read_functional.join(', ')}")
     }
+    // One co-assembly per --coassembly_group_by group (sample -> label; [:]
+    // without the param): every check on the param, the table and the labels
+    // runs here, before any download
+    def coassembly_groups = coassemblyGroups()
+
     // The summary's grouping/ordering columns live in the metadata table
     if (flagOn(params.results_summary) && (params.summary_group_by || params.summary_order_by) && !params.sample_metadata) {
         error("--summary_group_by and --summary_order_by name columns of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
@@ -403,6 +410,10 @@ workflow {
     log.info "  Quality control      : ${params.quality_control}"
     log.info "  Read aligner         : ${params.read_aligner}"
     log.info "  Assembly mode        : ${params.assembly_mode}${params.assembly_mode != 'none' && params.assembly_read_reduction != 'none' ? " (assembler input: ${params.assembly_read_reduction})" : ''}"
+    if (coassembly_groups) {
+        def members = coassembly_groups.groupBy { _sample, label -> label }
+        log.info "  Co-assembly groups   : ${members.size()} by ${params.coassembly_group_by} (${members.collect { label, samples -> "${label}: ${samples.size()}" }.sort().join(', ')})"
+    }
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
@@ -587,6 +598,18 @@ workflow {
     ch_contig_bins   = channel.empty()   // [meta, <id>_contig_bins.tsv] when binning is on
     ch_gtdbtk_reports = channel.empty()  // <id>_gtdbtk_{bac120,ar53}.tsv when binning is on
 
+    // pipeline_info/coassembly_groups.tsv: each sample's co-assembly group
+    // (--coassembly_group_by only), read by the contig functional aggregation
+    // and the summary
+    ch_coassembly_groups = channel.value([])
+    if ( coassembly_groups ) {
+        ch_coassembly_groups = channel
+            .of("sample\tgroup\n" + coassembly_groups.collect { sample, label -> "${sample}\t${label}\n" }.join(''))
+            .collectFile(name: 'coassembly_groups.tsv', storeDir: "${params.output}/pipeline_info")
+            .first()
+        ch_summary_reports = ch_summary_reports.mix(ch_coassembly_groups)
+    }
+
     if ( params.assembly_mode != "none" ) {
         ASSEMBLY(
             ch_clean_reads
@@ -714,7 +737,8 @@ workflow {
             ch_ags,
             ch_refined_bins,
             ch_bakta_db,
-            ch_cog_def
+            ch_cog_def,
+            ch_coassembly_groups
         )
         ch_versions = ch_versions.mix(FUNCTIONAL_ANNOTATION.out.versions)
         // the contig branch's study tables (summary/; never merged with the read branch's) and per-sample

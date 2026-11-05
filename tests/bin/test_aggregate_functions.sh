@@ -290,6 +290,52 @@ check "coassembly: per-sample cpge (sampleA 50.000000, sampleB/Z empty)" \
     "grep -qP 'sampleA\tcontig_1_1\tcoassembly\t30\t300\t750000.0000\t50.000000\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleB\tcontig_1_2\tcoassembly\t50\t300\t1000000.0000\t\$' '${D}/gene_abundance.tsv' && grep -qP 'sampleZ\t\t\t\tunavailable\$' '${D}/ags_and_ge.tsv'"
 
 #
+# 2b. Co-assembly per group (--coassembly_group_by): g1 = sampleA + sampleB, g2 =
+#     sampleZ (a one-sample group). Both groups' gene sets have the same gene ids
+#     (MEGAHIT names every assembly's contigs k141_N): each sample must meet its
+#     own group's annotations only
+#
+D="${WORK}/coassembly_groups"
+mkdir -p "${D}"
+cp "${FIXTURES}/sampleA.featureCounts.txt" "${FIXTURES}/sampleB.featureCounts.txt" \
+   "${FIXTURES}/sampleZ.featureCounts.txt" "${D}/"
+for g in g1 g2; do
+    sed "s/sampleA/${g}/g" "${FIXTURES}/sampleA.emapper.annotations" > "${D}/${g}.emapper.annotations"
+    cp "${GFF_FIXTURE}" "${D}/${g}.gff.gz"
+done
+# g2 annotates one gene fewer than g1, so a cross-group join would show
+grep -v '^contig_1_1\b' "${D}/g1.emapper.annotations" > "${D}/g2.emapper.annotations"
+cp "${FIXTURES}/eggnog_versions.yml" "${FIXTURES}/cog-fixture.def.tab" "${D}/"
+printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\nsampleZ\tg2\n' > "${D}/coassembly_groups.tsv"
+NEXT_WORKDIR="${D}" expect_pass "co-assembly groups: each sample against its group's gene set" \
+    --assembly-mode coassembly --coassembly-groups coassembly_groups.tsv \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
+    --annotations g1.emapper.annotations g2.emapper.annotations \
+    --gffs g1.gff.gz g2.gff.gz \
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir .
+# (the fixture annotates contig_1_1 only, so g2 has no 5.1 rows)
+check "groups: 5.1 keyed by group, contig_1_1 annotated in g1 only" \
+    "[ \"\$(tail -n +2 '${D}/gene_annotations.tsv' | cut -f1 | sort -u | tr '\n' ' ')\" = 'g1 ' ] && grep -qP '^g1\tcontig_1_1\t' '${D}/gene_annotations.tsv'"
+check "groups: 5.2 keeps assembly_mode coassembly and every sample" \
+    "[ \"\$(tail -n +2 '${D}/gene_abundance.tsv' | cut -f1,3 | sort -u | tr '\n' ' ')\" = \"\$(printf 'sampleA\tcoassembly sampleB\tcoassembly sampleZ\tcoassembly ')\" ]"
+check "groups: sampleZ (g2) gets no term of contig_1_1, sampleA (g1) does" \
+    "[ \"\$(diff <(grep -P '^sampleA\t' '${D}/annotated_fraction.tsv' | grep -P '\tany\t' | cut -f3,4) <(grep -P '^sampleZ\t' '${D}/annotated_fraction.tsv' | grep -P '\tany\t' | cut -f3,4) > /dev/null; echo \$?)\" = 1 ]"
+printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\n' > "${D}/groups_missing.tsv"
+NEXT_WORKDIR="${D}" expect_fail "groups: a sample without a group fails" \
+    --assembly-mode coassembly --coassembly-groups groups_missing.tsv \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
+    --annotations g1.emapper.annotations g2.emapper.annotations \
+    --gffs g1.gff.gz g2.gff.gz \
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_missing
+printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\nsampleZ\tg3\n' > "${D}/groups_other.tsv"
+NEXT_WORKDIR="${D}" expect_fail "groups: annotation files of other groups fail" \
+    --assembly-mode coassembly --coassembly-groups groups_other.tsv \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
+    --annotations g1.emapper.annotations g2.emapper.annotations \
+    --gffs g1.gff.gz g2.gff.gz \
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_other
+
+#
 # 3. Empty gene set (empty-contig sample shape)
 #
 D="${WORK}/empty"

@@ -14,7 +14,9 @@
     
     INPUTS:
         reads: Channel of [meta, reads] tuples for per-sample assembly
-                (co-assembly mode pools this same channel internally)
+                (co-assembly mode pools this same channel internally: every
+                sample into one co-assembly, or one co-assembly per
+                --coassembly_group_by group)
     
     OUTPUTS:
         contigs: [meta, reads, contigs] - Filtered contigs with reads for binning
@@ -23,13 +25,19 @@
         bam_meta: [meta, bam] - BAM files only for indexing
         counting_bam: [meta, bam] - One BAM per sample, for gene quantification
                 and co-assembly binning depths (assembly: the same BAM as
-                bam_meta; coassembly: each sample against the co-assembly, whose
-                samtools merge is bam/bam_meta - issue #28)
+                bam_meta; coassembly: each sample against its co-assembly, whose
+                samtools merge is bam/bam_meta - issue #28; meta.group names
+                the co-assembly)
+
+    CO-ASSEMBLY META:
+        [id: 'coassembly' (or the group's label), coassembly: true,
+         samples: [its sample ids, sorted]]
         versions: Tool version information
     
     MODES:
         assembly: Per-sample assembly (default)
-        coassembly: Pool all reads and assemble together
+        coassembly: Pool all reads and assemble together (per group with
+                    --coassembly_group_by)
         none: Skip assembly entirely
 ----------------------------------------------------------------------------------------
 */
@@ -45,6 +53,7 @@ include { BWAMEM3_SAMTOOLS     } from '../../modules/local/bwamem3_samtools/main
 include { SAMTOOLS_MERGE as NFCORE_SAMTOOLS_MERGE } from '../../modules/nf-core/samtools/merge/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
 include { flagOn                } from './utils_params'
+include { coassemblyGroups      } from './utils_coassembly'
 
 workflow ASSEMBLY {
     take:
@@ -129,17 +138,28 @@ workflow ASSEMBLY {
     // Co-assembly mode
     //
     if ( params.assembly_mode == "coassembly" ) {
-        // Pool all samples' reads for the co-assembly, ordered by sample id
-        // (each sample keeps its own R1, R2(, singleton) order, so MEGAHIT's
-        // R1/R2 lists stay paired). Plain collect() followed task completion
-        // order, which changed the MEGAHIT task hash between identical runs
-        // and could re-run the whole co-assembly on -resume (design doc Q19).
-        // Built once for MEGAHIT (or BBNorm) and BBMAP.
-        ch_pooled_reads = reads
-            .toSortedList { a, b -> a[0].id <=> b[0].id }
-            .map { items -> items.collect { item -> item[1] }.flatten() }
+        // The co-assembly each sample goes into: its --coassembly_group_by
+        // group's label, or 'coassembly' for every sample (roadmap Phase 15)
+        def groups = coassemblyGroups()
 
-        ch_coassembly_reads = ch_pooled_reads.map { all_reads -> [[id: "coassembly"], all_reads] }
+        // Pool each co-assembly's reads, ordered by sample id (each sample
+        // keeps its own R1, R2(, singleton) order, so MEGAHIT's R1/R2 lists
+        // stay paired). groupTuple lists them in task completion order, which
+        // changed the MEGAHIT task hash between identical runs and could re-run
+        // the whole co-assembly on -resume (design doc Q19), hence the sort. It
+        // has no group size: a sample QC drops (--min_read_sample) leaves its
+        // group smaller, or empty, instead of waiting for it forever. Built once
+        // for MEGAHIT (or BBNorm) and BBMAP.
+        ch_coassembly_reads = reads
+            .map { meta, files -> [(groups[meta.id] ?: 'coassembly'), meta, files] }
+            .groupTuple(by: 0)
+            .map { label, metas, files_list ->
+                def members = [metas, files_list].transpose().sort { a, b -> a[0].id <=> b[0].id }
+                [
+                    [id: label, coassembly: true, samples: members.collect { m -> m[0].id }],
+                    members.collect { m -> m[1] }.flatten()
+                ]
+            }
 
         // Assembler input: the pooled reads, or their normalized copy (one
         // BBNorm call over every sample's reads)
@@ -160,7 +180,7 @@ workflow ASSEMBLY {
         // pooled reads under read reduction, as in per-sample mode)
         BBMAP(
             reduce_reads
-                ? ch_coassembly_reads.combine(MEGAHIT.out.contigs_only.map { _meta, contigs -> contigs })
+                ? ch_coassembly_reads.join(MEGAHIT.out.contigs_only)
                 : MEGAHIT.out.contigs_and_reads
         )
         
@@ -182,22 +202,28 @@ workflow ASSEMBLY {
         // sample in one task did. No read groups, as before: nothing
         // downstream reads them.
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
+            // [group label, sample meta + its group, reads, its co-assembly's contigs]
             ch_per_sample_input = reads
-                .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
+                .map { meta, files -> [(groups[meta.id] ?: 'coassembly'), meta + [group: (groups[meta.id] ?: 'coassembly')], files] }
+                .combine(BBMAP.out.contigs_only.map { meta, contigs -> [meta.id, contigs] }, by: 0)
 
             if ( params.read_aligner == 'bwamem3' ) {
-                // One index of the co-assembly, shared by every sample (bowtie2
+                // One index per co-assembly, shared by its samples (bowtie2
                 // builds it in each task)
                 BWAMEM3_INDEX(BBMAP.out.contigs_only)
                 ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
 
-                BWAMEM3_SAMTOOLS(ch_per_sample_input.combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index }))
+                BWAMEM3_SAMTOOLS(
+                    ch_per_sample_input
+                        .combine(BWAMEM3_INDEX.out.index.map { meta, index -> [meta.id, index] }, by: 0)
+                        .map { _label, meta, files, contigs, index -> [meta, files, contigs, index] }
+                )
 
                 ch_sample_bams = BWAMEM3_SAMTOOLS.out.bam_only
                 ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
             } else {
-                BOWTIE2_SAMTOOLS(ch_per_sample_input)
+                BOWTIE2_SAMTOOLS(ch_per_sample_input.map { _label, meta, files, contigs -> [meta, files, contigs] })
 
                 ch_sample_bams = BOWTIE2_SAMTOOLS.out.bam_only
                 ch_empty_reports = BOWTIE2_SAMTOOLS.out.empty_contig_report
@@ -205,21 +231,28 @@ workflow ASSEMBLY {
             }
         }
 
-        // Pooled BAM for binning and contig taxonomy: the per-sample BAMs in
-        // sample order (a fixed task input, and the record order of the old
-        // pooled task), named coassembly_all_reads.bam (ext.prefix)
+        // Pooled BAM of each co-assembly for binning and contig taxonomy: its
+        // samples' BAMs in sample order (a fixed task input, and the record
+        // order of the old pooled task), named <id>_all_reads.bam (ext.prefix;
+        // coassembly_all_reads.bam without groups). A co-assembly knows its
+        // samples, so each group's merge starts once its own BAMs are done
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) ) {
             NFCORE_SAMTOOLS_MERGE(
                 ch_sample_bams
-                    .toSortedList { a, b -> a[0].id <=> b[0].id }
-                    .map { items -> [[id: "coassembly"], items.collect { item -> item[1] }, []] },
+                    .map { meta, bam -> [meta.group, meta.id, bam] }
+                    .combine(BBMAP.out.contigs_only.map { meta, _contigs -> [meta.id, meta] }, by: 0)
+                    .map { _label, id, bam, cmeta -> [groupKey(cmeta, cmeta.samples.size()), id, bam] }
+                    .groupTuple()
+                    .map { key, ids, bams ->
+                        [key.getGroupTarget(), [ids, bams].transpose().sort { a, b -> a[0] <=> b[0] }.collect { pair -> pair[1] }, []]
+                    },
                 [[], [], [], []],
                 ''
             )
 
             ch_bam_only = NFCORE_SAMTOOLS_MERGE.out.bam
             ch_bam_with_contigs = NFCORE_SAMTOOLS_MERGE.out.bam
-                .combine(BBMAP.out.contigs_only.map { _meta, contigs -> contigs })
+                .join(BBMAP.out.contigs_only)
                 .map { meta, bam, contigs -> [meta, contigs, bam] }
         }
     }

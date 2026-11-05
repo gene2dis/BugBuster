@@ -14,6 +14,9 @@ tools:
       licence: ["BSD-3-Clause"]
 
 input:
+  - meta:
+      type: map
+      description: Co-assembly metadata (meta.id 'coassembly', or the --coassembly_group_by group's label)
   - reports:
       type: file
       description: |

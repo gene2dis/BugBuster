@@ -13,8 +13,9 @@
         contigs_and_bam: [meta, contigs, bam] - Contigs with aligned reads (BAM)
         checkm2_db: CheckM2 database for quality assessment
         gtdbtk_db: GTDB-Tk database for taxonomic classification
-        sample_bams: [meta, bam] - One BAM per sample against the co-assembly
-                (used only under co-assembly: MetaBAT2 depths and bin coverage)
+        sample_bams: [meta, bam] - One BAM per sample against its co-assembly
+                (meta.group: the co-assembly's id; used only under co-assembly:
+                MetaBAT2 depths and bin coverage)
     
     OUTPUTS:
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
@@ -76,23 +77,25 @@ workflow BINNING {
     // (docs/benchmarks/binning_2026.md: MIMAG high-quality MetaBAT2 bins
     // 11 -> 23); SemiBin2 and COMEBin keep the pooled BAM (SemiBin2's
     // pre-trained models take one coverage column)
+    // Under co-assembly each co-assembly (one per --coassembly_group_by
+    // group) takes its own samples' BAMs; it knows how many, so a group's
+    // depths start once its BAMs are done
     ch_depth_input = params.assembly_mode == "coassembly"
-        ? contigs_and_bam
-            .map { meta, contigs, _bam -> [meta, contigs] }
-            .combine(
-                sample_bams
-                    .toSortedList { a, b -> a[0].id <=> b[0].id }
-                    .map { items -> [items.collect { item -> item[1] }] }
-            )
+        ? sample_bams
+            .map { meta, bam -> [meta.group, meta.id, bam] }
+            .combine(contigs_and_bam.map { meta, contigs, _bam -> [meta.id, meta, contigs] }, by: 0)
+            .map { _label, id, bam, cmeta, contigs -> [groupKey([cmeta, contigs], cmeta.samples.size()), id, bam] }
+            .groupTuple()
+            .map { key, ids, bams ->
+                def (cmeta, contigs) = key.getGroupTarget()
+                [cmeta, contigs, [ids, bams].transpose().sort { a, b -> a[0] <=> b[0] }.collect { pair -> pair[1] }]
+            }
         : contigs_and_bam
     CALCULATE_DEPTH(ch_depth_input)
     ch_versions = ch_versions.mix(CALCULATE_DEPTH.out.versions.first())
-    // the samples each depth table has a column for
-    ch_depth_samples = params.assembly_mode == "coassembly"
-        ? CALCULATE_DEPTH.out.depth
-            .combine(sample_bams.map { meta, _bam -> meta.id }.toSortedList().map { ids -> [ids] })
-            .map { meta, _contigs, depth, samples -> [meta.id, depth, samples] }
-        : CALCULATE_DEPTH.out.depth.map { meta, _contigs, depth -> [meta.id, depth, [meta.id]] }
+    // the samples each depth table has a column for: the co-assembly's, or the sample itself
+    ch_depth_samples = CALCULATE_DEPTH.out.depth
+        .map { meta, _contigs, depth -> [meta.id, depth, meta.coassembly ? meta.samples : [meta.id]] }
 
     if (use_metabat2) {
         METABAT2(CALCULATE_DEPTH.out.depth)
@@ -277,11 +280,20 @@ workflow BINNING {
         BIN_TAX_REPORT(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
         ch_versions = ch_versions.mix(BIN_QUALITY_REPORT.out.versions, BIN_TAX_REPORT.out.versions)
     } else if ( params.assembly_mode == "coassembly" ) {
-        // Co-assembly mode: the bin summary (quality, taxonomy and depth per sample)
+        // Co-assembly mode: the bin summary (quality, taxonomy and depth per
+        // sample) of each co-assembly; without refined bins there are no depth
+        // tables, and BIN_SUMMARY writes a header-only table from the empty
+        // quality/taxonomy reports
         BIN_SUMMARY(
-            ch_bin_depth.collect(sort: true).ifEmpty([])
-                .combine(ch_gtdb_tk.map { _meta, reports -> reports }.collect(sort: true))
-                .combine(ch_checkm_refined.map { _meta, reports -> reports }.collect(sort: true))
+            ch_checkm_refined.map { meta, reports -> [meta.id, meta, reports] }
+                .join(ch_gtdb_tk.map { meta, reports -> [meta.id, reports] })
+                .map { id, meta, quality, taxonomy -> [id, [meta, [quality, taxonomy].flatten()]] }
+                .join(BIN_DEPTH.out.bin_depth.map { meta, tables -> [meta.id, tables] }, remainder: true)
+                .filter { _id, reports, _tables -> reports != null }
+                .map { _id, reports, tables ->
+                    def (meta, files) = reports
+                    [meta, (files + [tables ?: []].flatten()).sort { f -> f.name }]
+                }
         )
         ch_versions = ch_versions.mix(BIN_SUMMARY.out.versions)
     }

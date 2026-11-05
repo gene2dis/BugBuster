@@ -14,7 +14,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id under co-assembly, 'coassembly' or its --coassembly_group_by group's label; meta.coassembly true)
   - reads:
       type: file
       description: Host-removed reads used for the assembly, passed through unchanged to the contigs_with_reads output

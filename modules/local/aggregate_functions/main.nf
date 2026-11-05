@@ -22,13 +22,13 @@
 
     Input:
         counts: all samples' featureCounts tables
-        annotations: eggNOG annotations (per sample, or one 'coassembly' file)
-        gffs: Pyrodigal gene GFFs (per sample, or one 'coassembly' file)
+        annotations: eggNOG annotations (per sample, or one per co-assembly)
+        gffs: Pyrodigal gene GFFs (per sample, or one per co-assembly)
         ags: MicrobeCensus <id>.ags.tsv tables; possibly a subset of samples
             or none at all (non-fatal failures, or --microbecensus false)
         dbcan: run_dbcan <id>.overview.tsv files; the whole set is absent
-            when --functional_cazy false (per sample, or one 'coassembly'
-            file, when present)
+            when --functional_cazy false (per sample, or one per co-assembly,
+            when present)
         eggnog_versions: versions.yml from EGGNOG_MAPPER_ANNOTATE (staged
             under a distinct name: this module writes its own versions.yml,
             and writing through a same-named input symlink would corrupt the
@@ -42,6 +42,9 @@
         assembly_mode: 'assembly' or 'coassembly' (join topology + 5.2 column)
         dbcan_consensus: 'recommended' or 'any' (which dbCAN calls feed
             aggregation, design doc Section 4.3 consensus policy)
+        coassembly_groups: coassembly_groups.tsv (sample, group) with
+            --coassembly_group_by, [] otherwise: each sample is counted against
+            its group's co-assembly, whose files are named by the group
 
     Output: gene_annotations.tsv, gene_abundance.tsv, function_abundance.tsv,
         function_wide_<ontology>_{tpm,cpge}.tsv (ko, cog, ec, pfam, cazy from
@@ -71,6 +74,7 @@ process AGGREGATE_FUNCTIONS {
     path(cog_def, stageAs: 'cog_def/*')
     val(assembly_mode)
     val(dbcan_consensus)
+    path(coassembly_groups, stageAs: 'groups/*')
 
     output:
     path("gene_annotations.tsv")   , emit: gene_annotations
@@ -89,6 +93,7 @@ process AGGREGATE_FUNCTIONS {
     def ags_arg = ags ? "--ags ${ags}" : ''
     def dbcan_arg = dbcan ? "--dbcan ${dbcan}" : ''
     def dbcan_versions_arg = dbcan_versions ? "--dbcan-versions-yml ${dbcan_versions}" : ''
+    def groups_arg = coassembly_groups ? "--coassembly-groups ${coassembly_groups}" : ''
     """
     aggregate_functions.py \\
         --assembly-mode ${assembly_mode} \\
@@ -98,6 +103,7 @@ process AGGREGATE_FUNCTIONS {
         ${ags_arg} \\
         ${dbcan_arg} \\
         ${dbcan_versions_arg} \\
+        ${groups_arg} \\
         --dbcan-consensus ${dbcan_consensus} \\
         --cog-def ${cog_def} \\
         --eggnog-versions-yml ${eggnog_versions} \\

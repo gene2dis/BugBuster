@@ -55,8 +55,8 @@ process MEGAHIT {
     // retried with more memory
     def mem_bytes = task.memory ? task.memory.toBytes() : '-'
 
-    // Determine if this is coassembly mode based on meta.id
-    def is_coassembly = (meta.id == 'coassembly')
+    // A co-assembly's meta says so (its id is 'coassembly', or its group's label)
+    def is_coassembly = meta.coassembly as boolean
     
     if (is_coassembly) {
         // Co-assembly mode: reads are already collected, need to separate R1/R2/singletons

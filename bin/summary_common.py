@@ -65,6 +65,31 @@ def warn(msg):
     print(f"WARNING: {msg}", file=sys.stderr)
 
 
+def load_coassembly_groups(root):
+    """pipeline_info/coassembly_groups.tsv (--coassembly_group_by: one co-assembly per group) -> {sample: group
+    label}; {} without it (one co-assembly called 'coassembly', or per-sample assemblies)."""
+    path = root / "pipeline_info" / "coassembly_groups.tsv"
+    if not path.exists():
+        return {}
+    groups = {}
+    for i, line in enumerate(path.read_text().splitlines()):
+        fields = line.split("\t")
+        if i == 0:
+            if fields != ["sample", "group"]:
+                die(f"{path}: expected the columns sample and group, got {fields}")
+            continue
+        if len(fields) != 2 or not all(fields):
+            die(f"{path}: line {i + 1} is not 'sample<TAB>group'")
+        groups[fields[0]] = fields[1]
+    return groups
+
+
+def coassembly_subdir(asm, groups):
+    """The folder of an assembly id under the id-keyed stage folders (deeparg/<id>, mags/<id>, ...): a co-assembly
+    group's label sits under coassembly/ (coassembly/<group>), any other id is its own folder."""
+    return f"coassembly/{asm}" if asm in set(groups.values()) else asm
+
+
 def natural_key(value):
     """Sort key that orders V2 before V10."""
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", str(value))]

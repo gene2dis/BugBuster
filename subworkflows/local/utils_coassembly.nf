@@ -1,0 +1,92 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CO-ASSEMBLY GROUPS (roadmap Phase 15, A4)
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    --coassembly_group_by <column> names a column of --sample_metadata (the
+    table the run summary reads: a 'sample' column, or sample names in the
+    first column; TSV, or CSV by its .csv extension, as
+    bin/results_summary.py load_metadata reads it). Every distinct value is one
+    co-assembly, labelled with the value's characters outside [A-Za-z0-9._-]
+    replaced by '_'. Without the param every sample goes into one co-assembly,
+    'coassembly'. Rows for samples that are not in the samplesheet are ignored
+    (a metadata table can cover several batches).
+----------------------------------------------------------------------------------------
+*/
+
+/**
+ * Sample -> co-assembly label under --coassembly_group_by, [:] without it.
+ * Stops the run (error) on any problem with the param, the table or the
+ * labels, listing the offending samples or values.
+ */
+def coassemblyGroups() {
+    if (!params.coassembly_group_by) {
+        return [:]
+    }
+    def column = params.coassembly_group_by.toString()
+    if (params.assembly_mode != 'coassembly') {
+        error("--coassembly_group_by ${column} groups the samples of a co-assembly, but --assembly_mode is '${params.assembly_mode}': add --assembly_mode coassembly")
+    }
+    if (!params.sample_metadata) {
+        error("--coassembly_group_by ${column} names a column of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
+    }
+
+    // The samplesheet's sample ids, as INPUT_CHECK reads them
+    def samples = file(params.input, checkIfExists: true)
+        .splitCsv(header: true, sep: ',', strip: true)
+        .collect { row -> row.sample?.toString()?.trim() }
+        .findAll { id -> id }
+
+    def table = file(params.sample_metadata, checkIfExists: true)
+    def sep = table.name.toLowerCase().endsWith('.csv') ? ',' : '\t'
+    def lines = table.splitCsv(sep: sep)
+    if (!lines) {
+        error("--sample_metadata ${params.sample_metadata} is empty")
+    }
+    def header = lines[0].collect { c -> c.toString() }
+    header[0] = header[0].replaceFirst(/^\uFEFF/, '')
+    def rows = lines.drop(1).collect { fields -> [header, fields].transpose().collectEntries { name, value -> [(name): value] } }
+    def key = 'sample' in header ? 'sample' : header[0]
+    if (!(column in header) || column == key) {
+        error("--coassembly_group_by ${column}: --sample_metadata ${params.sample_metadata} has no such column (columns: ${header.findAll { c -> c != key }.join(', ')})")
+    }
+
+    def value_of = [:]
+    rows.each { row ->
+        def id = row[key]?.toString()
+        if (id != null && id in samples) {
+            if (value_of.containsKey(id)) {
+                error("--sample_metadata ${params.sample_metadata}: sample ${id} has more than one row")
+            }
+            value_of[id] = row[column]?.toString()?.trim() ?: ''
+        }
+    }
+    def no_row = samples.findAll { id -> !value_of.containsKey(id) }
+    if (no_row) {
+        error("--coassembly_group_by ${column}: no --sample_metadata row for sample(s) ${no_row.join(', ')}")
+    }
+    def blank = samples.findAll { id -> value_of[id] == '' }
+    if (blank) {
+        error("--coassembly_group_by ${column}: no value in column ${column} for sample(s) ${blank.join(', ')}")
+    }
+
+    // Labels name folders and files: path-safe, distinct, and never a sample
+    // id or the ungrouped co-assembly's id
+    def label_of = (value_of.values() as List).unique().collectEntries { value -> [(value): value.replaceAll(/[^A-Za-z0-9._-]/, '_')] }
+    def by_label = label_of.groupBy { _value, label -> label }
+    def clashes = by_label.findAll { _label, values -> values.size() > 1 }
+    if (clashes) {
+        error("--coassembly_group_by ${column}: the values ${clashes.collect { label, values -> values.keySet().collect { v -> "'${v}'" }.join(' and ') + " both become '${label}'" }.join('; ')} (characters outside A-Z, a-z, 0-9, '.', '_' and '-' become '_'): make them differ in those characters")
+    }
+    label_of.each { value, label ->
+        if (!(label ==~ /[A-Za-z0-9][A-Za-z0-9_.\-]*/)) {
+            error("--coassembly_group_by ${column}: the value '${value}' gives the label '${label}', which does not start with a letter or digit")
+        }
+        if (label == 'coassembly') {
+            error("--coassembly_group_by ${column}: the value '${value}' gives the label 'coassembly', the name of the ungrouped co-assembly: rename it")
+        }
+        if (label in samples) {
+            error("--coassembly_group_by ${column}: the value '${value}' gives the label '${label}', which is also a sample id: rename it")
+        }
+    }
+    return samples.sort(false).collectEntries { id -> [(id): label_of[value_of[id]]] }
+}

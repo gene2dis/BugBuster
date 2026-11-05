@@ -9,7 +9,7 @@ abundances."""
 
 import pandas as pd
 
-from summary_common import die
+from summary_common import die, load_coassembly_groups
 
 CONTIG_TABLE = ("05_arg_prediction", "contig_level", "summary", "Contig_tax_and_arg_prediction.tsv")
 NEEDED = {"Sample", "contig_name", "ARG_gene", "predicted_ARG_class"}
@@ -150,10 +150,12 @@ def load_arg_gene_abundance(root):
     """DEEPARG_CONTIGS' hits per assembly (05_arg_prediction/contig_level/deeparg/<id>/*.mapping.ARG, read_id =
     the Pyrodigal gene id) joined to gene_abundance.tsv (07_functional_annotation/summary/), keyed on the assembly:
     gene ids repeat across per-sample assemblies (MEGAHIT names every assembly's contigs k141_N), so a per-sample
-    assembly's genes are matched to its own sample only, a co-assembly's to every sample. None without both."""
+    assembly's genes are matched to its own sample only, a co-assembly's to every sample (with co-assembly groups,
+    a group's to its own samples; their hits are under deeparg/coassembly/<group>/). None without both."""
     ddir = root / "05_arg_prediction" / "contig_level" / "deeparg"
     gpath = root / "07_functional_annotation" / "summary" / "gene_abundance.tsv"
-    maps = sorted(ddir.glob("*/*.mapping.ARG")) if ddir.is_dir() else []
+    maps = sorted(ddir.glob("*/*.mapping.ARG")) + sorted(ddir.glob("coassembly/*/*.mapping.ARG")) if ddir.is_dir() \
+        else []
     if not maps or not gpath.exists():
         return None
     hits = []
@@ -173,8 +175,9 @@ def load_arg_gene_abundance(root):
     chunks = [c[c["gene_id"].isin(wanted)]
               for c in pd.read_csv(gpath, sep="\t", dtype={"sample_id": str, "gene_id": str}, chunksize=500_000)]
     ab = pd.concat(chunks, ignore_index=True)
+    groups = load_coassembly_groups(root)
     coassembly = (ab["assembly_mode"] == "coassembly").any() if not ab.empty else "coassembly" in set(hits["assembly"])
-    ab["assembly"] = "coassembly" if coassembly else ab["sample_id"]
+    ab["assembly"] = ab["sample_id"].map(groups) if groups else "coassembly" if coassembly else ab["sample_id"]
     out = hits.merge(ab, on=["assembly", "gene_id"], how="inner")
     out = out.rename(columns={"sample_id": "sample"})
     out["contig"] = out["gene_id"].str.rsplit("_", n=1).str[0]

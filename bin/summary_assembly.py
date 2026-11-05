@@ -2,16 +2,17 @@
 contigs, BBMAP's length filter from CONTIG_FILTER_SUMMARY) and the share of each sample's reads on the contigs
 and on their predicted genes (FEATURECOUNTS_GENES' summaries, --contig_level_functional).
 
-Published inputs: 03_assembly/{per_sample/<sample>,coassembly}/<id>_contig.stats,
+Published inputs: 03_assembly/{per_sample/<sample>,coassembly,coassembly/<group>}/<id>_contig.stats,
 pipeline_info/contig_filtering_summary.txt, 07_functional_annotation/gene_abundance/<sample>/
-<sample>.featureCounts.txt.summary. An assembly is a sample name, or coassembly.
+<sample>.featureCounts.txt.summary. An assembly is a sample name, coassembly, or a co-assembly group's label
+(--coassembly_group_by; pipeline_info/coassembly_groups.tsv gives each sample's group).
 """
 
 import re
 
 import pandas as pd
 
-from summary_common import NA_NOT_RUN, die
+from summary_common import NA_NOT_RUN, die, load_coassembly_groups
 
 UNITS = {"": 1, "b": 1, "bp": 1, "kb": 1e3, "kbp": 1e3, "mb": 1e6, "mbp": 1e6, "gb": 1e9, "gbp": 1e9}
 
@@ -91,7 +92,8 @@ def load_assembly(root):
     """-> {"stats": {assembly: parsed stats}, "filter": DataFrame, "counts": {sample: featureCounts summary}} or
     None when no assembly ran."""
     adir = root / "03_assembly"
-    paths = sorted(adir.glob("coassembly/*_contig.stats")) + sorted(adir.glob("per_sample/*/*_contig.stats"))
+    paths = (sorted(adir.glob("coassembly/*_contig.stats")) + sorted(adir.glob("coassembly/*/*_contig.stats"))
+             + sorted(adir.glob("per_sample/*/*_contig.stats")))
     if not paths:
         return None
     stats = {p.name[:-len("_contig.stats")]: parse_contig_stats(p) for p in paths}
@@ -104,7 +106,7 @@ def load_assembly(root):
         if df.columns[0] != "Status" or df.shape[1] != 2:
             die(f"{p}: not a featureCounts summary (expected Status and one count column)")
         counts[p.name[:-len(".featureCounts.txt.summary")]] = dict(zip(df["Status"], df.iloc[:, 1]))
-    return {"stats": stats, "filter": filt, "counts": counts}
+    return {"stats": stats, "filter": filt, "counts": counts, "groups": load_coassembly_groups(root)}
 
 
 def assembly_stats_table(parts):
@@ -119,7 +121,8 @@ def assembly_stats_table(parts):
             minlen = filt.at[asm, "min_contig_length_bp"] if filt is not None and asm in filt.index else None
             rows.append({
                 "assembly": asm, "batch": label,
-                "assembly_mode": "coassembly" if asm == "coassembly" else "assembly",
+                "assembly_mode": ("coassembly" if asm == "coassembly" or asm in set(a["groups"].values())
+                                  else "assembly"),
                 "contigs": st["contigs"],
                 "assembly_length_mb": None if st["length_bp"] is None else round(st["length_bp"] / 1e6, 3),
                 "n50_kb": None if st["n50_bp"] is None else round(st["n50_bp"] / 1e3, 3),
@@ -151,7 +154,7 @@ def read_use_frame(parts, batch_samples):
             continue
         coassembly = "coassembly" in a["stats"]
         for s in batch_samples.get(label, []):
-            asm = "coassembly" if coassembly else s
+            asm = a["groups"].get(s, s) if a["groups"] else "coassembly" if coassembly else s
             if asm not in a["stats"]:
                 continue
             c = a["counts"].get(s)
