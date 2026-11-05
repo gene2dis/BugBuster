@@ -20,7 +20,7 @@ process CALCULATE_DEPTH {
     tag "${meta.id}"
     label 'process_single'
     
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/metabat2:2.18--h38e344b_2' :
         'quay.io/biocontainers/metabat2:2.18--h38e344b_2' }"
 

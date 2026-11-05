@@ -2,7 +2,7 @@
 // The tiers are deliberate: the former single-valued mmseqs_* params could not
 // describe this design and were removed (audit #14).
 process CLUSTERING {
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/mmseqs2:18.8cc5c--hd6d6fdc_0' :
         'quay.io/biocontainers/mmseqs2:18.8cc5c--hd6d6fdc_0' }"
 

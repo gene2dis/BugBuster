@@ -8,7 +8,10 @@
 #   - per process: the meta.yml input entries are the process inputs (meta
 #     maps plus every val/path variable, in order) and the output entries
 #     are exactly the process `emit:` names (plus optional meta entries),
-#   - every process in the file has a tag and a label.
+#   - every process in the file has a tag and a label,
+#   - no module, workflow or config file tests `workflow.containerEngine`
+#     == or != 'singularity' / 'apptainer' alone: both engines take the same
+#     image (CONTRIBUTING.md).
 # Single-process files use top-level input/output; multi-process files use a
 # `processes:` list (name, description, input, output).
 #
@@ -103,6 +106,20 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
         got_out = [o for o in entry_names(pd.get('output')) if o not in ('meta', 'meta_list')]
         if sorted(got_out) != sorted(want_out):
             problems.append(f'{d.name}/{pname}: output {sorted(got_out)} != emits {sorted(want_out)}')
+
+# modules, workflows and config files choose the singularity image the same
+# way for both engines (an == or != against one of them leaves the other out)
+repo = root.parent.parent
+engine_eq = re.compile(r"containerEngine\s*[!=]=\s*['\"](singularity|apptainer)"
+                       r"|['\"](singularity|apptainer)['\"]\s*[!=]=\s*workflow\.containerEngine")
+files = [repo / 'main.nf', repo / 'nextflow.config', *repo.glob('modules/local/**/*.nf'),
+         *repo.glob('subworkflows/local/**/*.nf'), *repo.glob('conf/**/*.config'),
+         *repo.glob('config/**/*.config')]
+for f in sorted(files):
+    for n, line in enumerate(f.read_text().splitlines(), 1):
+        if not line.lstrip().startswith('//') and engine_eq.search(line):
+            problems.append(f"{f.relative_to(repo)}:{n}: containerEngine == / != a single "
+                            f"engine; test containerEngine in ['singularity', 'apptainer']")
 
 checked = sum(1 for d in root.iterdir() if (d / 'main.nf').exists())
 for p in problems:

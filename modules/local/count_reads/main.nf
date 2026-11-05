@@ -3,7 +3,7 @@ process COUNT_READS {
     tag "${meta.id}"
     label 'process_single'
 
-    container "${ workflow.containerEngine == 'singularity' && !task.ext.singularity_pull_docker_container ?
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ubuntu:24.04' :
         'ubuntu:24.04' }"
 

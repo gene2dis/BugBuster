@@ -1129,6 +1129,25 @@ next release is tagged.
 
 ### Fixed
 
+- **`-profile apptainer` now uses the same images as `-profile singularity`**:
+  18 modules (BBMap, BBNorm, Binette, MetaBAT2 and its depth step, CheckM2,
+  MMseqs2 clustering, COMEBin, the two ubuntu helpers, the Bakta database
+  format step, GTDB-Tk, MEGAHIT, the four RGI processes, SemiBin2) chose their
+  depot.galaxyproject.org image only when the engine was `singularity`, so
+  under apptainer they pulled and converted the docker image instead; the
+  default `-B /tmp:/tmp` bind had the same test. Tool versions are unchanged.
+- **Bakta could hang forever under singularity/apptainer**: tRNAscan-SE, which
+  Bakta runs, names its temp files `/tmp/tscan<PID>`. Every container task has
+  its own process numbering but shares the host `/tmp`, so two Bakta tasks
+  running side by side can get the same PID; the second then finds the first
+  one's files and waits on an overwrite prompt that never gets an answer. Bakta
+  now runs with `TMPDIR` in its task directory (passed with `--env`, so
+  Singularity needs version 3.6 or later; any Apptainer works).
+- **`-profile slurm,apptainer` ignored the SLURM image settings**: `conf/slurm.config`
+  and `conf/institutional.config` set the cache directory
+  (`--singularity_cache`), the 60 min pull timeout and `--singularity_run_options`
+  for singularity only; apptainer now gets the same (`-profile slurm,apptainer`,
+  slurm first).
 - **A custom Kraken2 or sourmash database was labelled as the registry
   default**: with `--custom_kraken_db` or `--custom_sourmash_db`, file names,
   the `Kraken DB` / `Sourmash DB` columns of `Reads_report_taxonomy.csv`, the
