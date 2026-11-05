@@ -157,6 +157,12 @@ check "results_summary.html sends the browser to the report" grep -q 'url=report
 check "HTML report loads nothing from the network" no_external out
 check "PDF report written" test -s out/results_summary.pdf
 check "QC, taxonomy and ARG figures written" test -s out/figures/qc_read_fate.png -a -s out/figures/taxonomy_species_heatmap.svg -a -s out/figures/arg_priority_heatmap.pdf
+check "genus bars: no Other bar when the named genera cover every sample" py - <<'PYEOF'
+import pandas as pd
+bars = pd.read_csv("out/figures/taxonomy_genus_bars.csv")
+assert "Other" not in set(bars["genus"]), bars
+assert "together they make up every sample" in open("out/report/taxonomy.html").read()
+PYEOF
 
 check "table contents" py - "${KM}" <<'PYEOF'
 import sys
@@ -688,6 +694,19 @@ assert qc.at["sampleA", "n_species"] == full.at["sampleA", "n_species"] - 1
 named = wide.loc[[i for i in wide.index if i != "unassigned species"], "sampleA"].astype(float)
 p = named[named > 0] / named.sum()
 assert abs(qc.at["sampleA", "shannon"] - float(-(p * np.log(p)).sum())) < 1e-9
+PYEOF
+
+# A genome without a genus: its share is not a named genus, so the genus bars pool it into Other
+make_results nogenus/results sampleA
+awk -F'\t' 'BEGIN{OFS="\t"} $1=="GCF_000009045.1"{$7=""; $8=""} {print}' "${FIX}/sylph_gtdb_tax_table.tsv" \
+    > nogenus/results/02_taxonomy/tables/sylph_gtdb_tax_table.tsv
+check "a taxon without a genus name" \
+    py "${SUMMARY}" --results nogenus/results --outdir nogenus_out --min-clean-pairs 10000 --no-excel
+check "genus bars: the taxon without a genus is drawn as Other" py - <<'PYEOF'
+import pandas as pd
+bars = pd.read_csv("nogenus_out/figures/taxonomy_genus_bars.csv").set_index(["genus", "sample"])
+assert abs(bars.at[("Other", "sampleA"), "relative_abundance_pct"] - 22.3376) < 1e-6, bars
+assert "everything else is &#39;Other&#39;" in open("nogenus_out/report/taxonomy.html").read()
 PYEOF
 
 # ARGs-OAP had no 16S or cell estimate for a sample (stage two stopped): its SARG cells are blank, not 0
