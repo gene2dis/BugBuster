@@ -738,9 +738,9 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 
 #### `--semibin_env_model`
 - **Type**: String
-- **Default**: `human_gut`
+- **Default**: `human_gut` (when not set)
 - **Options**: `human_gut`, `dog_gut`, `ocean`, `soil`, `cat_gut`, `human_oral`, `mouse_gut`, `pig_gut`, `built_environment`, `wastewater`, `chicken_caecum`, `global`
-- **Description**: SemiBin environment model for binning
+- **Description**: SemiBin2 pre-trained environment model for per-sample assemblies (co-assemblies use `--semibin_coassembly_env_model`). When it is not set, SemiBin2 uses `human_gut` and the run warns at launch: choose the model that matches the samples, or `global` for samples that are not from a human gut. Setting it, `human_gut` included, removes the warning
 - **Example**: `--semibin_env_model ocean`
 
 #### `--semibin_random_seed`

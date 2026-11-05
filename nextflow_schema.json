@@ -661,7 +661,6 @@
                 },
                 "semibin_env_model": {
                     "type": "string",
-                    "default": "human_gut",
                     "enum": [
                         "human_gut",
                         "dog_gut",
@@ -676,7 +675,7 @@
                         "chicken_caecum",
                         "global"
                     ],
-                    "description": "SemiBin environment model for binning.",
+                    "description": "SemiBin2 pre-trained environment model for per-sample assemblies. Default human_gut, with a launch warning when not set: use global for samples that are not from a human gut.",
                     "fa_icon": "fas fa-globe"
                 },
                 "semibin_coassembly_mode": {

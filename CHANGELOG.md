@@ -468,6 +468,13 @@ next release is tagged.
 
 ### Changed
 
+- **Launch warning for the default per-sample SemiBin2 model.** Per-sample
+  SemiBin2 uses a model pre-trained on one environment, `human_gut` unless
+  `--semibin_env_model` says otherwise. When binning runs per sample with
+  SemiBin2 and the parameter is not set, the run now warns at launch and
+  suggests `global` for samples that are not from a human gut. Its config
+  default is now empty (null; `human_gut` is still applied), so an explicit
+  `--semibin_env_model human_gut` gives no warning. Bins do not change.
 - **Run summary report: a multi-page HTML site and a PDF** (`00_summary/`).
   The one-page `results_summary.html` is replaced by an offline HTML report in
   `report/` (`results_summary.html` now opens `report/index.html`): an

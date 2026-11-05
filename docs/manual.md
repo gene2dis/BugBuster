@@ -744,7 +744,7 @@ per-sample depths raised MetaBAT2's MIMAG high-quality bins from 11 to 23
 | `--metabat_minContig` | `2500` | Minimum contig length for MetaBAT2 |
 | `--bin_min_completeness` | `50` | Minimum CheckM2 completeness (%) of a refined bin (used when ≥2 binners; was `--metawrap_completeness`, still accepted with a warning) |
 | `--bin_max_contamination` | `10` | Maximum CheckM2 contamination (%) of a refined bin (used when ≥2 binners; was `--metawrap_contamination`, still accepted with a warning) |
-| `--semibin_env_model` | `human_gut` | SemiBin environment model |
+| `--semibin_env_model` | `human_gut` | SemiBin2 pre-trained model for per-sample assemblies; when not set, the run warns at launch (use `global` for samples that are not from a human gut) |
 | `--semibin_coassembly_mode` | `pretrained` | Co-assembly: SemiBin2 pre-trained model on the pooled BAM (`pretrained`) or a model trained on the co-assembly (`train_self`, ~40× the CPU time) |
 | `--semibin_coassembly_env_model` | `global` | SemiBin2 pre-trained model for the co-assembly |
 | `--semibin_random_seed` | `11` | SemiBin2 `--random-seed`, so reruns give the same bins |

@@ -241,6 +241,13 @@ workflow {
         error("Invalid binner(s): ${invalid_binners.join(', ')}. Valid options: ${valid_binners.join(', ')}")
     }
 
+    // Per-sample SemiBin2 uses a model pre-trained on one environment; the
+    // default (human_gut) suits few other samples. --semibin_env_model is null
+    // unless the user sets it, so an explicit human_gut gives no warning
+    if (flagOn(params.include_binning) && params.assembly_mode == 'assembly' && 'semibin' in binners_list && !params.semibin_env_model) {
+        log.warn "SemiBin2 bins each per-sample assembly with its pre-trained human_gut model (--semibin_env_model not set). For samples that are not from a human gut, pass --semibin_env_model global, or the model of their environment (dog_gut, ocean, soil, cat_gut, human_oral, mouse_gut, pig_gut, built_environment, wastewater, chicken_caecum)"
+    }
+
     // --metawrap_completeness / --metawrap_contamination name MetaWRAP's
     // cutoffs, which Binette took over: still accepted, with a warning (BINETTE
     // reads them when the new param is not given). Both given with different
