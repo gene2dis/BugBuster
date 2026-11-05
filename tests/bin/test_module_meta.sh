@@ -110,9 +110,10 @@ for d in sorted(p for p in root.iterdir() if p.is_dir()):
 # modules, workflows and config files choose the singularity image the same
 # way for both engines (an == or != against one of them leaves the other out)
 repo = root.parent.parent
-engine_eq = re.compile(r"containerEngine\s*[!=]=\s*['\"](singularity|apptainer)")
-files = [repo / 'main.nf', repo / 'nextflow.config', *repo.glob('modules/local/*/main.nf'),
-         *repo.glob('subworkflows/local/*.nf'), *repo.glob('conf/**/*.config'),
+engine_eq = re.compile(r"containerEngine\s*[!=]=\s*['\"](singularity|apptainer)"
+                       r"|['\"](singularity|apptainer)['\"]\s*[!=]=\s*workflow\.containerEngine")
+files = [repo / 'main.nf', repo / 'nextflow.config', *repo.glob('modules/local/**/*.nf'),
+         *repo.glob('subworkflows/local/**/*.nf'), *repo.glob('conf/**/*.config'),
          *repo.glob('config/**/*.config')]
 for f in sorted(files):
     for n, line in enumerate(f.read_text().splitlines(), 1):

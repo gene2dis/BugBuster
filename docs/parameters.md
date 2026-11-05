@@ -1179,8 +1179,8 @@ These parameters are read by the execution profiles in `conf/` (`-profile aws`, 
 | `--slurm_queue_short` / `--slurm_queue_long` | — | Partitions for short/long jobs |
 | `--slurm_account` | — | Account for job submission |
 | `--slurm_queue_size` | `100` | Executor queue size |
-| `--singularity_cache` | — | Singularity image cache directory |
-| `--singularity_run_options` | — | Extra singularity run options |
+| `--singularity_cache` | — | Singularity/Apptainer image cache directory |
+| `--singularity_run_options` | — | Extra singularity/apptainer run options |
 
 ---
 

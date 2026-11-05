@@ -62,6 +62,12 @@ nextflow run main.nf \
     --singularity_cache '/shared/containers'
 ```
 
+With Apptainer, use `-profile slurm,apptainer`, with `slurm` first: `conf/slurm.config` turns the
+singularity engine on, and only an `apptainer` profile applied after it turns that off again
+(`apptainer,slurm` enables both engines and Nextflow refuses to start). `--singularity_cache` and
+`--singularity_run_options` apply to Apptainer too. Singularity needs version 3.6 or later (or any
+Apptainer): the pipeline passes `--env` to some tasks.
+
 ### Creating an Institutional Profile
 
 `conf/institutional.config` is a **template only** — no `institutional` profile is defined in `nextflow.config`, so it must be either registered as a profile (steps below) or passed directly with `-c conf/my_institution.config`.
