@@ -38,4 +38,21 @@ class TestData {
         table.text = text
         return table.absolutePath
     }
+
+    // Every file a run published under outputDir, relative to it, without the
+    // run-specific pipeline_info reports and the test's own samplesheets: the
+    // list to compare with a tests/data/stub_paths/ file
+    static List<String> publishedPaths(outputDir) {
+        def out = new File("${outputDir}")
+        def published = []
+        out.eachFileRecurse { f ->
+            if (f.isFile()) {
+                def rel = out.toPath().relativize(f.toPath()).toString()
+                if (!(rel ==~ /pipeline_info\/(execution_|pipeline_dag|params_).*/) && !rel.startsWith('local_test_samplesheet')) {
+                    published << rel
+                }
+            }
+        }
+        return published
+    }
 }
