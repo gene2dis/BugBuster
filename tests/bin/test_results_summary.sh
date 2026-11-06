@@ -464,6 +464,17 @@ plain, cv = m[m["batch"] == "plain"], m[m["batch"] == "cv"]
 assert not plain.empty and (plain["arg_genes_viral_checkv_high"] == "").all(), plain
 assert set(cv["arg_genes_viral_checkv_high"]) == {"0", "1"}, cv
 PYEOF
+# a CheckV batch whose contig table has no ARG rows, merged with a batch without CheckV: no CheckV columns to count
+# on (this stopped the summary with KeyError: 'checkv_quality')
+cp -r co1_cv co1_cv_noarg
+py - co1_cv_noarg/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv <<'PYEOF'
+import sys
+import pandas as pd
+t = pd.read_csv(sys.argv[1], sep="\t", dtype=str, keep_default_na=False)
+t[t["ARG_gene"] == ""].to_csv(sys.argv[1], sep="\t", index=False)
+PYEOF
+check "CheckV: a CheckV batch without ARGs merged with one without CheckV" \
+    documented cv_noarg_out --results co1_cv_noarg/results co2/results --batch-labels cv plain --min-clean-pairs 10000
 
 
 # a metadata table with a byte-order mark and spaces around its names and values reads as the trimmed one
@@ -998,6 +1009,10 @@ for out, ran in (("st_asm_out", False), ("st_asm_gunc_out", True)):
     for doc in ("README.md", "LLM_GUIDE.md"):
         text = open(f"{out}/{doc}").read()
         assert ("finds chimeras across distant lineages" in text) == ran, (out, doc)
+report = "".join(open(p).read() for p in __import__("glob").glob("st_asm_gunc_out/report/*.html"))
+assert "finds chimeras across distant lineages" in report, "GUNC caveat not in the HTML report"
+assert "finds chimeras across distant lineages" not in "".join(
+    open(p).read() for p in __import__("glob").glob("st_asm_out/report/*.html"))
 readme = open("st_asm_gunc_out/README.md").read()
 row = next(line for line in readme.splitlines() if line.startswith("| MAG chimerism (GUNC)"))
 assert "| ran |" in row, row

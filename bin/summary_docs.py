@@ -793,11 +793,16 @@ STAGE_PITFALLS = {
 }
 
 
-def pitfalls(ctx):
-    """PITFALLS plus the caveats of the optional stages that ran."""
+def stage_pitfalls(ctx):
+    """The caveats of the optional stages that ran in some batch (README, LLM guide and the report)."""
     ran = {st["key"] for statuses in ctx.get("stage_status", {}).values() for st, status in statuses
            if status.startswith("ran")}
-    return PITFALLS + [text for key, text in STAGE_PITFALLS.items() if key in ran]
+    return [text for key, text in STAGE_PITFALLS.items() if key in ran]
+
+
+def pitfalls(ctx):
+    """PITFALLS plus the caveats of the optional stages that ran."""
+    return PITFALLS + stage_pitfalls(ctx)
 
 def stage_rows(stage_status_by_batch):
     """[[stage, status per batch ..., what the summary takes]] for the README / guide stage table."""

@@ -19,7 +19,8 @@ CHECKV = {"checkv_quality"}
 # not_determined
 CHECKV_TIERS = {"Complete": "high", "High-quality": "high", "Medium-quality": "medium", "Low-quality": "low",
                 "Not-determined": "not_determined"}
-CHECKV_COUNTS = [f"arg_genes_viral_checkv_{t}" for t in ("high", "medium", "low", "not_determined")]
+CHECKV_TIER_ORDER = ["high", "medium", "low", "not_determined"]
+CHECKV_COUNTS = [f"arg_genes_viral_checkv_{t}" for t in CHECKV_TIER_ORDER]
 RANKS = ["superkingdom", "phylum", "class", "order", "family", "genus", "species"]
 MAPPING_COLUMNS = ["#ARG", "read_id", "predicted_ARG-class"]
 GENE_ABUNDANCE_COLUMNS = ["sample_id", "gene_id", "assembly_mode", "count", "length_bp", "tpm", "cpge"]
@@ -64,9 +65,8 @@ def has_checkv(df):
 def checkv_tier(value):
     """The best CheckV tier of a contig table cell (';'-joined for a gene in several proviruses), as a count
     column suffix."""
-    order = list(dict.fromkeys(CHECKV_TIERS.values()))
     tiers = [CHECKV_TIERS.get(v, "not_determined") for v in str(value).split(";")]
-    return min(tiers, key=order.index)
+    return min(tiers, key=CHECKV_TIER_ORDER.index)
 
 
 def contig_mobile_table(parts):
@@ -75,10 +75,11 @@ def contig_mobile_table(parts):
     batch is part of the key: every co-assembly is called 'coassembly'. None when no batch has the geNomad
     columns. With CheckV's columns in some batch, the genes on virus contigs or in proviruses are also counted by
     CheckV tier (a gene in several proviruses at its best one); blank for a batch without CheckV."""
-    with_checkv = any(has_checkv(p) for _, p in parts)
     parts = [p.assign(batch=label, _checkv=has_checkv(p)) for label, p in parts if has_genomad(p) and not p.empty]
     if not parts:
         return None
+    # from the batches kept: a CheckV batch without ARG rows adds no column to count on
+    with_checkv = any(p["_checkv"].iat[0] for p in parts)
     df = pd.concat(parts, ignore_index=True)
     df["on_plasmid"] = df["mobile_class"] == "plasmid"
     df["on_virus"] = df["mobile_class"] == "virus"
