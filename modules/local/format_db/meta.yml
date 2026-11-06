@@ -93,6 +93,18 @@ processes:
           description: geNomad database directory
           pattern: "genomad_db"
 
+  - name: FORMAT_GUNC_DB
+    description: Runs bin/gunc_db_reformat.sh - downloads the GUNC DIAMOND reference GUNC 1.1.1's download_db fetches (Zenodo), checks the md5 of the .gz and of the unpacked .dmnd, which keeps GUNC's file name (GUNC reads the reference from it)
+    input:
+      - key:
+          type: value
+          description: GUNC reference registry key (params.gunc_db)
+    output:
+      - gunc_db:
+          type: file
+          description: GUNC DIAMOND reference
+          pattern: "gunc_db_*.dmnd"
+
   - name: DOWNLOAD_DEEPARG_DB
     description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date
     input: []

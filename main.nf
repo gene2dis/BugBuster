@@ -65,6 +65,7 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
+      --gunc_prediction             GUNC chimerism check of the refined MAGs; needs --include_binning (default: ${params.gunc_prediction})
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
@@ -171,6 +172,7 @@ include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
+include { GUNC_RUN                 } from './modules/local/gunc_run/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
@@ -300,6 +302,9 @@ workflow {
             error("--megahit_k_list ${params.megahit_k_list}: MEGAHIT needs odd k values from 15 to 255, at most 28 apart")
         }
     }
+    if (flagOn(params.gunc_prediction) && !flagOn(params.include_binning)) {
+        error("--gunc_prediction requires --include_binning (GUNC checks the refined bins)")
+    }
     if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
@@ -417,6 +422,7 @@ workflow {
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
+    log.info "  GUNC (chimeras)      : ${params.gunc_prediction}"
     log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
@@ -642,6 +648,29 @@ workflow {
                 ch_gtdbtk_reports,
                 BINNING.out.bin_depth
             )
+
+            //
+            // MODULE: GUNC chimerism check of each assembly's refined bins
+            // (roadmap Phase 16, G1), next to their CheckM2 report. A bin set
+            // can be empty (Binette or SemiBin write only SKIPPED.txt when
+            // nothing passes): those assemblies are skipped
+            //
+            if ( flagOn(params.gunc_prediction) ) {
+                GUNC_RUN(
+                    ch_refined_bins.filter { meta, bins ->
+                        def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
+                        if ( !has_bins ) {
+                            log.warn "No refined bins for ${meta.id}: skipping GUNC"
+                        }
+                        has_bins
+                    },
+                    PREPARE_DATABASES.out.gunc_db
+                        .ifEmpty { error "ERROR: GUNC database is empty. Ensure --gunc_prediction is enabled and a valid GUNC database is configured (--gunc_db, or --custom_gunc_db)." }
+                        .first()
+                )
+                ch_summary_reports = ch_summary_reports.mix(GUNC_RUN.out.maxcss.map { _meta, table -> table })
+                ch_versions = ch_versions.mix(GUNC_RUN.out.versions.first())
+            }
 
             //
             // MODULE: contig -> refined bin, for the bin columns of the

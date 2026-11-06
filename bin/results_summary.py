@@ -472,7 +472,8 @@ def main(argv=None):
                                 ("genomad", has_genomad(contig_args)), ("assembly", assembly is not None),
                                 ("binning", mags is not None), ("bin_arg", clusters is not None),
                                 ("contig_functional", cfunc is not None),
-                                ("mag_functional", mags is not None and mags["bakta"])) if v}
+                                ("mag_functional", mags is not None and mags["bakta"]),
+                                ("gunc", mags is not None and mags.get("gunc", False))) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,

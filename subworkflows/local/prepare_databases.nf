@@ -14,6 +14,7 @@ include { FORMAT_METABULI_DB      } from '../../modules/local/format_db/main'
 include { FORMAT_GENOMAD_DB       } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
+include { FORMAT_GUNC_DB          } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
@@ -44,6 +45,7 @@ workflow PREPARE_DATABASES {
     ch_genomad_db       = channel.empty()
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
+    ch_gunc_db          = channel.empty()
     ch_rgi_card_db      = channel.empty()
     ch_kmarvel_db       = channel.empty()
     ch_eggnog_db        = channel.empty()
@@ -245,6 +247,17 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // GUNC's DIAMOND reference for the chimerism check of the refined MAGs
+    //
+    if ( flagOn(params.gunc_prediction) ) {
+        if ( params.custom_gunc_db ) {
+            ch_gunc_db = channel.fromPath(params.custom_gunc_db, type: 'file', checkIfExists: true)
+        } else {
+            ch_gunc_db = FORMAT_GUNC_DB(channel.of(params.gunc_db)).gunc_db
+        }
+    }
+
+    //
     // eggNOG 7 data for contig-level functional annotation (eggNOG-mapper v3)
     //
     if ( flagOn(params.contig_level_functional) ) {
@@ -390,6 +403,7 @@ workflow PREPARE_DATABASES {
     genomad_db             = ch_genomad_db
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
+    gunc_db                = ch_gunc_db
     rgi_card_db            = ch_rgi_card_db
     kmarvel_db             = ch_kmarvel_db
     eggnog_db              = ch_eggnog_db

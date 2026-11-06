@@ -198,6 +198,34 @@ process FORMAT_CHECKM2_DB {
         """
 }
 
+process FORMAT_GUNC_DB {
+    tag "format_gunc_db"
+    container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
+
+    label 'process_download'
+
+    input:
+        val(key)
+
+    output:
+        path("${params.gunc_ref_db[key]["file"]}"), emit: gunc_db
+
+    script:
+        def entry = params.gunc_ref_db[key]
+        """
+        ${entry["fmtscript"]} \
+            '${entry["url"]}' \
+            '${entry["gz_md5"]}' \
+            '${entry["file"]}' \
+            '${entry["md5"]}'
+        """
+
+    stub:
+        """
+        touch ${params.gunc_ref_db[key]["file"]}
+        """
+}
+
 process DOWNLOAD_GTDBTK_DB {
     tag "download_gtdbtk_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'

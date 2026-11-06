@@ -1,0 +1,43 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    GUNC_RUN Module Test
+
+    Stub only: a real run needs GUNC's 13.5 GB proGenomes reference (checked
+    on real bins in the roadmap Phase 16 harness). The stub writes the
+    maxCSS-level header GUNC 1.1.1 writes, under the assembly's name.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test GUNC_RUN Process"
+    script "../../modules/local/gunc_run/main.nf"
+    process "GUNC_RUN"
+
+    test("stub: the maxCSS-level table under the assembly's name") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA', coassembly: false ],
+                    file("${projectDir}/tests/data/bins/overlap_bins", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/bins/overlap_depth.txt", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def table = process.out.maxcss.get(0)[1]
+            assert new File(table.toString()).name == 'sampleA_gunc_maxCSS_level.tsv'
+            def header = path(table).readLines()[0].split('\t') as List
+            assert header[0] == 'genome'
+            assert ['clade_separation_score', 'contamination_portion', 'reference_representation_score', 'pass.GUNC'].every { c -> c in header }
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('gunc: 1.1.1') && versions.contains('diamond: 2.1.24')
+        }
+    }
+}

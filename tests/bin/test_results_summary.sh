@@ -890,6 +890,49 @@ assert ab.at[("binette_bin10", "sampleA"), "mean_depth_x"] == 7.25, ab
 assert ab.at[("binette_bin2", "sampleA"), "mean_depth_x"] == 0.5, ab
 assert len(ab) == 2, ab
 PYEOF
+# GUNC (--gunc_prediction, roadmap Phase 16 G1): its maxCSS-level table adds four mags columns after tier_basis and
+# changes nothing else; bin10 passes, bin2 fails, a third genome GUNC could not score is not a MAG of the run
+cp -r st_asm st_asm_gunc
+mkdir -p st_asm_gunc/results/04_binning/per_sample/sampleA/quality/gunc
+printf '%s\n' \
+    $'genome\tn_genes_called\tn_genes_mapped\tn_contigs\ttaxonomic_level\tproportion_genes_retained_in_major_clades\tgenes_retained_index\tclade_separation_score\tcontamination_portion\tn_effective_surplus_clades\tmean_hit_identity\treference_representation_score\tpass.GUNC' \
+    $'binette_bin10\t2422\t2101\t174\tkingdom\t0.99\t0.86\t0.0\t0.0\t0.0\t0.82\t0.71\tTrue' \
+    $'binette_bin2\t3094\t2950\t68\tgenus\t0.93\t0.89\t0.62\t0.21\t0.35\t0.88\t0.79\tFalse' \
+    $'binette_bin99\t40\t8\t3\tkingdom\tnan\tnan\tnan\tnan\tnan\tnan\tnan\tnan' \
+    > st_asm_gunc/results/04_binning/per_sample/sampleA/quality/gunc/sampleA_gunc_maxCSS_level.tsv
+# the same batch label as the run without GUNC (it is taken from the directory name otherwise)
+check "GUNC: every column documented" \
+    documented st_asm_gunc_out --results st_asm_gunc/results --batch-labels st_asm --min-clean-pairs 10000
+check "GUNC: mags columns after tier_basis, the tier unchanged, every other table identical" \
+    py - <<'PYEOF'
+import filecmp, os
+import pandas as pd
+old = pd.read_csv("st_asm_out/tables/mags.tsv", sep="\t", keep_default_na=False)
+new = pd.read_csv("st_asm_gunc_out/tables/mags.tsv", sep="\t", keep_default_na=False)
+gunc = ["gunc_pass", "clade_separation_score", "contamination_portion", "reference_representation_score"]
+assert not set(gunc) & set(old.columns), old.columns
+i = list(old.columns).index("tier_basis") + 1
+assert list(new.columns) == list(old.columns)[:i] + gunc + list(old.columns)[i:], new.columns
+assert new.drop(columns=gunc).equals(old), "GUNC changed another mags column"
+g = pd.read_csv("st_asm_gunc_out/tables/mags.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("bin")
+assert g.at["binette_bin10", "gunc_pass"] == "True" and g.at["binette_bin2", "gunc_pass"] == "False", g[gunc]
+assert g.at["binette_bin2", "clade_separation_score"] == "0.62" and g.at["binette_bin2", "contamination_portion"] == "0.21"
+assert g.at["binette_bin10", "reference_representation_score"] == "0.71"
+assert "binette_bin99" not in g.index
+tables = sorted(os.listdir("st_asm_out/tables"))
+assert tables == sorted(os.listdir("st_asm_gunc_out/tables")), "GUNC changed the table list"
+differ = [t for t in tables if not filecmp.cmp(f"st_asm_out/tables/{t}", f"st_asm_gunc_out/tables/{t}", shallow=False)]
+assert differ == ["mags.tsv"], differ
+PYEOF
+check "GUNC: its caveat and stage in README / LLM_GUIDE only when it ran" py - <<'PYEOF'
+for out, ran in (("st_asm_out", False), ("st_asm_gunc_out", True)):
+    for doc in ("README.md", "LLM_GUIDE.md"):
+        text = open(f"{out}/{doc}").read()
+        assert ("finds chimeras across distant lineages" in text) == ran, (out, doc)
+readme = open("st_asm_gunc_out/README.md").read()
+row = next(line for line in readme.splitlines() if line.startswith("| MAG chimerism (GUNC)"))
+assert "| ran |" in row, row
+PYEOF
 # co-assembly groups (--coassembly_group_by, roadmap Phase 15): the co-assembly fixture laid out as two groups,
 # g1 = sampleC and g2 = sampleD (stages/coassembly_groups, made by tests/bin/make_grouped_summary_tree.py), and a
 # second batch of the same groups with other sample names
