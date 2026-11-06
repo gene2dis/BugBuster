@@ -2,8 +2,12 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     GUNC_RUN Module Test
 
-    Stub only: a real run needs GUNC's 13.5 GB proGenomes reference (checked
-    on real bins in the roadmap Phase 16 harness). The stub writes the
+    The real reference is 13.5 GB (checked on real bins in the roadmap Phase 16
+    harness). Here GUNC runs for real against a 20-protein stand-in
+    (tests/data/gunc/, tests/bin/make_gunc_fixtures.sh) on two bins whose
+    names contain '.fa' (sample 'soil.fall21'): GUNC itself cuts a name at its
+    first '.fa', which made both 'soil' and stopped it, so the module stages the
+    bins under neutral names and maps them back. The stub writes the
     maxCSS-level header GUNC 1.1.1 writes, under the assembly's name.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
@@ -13,6 +17,31 @@ nextflow_process {
     name "Test GUNC_RUN Process"
     script "../../modules/local/gunc_run/main.nf"
     process "GUNC_RUN"
+
+    test("bin names with '.fa' in them keep their names (the CheckM2 Name)") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'soil.fall21', coassembly: false ],
+                    file("${projectDir}/tests/data/gunc/soil.fall21_metabat_bins", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/gunc/gunc_db_progenomes2.1.dmnd", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def table = process.out.maxcss.get(0)[1]
+            assert new File(table.toString()).name == 'soil.fall21_gunc_maxCSS_level.tsv'
+            def rows = path(table).readLines()
+            assert rows[0].startsWith('genome\tn_genes_called\t') && rows[0].endsWith('\treference_representation_score\tpass.GUNC')
+            assert rows.drop(1).collect { r -> r.split('\t')[0] }.sort() == ['soil.fall21_metabat_bin.1', 'soil.fall21_metabat_bin.2']
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('gunc: 1.1.1') && versions.contains('diamond: 2.1.24') && versions.contains('gunc_db: progenomes_2.1')
+        }
+    }
 
     test("stub: the maxCSS-level table under the assembly's name") {
         options "-stub"

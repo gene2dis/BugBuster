@@ -235,7 +235,8 @@ process FORMAT_GUNC_DB {
     tag "format_gunc_db"
     container 'community.wave.seqera.io/library/wget:1.21.4--c8b4f4320c34b13d'
 
-    label 'process_download'
+    // gtdb_214 is a 37.9 GB download, then a single-threaded gunzip and two md5 passes
+    label 'process_download_extensive'
 
     input:
         val(key)

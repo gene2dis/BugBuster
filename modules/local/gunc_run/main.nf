@@ -7,8 +7,9 @@
     and the clade separation score at the taxonomic level where the genes
     split the most (the maxCSS level). It finds chimeras across distant
     lineages that CheckM2's completeness and contamination can miss. A bin is
-    one *.fa file; its GUNC genome name is the file name without .fa, the
-    same as CheckM2's Name.
+    one *.fa file; its genome name in the table is the file name without .fa,
+    the same as CheckM2's Name (GUNC itself cuts a name at its first '.fa',
+    so the bins go in as bin_<n>.fa and the names are mapped back).
 
     Input:
         tuple val(meta), path(bins)  - refined bin directory (*.fa)
@@ -47,9 +48,18 @@ process GUNC_RUN {
     """
     set -euo pipefail
 
-    mkdir -p gunc_out gunc_tmp
+    # each bin under a neutral name, mapped back after the run: GUNC names a
+    # genome by the part of its file name before the first '.fa', which a
+    # sample id can contain ('soil.fall21_metabat_bin.1.fa')
+    mkdir -p gunc_in gunc_out gunc_tmp
+    n=0
+    for bin in ${bins}/*.fa; do
+        n=\$((n + 1))
+        ln -s "\$(readlink -f "\$bin")" gunc_in/bin_\$n.fa
+        printf 'bin_%s\t%s\n' "\$n" "\$(basename "\$bin" .fa)" >> bin_names.tsv
+    done
     gunc run \\
-        --input_dir ${bins} \\
+        --input_dir gunc_in \\
         --file_suffix .fa \\
         --db_file ${db} \\
         --threads ${task.cpus} \\
@@ -62,8 +72,10 @@ process GUNC_RUN {
     table=\$(ls gunc_out/GUNC.*.maxCSS_level.tsv)
     reference=\$(basename "\$table" .maxCSS_level.tsv)
     reference=\${reference#GUNC.}
-    mv "\$table" ${prefix}_gunc_maxCSS_level.tsv
-    rm -rf gunc_out gunc_tmp
+    awk -F '\\t' -v OFS='\\t' 'NR == FNR { name[\$1] = \$2; next }
+        FNR > 1 { if (!(\$1 in name)) { print "GUNC_RUN: unknown genome " \$1 > "/dev/stderr"; exit 1 } \$1 = name[\$1] }
+        { print }' bin_names.tsv "\$table" > ${prefix}_gunc_maxCSS_level.tsv
+    rm -rf gunc_in gunc_out gunc_tmp bin_names.tsv
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

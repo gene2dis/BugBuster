@@ -52,8 +52,9 @@ process CHECKV_ENDTOEND {
     set -euo pipefail
 
     # count every header: 'grep -q' would stop at the first one and gzip die
-    # of SIGPIPE, which pipefail reads as no sequences
-    n_viruses=\$(gzip -cdf ${viruses} | grep -c '^>' || true)
+    # of SIGPIPE, which pipefail reads as no sequences; awk exits 0 on no
+    # match, so a gzip failure (a corrupt file) still stops the task
+    n_viruses=\$(gzip -cdf ${viruses} | awk '/^>/ { n++ } END { print n + 0 }')
     if [ "\$n_viruses" -gt 0 ]; then
         checkv end_to_end \\
             ${viruses} \\

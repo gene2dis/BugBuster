@@ -7,7 +7,8 @@
     module writes a header-only quality summary and never calls CheckV, so
     that path runs here for real: tests/data/checkv/no_viruses.fna.gz is an
     empty gzip and tests/data/checkv/db/ holds only the README line the
-    version is read from.
+    version is read from. A truncated gzip must fail the task, not read as a
+    FASTA without viruses.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -38,6 +39,25 @@ nextflow_process {
             assert summary[0].contains('\tcheckv_quality\t') && summary[0].contains('\tcompleteness\t')
             def versions = path(process.out.versions.get(0)).text
             assert versions.contains('checkv: 1.1.1') && versions.contains('checkv_db: 1.5')
+        }
+    }
+
+    test("a corrupt virus FASTA fails the task instead of reading as no viruses") {
+        // tests/data/checkv/truncated_viruses.fna.gz: the first half of a gzip
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA', coassembly: false ],
+                    file("${projectDir}/tests/data/checkv/truncated_viruses.fna.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/checkv/db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
         }
     }
 
