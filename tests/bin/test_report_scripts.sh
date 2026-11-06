@@ -653,6 +653,32 @@ NEXT_WORKDIR="${ACGE_WORK}"
 expect_pass "arg_contig_level_report: empty geNomad files (stub) still give the columns" arg_contig_level_report.py
 check_grep "arg_contig_level_report: empty geNomad files give chromosome" "Contig_tax_and_arg_prediction.tsv" \
     "^test_sample2	k141_0	.*	chromosome						ACRA	"
+# CheckV on geNomad's virus FASTA (--checkv_prediction, roadmap Phase 16 G2): the virus contig k141_231 and the
+# provirus region k141_0|provirus_200_900, which ACRA overlaps, get CheckV's columns after geNomad's
+ACC_WORK="${WORK}/arg_contig_level_report_checkv"
+mkdir -p "${ACC_WORK}"
+cp "${ACG_WORK}"/test_sample2_* "${ACG_WORK}/test_sample2.gff.gz" "${ACC_WORK}/"
+rm -f "${ACC_WORK}/Contig_tax_and_arg_prediction.tsv"
+printf "contig_id\tcontig_length\tprovirus\tproviral_length\tgene_count\tviral_genes\thost_genes\tcheckv_quality\tmiuvig_quality\tcompleteness\tcompleteness_method\tcontamination\tkmer_freq\twarnings\nk141_231\t1018\tNo\tNA\t2\t2\t0\tLow-quality\tGenome-fragment\t3.12\tAAI-based (medium-confidence)\t0.0\t1.0\t\nk141_0|provirus_200_900\t701\tYes\t650\t1\t1\t0\tNot-determined\tGenome-fragment\tNA\tNA\t7.15\t1.0\tno viral genes detected\n" \
+    > "${ACC_WORK}/test_sample2_checkv_quality_summary.tsv"
+NEXT_WORKDIR="${ACC_WORK}"
+expect_pass "arg_contig_level_report: with CheckV quality summaries" arg_contig_level_report.py
+check_grep "arg_contig_level_report: CheckV columns after geNomad's" "Contig_tax_and_arg_prediction.tsv" \
+    "	plasmid_conjugation_genes	checkv_quality	checkv_completeness	checkv_contamination	checkv_provirus	ARG_gene	"
+check_grep "arg_contig_level_report: virus contig gets its CheckV row" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_231	.*	virus	.*	Low-quality	3.12	0.0	No	BCRA	"
+check_grep "arg_contig_level_report: ARG gene in a provirus gets the region's CheckV row" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	200-900	.*	Not-determined	NA	7.15	Yes	ACRA	"
+check_grep "arg_contig_level_report: ARG gene outside the provirus has no CheckV values" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200								TETM	"
+check_grep "arg_contig_level_report: plasmid contig has no CheckV values" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_820	.*	MOBQ					MEFA	"
+ACCN_WORK="${WORK}/arg_contig_level_report_checkv_no_genomad"
+mkdir -p "${ACCN_WORK}"
+cp "${ACR_WORK}"/test_sample2_* "${ACC_WORK}/test_sample2_checkv_quality_summary.tsv" "${ACCN_WORK}/"
+rm -f "${ACCN_WORK}/Contig_tax_and_arg_prediction.tsv"
+NEXT_WORKDIR="${ACCN_WORK}"
+expect_fail "arg_contig_level_report: CheckV tables without geNomad's fail" arg_contig_level_report.py
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

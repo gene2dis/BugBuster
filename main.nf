@@ -71,6 +71,7 @@ def printHelp() {
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) (default: ${params.contig_tax_and_arg})
       --genomad_prediction          Classify contigs as chromosome / plasmid / virus with geNomad (default: ${params.genomad_prediction})
+      --checkv_prediction           CheckV quality of geNomad's viruses and proviruses; needs --genomad_prediction (default: ${params.checkv_prediction})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
@@ -173,6 +174,7 @@ include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_repo
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
 include { GUNC_RUN                 } from './modules/local/gunc_run/main'
+include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
@@ -302,6 +304,9 @@ workflow {
             error("--megahit_k_list ${params.megahit_k_list}: MEGAHIT needs odd k values from 15 to 255, at most 28 apart")
         }
     }
+    if (flagOn(params.checkv_prediction) && !flagOn(params.genomad_prediction)) {
+        error("--checkv_prediction requires --genomad_prediction (CheckV checks geNomad's virus contigs and proviruses)")
+    }
     if (flagOn(params.gunc_prediction) && !flagOn(params.include_binning)) {
         error("--gunc_prediction requires --include_binning (GUNC checks the refined bins)")
     }
@@ -428,6 +433,7 @@ workflow {
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  geNomad (mobile)     : ${params.genomad_prediction}"
+    log.info "  CheckV (viruses)     : ${params.checkv_prediction}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
     log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : params.read_level_functional == 'humann' ? " (${params.custom_humann_db ? 'custom database' : params.humann_db})" : ''}"
@@ -864,6 +870,22 @@ workflow {
         ch_genomad_tables = NFCORE_GENOMAD_ENDTOEND.out.aggregated_classification
             .mix(NFCORE_GENOMAD_ENDTOEND.out.plasmid_summary, NFCORE_GENOMAD_ENDTOEND.out.virus_summary)
             .map { _meta, table -> table }
+
+        //
+        // MODULE: CheckV quality of geNomad's virus contigs and proviruses
+        // (roadmap Phase 16, G2); with --contig_tax_and_arg its columns join
+        // the contig table next to geNomad's
+        //
+        if ( flagOn(params.checkv_prediction) ) {
+            CHECKV_ENDTOEND(
+                NFCORE_GENOMAD_ENDTOEND.out.virus_fasta,
+                PREPARE_DATABASES.out.checkv_db
+                    .ifEmpty { error "ERROR: CheckV database is empty. Ensure --checkv_prediction is enabled and a valid CheckV database is configured (--checkv_db, or --custom_checkv_db)." }
+                    .first()
+            )
+            ch_genomad_tables = ch_genomad_tables.mix(CHECKV_ENDTOEND.out.quality_summary.map { _meta, table -> table })
+            ch_versions = ch_versions.mix(CHECKV_ENDTOEND.out.versions.first())
+        }
     }
 
     //

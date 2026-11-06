@@ -304,6 +304,16 @@ TABLE_DOCS = {
             ("arg_genes_on_virus", "genes on contigs geNomad calls virus (whole contig)"),
             ("arg_genes_in_provirus", "genes overlapping a provirus region geNomad found inside a contig"),
             ("pct_mobile", "% of arg_genes on a plasmid or virus contig or in a provirus (each gene counted once)"),
+            ("arg_genes_viral_checkv_high", "CheckV (--checkv_prediction): of the genes on virus contigs or in "
+                                            "proviruses, those whose virus CheckV rates Complete or High-quality "
+                                            "(>= 90 % complete); a gene in several proviruses counts once, at its "
+                                            "best tier; blank for a batch without CheckV"),
+            ("arg_genes_viral_checkv_medium", "those whose virus CheckV rates Medium-quality (50-90 % complete)"),
+            ("arg_genes_viral_checkv_low", "those whose virus CheckV rates Low-quality (< 50 % complete)"),
+            ("arg_genes_viral_checkv_not_determined", "those CheckV could not rate (Not-determined: no reference "
+                                                      "match or viral HMM to estimate completeness from), or with no "
+                                                      "CheckV row; the four columns sum to arg_genes_on_virus + "
+                                                      "arg_genes_in_provirus"),
         ],
     },
     "function_read_long": {
@@ -774,6 +784,12 @@ STAGE_PITFALLS = {
             "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
             "quality_tier. Its reference (proGenomes 2.1, 2020; or GTDB r214) is older than GTDB r232: a MAG of a "
             "lineage the reference lacks has a low reference_representation_score and an unreliable call.",
+    "checkv": "CheckV's quality tiers (arg_contig_mobile arg_genes_viral_checkv_*, and the contig table's "
+              "checkv_quality) estimate how complete geNomad's virus or provirus is: completeness from amino-acid "
+              "identity to CheckV's genomes, else from its HMMs. Low-quality and Not-determined mean too short or too "
+              "novel to judge, not 'not a virus'; Complete needs terminal repeats or flanking host regions. A "
+              "provirus's tier is that of the region geNomad cut out, and CheckV may trim host genes from it "
+              "(checkv_provirus).",
 }
 
 

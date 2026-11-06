@@ -93,6 +93,15 @@ STAGES = [
         "needs": "contig_arg",
     },
     {
+        "key": "checkv", "title": "Virus quality (CheckV)",
+        "params": "--checkv_prediction (needs --genomad_prediction; ARG columns with --contig_tax_and_arg), --checkv_db",
+        "processes": ["CHECKV_ENDTOEND"],
+        "summary": "arg_contig_mobile columns arg_genes_viral_checkv_* (ARG genes on virus contigs and in proviruses "
+                   "by CheckV tier; needs --contig_tax_and_arg)",
+        # its columns come with the contig stage's table, as geNomad's do
+        "needs": "contig_arg",
+    },
+    {
         "key": "bin_arg", "title": "Bin-level ARG clustering (assembly DeepARG hits split by bin, MMseqs2)",
         "params": "--arg_bin_clustering (needs binning)",
         "processes": ["BIN_ARG_SPLIT", "ARG_FASTA_FORMATTER", "CLUSTERING"],

@@ -130,6 +130,39 @@ process FORMAT_GENOMAD_DB {
         """
 }
 
+process FORMAT_CHECKV_DB {
+    tag "format_checkv_db"
+    // the CheckV image: wget for the download, DIAMOND for the index CheckV
+    // searches (built as checkv download_database builds it)
+    container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
+        'https://depot.galaxyproject.org/singularity/checkv:1.1.1--pyh106432d_1' :
+        'quay.io/biocontainers/checkv:1.1.1--pyh106432d_1' }"
+
+    label 'process_download'
+
+    input:
+        val(key)
+
+    output:
+        path("checkv_db"), emit: checkv_db
+
+    script:
+        def entry = params.checkv_ref_db[key]
+        """
+        ${entry["fmtscript"]} \\
+            '${entry["url"]}' \\
+            '${entry["bytes"]}' \\
+            '${entry["version"]}'
+        """
+
+    stub:
+        """
+        mkdir -p checkv_db/genome_db checkv_db/hmm_db/checkv_hmms
+        touch checkv_db/genome_db/checkv_reps.dmnd checkv_db/genome_db/checkv_reps.tsv checkv_db/genome_db/checkv_error.tsv checkv_db/hmm_db/checkv_hmms.tsv
+        echo '## Verion 1.5 (stub)' > checkv_db/README.txt
+        """
+}
+
 process DOWNLOAD_DEEPARG_DB {
 
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] ?

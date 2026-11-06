@@ -393,9 +393,78 @@ unused = set(unused_doc_columns(tables, "subject"))
 allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_hosts"), ("samples_qc", "mean_read_length"),
            # the assembly and contig functional columns (tested on tests/data/summary/stages below)
            ("samples_qc", "pct_reads_on_genes"), ("samples_qc", "func_contig_genes_annotated_pct"),
-           ("samples_qc", "func_contig_annotated_by_abundance_pct")}
+           ("samples_qc", "func_contig_annotated_by_abundance_pct"),
+           # CheckV's tier counts (tested on a copy of this fixture with CheckV columns below)
+           ("arg_contig_mobile", "arg_genes_viral_checkv_high"), ("arg_contig_mobile", "arg_genes_viral_checkv_medium"),
+           ("arg_contig_mobile", "arg_genes_viral_checkv_low"),
+           ("arg_contig_mobile", "arg_genes_viral_checkv_not_determined")}
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
+
+# CheckV (--checkv_prediction, roadmap Phase 16 G2): its columns in the contig table add the CheckV tier counts to
+# arg_contig_mobile and change nothing else. The virus contig's BCRA is High-quality; ACRA sits in two proviruses,
+# Low- and Medium-quality, and counts once, at medium. Merged with a batch without CheckV, that batch's counts are
+# blank
+add_checkv() {
+    # add_checkv <contig table>: CheckV's four columns after geNomad's, filled for ACRA and BCRA
+    py - "$1" <<'PYEOF'
+import sys
+import pandas as pd
+p = sys.argv[1]
+t = pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False)
+i = list(t.columns).index("plasmid_conjugation_genes") + 1
+for k, c in enumerate(["checkv_quality", "checkv_completeness", "checkv_contamination", "checkv_provirus"]):
+    t.insert(i + k, c, "")
+acra = t["ARG_gene"] == "ACRA"
+t.loc[acra, ["provirus", "checkv_quality", "checkv_completeness", "checkv_contamination", "checkv_provirus"]] = \
+    ["200-900;1000-1200", "Low-quality;Medium-quality", "12.5;61.0", "0.0;3.2", "No;Yes"]
+t.loc[t["ARG_gene"] == "BCRA", ["checkv_quality", "checkv_completeness", "checkv_contamination", "checkv_provirus"]] = \
+    ["High-quality", "93.4", "0.0", "No"]
+t.to_csv(p, sep="\t", index=False)
+PYEOF
+}
+cp -r run1 run1_cv
+add_checkv run1_cv/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv
+check "the same tree without CheckV, plain options" \
+    documented docs_plain_out --results run1/results --batch-labels run1 --min-clean-pairs 10000
+check "CheckV: every column documented" \
+    documented run1_cv_out --results run1_cv/results --batch-labels run1 --min-clean-pairs 10000
+check "CheckV: tier counts appended to arg_contig_mobile, every other table identical" py - <<'PYEOF'
+import filecmp, os
+import pandas as pd
+old = pd.read_csv("out/tables/arg_contig_mobile.tsv", sep="\t")
+new = pd.read_csv("run1_cv_out/tables/arg_contig_mobile.tsv", sep="\t")
+cv = ["arg_genes_viral_checkv_high", "arg_genes_viral_checkv_medium", "arg_genes_viral_checkv_low",
+      "arg_genes_viral_checkv_not_determined"]
+assert list(new.columns) == list(old.columns) + cv, new.columns
+assert new[list(old.columns)].equals(old), "CheckV changed another arg_contig_mobile column"
+m = new.set_index("arg_class")
+assert list(m.loc["bacitracin", cv]) == [1, 0, 0, 0], m.loc["bacitracin"]
+assert list(m.loc["multidrug", cv]) == [0, 1, 0, 0], m.loc["multidrug"]
+assert list(m.loc["tetracycline", cv]) == [0, 0, 0, 0], m.loc["tetracycline"]
+assert (m[cv].sum(axis=1) == m["arg_genes_on_virus"] + m["arg_genes_in_provirus"]).all()
+# out/ ran with metadata and grouping options: compare with a run of run1 without them
+differ = [t for t in sorted(os.listdir("docs_plain_out/tables"))
+          if not filecmp.cmp(f"docs_plain_out/tables/{t}", f"run1_cv_out/tables/{t}", shallow=False)]
+assert differ == ["arg_contig_mobile.tsv"], differ
+md = open("run1_cv_out/README.md").read()
+assert "CheckV's quality tiers" in md and "CheckV's quality tiers" not in open("docs_plain_out/README.md").read()
+row = next(l for l in md.splitlines() if l.startswith("| Virus quality (CheckV)"))
+assert "| ran |" in row, row
+PYEOF
+# a co-assembly batch with CheckV merged with one without: the latter's tier counts are blank
+cp -r co1 co1_cv
+add_checkv co1_cv/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv
+check "CheckV: a batch without CheckV merged with one with it" \
+    documented cv_merge_out --results co1_cv/results co2/results --batch-labels cv plain --min-clean-pairs 10000
+check "CheckV: the batch without CheckV has blank tier counts" py - <<'PYEOF'
+import pandas as pd
+m = pd.read_csv("cv_merge_out/tables/arg_contig_mobile.tsv", sep="\t", dtype=str, keep_default_na=False)
+plain, cv = m[m["batch"] == "plain"], m[m["batch"] == "cv"]
+assert not plain.empty and (plain["arg_genes_viral_checkv_high"] == "").all(), plain
+assert set(cv["arg_genes_viral_checkv_high"]) == {"0", "1"}, cv
+PYEOF
+
 
 # a metadata table with a byte-order mark and spaces around its names and values reads as the trimmed one
 printf '\xef\xbb\xbfsample \t subject\nsampleA \t S1\n sampleB\tS2 \n' > padded_meta.tsv

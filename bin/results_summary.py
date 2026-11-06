@@ -79,7 +79,8 @@ from summary_bin_args import arg_cluster_sharing_table, arg_mag_long_table, load
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
 from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
-                             contig_mobile_table, has_genomad, load_arg_gene_abundance, load_contig_table)
+                             contig_mobile_table, has_checkv, has_genomad, load_arg_gene_abundance,
+                             load_contig_table)
 from summary_figures import (FigureWriter, fig_args, fig_arg_contig_hosts, fig_cog, fig_mag_abundance,  # noqa: E402
                              fig_mag_quality, fig_method_by_category, fig_method_upset, fig_qc, fig_sarg,
                              fig_taxonomy, fig_watchlist, short_count)
@@ -473,7 +474,8 @@ def main(argv=None):
                                 ("binning", mags is not None), ("bin_arg", clusters is not None),
                                 ("contig_functional", cfunc is not None),
                                 ("mag_functional", mags is not None and mags["bakta"]),
-                                ("gunc", mags is not None and mags.get("gunc", False))) if v}
+                                ("gunc", mags is not None and mags.get("gunc", False)),
+                                ("checkv", has_checkv(contig_args))) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
