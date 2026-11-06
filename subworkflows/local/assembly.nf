@@ -53,7 +53,7 @@ include { BWAMEM3_SAMTOOLS     } from '../../modules/local/bwamem3_samtools/main
 include { SAMTOOLS_MERGE as NFCORE_SAMTOOLS_MERGE } from '../../modules/nf-core/samtools/merge/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
 include { flagOn                } from './utils_params'
-include { coassemblyGroups      } from './utils_coassembly'
+include { coassemblyGroups; coassemblyLabel } from './utils_coassembly'
 
 workflow ASSEMBLY {
     take:
@@ -151,7 +151,7 @@ workflow ASSEMBLY {
         // group smaller, or empty, instead of waiting for it forever. Built once
         // for MEGAHIT (or BBNorm) and BBMAP.
         ch_coassembly_reads = reads
-            .map { meta, files -> [(groups[meta.id] ?: 'coassembly'), meta, files] }
+            .map { meta, files -> [coassemblyLabel(groups, meta.id), meta, files] }
             .groupTuple(by: 0)
             .map { label, metas, files_list ->
                 def members = [metas, files_list].transpose().sort { a, b -> a[0].id <=> b[0].id }
@@ -204,7 +204,10 @@ workflow ASSEMBLY {
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
             // [group label, sample meta + its group, reads, its co-assembly's contigs]
             ch_per_sample_input = reads
-                .map { meta, files -> [(groups[meta.id] ?: 'coassembly'), meta + [group: (groups[meta.id] ?: 'coassembly')], files] }
+                .map { meta, files ->
+                    def label = coassemblyLabel(groups, meta.id)
+                    [label, meta + [group: label], files]
+                }
                 .combine(BBMAP.out.contigs_only.map { meta, contigs -> [meta.id, contigs] }, by: 0)
 
             if ( params.read_aligner == 'bwamem3' ) {

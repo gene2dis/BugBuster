@@ -13,6 +13,8 @@
 ----------------------------------------------------------------------------------------
 */
 
+include { get_sample_ids } from './input_check'
+
 /**
  * Sample -> co-assembly label under --coassembly_group_by, [:] without it.
  * Stops the run (error) on any problem with the param, the table or the
@@ -30,11 +32,9 @@ def coassemblyGroups() {
         error("--coassembly_group_by ${column} names a column of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
     }
 
-    // The samplesheet's sample ids, as INPUT_CHECK reads them
-    def samples = file(params.input, checkIfExists: true)
-        .splitCsv(header: true, sep: ',', strip: true)
-        .collect { row -> row.sample?.toString()?.trim() }
-        .findAll { id -> id }
+    // The samplesheet's sample ids, as INPUT_CHECK reads them (ids and the
+    // metadata's header and ids are compared trimmed)
+    def samples = get_sample_ids(file(params.input, checkIfExists: true))
 
     def table = file(params.sample_metadata, checkIfExists: true)
     def sep = table.name.toLowerCase().endsWith('.csv') ? ',' : '\t'
@@ -42,8 +42,8 @@ def coassemblyGroups() {
     if (!lines) {
         error("--sample_metadata ${params.sample_metadata} is empty")
     }
-    def header = lines[0].collect { c -> c.toString() }
-    header[0] = header[0].replaceFirst(/^\uFEFF/, '')
+    def header = lines[0].collect { c -> c.toString().trim() }
+    header[0] = header[0].replaceFirst(/^\uFEFF/, '').trim()
     def rows = lines.drop(1).collect { fields -> [header, fields].transpose().collectEntries { name, value -> [(name): value] } }
     def key = 'sample' in header ? 'sample' : header[0]
     if (!(column in header) || column == key) {
@@ -52,7 +52,7 @@ def coassemblyGroups() {
 
     def value_of = [:]
     rows.each { row ->
-        def id = row[key]?.toString()
+        def id = row[key]?.toString()?.trim()
         if (id != null && id in samples) {
             if (value_of.containsKey(id)) {
                 error("--sample_metadata ${params.sample_metadata}: sample ${id} has more than one row")
@@ -89,4 +89,19 @@ def coassemblyGroups() {
         }
     }
     return samples.sort(false).collectEntries { id -> [(id): label_of[value_of[id]]] }
+}
+
+/**
+ * The co-assembly a sample goes into: 'coassembly' without groups, else its
+ * group's label. A sample the groups do not list stops the run, rather than
+ * getting a co-assembly of its own.
+ */
+def coassemblyLabel(groups, id) {
+    if (!groups) {
+        return 'coassembly'
+    }
+    if (!groups.containsKey(id)) {
+        error("--coassembly_group_by ${params.coassembly_group_by}: sample ${id} is in no co-assembly group (groups were read for: ${groups.keySet().join(', ')})")
+    }
+    return groups[id]
 }

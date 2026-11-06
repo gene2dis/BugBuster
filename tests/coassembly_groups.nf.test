@@ -225,6 +225,26 @@ nextflow_pipeline {
         }
     }
 
+    test("Reads a metadata table with spaces around its names and ids") {
+        // The CSV header ' site' and the ids ' test_sample1 ' are read trimmed,
+        // like the samplesheet: the run reaches the label check (both rows
+        // matched, column found) instead of failing on the column or the rows
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.csv", "sample, site\n test_sample1 ,site 1\ntest_sample2 , site/1\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("'site 1' and 'site/1' both become 'site_1'")
+        }
+    }
+
     test("Rejects two group values that give the same label") {
         when {
             params {

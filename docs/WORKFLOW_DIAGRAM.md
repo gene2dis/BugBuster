@@ -328,7 +328,7 @@ flowchart TD
 The whole subworkflow needs `include_binning` (default `false`); the green boxes are what a
 binning run does with the default `binners`. Binette keeps bins at `bin_min_completeness` 50
 and `bin_max_contamination` 10. **Outputs:** `refined_bins`, `gtdbtk` (bac120/ar53
-summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (co-assembly).
+summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (`BIN_DEPTH`, both assembly modes).
 
 ### 8. Contig taxonomy, contig ARGs and geNomad
 
