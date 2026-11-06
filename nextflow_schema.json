@@ -138,14 +138,14 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Estimate the quality of geNomad's virus contigs and proviruses with CheckV (needs --genomad_prediction).",
-                    "help_text": "CheckV 1.1.1 end_to_end (DIAMOND 2.1.8, HMMER 3.4) on each assembly's geNomad virus FASTA against --checkv_db; results in 06_contig_taxonomy/checkv/<assembly>/. With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains checkv_quality, checkv_completeness, checkv_contamination and checkv_provirus, and arg_contig_mobile counts the ARG genes on virus contigs and in proviruses by CheckV tier. CheckV only reads its database.",
+                    "help_text": "CheckV 1.1.1 end_to_end (DIAMOND 2.1.8, HMMER 3.4) on each assembly's geNomad virus FASTA against --checkv_db; results in 06_contig_taxonomy/checkv/<sample>/ (co-assembly: checkv/coassembly/, or checkv/coassembly/<group>/ with --coassembly_group_by). With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains checkv_quality, checkv_completeness, checkv_contamination and checkv_provirus, and arg_contig_mobile counts the ARG genes on virus contigs and in proviruses by CheckV tier. CheckV only reads its database.",
                     "fa_icon": "fas fa-virus"
                 },
                 "gunc_prediction": {
                     "type": "boolean",
                     "default": false,
                     "description": "Check the refined MAGs for chimerism with GUNC (needs --include_binning).",
-                    "help_text": "GUNC 1.1.1 (DIAMOND 2.1.24) on each assembly's refined bins (Binette's, or the single binner's) against --gunc_db; its maxCSS-level table in 04_binning/<assembly>/quality/gunc/. The summary's mags table gains gunc_pass, clade_separation_score, contamination_portion and reference_representation_score. GUNC finds chimeras across lineages that CheckM2 can miss; a fail flags the MAG and does not change its MIMAG quality_tier.",
+                    "help_text": "GUNC 1.1.1 (DIAMOND 2.1.24) on each assembly's refined bins (Binette's, or the single binner's) against --gunc_db; its maxCSS-level table in 04_binning/per_sample/<sample>/quality/gunc/ (co-assembly: 04_binning/coassembly[/<group>]/quality/gunc/). The summary's mags table gains gunc_pass, clade_separation_score, contamination_portion and reference_representation_score. GUNC finds chimeras across lineages that CheckM2 can miss; a fail flags the MAG and does not change its MIMAG quality_tier.",
                     "fa_icon": "fas fa-puzzle-piece"
                 },
                 "min_read_sample": {

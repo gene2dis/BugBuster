@@ -820,7 +820,8 @@ reference lacks; proGenomes 2.1 dates from 2020, older than the GTDB r232
 GTDB-Tk uses) the score is unreliable. When fewer than 40 % of a MAG's genes
 fall in its abundant clades, GUNC sets the CSS to 0, so such a MAG passes by
 default. A MAG with fewer than 11 genes mapped is not scored (blank). The table is in
-`04_binning/<assembly>/quality/gunc/`, and the summary's `mags` table gains
+`04_binning/per_sample/<sample>/quality/gunc/` (co-assembly:
+`04_binning/coassembly[/<group>]/quality/gunc/`), and the summary's `mags` table gains
 `gunc_pass`, `clade_separation_score`, `contamination_portion` and
 `reference_representation_score`. A GUNC fail flags the MAG; it does not
 change the MIMAG `quality_tier`: check the MAG (its contigs' taxonomy, its
@@ -901,7 +902,9 @@ genes at a provirus's edges, and looks for terminal repeats. Its tiers:
 `Not-determined` (nothing to estimate completeness from). Low-quality and
 Not-determined mean a fragment, or a virus too novel for the database, not a
 false virus call. The database (`--checkv_db` v1.5, 6.4 GB unpacked) is only
-read. Outputs in `06_contig_taxonomy/checkv/<assembly>/<assembly>_checkv/`.
+read. Outputs in `06_contig_taxonomy/checkv/<sample>/<sample>_checkv/`
+(co-assembly: `checkv/coassembly/coassembly_checkv/`, or
+`checkv/coassembly/<group>/<group>_checkv/` with `--coassembly_group_by`).
 
 BlobTools' tables and phylum plot use Metabuli's calls and the database's own
 taxdump; its 2025 `domain` rank is renamed `superkingdom` for BlobTools 1.1.1,

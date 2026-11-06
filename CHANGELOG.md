@@ -17,7 +17,8 @@ next release is tagged.
   `quay.io/biocontainers/gunc:1.1.1--pyhdfd78af_0` and its depot sif) checks
   each assembly's refined MAGs (Binette's, or the single binner's bins) for
   chimeras across lineages that CheckM2 can miss. Its maxCSS-level table goes
-  to `04_binning/<assembly>/quality/gunc/<assembly>_gunc_maxCSS_level.tsv`,
+  to `04_binning/per_sample/<sample>/quality/gunc/<sample>_gunc_maxCSS_level.tsv`
+  (co-assembly: `04_binning/coassembly[/<group>]/quality/gunc/`),
   and the summary's `mags` table gains `gunc_pass`, `clade_separation_score`,
   `contamination_portion` and `reference_representation_score` after
   `tier_basis`. A GUNC fail flags the MAG and does not change its MIMAG
@@ -31,7 +32,8 @@ next release is tagged.
   `quay.io/biocontainers/checkv:1.1.1--pyh106432d_1` and its depot sif) rates
   each assembly's geNomad virus contigs and proviruses: completeness, host
   contamination, closed genomes and the quality tier, in
-  `06_contig_taxonomy/checkv/<assembly>/<assembly>_checkv/`. With
+  `06_contig_taxonomy/checkv/<sample>/<sample>_checkv/` (co-assembly:
+  `checkv/coassembly/`, or `checkv/coassembly/<group>/` per group). With
   `--contig_tax_and_arg`, `Contig_tax_and_arg_prediction.tsv` gains
   `checkv_quality`, `checkv_completeness`, `checkv_contamination` and
   `checkv_provirus` after geNomad's columns, and the summary's
