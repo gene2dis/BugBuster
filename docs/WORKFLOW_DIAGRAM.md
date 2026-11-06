@@ -103,6 +103,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `RGI_KMER` | `rgi_prediction` and: with `custom_rgi_card_db`, its k-mer files for `rgi_kmer_size` present or `custom_rgi_wildcard` given; without, `rgi_include_wildcard` (default `true`) | — |
 | `KMARVEL`, `KMARVEL_REPORT` | `kmarvel_prediction` | — |
 | `ASSEMBLY` | `assembly_mode != 'none'` (default `assembly`) | — |
+| One co-assembly per group | `coassembly_group_by` (a `sample_metadata` column) with `assembly_mode == 'coassembly'` | needs `coassembly` and `sample_metadata`; the column exists; every sample has a value; labels distinct, not a sample id or `coassembly` |
 | `BBNORM` | `assembly_read_reduction == 'normalize'` (default `none`) | needs an assembly |
 | Reads → contigs alignment | `include_binning` or `contig_tax_and_arg` or `contig_level_functional` | — |
 | `NFCORE_SAMTOOLS_MERGE` (pooled co-assembly BAM) | `assembly_mode == 'coassembly'` and (`include_binning` or `contig_tax_and_arg`) | — |
@@ -255,15 +256,17 @@ flowchart TD
 
 ### 6. ASSEMBLY
 
-MEGAHIT runs per sample (`assembly`, default) or once on the pooled reads (`coassembly`).
-BBNorm, when selected, reduces only MEGAHIT's input: BBMap, the alignments and everything
-downstream use the full reads.
+MEGAHIT runs per sample (`assembly`, default) or once on the pooled reads (`coassembly`):
+once for every sample, or once per group of `--sample_metadata` with `coassembly_group_by`,
+each sample then aligned to its own group's co-assembly and every later step running per
+group. BBNorm, when selected, reduces only MEGAHIT's input: BBMap, the alignments and
+everything downstream use the full reads.
 
 ```mermaid
 flowchart TD
     Clean(["clean reads"]) --> Mode{assembly_mode}
     Mode -->|"assembly (default)<br/>per sample"| Red
-    Mode -->|"coassembly<br/>reads pooled"| Red
+    Mode -->|"coassembly<br/>reads pooled: all samples,<br/>or per coassembly_group_by group"| Red
     Red{assembly_read_reduction} -->|normalize| BBNORM["BBNORM<br/>assembler input only"]
     Red -->|"none (default)"| MEGAHIT
     BBNORM --> MEGAHIT
@@ -272,9 +275,9 @@ flowchart TD
     BBMAP -->|"include_binning or contig_tax_and_arg<br/>or contig_level_functional"| Aln{read_aligner}
     Aln -->|"bwamem3 (default)"| BWAMEM3_INDEX --> BWAMEM3_SAMTOOLS
     Aln -->|bowtie2| BOWTIE2_SAMTOOLS
-    BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS --> SampleBAM(["per-sample BAM<br/>assembly: vs its own contigs<br/>coassembly: each sample once<br/>vs the co-assembly"])
-    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM: SemiBin2,<br/>COMEBin, BlobTools"]
-    SampleBAM -->|"featureCounts, MetaBAT2 depths,<br/>bin depth (co-assembly)"| Out(["counting_bam"])
+    BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS --> SampleBAM(["per-sample BAM<br/>assembly: vs its own contigs<br/>coassembly: each sample once<br/>vs its co-assembly"])
+    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM per co-assembly:<br/>SemiBin2, BlobTools"]
+    SampleBAM -->|"featureCounts, MetaBAT2 depths,<br/>COMEBin, bin depth"| Out(["counting_bam"])
 
     BBMAP -->|filter reports| CONTIG_FILTER_SUMMARY
     BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS -->|empty-contig reports| CONTIG_FILTER_SUMMARY["CONTIG_FILTER_SUMMARY<br/>contig_filtering_summary.txt"]
@@ -293,10 +296,12 @@ BAM under co-assembly), `bam_meta`, `counting_bam` (one BAM per sample in both m
 
 ```mermaid
 flowchart TD
-    In(["[meta, contigs, bam]<br/>+ per-sample BAMs"]) --> Sel{binners<br/>default semibin}
+    In(["[meta, contigs, bam]<br/>+ per-sample BAMs"]) --> CALCULATE_DEPTH["CALCULATE_DEPTH<br/>jgi depths<br/>coassembly: one column per sample"]
+    In --> Sel{binners<br/>default semibin}
     Sel -->|"semibin (default)"| SEMIBIN["SEMIBIN<br/>per sample: human_gut model<br/>coassembly: pre-trained global"]
-    Sel -->|metabat2| CALCULATE_DEPTH["CALCULATE_DEPTH<br/>coassembly: one column per sample"] --> METABAT2
-    Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow"]
+    Sel -->|metabat2| METABAT2
+    CALCULATE_DEPTH --> METABAT2
+    Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow<br/>coassembly: per-sample BAMs"]
 
     SEMIBIN & METABAT2 & COMEBIN --> N{number of binners}
     N -->|"≥ 2"| BINETTE["BINETTE<br/>refinement; CheckM2 of raw<br/>and refined bins"]
@@ -308,22 +313,22 @@ flowchart TD
 
     Quality -->|assembly| BIN_QUALITY_REPORT
     GTDB_TK_BATCH -->|assembly| BIN_TAX_REPORT
-    Bins -->|coassembly| BIN_CONTIG_TABLE["BIN_CONTIG_TABLE<br/>contig → bin<br/>(skipped without bins)"]
-    BIN_CONTIG_TABLE --> BEDTOOLS_BIN_DEPTH["BEDTOOLS_BIN_DEPTH<br/>each sample's BAM<br/>over each bin"]
-    BEDTOOLS_BIN_DEPTH -->|coassembly| BIN_SUMMARY
+    Bins --> BIN_DEPTH["BIN_DEPTH<br/>length-weighted MAG depth<br/>per sample (skipped without bins)"]
+    CALCULATE_DEPTH --> BIN_DEPTH
+    BIN_DEPTH -->|coassembly| BIN_SUMMARY
     GTDB_TK_BATCH -->|coassembly| BIN_SUMMARY
     Quality -->|"coassembly<br/>(refined bins' reports)"| BIN_SUMMARY
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT on
-    class CALCULATE_DEPTH,METABAT2,COMEBIN,BINETTE,BIN_CONTIG_TABLE,BEDTOOLS_BIN_DEPTH,BIN_SUMMARY opt
+    class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT,CALCULATE_DEPTH,BIN_DEPTH on
+    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY opt
 ```
 
 The whole subworkflow needs `include_binning` (default `false`); the green boxes are what a
 binning run does with the default `binners`. Binette keeps bins at `bin_min_completeness` 50
 and `bin_max_contamination` 10. **Outputs:** `refined_bins`, `gtdbtk` (bac120/ar53
-summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (co-assembly).
+summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (`BIN_DEPTH`, both assembly modes).
 
 ### 8. Contig taxonomy, contig ARGs and geNomad
 
@@ -391,7 +396,7 @@ flowchart TD
     EGGNOG_MAPPER_SEARCH --> EGGNOG_MAPPER_ANNOTATE["EGGNOG_MAPPER_ANNOTATE<br/>eggNOG-mapper 3.0.0-beta6"]
     Prot -->|"contig_level_functional and<br/>functional_cazy (default)"| RUN_DBCAN["RUN_DBCAN<br/>run_dbcan v5 CAZy"]
     BAMs(["counting_bam"]) --> FEATURECOUNTS_GENES
-    Prot -->|"GFF; coassembly: one GFF<br/>for every sample"| FEATURECOUNTS_GENES
+    Prot -->|"GFF; coassembly: the co-assembly's<br/>GFF for each of its samples"| FEATURECOUNTS_GENES
     Ags(["MICROBECENSUS AGS<br/>(optional, non-fatal)"]) --> AGGREGATE_FUNCTIONS
     EGGNOG_MAPPER_ANNOTATE & RUN_DBCAN & FEATURECOUNTS_GENES --> AGGREGATE_FUNCTIONS["AGGREGATE_FUNCTIONS<br/>TPM + CPGE tables<br/>(KO, COG, EC, Pfam, CAZy)"]
 
@@ -516,13 +521,15 @@ results directories outside the pipeline (manual, Example 13).
 | Module | Condition | Description |
 |--------|-----------|-------------|
 | `SEMIBIN` | `semibin` in `binners` (default) | SemiBin2 (pre-trained `global` model under co-assembly) |
-| `CALCULATE_DEPTH` + `METABAT2` | `metabat2` in `binners` | Contig depths (one column per sample under co-assembly) and MetaBAT2 |
+| `CALCULATE_DEPTH` | always | jgi contig depths (one column per sample under co-assembly): MetaBAT2's input and the MAG depth |
+| `METABAT2` | `metabat2` in `binners` | MetaBAT2 |
 | `COMEBIN` | `comebin` in `binners` | COMEBin, CPU only |
 | `BINETTE` | ≥ 2 binners | Refinement, with CheckM2 of the raw and refined bins |
 | `CHECKM2_BATCH` | 1 binner | CheckM2 of the binner's bins |
 | `GTDB_TK_BATCH` | always | GTDB-Tk classification of every sample's bins in one run |
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | `assembly` mode | Quality and taxonomy reports |
-| `BIN_CONTIG_TABLE` + `BEDTOOLS_BIN_DEPTH` / `BIN_SUMMARY` | `coassembly` mode | Bin depth per sample from the per-sample BAMs, and the bin summary |
+| `BIN_DEPTH` | always (a refined bin set) | MAG depth per sample: the length-weighted mean of its contigs' jgi depths |
+| `BIN_SUMMARY` | `coassembly` mode | Bin summary (quality, taxonomy, depth per sample) |
 
 ### Contig taxonomy, contig and bin ARGs
 | Module | Description |
@@ -574,7 +581,7 @@ results/
 ├── 01_quality_control/          # fastp reports, Reads_report.csv
 ├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
 │                                # phyloseq, figures
-├── 03_assembly/                 # per_sample/ or coassembly/: contigs, filtered contigs, stats
+├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
 ├── 04_binning/                  # Raw and refined bins, CheckM2 quality, GTDB-Tk taxonomy,
 │                                # coverage and summary (co-assembly)
 ├── 05_arg_prediction/           # read_level/ (args_oap, rgi, rgi_kmer, kmarvel + summaries),

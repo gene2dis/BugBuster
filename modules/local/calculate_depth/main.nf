@@ -3,6 +3,7 @@
     CALCULATE_DEPTH Module
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     Calculate contig depth from BAM files using jgi_summarize_bam_contig_depths
+    (MetaBAT2's input and BIN_DEPTH's MAG depth; runs whenever binning does)
     
     One BAM per sample assembly; under co-assembly one BAM per sample
     (against the co-assembly), giving one depth column per sample
@@ -60,12 +61,12 @@ process CALCULATE_DEPTH {
     stub:
     prefix = meta.id
     """
-    # Create stub depth file
-    cat > ${prefix}_depth.txt << 'EOF'
-    contigName	contigLen	totalAvgDepth	sample1.bam	sample1.bam-var
-    contig_1	5000	25.5	25.5	10.2
-    contig_2	3000	18.3	18.3	8.1
-    EOF
+    # Stub depth file: jgi's header, one depth and variance column per BAM
+    header="contigName\\tcontigLen\\ttotalAvgDepth"
+    for b in ${bam}; do
+        header="\${header}\\t\$(basename "\$b" .bam)\\t\$(basename "\$b" .bam)-var"
+    done
+    printf "\${header}\\n" > ${prefix}_depth.txt
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

@@ -17,7 +17,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id, 'coassembly' or its --coassembly_group_by group's label)
   - seed_orthologs:
       type: file
       description: Seed orthologs table from EGGNOG_MAPPER_SEARCH

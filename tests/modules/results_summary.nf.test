@@ -199,6 +199,7 @@ nextflow_process {
                 output                  = "${outputDir}"
                 summary_min_clean_pairs = 10000
                 summary_batch_label     = "co"
+                assembly_mode           = "coassembly"
             }
             process {
                 """
@@ -230,6 +231,52 @@ nextflow_process {
             assert tables["mag_abundance.tsv"].size() == 1 + 2 * 2
             assert tables["mag_abundance.tsv"].any { line -> line.startsWith("coassembly\tco\tbinette_bin1\tsampleC\t0.138756\t") }
             assert tables["mags.tsv"].size() == 3
+        }
+    }
+
+    test("lays out the stage files of co-assembly groups") {
+        // tests/data/summary/stages/coassembly_groups (tests/bin/make_grouped_summary_tree.py: the co-assembly
+        // fixture as groups g1 = sampleC, g2 = sampleD): coassembly_groups.tsv sends the g1_* / g2_* names to the
+        // coassembly/<group>/ folders and each sample's bin depth to its own group's coverage/
+        when {
+            params {
+                output                  = "${outputDir}"
+                summary_min_clean_pairs = 10000
+                summary_batch_label     = "grp"
+                assembly_mode           = "coassembly"
+            }
+            process {
+                """
+                def fix = "${projectDir}/tests/data/summary"
+                input[0]  = file("\${fix}/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = []
+                input[3]  = []
+                input[4]  = []
+                input[5]  = []
+                input[6]  = []
+                input[7]  = []
+                input[8]  = []
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
+                input[14] = files("\${fix}/stages/coassembly_groups/**", type: 'file').sort { f -> f.name }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.tables.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert tables["assembly_stats.tsv"].count { line -> line =~ /^g[12]\tgrp\tcoassembly\t180428\t/ } == 2
+            // each sample's depth row in its own group only
+            assert tables["mag_abundance.tsv"].size() == 1 + 2 * 2
+            assert tables["mag_abundance.tsv"].any { line -> line.startsWith("g1\tgrp\tbinette_bin1\tsampleC\t0.138756\t") }
+            assert tables["mag_abundance.tsv"].any { line -> line.startsWith("g2\tgrp\tbinette_bin1\tsampleD\t") }
+            assert tables["assembly_read_use.tsv"].any { line -> line.startsWith("sampleD\t") && line.tokenize('\t').contains("g2") }
+            assert tables["mags.tsv"].size() == 1 + 2 * 2
         }
     }
 

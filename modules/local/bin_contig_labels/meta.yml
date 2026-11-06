@@ -13,7 +13,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id, 'coassembly' or its --coassembly_group_by group's label)
   - bins:
       type: directory
       description: The sample's refined bins (*.fa; a directory with only a SKIPPED/FAILED marker gives a header-only table)

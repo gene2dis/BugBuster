@@ -7,7 +7,8 @@
     mapping, coverage, binning and gene counting use the full clean reads.
 
     Supports both per-sample and co-assembly modes (the pooled reads of every
-    sample, meta.id 'coassembly', are normalized together in one call)
+    sample, or of one --coassembly_group_by group (meta.coassembly), are
+    normalized together in one call)
 
     Input:
         tuple val(meta), path(reads)
@@ -64,7 +65,7 @@ process BBNORM {
     // Co-assembly pools every sample's reads; bin/read_role.sh sorts them by
     // file name, as MEGAHIT and the aligners do. A single sample's reads
     // arrive positionally (raw input names when QC is off).
-    def classify_reads = meta.id == 'coassembly'
+    def classify_reads = meta.coassembly
         ? """for read_file in ${reads.join(' ')}; do
         role=\$(read_role.sh "\$read_file") || exit 1
         case "\$role" in
@@ -149,7 +150,7 @@ process BBNORM {
 
     stub:
     prefix = meta.id
-    def classify_reads = meta.id == 'coassembly'
+    def classify_reads = meta.coassembly
         ? """for read_file in ${reads.join(' ')}; do
         if [ "\$(read_role.sh "\$read_file")" = S ]; then S_files+=("\$read_file"); fi
     done"""

@@ -14,10 +14,13 @@ tools:
       licence: ["BSD-3-Clause"]
 
 input:
+  - meta:
+      type: map
+      description: Co-assembly metadata (meta.id 'coassembly', or the --coassembly_group_by group's label)
   - reports:
       type: file
       description: |
-        Mixed collection read by filename glob - BEDTOOLS_BIN_DEPTH bin coverage tables (*bin_depth.tsv),
+        Mixed collection read by filename glob - BIN_DEPTH bin depth tables (*bin_depth.tsv),
         GTDB-Tk bac120/ar53 summaries (*gtdbtk*.tsv) and CheckM2 refined-bin quality reports (*quality_report.tsv)
       pattern: "*.tsv"
 

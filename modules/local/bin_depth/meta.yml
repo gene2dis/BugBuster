@@ -1,0 +1,41 @@
+name: bin_depth
+description: MAG depth per sample - the contig-length-weighted mean of each refined bin's contig depths from jgi_summarize_bam_contig_depths (MetaBAT2's depth, alignments at >= 97 % identity), in both assembly modes
+keywords:
+  - depth
+  - coverage
+  - binning
+  - mag
+tools:
+  - metabat2:
+      description: Metagenome binning tool; its image provides the BusyBox awk this module runs on CALCULATE_DEPTH's jgi_summarize_bam_contig_depths table
+      homepage: https://bitbucket.org/berkeleylab/metabat
+      documentation: https://bitbucket.org/berkeleylab/metabat/src/master/README.md
+      doi: "10.7717/peerj.7359"
+
+input:
+  - meta:
+      type: map
+      description: Assembly metadata (meta.id is the sample name, or the co-assembly id; meta.coassembly true for a co-assembly)
+  - depth:
+      type: file
+      description: CALCULATE_DEPTH's depth table (contigName, contigLen, totalAvgDepth, then <sample>_all_reads and its -var column per BAM)
+      pattern: "*_depth.txt"
+  - bins:
+      type: directory
+      description: Refined bin directory; bins are its *.fa files, contigs the first word of each header
+  - samples:
+      type: list
+      description: Sample ids the depth columns must match (the sample itself, or the samples mapped to the co-assembly)
+
+output:
+  - bin_depth:
+      type: tuple
+      description: Tuple of meta and one table per sample (sample, bin_id, Total_contigs, average_cov = length-weighted mean depth)
+      pattern: "*_bin_depth.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

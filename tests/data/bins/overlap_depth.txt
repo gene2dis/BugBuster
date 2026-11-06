@@ -1,0 +1,5 @@
+contigName	contigLen	totalAvgDepth	s1_all_reads	s1_all_reads-var	s2_all_reads	s2_all_reads-var
+c1	1000	12	2	0.5	10	1
+c2	3000	6	6	1	0	0
+c3	100	2	1	0	1	0
+cX	500	200	100	0	100	0

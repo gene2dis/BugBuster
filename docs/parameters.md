@@ -72,9 +72,15 @@ Complete reference for all BugBuster pipeline parameters.
 - **Options**: `assembly`, `coassembly`, `none`
 - **Description**: Genome assembly strategy
   - `assembly`: Per-sample assembly
-  - `coassembly`: Pool all samples for single assembly
+  - `coassembly`: Pool all samples for single assembly (or one assembly per group, `--coassembly_group_by`)
   - `none`: Skip assembly
 - **Example**: `--assembly_mode coassembly`
+
+### `--coassembly_group_by`
+- **Type**: String (a column name)
+- **Default**: none (every sample in one co-assembly)
+- **Description**: Co-assemble the samples in groups: one co-assembly per distinct value of this column of `--sample_metadata` (the table the run summary reads: a `sample` column, or sample names in the first column; TSV, or CSV by its `.csv` extension). Each sample's reads are aligned to its own group's co-assembly only; binning, contig taxonomy and ARGs, geNomad, the functional branches and the summary run per group. A one-sample group is allowed (that sample's assembly, run in co-assembly mode). The group's label is the value with every character outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` replaced by `_` (`site 1` becomes `site_1`); its outputs go under `<stage>/coassembly/<label>/` (for example `04_binning/coassembly/site_1/`), and `pipeline_info/coassembly_groups.tsv` lists each sample's group. Stops at launch: without `--assembly_mode coassembly` or `--sample_metadata`; when the table has no such column; when a samplesheet sample has no row or no value (all such samples are listed); when two values give the same label or labels that differ only in letter case (`SiteA` and `sitea`: one folder on a case-insensitive filesystem), or a label is a sample id or `coassembly`, or does not start with a letter or digit. Rows for samples not in the samplesheet are ignored. Independent of `--summary_group_by`, which only groups the summary's figures (both may name the same column). Keep each group's samples in one run: a group split across runs (batches) is co-assembled once per run
+- **Example**: `--sample_metadata samples.tsv --coassembly_group_by site`
 
 ### `--taxonomic_profiler`
 - **Type**: String
@@ -738,9 +744,9 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 
 #### `--semibin_env_model`
 - **Type**: String
-- **Default**: `human_gut`
+- **Default**: `human_gut` (when not set)
 - **Options**: `human_gut`, `dog_gut`, `ocean`, `soil`, `cat_gut`, `human_oral`, `mouse_gut`, `pig_gut`, `built_environment`, `wastewater`, `chicken_caecum`, `global`
-- **Description**: SemiBin environment model for binning
+- **Description**: SemiBin2 pre-trained environment model for per-sample assemblies (co-assemblies use `--semibin_coassembly_env_model`). When it is not set, SemiBin2 uses `human_gut` and the run warns at launch: choose the model that matches the samples, or `global` for samples that are not from a human gut. Setting it, `human_gut` included, removes the warning
 - **Example**: `--semibin_env_model ocean`
 
 #### `--semibin_random_seed`

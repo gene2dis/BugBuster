@@ -45,6 +45,8 @@
 #   functional/sampleA.ags.tsv
 #                        MicrobeCensus table of sampleA
 #
+# stages/coassembly_groups/ (the co-assembly tree as two --coassembly_group_by
+# groups) is made from stages/coassembly/ by tests/bin/make_grouped_summary_tree.py.
 # Not made by this script: stages/assembly/ and stages/coassembly/ (results
 # trees of a per-sample assembly and a co-assembly for the stage tables of the
 # summary) were trimmed from the published outputs of a real all-branches run

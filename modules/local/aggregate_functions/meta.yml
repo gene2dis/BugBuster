@@ -52,6 +52,10 @@ input:
   - dbcan_consensus:
       type: string
       description: "'recommended' (the tool's >=2-tools Recommend Results column) or 'any' (union of the per-tool calls) - which dbCAN calls feed aggregation"
+  - coassembly_groups:
+      type: file
+      description: "coassembly_groups.tsv (sample, group) with --coassembly_group_by, or [] - each sample is counted against its group's co-assembly, whose annotations, GFF and dbCAN files are named by the group"
+      pattern: "coassembly_groups.tsv"
 
 output:
   - gene_annotations:

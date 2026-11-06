@@ -292,6 +292,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+            // MAG depth per sample in per-sample mode too (roadmap Phase 15, B1)
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_DEPTH") } == 2
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/coverage/test_sample1_bin_depth.tsv").exists()
         }
     }
 
@@ -299,7 +302,7 @@ nextflow_pipeline {
         // The co-assembly index is built ONCE and shared by the per-sample
         // alignments (one per sample, issue #28): their merge is the pooled
         // BAM, and the same BAMs give MetaBAT2 its depths, count genes and
-        // give bin depth (BIN_CONTIG_TABLE + BEDTOOLS_BIN_DEPTH, no remap)
+        // give bin depth (CALCULATE_DEPTH's jgi table + BIN_DEPTH, no remap)
         options "-stub"
 
         when {
@@ -329,8 +332,11 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BWAMEM3_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_CONTIG_TABLE") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BEDTOOLS_BIN_DEPTH") } == 2
+            // MAG depth: one BIN_DEPTH task over the co-assembly's jgi table,
+            // one table per sample (roadmap Phase 15, B1)
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_DEPTH") } == 1
+            assert path("${outputDir}/04_binning/coassembly/coverage/test_sample1_bin_depth.tsv").exists()
+            assert path("${outputDir}/04_binning/coassembly/coverage/test_sample2_bin_depth.tsv").exists()
             assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 1
             assert path("${outputDir}/04_binning/coassembly/summary").exists()
         }
@@ -369,6 +375,9 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("CALCULATE_DEPTH") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
+            // MAG depth per sample in per-sample mode too (roadmap Phase 15, B1)
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_DEPTH") } == 2
+            assert path("${outputDir}/04_binning/per_sample/test_sample1/coverage/test_sample1_bin_depth.tsv").exists()
         }
     }
 
@@ -403,8 +412,11 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("BOWTIE2_SAMTOOLS (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("SAMTOOLS_MERGE") } == 1
             assert workflow.trace.tasks().count { task -> task.name.contains("FEATURECOUNTS_GENES") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_CONTIG_TABLE") } == 1
-            assert workflow.trace.tasks().count { task -> task.name.contains("BEDTOOLS_BIN_DEPTH") } == 2
+            // MAG depth: one BIN_DEPTH task over the co-assembly's jgi table,
+            // one table per sample (roadmap Phase 15, B1)
+            assert workflow.trace.tasks().count { task -> task.name.contains("BIN_DEPTH") } == 1
+            assert path("${outputDir}/04_binning/coassembly/coverage/test_sample1_bin_depth.tsv").exists()
+            assert path("${outputDir}/04_binning/coassembly/coverage/test_sample2_bin_depth.tsv").exists()
             assert path("${outputDir}/04_binning/coassembly/summary").exists()
         }
     }
@@ -1720,6 +1732,58 @@ nextflow_pipeline {
             assert path("${outputDir}/../meta/nextflow.log").text.contains("--metawrap_completeness is deprecated")
             assert path("${outputDir}/04_binning/per_sample/test_sample1/refined_bins/test_sample1_binette_bins/binette_args.txt")
                 .text.contains("--min_completeness 70 --max_contamination 5")
+        }
+    }
+
+    test("Warns when per-sample SemiBin2 runs on the default model") {
+        // Roadmap B2: --semibin_env_model is null unless set; SemiBin2 then
+        // uses human_gut and the launch log says so
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode      = "assembly"
+                include_binning    = true
+                binners            = "semibin,metabat2"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("pre-trained human_gut model (--semibin_env_model not set)")
+        }
+    }
+
+    test("No SemiBin2 model warning when --semibin_env_model is set") {
+        // An explicit value, the default model included, is the user's choice
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode      = "assembly"
+                include_binning    = true
+                binners            = "semibin,metabat2"
+                semibin_env_model  = "human_gut"
+                taxonomic_profiler = "none"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !path("${outputDir}/../meta/nextflow.log").text.contains("--semibin_env_model not set")
         }
     }
 

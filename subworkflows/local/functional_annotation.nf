@@ -26,11 +26,12 @@
     docs/manual.md).
 
     Assembly-mode handling (design doc Section 3.5): annotation works
-    identically in both modes (per-sample elements under 'assembly', a single
-    'coassembly' element under 'coassembly'). Quantification is mode-aware:
-    under 'assembly' each sample's BAM joins its own gene GFF; under
-    'coassembly' every per-sample BAM is counted against the single shared
-    co-assembly GFF, giving per-sample counts over a shared gene set.
+    identically in both modes (per-sample elements under 'assembly', one
+    element per co-assembly under 'coassembly': 'coassembly', or one per
+    --coassembly_group_by group). Quantification is mode-aware: under
+    'assembly' each sample's BAM joins its own gene GFF; under 'coassembly'
+    each per-sample BAM is counted against its co-assembly's GFF (meta.group),
+    giving per-sample counts over the co-assembly's shared gene set.
 ----------------------------------------------------------------------------------------
 */
 
@@ -54,6 +55,7 @@ workflow FUNCTIONAL_ANNOTATION {
     ch_refined_bins // channel: [ meta, bins_dir ] BINNING.out.refined_bins (one dir per sample / 'coassembly'; may hold only SKIPPED.txt)
     ch_bakta_db     // channel: Bakta db dir (schema 6 layout); empty when --mag_level_functional false
     ch_cog_def      // channel: NCBI COG definitions table (cog-24.def.tab); empty when --contig_level_functional false
+    ch_coassembly_groups // channel: coassembly_groups.tsv (sample, group) with --coassembly_group_by, else a value []
 
     main:
     ch_versions = channel.empty()
@@ -87,10 +89,13 @@ workflow FUNCTIONAL_ANNOTATION {
         }
 
         // Pair each counting BAM with its gene GFF (design doc Section 4.4):
-        // under coassembly the GFF channel is a single 'coassembly' element shared
-        // by every per-sample BAM, so a meta join cannot apply
+        // under coassembly a co-assembly's GFF is shared by its samples' BAMs
+        // (meta.group names it), so a meta join cannot apply
         if ( params.assembly_mode == 'coassembly' ) {
-            ch_fc_input = ch_counting_bam.combine(ch_gene_gff.map { _meta, gff -> gff })
+            ch_fc_input = ch_counting_bam
+                .map { meta, bam -> [meta.group, meta, bam] }
+                .combine(ch_gene_gff.map { meta, gff -> [meta.id, gff] }, by: 0)
+                .map { _label, meta, bam, gff -> [meta, bam, gff] }
         } else {
             ch_fc_input = ch_counting_bam.join(ch_gene_gff)
         }
@@ -120,7 +125,8 @@ workflow FUNCTIONAL_ANNOTATION {
             ch_dbcan_versions_agg,
             ch_cog_def.first(),
             params.assembly_mode,
-            params.dbcan_consensus
+            params.dbcan_consensus,
+            ch_coassembly_groups
         )
 
         ch_annotations         = EGGNOG_MAPPER_ANNOTATE.out.annotations

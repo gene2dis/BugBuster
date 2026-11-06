@@ -42,9 +42,10 @@ process SEMIBIN {
 
     script:
     prefix = meta.id
-    def is_coassembly = (meta.id == 'coassembly')
+    def is_coassembly = meta.coassembly as boolean
     def train_self = is_coassembly && params.semibin_coassembly_mode == 'train_self'
-    def env_model = is_coassembly ? params.semibin_coassembly_env_model : params.semibin_env_model
+    // --semibin_env_model is null unless the user sets it (main.nf warns): human_gut
+    def env_model = is_coassembly ? params.semibin_coassembly_env_model : (params.semibin_env_model ?: 'human_gut')
     // A fixed seed: unseeded SemiBin2 gives a bin more or less between reruns
     def seed = params.semibin_random_seed
     

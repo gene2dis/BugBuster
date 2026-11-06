@@ -151,21 +151,21 @@
   </g>
   <path class="step" d="M564,390 H578" marker-end="url(#arrow)"/>
   <g class="box on" transform="translate(580,372)">
-    <rect width="164" height="36" rx="6"/>
-    <text class="n" x="82" y="15">MEGAHIT</text>
-    <text class="d" x="82" y="28">per sample or co-assembly</text>
+    <rect width="214" height="36" rx="6"/>
+    <text class="n" x="107" y="15">MEGAHIT</text>
+    <text class="d" x="107" y="28">per sample, or co-assembly: all or by group</text>
   </g>
-  <path class="step" d="M744,390 H758" marker-end="url(#arrow)"/>
-  <g class="box on" transform="translate(760,372)">
-    <rect width="130" height="36" rx="6"/>
-    <text class="n" x="65" y="15">BBMap</text>
-    <text class="d" x="65" y="28">contigs ≥ 1,000 bp</text>
+  <path class="step" d="M794,390 H808" marker-end="url(#arrow)"/>
+  <g class="box on" transform="translate(810,372)">
+    <rect width="106" height="36" rx="6"/>
+    <text class="n" x="53" y="15">BBMap</text>
+    <text class="d" x="53" y="28">contigs ≥ 1,000 bp</text>
   </g>
-  <path class="step" d="M890,390 H904" marker-end="url(#arrow)"/>
-  <g class="box" transform="translate(906,372)">
-    <rect width="120" height="36" rx="6"/>
-    <text class="n" x="60" y="15">bwa-mem3</text>
-    <text class="d" x="60" y="28">reads → contigs</text>
+  <path class="step" d="M916,390 H930" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(932,372)">
+    <rect width="96" height="36" rx="6"/>
+    <text class="n" x="48" y="15">bwa-mem3</text>
+    <text class="d" x="48" y="28">reads → contigs</text>
   </g>
 
   <text class="rl" x="364" y="441">Binning</text>

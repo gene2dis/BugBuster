@@ -397,6 +397,16 @@ allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_host
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
 
+# a metadata table with a byte-order mark and spaces around its names and values reads as the trimmed one
+printf '\xef\xbb\xbfsample \t subject\nsampleA \t S1\n sampleB\tS2 \n' > padded_meta.tsv
+check "metadata with a BOM and padded names and values" \
+    py "${SUMMARY}" --results run1/results --outdir paddedmeta --metadata padded_meta.tsv --group-by subject --min-clean-pairs 10000
+check "the padded table's samples and groups are read trimmed" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("paddedmeta/tables/samples_qc.tsv", sep="\t", dtype=str)
+assert dict(zip(qc["sample"], qc["subject"])) == {"sampleA": "S1", "sampleB": "S2"}, qc[["sample", "subject"]]
+PYEOF
+
 # metadata columns named like common study variables are kept as they are
 printf 'sample\tgroup\ttype\tclass\tdescription\nsampleA\tg1\tt1\tc1\td1\nsampleB\tg2\tt2\tc2\td2\n' > common_meta.tsv
 check "metadata with group / type / class / description columns" \
@@ -803,8 +813,9 @@ assert m.loc[("co", "coassembly", "binette_bin1"), "quality_tier"] == "high"
 assert m.loc[("asm", "sampleA", "binette_bin10"), "genus"] == "Senimuribacter"
 assert int(m.loc[("asm", "sampleA", "binette_bin10"), "cds"]) == 2291
 assert len(m) == 4 and "sampleB" not in m.index.get_level_values("assembly")
-# MAG depth: per-sample assembly = length-weighted contig coverage of the bin; co-assembly = the bin depth file
-# (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH wrote before)
+# MAG depth: per-sample assembly without a bin depth table (results before roadmap Phase 15) = length-weighted
+# contig coverage of the bin; co-assembly = the bin depth file (sampleC's has the padded fields BEDTOOLS_BIN_DEPTH
+# wrote before Phase 11b)
 ct = pd.read_csv(f"{stg}/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv",
                  sep="\t", keep_default_na=False)
 # one row per contig: the table repeats a contig per ARG hit
@@ -863,6 +874,59 @@ assert abs(cog.at["K", "sampleA"] - row["abundance_cpge"]) < 1e-9
 fl = t("st_asm_out", "function_contig_long")
 assert len(fl) == len(fa) and "abundance_native" not in fl.columns
 assert set(fl.loc[fl["backend"] == "run_dbcan", "ontology"]) == {"cazy_dbcan"}
+PYEOF
+# MAG depth from the per-sample bin depth table (roadmap Phase 15, B1: BIN_DEPTH in both modes), which takes the
+# place of the contig-table coverage the run above falls back to (results without that table)
+cp -r st_asm st_asm_bd
+mkdir -p st_asm_bd/results/04_binning/per_sample/sampleA/coverage
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\nsampleA\tbinette_bin10\t12\t7.25\nsampleA\tbinette_bin2\t3\t0.5\n' \
+    > st_asm_bd/results/04_binning/per_sample/sampleA/coverage/sampleA_bin_depth.tsv
+check "per-sample MAG depth from the bin depth table" \
+    documented st_asm_bd_out --results st_asm_bd/results --min-clean-pairs 10000
+check "per-sample bin depth table values reach mag_abundance" py - <<'PYEOF'
+import pandas as pd
+ab = pd.read_csv("st_asm_bd_out/tables/mag_abundance.tsv", sep="\t").set_index(["bin", "sample"])
+assert ab.at[("binette_bin10", "sampleA"), "mean_depth_x"] == 7.25, ab
+assert ab.at[("binette_bin2", "sampleA"), "mean_depth_x"] == 0.5, ab
+assert len(ab) == 2, ab
+PYEOF
+# co-assembly groups (--coassembly_group_by, roadmap Phase 15): the co-assembly fixture laid out as two groups,
+# g1 = sampleC and g2 = sampleD (stages/coassembly_groups, made by tests/bin/make_grouped_summary_tree.py), and a
+# second batch of the same groups with other sample names
+cp -r "${STG}/coassembly_groups" st_grp
+py "${REPO_DIR}/tests/bin/make_grouped_summary_tree.py" "${STG}/coassembly" st_grp2 sampleC=sampleE sampleD=sampleF
+check "co-assembly groups: every column documented" documented st_grp_out --results st_grp --min-clean-pairs 10000
+check "co-assembly groups of two batches merged" \
+    documented st_grp_merge --results st_grp st_grp2 --batch-labels ga gb --min-clean-pairs 10000
+check "co-assembly groups: one assembly per group, each sample with its own group" py - "${STG}" <<'PYEOF'
+import sys
+import pandas as pd
+stg = sys.argv[1]
+t = lambda out, name: pd.read_csv(f"{out}/tables/{name}.tsv", sep="\t", keep_default_na=False)  # noqa: E731
+a = t("st_grp_out", "assembly_stats").set_index("assembly")
+assert sorted(a.index) == ["g1", "g2"] and set(a["assembly_mode"]) == {"coassembly"}, a
+assert a.at["g1", "contigs_kept"] == 34888, a
+u = t("st_grp_out", "assembly_read_use").set_index("sample")
+assert u.at["sampleC", "assembly"] == "g1" and u.at["sampleD", "assembly"] == "g2", u
+m = t("st_grp_out", "mags")
+assert sorted(set(m["assembly"])) == ["g1", "g2"] and len(m) == 2 * len(m[m["assembly"] == "g1"]), m
+assert set(m.loc[m["bin"] == "binette_bin1", "quality_tier"]) == {"high"}, m  # Bakta found under mags/coassembly/<g>/
+ab = t("st_grp_out", "mag_abundance")
+assert set(zip(ab["assembly"], ab["sample"])) == {("g1", "sampleC"), ("g2", "sampleD")}, ab
+d = pd.read_csv(f"{stg}/coassembly/04_binning/coassembly/coverage/sampleD_bin_depth.tsv", sep="\t", dtype=str)
+d = d.apply(lambda c: c.str.strip())
+want = float(d.loc[d["bin_id"] == "binette_bin1", "average_cov"].iloc[0])
+assert ab.set_index(["assembly", "bin"]).at[("g2", "binette_bin1"), "mean_depth_x"] == want, (ab, want)
+ga = t("st_grp_out", "arg_contig_abundance")
+assert set(zip(ga["assembly"], ga["sample"])) == {("g1", "sampleC"), ("g2", "sampleD")}, ga
+cl = t("st_grp_out", "arg_contig_long")
+assert sorted(set(cl["assembly"])) == ["g1", "g2"], cl
+# two batches with groups of the same name stay apart by batch
+mm = t("st_grp_merge", "mags").set_index(["batch", "assembly", "bin"])
+assert ("ga", "g1", "binette_bin1") in mm.index and ("gb", "g1", "binette_bin1") in mm.index, mm.index
+ma = t("st_grp_merge", "mag_abundance")
+assert set(zip(ma["batch"], ma["assembly"], ma["sample"])) == {("ga", "g1", "sampleC"), ("ga", "g2", "sampleD"),
+                                                              ("gb", "g1", "sampleE"), ("gb", "g2", "sampleF")}, ma
 PYEOF
 check "ARG RPKG = RPKM x clean pairs / 1e6 / genome equivalents (NA_no_ags without MicrobeCensus)" py - <<'PYEOF'
 import pandas as pd

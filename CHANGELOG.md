@@ -12,6 +12,30 @@ next release is tagged.
 
 ### Added
 
+- **One co-assembly per sample group** (`--coassembly_group_by <column>`). With
+  `--assembly_mode coassembly`, a column of `--sample_metadata` (the table the
+  run summary reads) splits the samples into groups, and each group gets its
+  own co-assembly: MEGAHIT (and BBNorm), the contig index, one alignment per
+  sample against its own group's co-assembly, the pooled BAM, binning and MAG
+  depth over the group's samples, contig taxonomy and ARGs, geNomad, bin-level
+  ARG clustering, the contig functional branch (each sample's reads counted on
+  its group's genes) and Bakta. A group's outputs go under
+  `<stage>/coassembly/<label>/` (also in the folders named by the assembly,
+  such as `05_arg_prediction/contig_level/deeparg/coassembly/<label>/`), the
+  label being the value with characters outside `A-Za-z0-9._-` replaced by
+  `_`; `pipeline_info/coassembly_groups.tsv` lists each sample's group, and the
+  summary's `assembly` column holds the label. One-sample groups are allowed.
+  Startup errors: the option without `--assembly_mode coassembly` or
+  `--sample_metadata`, a missing column, samples with no row or no value (all
+  listed), two values with the same label or labels that differ only in letter
+  case, and a label equal to a sample id or
+  `coassembly` or not starting with a letter or digit. Without the option
+  nothing changes (one co-assembly called `coassembly`, same paths and
+  files), except that every co-assembly task's input now carries the group
+  fields, so `-resume` of a co-assembly work directory from an earlier release
+  reruns those tasks. Keep each group's samples in one run: a group split
+  across batches is co-assembled once per batch. Independent of
+  `--summary_group_by`, which only groups the summary's figures.
 - **Pipeline overview figure and up-to-date workflow diagrams** (docs only).
   `docs/images/bugbuster_overview.svg` (hand-written, Inter embedded, Okabe-Ito
   accents) and its PNG, rendered by `docs/images/render_overview.sh` in pinned
@@ -468,6 +492,36 @@ next release is tagged.
 
 ### Changed
 
+- **MAG depth has one definition in both assembly modes.** A MAG's depth in a
+  sample (`04_binning/.../coverage/<sample>_bin_depth.tsv`, `Bin_summary.csv`'s
+  `<sample>_avgcov` and the summary's `mag_abundance`) is now the mean of its
+  contigs' depths weighted by contig length, from the depths MetaBAT2 bins on
+  (`jgi_summarize_bam_contig_depths`: alignments at >= 97 % identity, 75 bp at
+  each contig end left out). Before, the co-assembly depth (BEDTOOLS_BIN_DEPTH)
+  counted every mapped read and weighted every contig equally, and per-sample
+  assemblies had a depth in the summary only with `--contig_tax_and_arg`
+  (from the contig table's coverage). A new `BIN_DEPTH` step replaces
+  `BIN_CONTIG_TABLE` + `BEDTOOLS_BIN_DEPTH`; `CALCULATE_DEPTH` now runs
+  whenever binning does, with or without MetaBAT2, and per-sample assemblies
+  publish `04_binning/per_sample/<sample>/coverage/<sample>_bin_depth.tsv`.
+  On the reference runs: per-sample assembly new/old median 0.998 (0.98-1.01,
+  45 MAGs); co-assembly median 0.993 (Spearman 0.993, 180 MAG x sample rows),
+  with the largest moves at depths below 0.1x (0.09-2.5x of the old value).
+- **Launch warning for the default per-sample SemiBin2 model.** Per-sample
+  SemiBin2 uses a model pre-trained on one environment, `human_gut` unless
+  `--semibin_env_model` says otherwise. When binning runs per sample with
+  SemiBin2 and the parameter is not set, the run now warns at launch and
+  suggests `global` for samples that are not from a human gut. Its config
+  default is now empty (null; `human_gut` is still applied), so an explicit
+  `--semibin_env_model human_gut` gives no warning. Bins do not change.
+- **COMEBin reads one BAM per sample under co-assembly.** It now gets the
+  co-assembly's per-sample BAMs (one coverage column each, as MetaBAT2's
+  depths) instead of their `samtools merge`; SemiBin2 and BlobTools keep the
+  pooled BAM. On a three-sample co-assembly (42.8 Mbp) it cost the same (20.0
+  vs 21.9 CPU-hours) and, with SemiBin2 and MetaBAT2, Binette kept 9 MAGs
+  instead of 8, 4 of them high quality either way
+  (`docs/benchmarks/coassembly_comebin_bams_2026.md`). COMEBin's bins under
+  co-assembly change; per-sample assembly is unchanged.
 - **Run summary report: a multi-page HTML site and a PDF** (`00_summary/`).
   The one-page `results_summary.html` is replaced by an offline HTML report in
   `report/` (`results_summary.html` now opens `report/index.html`): an
@@ -1144,6 +1198,12 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Run summary metadata read trimmed (`bin/results_summary.py`)**: the
+  `--sample_metadata` table's column names and values are read without
+  surrounding spaces or a byte-order mark, as `--coassembly_group_by` reads
+  it, so `--summary_group_by site` finds a `site ` column and ` sampleA`
+  matches the sample `sampleA`.
 
 - **Taxonomy bar plots (`02_taxonomy/figures/`, `bin/taxonomy_phyloseq.py`)**: the
   plots no longer add an "Other" legend entry at 0% when every taxon at the

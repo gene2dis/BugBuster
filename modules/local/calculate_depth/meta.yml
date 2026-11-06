@@ -1,5 +1,5 @@
 name: calculate_depth
-description: Per-contig read depth from reads-vs-contigs BAMs with jgi_summarize_bam_contig_depths, as the abundance input for MetaBAT2
+description: Per-contig read depth from reads-vs-contigs BAMs with jgi_summarize_bam_contig_depths, the abundance input for MetaBAT2 and for BIN_DEPTH's MAG depth
 keywords:
   - depth
   - coverage
@@ -15,7 +15,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly' under co-assembly)
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id under co-assembly, 'coassembly' or its --coassembly_group_by group's label; meta.coassembly true)
   - contigs:
       type: file
       description: Length-filtered contigs, passed through to the output for METABAT2

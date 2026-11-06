@@ -50,6 +50,8 @@ process RESULTS_SUMMARY {
     // (--summary_batch_label, or the output directory's name)
     def run_dir = "run/results"
     def batch_label = task.ext.batch_label ?: 'run'
+    // per_sample/<sample>/ or coassembly/ for the bin depth tables (ext.assembly_mode: --assembly_mode)
+    def bin_depth_dir = task.ext.assembly_mode == 'assembly' ? 'per_sample' : 'coassembly'
     """
     mkdir -p ${run_dir}/01_quality_control/summary ${run_dir}/01_quality_control/fastp \\
         ${run_dir}/02_taxonomy/tables ${run_dir}/02_taxonomy/sylph \\
@@ -93,8 +95,18 @@ process RESULTS_SUMMARY {
     done
     # run-level tables of the other stages, laid out at their published paths by file name; a new stage
     # adds one case here and one mix() into ch_summary_reports in main.nf
-    # an assembly's folder: coassembly, or per_sample/<sample>
-    asm_dir() { [ "\$1" = coassembly ] && echo coassembly || echo "per_sample/\$1"; }
+    # coassembly_groups.tsv (--coassembly_group_by): sample -> co-assembly group, staged with the stage tables
+    groups=in_reports/coassembly_groups.tsv
+    is_group() { [ -e "\$groups" ] && cut -f2 "\$groups" | tail -n +2 | grep -qxF -- "\$1"; }
+    group_of() { if [ -e "\$groups" ]; then awk -F '\t' -v s="\$1" 'NR > 1 && \$1 == s { print \$2 }' "\$groups"; fi; }
+    # an assembly's folder: coassembly, coassembly/<group>, or per_sample/<sample>
+    asm_dir() {
+        if [ "\$1" = coassembly ]; then echo coassembly
+        elif is_group "\$1"; then echo "coassembly/\$1"
+        else echo "per_sample/\$1"; fi
+    }
+    # an assembly's folder under the id-keyed stage folders (deeparg/, mags/): <id>, or coassembly/<group>
+    id_dir() { if is_group "\$1"; then echo "coassembly/\$1"; else echo "\$1"; fi; }
     for f in in_reports/*; do
         [ -e "\$f" ] || continue
         name=\$(basename "\$f")
@@ -112,16 +124,26 @@ process RESULTS_SUMMARY {
             Contig_tax_and_arg_prediction.tsv)
                 dest=${run_dir}/05_arg_prediction/contig_level/summary ;;
             *_contigs_deep_arg.out.mapping.ARG)
-                dest=${run_dir}/05_arg_prediction/contig_level/deeparg/\${name%_contigs_deep_arg.out.mapping.ARG} ;;
+                dest=${run_dir}/05_arg_prediction/contig_level/deeparg/\$(id_dir "\${name%_contigs_deep_arg.out.mapping.ARG}") ;;
             Arg_cluster_*_cluster.tsv)
                 dest=${run_dir}/05_arg_prediction/bin_level/clustering ;;
-            contig_filtering_summary.txt)
+            contig_filtering_summary.txt|coassembly_groups.tsv)
                 dest=${run_dir}/pipeline_info ;;
             *_contig.stats)
                 id=\${name%_contig.stats}
                 dest=${run_dir}/03_assembly/\$(asm_dir "\$id") ;;
             *_bin_depth.tsv)
-                dest=${run_dir}/04_binning/coassembly/coverage ;;
+                # <sample>_bin_depth.tsv: next to the sample's own assembly in per-sample mode, else
+                # its co-assembly's
+                s=\${name%_bin_depth.tsv}
+                g=\$(group_of "\$s")
+                if [ -n "\$g" ]; then
+                    dest=${run_dir}/04_binning/coassembly/\$g/coverage
+                elif [ "${bin_depth_dir}" = per_sample ]; then
+                    dest=${run_dir}/04_binning/per_sample/\$s/coverage
+                else
+                    dest=${run_dir}/04_binning/coassembly/coverage
+                fi ;;
             *_gtdbtk_bac120.tsv|*_gtdbtk_ar53.tsv)
                 id=\${name%_gtdbtk_*}
                 dest=${run_dir}/04_binning/\$(asm_dir "\$id")/taxonomy/gtdbtk ;;
@@ -132,7 +154,7 @@ process RESULTS_SUMMARY {
                 dest=${run_dir}/04_binning/\$(asm_dir "\$id")/quality/checkm2 ;;
             *_binette_bin*.tsv|*_binette_bin*.txt)
                 # Bakta's <id>_<bin>.tsv / .txt (it runs on Binette's refined bins only)
-                dest=${run_dir}/07_functional_annotation/mags/\${name%_binette_bin*} ;;
+                dest=${run_dir}/07_functional_annotation/mags/\$(id_dir "\${name%_binette_bin*}") ;;
             *)
                 echo "WARNING: RESULTS_SUMMARY does not read \$name; skipped" >&2
                 continue ;;

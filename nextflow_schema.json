@@ -57,6 +57,12 @@
                     "help_text": "Choose 'assembly' for individual sample assembly, 'coassembly' to combine all samples, or 'none' to skip assembly.",
                     "fa_icon": "fas fa-puzzle-piece"
                 },
+                "coassembly_group_by": {
+                    "type": "string",
+                    "description": "Column of --sample_metadata that groups the samples of a co-assembly: one co-assembly per distinct value (needs --assembly_mode coassembly and --sample_metadata). Without it every sample goes into one co-assembly.",
+                    "help_text": "Every sample of the samplesheet needs a row and a value. Each group's outputs go under <stage>/coassembly/<group>/, the label being the value with characters outside A-Z, a-z, 0-9, '.', '_' and '-' replaced by '_'. Keep each group's samples in one run (batch): a group split across runs is co-assembled once per run.",
+                    "fa_icon": "fas fa-object-group"
+                },
                 "taxonomic_profiler": {
                     "type": "string",
                     "default": "sylph",
@@ -661,7 +667,6 @@
                 },
                 "semibin_env_model": {
                     "type": "string",
-                    "default": "human_gut",
                     "enum": [
                         "human_gut",
                         "dog_gut",
@@ -676,7 +681,7 @@
                         "chicken_caecum",
                         "global"
                     ],
-                    "description": "SemiBin environment model for binning.",
+                    "description": "SemiBin2 pre-trained environment model for per-sample assemblies. Default human_gut, with a launch warning when not set: use global for samples that are not from a human gut.",
                     "fa_icon": "fas fa-globe"
                 },
                 "semibin_coassembly_mode": {

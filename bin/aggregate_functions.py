@@ -4,7 +4,8 @@ coordinates into the canonical functional-annotation tables (design doc
 Sections 4.8, 5, 6; tasks T4 (TPM), T5 (CPGE) and T6 (dbCAN) — contig branch).
 
 Inputs per sample (per co-assembly for annotations/GFF/dbCAN under coassembly
-mode):
+mode; with --coassembly-groups one co-assembly per group, each sample counted
+against its group's):
   - <id>.featureCounts.txt   gene counts (FEATURECOUNTS_GENES)
   - <id>.emapper.annotations eggNOG-mapper v3 annotations
   - <id>.gff[.gz]            Pyrodigal gene coordinates
@@ -344,6 +345,22 @@ def parse_gff(path):
     return genes
 
 
+def parse_coassembly_groups(path):
+    """coassembly_groups.tsv (sample, group; the pipeline's
+    pipeline_info/coassembly_groups.tsv) -> {sample: group}."""
+    table = pd.read_csv(path, sep='\t', dtype=str, keep_default_na=False)
+    if list(table.columns) != ['sample', 'group']:
+        fail(f"{path}: expected the columns sample and group, got "
+             f"{list(table.columns)}")
+    if table['sample'].duplicated().any():
+        fail(f"{path}: duplicate samples "
+             f"{sorted(table.loc[table['sample'].duplicated(), 'sample'])}")
+    if (table['group'] == '').any():
+        fail(f"{path}: no group for sample(s) "
+             f"{sorted(table.loc[table['group'] == '', 'sample'])}")
+    return dict(zip(table['sample'], table['group']))
+
+
 def parse_ags(path):
     """MICROBECENSUS <id>.ags.tsv -> (sample, values dict).
 
@@ -598,6 +615,15 @@ Examples:
       --dbcan coassembly.overview.tsv \\
       --dbcan-versions-yml dbcan_versions.yml \\
       --eggnog-versions-yml versions.yml --output-dir .
+
+  # Co-assembly per group (--coassembly_group_by): one annotations file, GFF
+  # and dbCAN overview per group, named by the group; groups.tsv maps samples
+  aggregate_functions.py --assembly-mode coassembly \\
+      --coassembly-groups coassembly_groups.tsv \\
+      --counts s1.featureCounts.txt s2.featureCounts.txt s3.featureCounts.txt \\
+      --annotations g1.emapper.annotations g2.emapper.annotations \\
+      --gffs g1.gff.gz g2.gff.gz \\
+      --eggnog-versions-yml versions.yml --output-dir .
         """
     )
     parser.add_argument('--counts', required=True, nargs='+', type=Path,
@@ -638,6 +664,11 @@ Examples:
     parser.add_argument('--assembly-mode', required=True,
                         choices=['assembly', 'coassembly'],
                         help='Drives the join topology and the assembly_mode column')
+    parser.add_argument('--coassembly-groups', type=Path, default=None,
+                        help='coassembly mode with one co-assembly per group: '
+                             'a TSV with sample and group columns; each '
+                             "sample's annotations, GFF and dbCAN overview "
+                             'are its group\'s (files named by the group)')
     parser.add_argument('--output-dir', required=True, type=Path,
                         help='Directory for the output tables')
     return parser.parse_args()
@@ -648,6 +679,7 @@ def main():
 
     for path in [*args.counts, *args.annotations, *args.gffs, *args.ags,
                  *args.dbcan, args.eggnog_versions_yml,
+                 *([args.coassembly_groups] if args.coassembly_groups else []),
                  *([args.cog_def] if args.cog_def else []),
                  *([args.dbcan_versions_yml] if args.dbcan_versions_yml else [])]:
         if not path.exists():
@@ -709,6 +741,9 @@ def main():
               f"{', '.join(ags_missing)} — cpge left empty (TPM-only "
               f"fallback, design doc Section 4.7)", file=sys.stderr)
 
+    if args.coassembly_groups and args.assembly_mode != 'coassembly':
+        fail("--coassembly-groups needs --assembly-mode coassembly")
+
     # Join topology (design doc Section 3.5): per-sample gene sets under
     # 'assembly'; one shared co-assembly gene set under 'coassembly'. dbCAN
     # overviews follow the annotations shape (the tool runs on the same
@@ -724,6 +759,26 @@ def main():
                  f"--dbcan {sorted(dbcan_by_id)} do not match")
         gff_for = dict(gffs_by_id)
         annotations_for = dict(annotations_by_id)
+    elif args.coassembly_groups:
+        # one co-assembly per group: each sample takes its group's unit; the
+        # units are the files' ids (gene ids repeat across co-assemblies, so a
+        # sample must never meet another group's genes)
+        unit_of = parse_coassembly_groups(args.coassembly_groups)
+        missing = sorted(set(sample_ids) - set(unit_of))
+        if missing:
+            fail(f"--coassembly-groups has no group for sample(s) {missing}")
+        units = {unit_of[sample] for sample in sample_ids}
+        for label, keys in [('annotations', annotations_by_id),
+                            ('GFFs', gffs_by_id)]:
+            if set(keys) != units:
+                fail(f"groups of --counts {sorted(units)} and "
+                     f"--{label.lower()} {sorted(keys)} do not match")
+        if dbcan_by_id and set(dbcan_by_id) != units:
+            fail(f"groups of --counts {sorted(units)} and --dbcan "
+                 f"{sorted(dbcan_by_id)} do not match")
+        gff_for = {sample: gffs_by_id[unit_of[sample]] for sample in sample_ids}
+        annotations_for = {sample: annotations_by_id[unit_of[sample]]
+                           for sample in sample_ids}
     else:
         if len(annotations_by_id) != 1 or len(gffs_by_id) != 1:
             fail(f"coassembly mode expects exactly one annotations file and one "
@@ -749,6 +804,11 @@ def main():
             sample: dbcan_exploded_by_id.get(sample, empty_exploded)
             for sample in sample_ids
         }
+    elif args.coassembly_groups:
+        dbcan_exploded_for = {
+            sample: dbcan_exploded_by_id.get(unit_of[sample], empty_exploded)
+            for sample in sample_ids
+        }
     else:
         shared_dbcan_exploded = (next(iter(dbcan_exploded_by_id.values()))
                                  if dbcan_exploded_by_id else empty_exploded)
@@ -763,6 +823,9 @@ def main():
     }
     if args.assembly_mode == 'assembly':
         eggnog_exploded_for = {sample: exploded_by_id[sample]
+                               for sample in sample_ids}
+    elif args.coassembly_groups:
+        eggnog_exploded_for = {sample: exploded_by_id[unit_of[sample]]
                                for sample in sample_ids}
     else:
         shared_eggnog_exploded = next(iter(exploded_by_id.values()))
@@ -830,9 +893,11 @@ def main():
     annotation_parts = []
     for unit in sorted(set(exploded_by_id) | set(dbcan_exploded_by_id)):
         # Under coassembly the single annotations unit pairs with the single
-        # shared GFF whatever either file is named; under assembly the ids match
+        # shared GFF whatever either file is named; under assembly and with
+        # co-assembly groups the ids match
         genes = next(iter(gffs_by_id.values())) \
-            if args.assembly_mode == 'coassembly' else gff_for[unit]
+            if args.assembly_mode == 'coassembly' and not args.coassembly_groups \
+            else gffs_by_id[unit]
         for exploded, tool, part_tool_version, part_db_version in [
                 (exploded_by_id.get(unit), 'eggnog-mapper',
                  tool_version, db_version),

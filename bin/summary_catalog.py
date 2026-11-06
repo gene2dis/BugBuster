@@ -53,7 +53,9 @@ STAGES = [
     },
     {
         "key": "assembly", "title": "Assembly (MEGAHIT)",
-        "params": "--assembly_mode (assembly | coassembly | none), --assembly_read_reduction (none | normalize), --megahit_k_list, --megahit_min_count",
+        "params": "--assembly_mode (assembly | coassembly | none), --coassembly_group_by (one co-assembly per "
+                  "--sample_metadata group), --assembly_read_reduction (none | normalize), --megahit_k_list, "
+                  "--megahit_min_count",
         "processes": ["BBNORM", "MEGAHIT", "BBMAP", "CONTIG_FILTER_SUMMARY"],
         "summary": "assembly_stats (contigs, length, N50, contigs kept by the length filter); assembly_read_use (% "
                    "of reads on contigs and genes, with --contig_level_functional)",
@@ -62,7 +64,7 @@ STAGES = [
         "key": "binning", "title": "Binning and MAGs (SemiBin2 / MetaBAT2 / COMEBin, Binette, CheckM2, GTDB-Tk)",
         "params": "--include_binning, --binners (Binette refinement with >= 2 binners)",
         "processes": ["SEMIBIN", "METABAT2", "COMEBIN", "BINETTE", "CHECKM2_BATCH", "GTDB_TK_BATCH",
-                      "BEDTOOLS_BIN_DEPTH"],
+                      "CALCULATE_DEPTH", "BIN_DEPTH"],
         "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {

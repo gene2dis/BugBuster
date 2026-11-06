@@ -16,7 +16,7 @@ tools:
 input:
   - meta:
       type: map
-      description: Sample metadata (meta.id is the sample name, or 'coassembly')
+      description: Sample metadata (meta.id is the sample name, or the co-assembly's id, 'coassembly' or its --coassembly_group_by group's label)
   - proteins:
       type: file
       description: Predicted protein FASTA from gene calling (gzipped accepted)
