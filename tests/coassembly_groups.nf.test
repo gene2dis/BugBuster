@@ -78,7 +78,7 @@ nextflow_pipeline {
                 assembly_mode           = "coassembly"
                 taxonomic_profiler      = "none"
                 include_binning         = true
-                binners                 = "semibin,metabat2"
+                binners                 = "semibin,metabat2,comebin"
                 contig_tax_and_arg      = true
                 genomad_prediction      = true
                 arg_bin_clustering      = true
@@ -103,8 +103,23 @@ nextflow_pipeline {
             assert count("BINNING:BIN_DEPTH (") == 2
             assert count("BINNING:BIN_SUMMARY (") == 2
             assert count("BINNING:BINETTE (") == 2
+            assert count("BINNING:COMEBIN (") == 2
             assert count("FUNCTIONAL_ANNOTATION:FEATURECOUNTS_GENES (") == 3
             assert count("FUNCTIONAL_ANNOTATION:EGGNOG_MAPPER_SEARCH (") == 2
+
+            // COMEBin reads its group's per-sample BAMs, not their merge (B3)
+            def comebin_bams = [:]
+            new File("${outputDir}/../work").eachDir { a -> a.eachDir { d ->
+                def cmd = new File(d, '.command.sh')
+                if (cmd.exists() && cmd.text.contains('_comebin_bins/comebin_res')) {
+                    def contigs = d.list().find { n -> n.endsWith('_filtered_contigs.fa') }
+                    comebin_bams[contigs] = d.list().findAll { n -> n.endsWith('.bam') }.sort()
+                }
+            } }
+            assert comebin_bams == [
+                'group_A_filtered_contigs.fa': ['test_sample1_all_reads.bam', 'test_sample2_all_reads.bam'],
+                'solo_filtered_contigs.fa'   : ['test_sample3_all_reads.bam']
+            ]
 
             def o = "${outputDir}"
             assert path("${o}/pipeline_info/coassembly_groups.tsv").readLines() ==

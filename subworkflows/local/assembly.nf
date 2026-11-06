@@ -195,9 +195,9 @@ workflow ASSEMBLY {
         ch_contigs_only = BBMAP.out.contigs_only
 
         // One alignment per sample against the co-assembly (issue #28): the
-        // per-sample BAMs count genes (design doc Q1/T3), give MetaBAT2 one
-        // depth column per sample and bin depth per sample, and their samtools
-        // merge is the pooled BAM SemiBin2, COMEBin and BlobTools take. A merge
+        // per-sample BAMs count genes (design doc Q1/T3), give MetaBAT2 and
+        // COMEBin one coverage column per sample and bin depth per sample, and
+        // their samtools merge is the pooled BAM SemiBin2 and BlobTools take. A merge
         // of the per-sample BAMs holds the same records as mapping every
         // sample in one task did. No read groups, as before: nothing
         // downstream reads them.

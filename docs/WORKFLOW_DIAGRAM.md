@@ -276,8 +276,8 @@ flowchart TD
     Aln -->|"bwamem3 (default)"| BWAMEM3_INDEX --> BWAMEM3_SAMTOOLS
     Aln -->|bowtie2| BOWTIE2_SAMTOOLS
     BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS --> SampleBAM(["per-sample BAM<br/>assembly: vs its own contigs<br/>coassembly: each sample once<br/>vs its co-assembly"])
-    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM per co-assembly:<br/>SemiBin2, COMEBin, BlobTools"]
-    SampleBAM -->|"featureCounts, MetaBAT2 depths,<br/>bin depth (co-assembly)"| Out(["counting_bam"])
+    SampleBAM -->|"coassembly and<br/>(include_binning or contig_tax_and_arg)"| NFCORE_SAMTOOLS_MERGE["NFCORE_SAMTOOLS_MERGE<br/>pooled BAM per co-assembly:<br/>SemiBin2, BlobTools"]
+    SampleBAM -->|"featureCounts, MetaBAT2 depths,<br/>COMEBin, bin depth"| Out(["counting_bam"])
 
     BBMAP -->|filter reports| CONTIG_FILTER_SUMMARY
     BWAMEM3_SAMTOOLS & BOWTIE2_SAMTOOLS -->|empty-contig reports| CONTIG_FILTER_SUMMARY["CONTIG_FILTER_SUMMARY<br/>contig_filtering_summary.txt"]
@@ -301,7 +301,7 @@ flowchart TD
     Sel -->|"semibin (default)"| SEMIBIN["SEMIBIN<br/>per sample: human_gut model<br/>coassembly: pre-trained global"]
     Sel -->|metabat2| METABAT2
     CALCULATE_DEPTH --> METABAT2
-    Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow"]
+    Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow<br/>coassembly: per-sample BAMs"]
 
     SEMIBIN & METABAT2 & COMEBIN --> N{number of binners}
     N -->|"≥ 2"| BINETTE["BINETTE<br/>refinement; CheckM2 of raw<br/>and refined bins"]

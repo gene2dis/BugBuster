@@ -2,7 +2,7 @@
 
 Benchmark run 2026-11-06 (roadmap Phase 15, B3). Under co-assembly, COMEBin gets the pooled BAM: the samtools merge of the per-sample alignments. Every sample is already aligned to its co-assembly on its own (Phase 7c), and MetaBAT2 and the MAG depth already read those per-sample BAMs. COMEBin accepts several BAMs and reads one coverage column from each. This benchmark asks whether giving it the per-sample BAMs changes its bins, or the bins Binette keeps.
 
-No pipeline code changed. **Decision: the owner's.** The COMEBin input stays as it is until then.
+**Decision (owner, 2026-11-06): switch.** Under co-assembly COMEBin now gets the per-sample BAMs, in the same PR (roadmap Phase 15); the benchmark itself changed no pipeline code.
 
 **Outcome:**
 

@@ -513,6 +513,14 @@ next release is tagged.
   suggests `global` for samples that are not from a human gut. Its config
   default is now empty (null; `human_gut` is still applied), so an explicit
   `--semibin_env_model human_gut` gives no warning. Bins do not change.
+- **COMEBin reads one BAM per sample under co-assembly.** It now gets the
+  co-assembly's per-sample BAMs (one coverage column each, as MetaBAT2's
+  depths) instead of their `samtools merge`; SemiBin2 and BlobTools keep the
+  pooled BAM. On a three-sample co-assembly (42.8 Mbp) it cost the same (20.0
+  vs 21.9 CPU-hours) and, with SemiBin2 and MetaBAT2, Binette kept 9 MAGs
+  instead of 8, 4 of them high quality either way
+  (`docs/benchmarks/coassembly_comebin_bams_2026.md`). COMEBin's bins under
+  co-assembly change; per-sample assembly is unchanged.
 - **Run summary report: a multi-page HTML site and a PDF** (`00_summary/`).
   The one-page `results_summary.html` is replaced by an offline HTML report in
   `report/` (`results_summary.html` now opens `report/index.html`): an

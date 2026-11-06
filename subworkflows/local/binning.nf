@@ -75,8 +75,10 @@ workflow BINNING {
     // so it runs whatever the binners. Under co-assembly it gets one depth
     // column per sample, from the per-sample BAMs in sample order
     // (docs/benchmarks/binning_2026.md: MIMAG high-quality MetaBAT2 bins
-    // 11 -> 23); SemiBin2 and COMEBin keep the pooled BAM (SemiBin2's
-    // pre-trained models take one coverage column)
+    // 11 -> 23), and so does COMEBin (one coverage column per BAM:
+    // docs/benchmarks/coassembly_comebin_bams_2026.md, roadmap Phase 15 B3);
+    // SemiBin2 keeps the pooled BAM (its pre-trained models take one
+    // coverage column)
     // Under co-assembly each co-assembly (one per --coassembly_group_by
     // group) takes its own samples' BAMs; it knows how many, so a group's
     // depths start once its BAMs are done
@@ -109,7 +111,7 @@ workflow BINNING {
     }
 
     if (use_comebin) {
-        COMEBIN(contigs_and_bam)
+        COMEBIN(ch_depth_input)
         ch_versions = ch_versions.mix(COMEBIN.out.versions.first())
     }
 

@@ -758,11 +758,14 @@ keeps same-named groups of different batches apart by the `batch` column.
 
 **Co-assembly coverage.** Under `--assembly_mode coassembly` each sample's reads
 are aligned once against the co-assembly. Those per-sample BAMs give MetaBAT2
-one depth column per sample, count genes for the functional branch and give
-each refined bin its per-sample depth; SemiBin2 (whose pre-trained models take
-one coverage column) and COMEBin get their `samtools merge`, the pooled BAM. On
-a five-sample co-assembly the per-sample depths raised MetaBAT2's MIMAG
-high-quality bins from 11 to 23 (`docs/benchmarks/binning_2026.md`).
+and COMEBin one coverage column per sample, count genes for the functional
+branch and give each refined bin its per-sample depth; SemiBin2 (whose
+pre-trained models take one coverage column) gets their `samtools merge`, the
+pooled BAM. On a five-sample co-assembly the per-sample depths raised
+MetaBAT2's MIMAG high-quality bins from 11 to 23
+(`docs/benchmarks/binning_2026.md`); on a three-sample one COMEBin cost the
+same with the per-sample BAMs as with the pooled BAM, and Binette kept 9 MAGs
+instead of 8 (`docs/benchmarks/coassembly_comebin_bams_2026.md`).
 
 **MAG depth.** In both assembly modes `coverage/<sample>_bin_depth.tsv` gives
 each refined bin's mean read depth in each sample aligned to its assembly (its
