@@ -77,6 +77,11 @@ def coassemblyGroups() {
     if (clashes) {
         error("--coassembly_group_by ${column}: the values ${clashes.collect { label, values -> values.keySet().collect { v -> "'${v}'" }.join(' and ') + " both become '${label}'" }.join('; ')} (characters outside A-Z, a-z, 0-9, '.', '_' and '-' become '_'): make them differ in those characters")
     }
+    // folder names that differ only in letter case are one folder on a case-insensitive filesystem
+    def case_clashes = label_of.groupBy { _value, label -> label.toLowerCase() }.findAll { _key, values -> values.size() > 1 }
+    if (case_clashes) {
+        error("--coassembly_group_by ${column}: the values ${case_clashes.collect { _key, values -> values.keySet().collect { v -> "'${v}'" }.join(' and ') }.join('; ')} give labels that differ only in letter case (${case_clashes.collect { _key, values -> values.values().collect { l -> "'${l}'" }.join(' and ') }.join('; ')}), the same folder on a case-insensitive filesystem: make them differ in more than case")
+    }
     label_of.each { value, label ->
         if (!(label ==~ /[A-Za-z0-9][A-Za-z0-9_.\-]*/)) {
             error("--coassembly_group_by ${column}: the value '${value}' gives the label '${label}', which does not start with a letter or digit")

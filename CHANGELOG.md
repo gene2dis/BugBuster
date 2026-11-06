@@ -27,7 +27,8 @@ next release is tagged.
   summary's `assembly` column holds the label. One-sample groups are allowed.
   Startup errors: the option without `--assembly_mode coassembly` or
   `--sample_metadata`, a missing column, samples with no row or no value (all
-  listed), two values with the same label, and a label equal to a sample id or
+  listed), two values with the same label or labels that differ only in letter
+  case, and a label equal to a sample id or
   `coassembly` or not starting with a letter or digit. Without the option
   nothing changes (one co-assembly called `coassembly`, same paths and
   files), except that every co-assembly task's input now carries the group
@@ -1197,6 +1198,12 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Run summary metadata read trimmed (`bin/results_summary.py`)**: the
+  `--sample_metadata` table's column names and values are read without
+  surrounding spaces or a byte-order mark, as `--coassembly_group_by` reads
+  it, so `--summary_group_by site` finds a `site ` column and ` sampleA`
+  matches the sample `sampleA`.
 
 - **Taxonomy bar plots (`02_taxonomy/figures/`, `bin/taxonomy_phyloseq.py`)**: the
   plots no longer add an "Other" legend entry at 0% when every taxon at the

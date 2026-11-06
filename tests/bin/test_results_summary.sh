@@ -397,6 +397,16 @@ allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_host
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
 
+# a metadata table with a byte-order mark and spaces around its names and values reads as the trimmed one
+printf '\xef\xbb\xbfsample \t subject\nsampleA \t S1\n sampleB\tS2 \n' > padded_meta.tsv
+check "metadata with a BOM and padded names and values" \
+    py "${SUMMARY}" --results run1/results --outdir paddedmeta --metadata padded_meta.tsv --group-by subject --min-clean-pairs 10000
+check "the padded table's samples and groups are read trimmed" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("paddedmeta/tables/samples_qc.tsv", sep="\t", dtype=str)
+assert dict(zip(qc["sample"], qc["subject"])) == {"sampleA": "S1", "sampleB": "S2"}, qc[["sample", "subject"]]
+PYEOF
+
 # metadata columns named like common study variables are kept as they are
 printf 'sample\tgroup\ttype\tclass\tdescription\nsampleA\tg1\tt1\tc1\td1\nsampleB\tg2\tt2\tc2\td2\n' > common_meta.tsv
 check "metadata with group / type / class / description columns" \

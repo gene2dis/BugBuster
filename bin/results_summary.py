@@ -207,7 +207,10 @@ RESERVED_COLUMNS = {
 def load_metadata(path):
     """Metadata table -> (DataFrame with a 'sample' column, {original name: new name} of renamed columns)."""
     sep = "," if str(path).lower().endswith(".csv") else "\t"
-    meta = pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False)
+    # names and values read trimmed, without a byte-order mark, as --coassembly_group_by reads the table
+    meta = pd.read_csv(path, sep=sep, dtype=str, keep_default_na=False, encoding="utf-8-sig")
+    meta.columns = [str(c).strip() for c in meta.columns]
+    meta = meta.apply(lambda col: col.str.strip())
     key = "sample" if "sample" in meta.columns else meta.columns[0]
     meta = meta.rename(columns={key: "sample"})
     if meta["sample"].duplicated().any():

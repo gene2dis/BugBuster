@@ -277,6 +277,23 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects two group labels that differ only in letter case") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\tSiteA\ntest_sample2\tsitea\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("'SiteA' and 'sitea' give labels that differ only in letter case")
+        }
+    }
+
     test("Rejects a group label that is a sample id") {
         when {
             params {
