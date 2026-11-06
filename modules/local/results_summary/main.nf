@@ -50,6 +50,8 @@ process RESULTS_SUMMARY {
     // (--summary_batch_label, or the output directory's name)
     def run_dir = "run/results"
     def batch_label = task.ext.batch_label ?: 'run'
+    // per_sample/<sample>/ or coassembly/ for the bin depth tables (ext.assembly_mode: --assembly_mode)
+    def bin_depth_dir = task.ext.assembly_mode == 'assembly' ? 'per_sample' : 'coassembly'
     """
     mkdir -p ${run_dir}/01_quality_control/summary ${run_dir}/01_quality_control/fastp \\
         ${run_dir}/02_taxonomy/tables ${run_dir}/02_taxonomy/sylph \\
@@ -131,13 +133,13 @@ process RESULTS_SUMMARY {
                 id=\${name%_contig.stats}
                 dest=${run_dir}/03_assembly/\$(asm_dir "\$id") ;;
             *_bin_depth.tsv)
-                # <sample>_bin_depth.tsv: next to the sample's own assembly when it has one (per-sample
-                # mode, its <sample>_contig.stats is staged too), else the co-assembly's
+                # <sample>_bin_depth.tsv: next to the sample's own assembly in per-sample mode, else
+                # its co-assembly's
                 s=\${name%_bin_depth.tsv}
                 g=\$(group_of "\$s")
                 if [ -n "\$g" ]; then
                     dest=${run_dir}/04_binning/coassembly/\$g/coverage
-                elif [ -e "in_reports/\${s}_contig.stats" ]; then
+                elif [ "${bin_depth_dir}" = per_sample ]; then
                     dest=${run_dir}/04_binning/per_sample/\$s/coverage
                 else
                     dest=${run_dir}/04_binning/coassembly/coverage

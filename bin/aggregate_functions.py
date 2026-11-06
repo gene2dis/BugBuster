@@ -741,6 +741,9 @@ def main():
               f"{', '.join(ags_missing)} — cpge left empty (TPM-only "
               f"fallback, design doc Section 4.7)", file=sys.stderr)
 
+    if args.coassembly_groups and args.assembly_mode != 'coassembly':
+        fail("--coassembly-groups needs --assembly-mode coassembly")
+
     # Join topology (design doc Section 3.5): per-sample gene sets under
     # 'assembly'; one shared co-assembly gene set under 'coassembly'. dbCAN
     # overviews follow the annotations shape (the tool runs on the same
@@ -760,8 +763,6 @@ def main():
         # one co-assembly per group: each sample takes its group's unit; the
         # units are the files' ids (gene ids repeat across co-assemblies, so a
         # sample must never meet another group's genes)
-        if args.assembly_mode != 'coassembly':
-            fail("--coassembly-groups needs --assembly-mode coassembly")
         unit_of = parse_coassembly_groups(args.coassembly_groups)
         missing = sorted(set(sample_ids) - set(unit_of))
         if missing:

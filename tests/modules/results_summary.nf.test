@@ -199,6 +199,7 @@ nextflow_process {
                 output                  = "${outputDir}"
                 summary_min_clean_pairs = 10000
                 summary_batch_label     = "co"
+                assembly_mode           = "coassembly"
             }
             process {
                 """
@@ -242,6 +243,7 @@ nextflow_process {
                 output                  = "${outputDir}"
                 summary_min_clean_pairs = 10000
                 summary_batch_label     = "grp"
+                assembly_mode           = "coassembly"
             }
             process {
                 """

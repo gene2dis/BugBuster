@@ -334,6 +334,14 @@ NEXT_WORKDIR="${D}" expect_fail "groups: annotation files of other groups fail" 
     --annotations g1.emapper.annotations g2.emapper.annotations \
     --gffs g1.gff.gz g2.gff.gz \
     --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_other
+NEXT_WORKDIR="${D}" expect_fail "groups: --coassembly-groups with --assembly-mode assembly fails" \
+    --assembly-mode assembly --coassembly-groups coassembly_groups.tsv \
+    --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
+    --annotations g1.emapper.annotations g2.emapper.annotations \
+    --gffs g1.gff.gz g2.gff.gz \
+    --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_mode
+check "groups: the failure names --assembly-mode coassembly" \
+    "grep -q 'coassembly-groups needs --assembly-mode coassembly' '${D}.log'"
 
 #
 # 3. Empty gene set (empty-contig sample shape)
