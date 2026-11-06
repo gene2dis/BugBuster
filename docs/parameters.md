@@ -106,6 +106,12 @@ Complete reference for all BugBuster pipeline parameters.
   - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
 - **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
+### `--gunc_prediction`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Check each assembly's refined MAGs (Binette's, or the single binner's bins) for chimerism with GUNC 1.1.1 (DIAMOND 2.1.24, Prodigal 2.6.3) against `--gunc_db`. GUNC maps the MAG's genes to its reference and scores, at the taxonomic level where they split the most, how cleanly they separate into clades by contig (the clade separation score): it finds chimeras across distant lineages that CheckM2's completeness and contamination can miss. Needs `--include_binning` (rejected at launch otherwise); an assembly without refined bins is skipped with a warning. GUNC's maxCSS-level table goes to `04_binning/<per_sample/<sample> | coassembly[/<group>]>/quality/gunc/<assembly>_gunc_maxCSS_level.tsv`, and the summary's `mags` table gains `gunc_pass`, `clade_separation_score`, `contamination_portion` and `reference_representation_score`. A GUNC fail flags the MAG and does not change its MIMAG `quality_tier`. Cost in the Phase 16 harness: 15-35 min, ~9 GB and ~7 busy CPUs per assembly of 6-36 MAGs (8 CPUs, 16 GB requested)
+- **Example**: `--gunc_prediction true --custom_gunc_db /shared/databases/gunc/gunc_db_progenomes2.1.dmnd`
+
 ### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
@@ -141,6 +147,12 @@ Complete reference for all BugBuster pipeline parameters.
 - **Default**: `false`
 - **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 (nf-core `genomad/endtoend`, end-to-end with `--cleanup`), against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/`. With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `mobile_class`, `plasmid_score`, `virus_score`, `provirus` (provirus regions overlapping the ARG gene), `virus_taxonomy` and `plasmid_conjugation_genes`, and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo. Cost in the Phase 9c benchmark: 1.1-5.5 CPU-h and ~18 GB per assembly (`process_medium`)
 - **Example**: `--genomad_prediction true --custom_genomad_db /shared/databases/genomad_db`
+
+### `--checkv_prediction`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Estimate the quality of geNomad's virus calls with CheckV 1.1.1 (`end_to_end`; DIAMOND 2.1.8, HMMER 3.4) against `--checkv_db`: each assembly's whole virus contigs and the provirus regions geNomad found inside contigs (its `<assembly>_filtered_contigs_virus.fna.gz`) get a completeness (from amino-acid identity to CheckV's genomes, else from its HMMs), host contamination, closed-genome evidence and a quality tier (`Complete`, `High-quality`, `Medium-quality`, `Low-quality`, `Not-determined`). Needs `--genomad_prediction` (rejected at launch otherwise). Results in `06_contig_taxonomy/checkv/<assembly>/<assembly>_checkv/` (`quality_summary.tsv`, `completeness.tsv`, `contamination.tsv`, `complete_genomes.tsv`, `viruses.fna`, `proviruses.fna`); an assembly without virus calls gets a header-only `quality_summary.tsv`. With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `checkv_quality`, `checkv_completeness`, `checkv_contamination` and `checkv_provirus` (for virus contigs, and for ARG genes inside proviruses, one value per overlapping region), and `00_summary/tables/arg_contig_mobile.tsv` counts the ARG genes on virus contigs and in proviruses by CheckV tier. CheckV only reads its database. Cost in the Phase 16 harness: 0.6-6.6 min and 1.6-2.5 GB per assembly (8 CPUs, 8 GB requested)
+- **Example**: `--genomad_prediction true --checkv_prediction true --custom_checkv_db /shared/databases/checkv/checkv-db-v1.5`
 
 ### `--contig_level_functional`
 - **Type**: Boolean
@@ -243,12 +255,28 @@ Complete reference for all BugBuster pipeline parameters.
 - **Size**: 0.84 GB download, 2.2 GB unpacked
 - **Example**: `--genomad_db v1.9`
 
+### `--checkv_db`
+- **Type**: String
+- **Default**: `v1.5`
+- **Options**: `v1.5`
+- **Description**: CheckV database release for `--checkv_prediction`: the pinned NERSC file (`checkv-db-v1.5.tar.gz`; CheckV's own `download_database` takes whatever release is current). CheckV publishes no checksum: the download's size, the release in its `README.txt` and the files CheckV checks are verified, and the DIAMOND index is built with the image's DIAMOND, as `download_database` does
+- **Size**: 1.68 GB download, 6.4 GB unpacked with its DIAMOND index
+- **Example**: `--checkv_db v1.5`
+
 ### `--checkm2_db`
 - **Type**: String
 - **Default**: `v3`
 - **Description**: CheckM2 database version
 - **Size**: 2.9 GB
 - **Example**: `--checkm2_db v3`
+
+### `--gunc_db`
+- **Type**: String
+- **Default**: `progenomes_2.1`
+- **Options**: `progenomes_2.1`, `gtdb_214`
+- **Description**: GUNC reference for `--gunc_prediction`: the DIAMOND database GUNC 1.1.1's `download_db` fetches (Zenodo records 19631736 and 19632326), checked against both md5s it records. `gtdb_214` is the GTDB-based reference (GTDB release 214); both are older than the GTDB r232 that GTDB-Tk classifies against
+- **Size**: `progenomes_2.1` 7.2 GB download, 13.5 GB unpacked; `gtdb_214` 37.9 GB download
+- **Example**: `--gunc_db progenomes_2.1`
 
 ### `--gtdbtk_db`
 - **Type**: String
@@ -378,6 +406,11 @@ Override automatic downloads by providing custom database paths:
 - **Description**: Path to custom CheckM2 database file
 - **Example**: `--custom_checkm2_db /path/to/checkm2.dmnd`
 
+### `--custom_gunc_db`
+- **Type**: String (file path)
+- **Description**: Path to a local GUNC DIAMOND database file (`.dmnd`); skips the download. Keep GUNC's file name (`gunc_db_progenomes2.1.dmnd`, `gunc_db_gtdb214.dmnd`): GUNC reads which reference it is, and so which taxonomy to map the genes to, from the file name, and takes any other name for proGenomes 2.1. The reference is recorded as `gunc_db` in `software_versions.yml`
+- **Example**: `--custom_gunc_db /shared/databases/gunc/gunc_db_progenomes2.1.dmnd`
+
 ### `--custom_gtdbtk_db`
 - **Type**: String (directory path)
 - **Description**: Path to the directory that **directly contains** the unarchived GTDB-Tk reference data (`markers/`, `skani/`, `taxonomy/`, `msa/`, ...) — the pipeline sets `GTDBTK_DATA_PATH` to this directory. For the official packages that is the extracted release directory itself (e.g. `release232/`), not its parent. The pipeline pins GTDB-Tk 2.8.0, which per the upstream compatibility table accepts **only GTDB R232** data; older R220/R226 packages require GTDB-Tk ≤ 2.6.1 and will not work
@@ -398,6 +431,11 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to a local geNomad database directory (`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); skips the download. geNomad 1.10-1.13 take database 1.9; its `version.txt` is recorded in `software_versions.yml`
 - **Example**: `--custom_genomad_db /shared/databases/genomad_db`
+
+### `--custom_checkv_db`
+- **Type**: String (directory path)
+- **Description**: Path to a local CheckV database directory; skips the download. It must hold `genome_db/checkv_reps.dmnd`, `genome_db/checkv_reps.tsv`, `genome_db/checkv_error.tsv`, `hmm_db/checkv_hmms.tsv` and `hmm_db/checkv_hmms/` (CheckV checks these before a run) and the release's `README.txt`, from which the version in `software_versions.yml` is read. A `checkv_reps.dmnd` built by an older DIAMOND 2.x reads fine (format version 3)
+- **Example**: `--custom_checkv_db /shared/databases/checkv/checkv-db-v1.5`
 
 ### `--custom_rgi_card_db`
 - **Type**: String (directory path)

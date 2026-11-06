@@ -12,6 +12,35 @@ next release is tagged.
 
 ### Added
 
+- **MAG chimerism check with GUNC** (`--gunc_prediction`, off by default; needs
+  `--include_binning`). GUNC 1.1.1 (DIAMOND 2.1.24, Prodigal 2.6.3;
+  `quay.io/biocontainers/gunc:1.1.1--pyhdfd78af_0` and its depot sif) checks
+  each assembly's refined MAGs (Binette's, or the single binner's bins) for
+  chimeras across lineages that CheckM2 can miss. Its maxCSS-level table goes
+  to `04_binning/<assembly>/quality/gunc/<assembly>_gunc_maxCSS_level.tsv`,
+  and the summary's `mags` table gains `gunc_pass`, `clade_separation_score`,
+  `contamination_portion` and `reference_representation_score` after
+  `tier_basis`. A GUNC fail flags the MAG and does not change its MIMAG
+  `quality_tier`. Reference: `--gunc_db progenomes_2.1` (default, 7.2 GB
+  download, 13.5 GB unpacked; `gtdb_214` for GTDB release 214, 37.9 GB),
+  md5-checked, stored in `<databases_dir>/gunc/<key>/`, or
+  `--custom_gunc_db` (a `.dmnd` under GUNC's own file name). Runs without the
+  option keep every output as before.
+- **Virus quality with CheckV** (`--checkv_prediction`, off by default; needs
+  `--genomad_prediction`). CheckV 1.1.1 (DIAMOND 2.1.8, HMMER 3.4;
+  `quay.io/biocontainers/checkv:1.1.1--pyh106432d_1` and its depot sif) rates
+  each assembly's geNomad virus contigs and proviruses: completeness, host
+  contamination, closed genomes and the quality tier, in
+  `06_contig_taxonomy/checkv/<assembly>/<assembly>_checkv/`. With
+  `--contig_tax_and_arg`, `Contig_tax_and_arg_prediction.tsv` gains
+  `checkv_quality`, `checkv_completeness`, `checkv_contamination` and
+  `checkv_provirus` after geNomad's columns, and the summary's
+  `arg_contig_mobile` gains the ARG genes on virus contigs and in proviruses
+  per CheckV tier (`arg_genes_viral_checkv_high`, `_medium`, `_low`,
+  `_not_determined`). Database: `--checkv_db v1.5` (1.68 GB download, 6.4 GB
+  unpacked with its DIAMOND index; size- and version-checked, stored in
+  `<databases_dir>/checkv/v1.5/`), or `--custom_checkv_db`; CheckV only reads
+  it. Runs without the option keep every output as before.
 - **One co-assembly per sample group** (`--coassembly_group_by <column>`). With
   `--assembly_mode coassembly`, a column of `--sample_metadata` (the table the
   run summary reads) splits the samples into groups, and each group gets its
