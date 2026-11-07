@@ -3,10 +3,11 @@
 # .npo the nonpareil binary wrote, and two tables for the run summary, so that no other script re-implements the
 # coverage correction or the model.
 #
-# Usage: nonpareil_fit.R <sample>.npo <sample>
+# Usage: nonpareil_fit.R <sample>.npo <sample> [reads_shorter_than_k]
 #
 # <sample>_nonpareil.tsv (one row):
-#   sample, reads (R: reads Nonpareil used; R1 only, so read pairs), read_length (L), al (AL: the read length the
+#   sample, reads (R: reads Nonpareil used; R1 only, so read pairs), reads_shorter_than_k (R1 reads the module
+#   left out, shorter than the k-mer; blank when not given), read_length (L), al (AL: the read length the
 #   package scales the effort by), kappa (redundancy at the sequenced depth), coverage (C: estimated average coverage
 #   at the sequenced depth), diversity (Nd), lr_star (LR*: effort for 95 % coverage on the fit's axis, AL x reads),
 #   depth_95pct_pairs (LR* / AL: read pairs for 95 % coverage), model_r (correlation of the model with the curve),
@@ -28,9 +29,10 @@
 suppressPackageStartupMessages(library(Nonpareil))
 
 args <- commandArgs(trailingOnly = TRUE)
-if (length(args) != 2) stop("usage: nonpareil_fit.R <sample>.npo <sample>")
+if (!length(args) %in% 2:3) stop("usage: nonpareil_fit.R <sample>.npo <sample> [reads_shorter_than_k]")
 npo <- args[1]
 sample <- args[2]
+short_reads <- if (length(args) == 3) args[3] else ""
 
 warns <- character(0)
 np <- withCallingHandlers(
@@ -55,6 +57,7 @@ al <- num(np$AL)
 values <- data.frame(
     sample = sample,
     reads = fmt(num(np$R)),
+    reads_shorter_than_k = short_reads,
     read_length = fmt(num(np$L)),
     al = fmt(al),
     kappa = fmt(num(np$kappa)),

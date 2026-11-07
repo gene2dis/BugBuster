@@ -1,0 +1,95 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    NONPAREIL Module Test
+
+    Sequencing coverage per sample (roadmap Phase 17, N1). The committed reads are too
+    few for a model fit (500 reads: the R package rejects the curve, "Median of the
+    curve is zero at 50% of the reads"), which is exactly the path that must not fail:
+    the coverage is reported, Nd and LR* are blank and the package's warning is kept.
+    The fitted path is covered by tests/bin/test_results_summary.sh on a real .npo
+    (tests/data/nonpareil/) and by the Phase 17 real-data runs. Its R1 is test_sample1's with
+    the first 5 reads cut to 20 bp (tests/data/nonpareil/short_reads_R1.fastq.gz): k-mer mode
+    stops on a read shorter than k, so the module must drop them.
+
+    k-mer mode has no seed, so no output is compared byte for byte.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test NONPAREIL Process"
+    script "../../modules/local/nonpareil/main.nf"
+    process "NONPAREIL"
+
+    test("R1 only, reads shorter than k dropped: coverage without a model, singletons ignored") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'nptest' ],
+                    [
+                        file("${projectDir}/tests/data/nonpareil/short_reads_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.values.get(0)[1]).readLines()*.split('\t', -1)
+            def head = rows[0] as List
+            assert head == ['sample', 'reads', 'reads_shorter_than_k', 'read_length', 'al', 'kappa', 'coverage',
+                            'diversity', 'lr_star', 'depth_95pct_pairs', 'model_r', 'has_model', 'consistent', 'warning']
+            def v = [head, rows[1] as List].transpose().collectEntries()
+            assert v.sample == 'nptest'
+            // the 495 reads of R1 of at least 24 bp: neither R2 nor the 10 singletons were read
+            assert v.reads == '495' && v.reads_shorter_than_k == '5'
+            def cov = v.coverage as double
+            assert cov > 0 && cov < 1
+            assert v.has_model == 'false' && v.consistent == 'false'
+            assert v.diversity == '' && v.lr_star == '' && v.depth_95pct_pairs == ''
+            assert v.warning.contains('Median of the curve is zero')
+            def curve = path(process.out.curve.get(0)[1]).readLines()
+            assert curve[0] == 'sample\tkind\tx_adj\tx_pairs\tcoverage\tcoverage_p25\tcoverage_p75'
+            assert curve.size() > 2 && curve.drop(1).every { it.split('\t')[1] == 'observed' }
+            // the curve ends at R read pairs with the reported coverage
+            def last = curve.last().split('\t')
+            assert Math.abs((last[3] as double) - 495) < 1e-6
+            assert Math.abs((last[4] as double) - cov) < 1e-9
+            assert process.out.raw.get(0)[1].collect { file(it).name }.sort() == ['nptest.npl', 'nptest.npo']
+            // the filtered copy of R1 is not left in the task directory
+            assert !new File(new File(process.out.values.get(0)[1].toString()).parentFile, 'nptest_R1.fastq').exists()
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('nonpareil: 3.5.5') && versions.contains('r-nonpareil: 3.5.3')
+        }
+    }
+
+    test("stub emits all declared outputs") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'nptest' ],
+                    [
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert process.out.values.size() == 1
+            assert process.out.curve.size() == 1
+            assert process.out.raw.size() == 1
+            assert path(process.out.versions.get(0)).text.contains('nonpareil: 3.5.5')
+        }
+    }
+}

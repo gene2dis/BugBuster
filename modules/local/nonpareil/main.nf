@@ -10,6 +10,12 @@
     R2 adds no fragments of its own; the singleton file is not used either. The
     estimates are per sample, so they hold in any batch.
 
+    k-mer mode stops ("Reads are required to have a minimum length of kmer size") on any
+    read shorter than k, and fastp keeps reads down to 15 bp: R1 reads shorter than k
+    (-k in ext.args, 24 by default) are dropped first, into an uncompressed copy in the
+    task directory (the copy nonpareil makes of a .gz input anyway), removed at the end.
+    Their number is the reads_shorter_than_k column (0.09 % of a 10 M-pair gut sample).
+
     k-mer mode has no seed (nonpareil's -r applies to alignment mode only), so the curve
     and its values change slightly from run to run.
 
@@ -50,11 +56,20 @@ process NONPAREIL {
     def args = task.ext.args ?: ''
     def prefix = meta.id
     def r1 = reads instanceof List ? reads[0] : reads
+    def kmer = (args =~ /-k\s+(\d+)/) ? (args =~ /-k\s+(\d+)/)[0][1] : '24'
     // -R: memory for the reads, in MiB (Nonpareil's default 1024 caps it otherwise); 90 % of the task's
     def ram_mib = task.memory ? Math.min((task.memory.toMega() * 0.9) as long, 4194303L) : 1024
     """
+    # R1 reads of at least k bp (nonpareil stops on a shorter one)
+    gzip -cdf ${r1} | awk -v k=${kmer} '
+        NR % 4 == 1 { h = \$0 }
+        NR % 4 == 2 { s = \$0 }
+        NR % 4 == 3 { p = \$0 }
+        NR % 4 == 0 { if (length(s) >= k) print h "\\n" s "\\n" p "\\n" \$0; else short++ }
+        END { print short + 0 > "reads_shorter_than_k.txt" }' > ${prefix}_R1.fastq
+
     nonpareil \\
-        -s ${r1} \\
+        -s ${prefix}_R1.fastq \\
         -T kmer \\
         -f fastq \\
         -b ${prefix} \\
@@ -62,7 +77,9 @@ process NONPAREIL {
         -R ${ram_mib} \\
         ${args}
 
-    nonpareil_fit.R ${prefix}.npo ${prefix}
+    rm ${prefix}_R1.fastq
+
+    nonpareil_fit.R ${prefix}.npo ${prefix} \$(cat reads_shorter_than_k.txt)
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
@@ -74,7 +91,7 @@ process NONPAREIL {
     stub:
     def prefix = meta.id
     """
-    printf 'sample\\treads\\tread_length\\tal\\tkappa\\tcoverage\\tdiversity\\tlr_star\\tdepth_95pct_pairs\\tmodel_r\\thas_model\\tconsistent\\twarning\\n' > ${prefix}_nonpareil.tsv
+    printf 'sample\\treads\\treads_shorter_than_k\\tread_length\\tal\\tkappa\\tcoverage\\tdiversity\\tlr_star\\tdepth_95pct_pairs\\tmodel_r\\thas_model\\tconsistent\\twarning\\n' > ${prefix}_nonpareil.tsv
     printf 'sample\\tkind\\tx_adj\\tx_pairs\\tcoverage\\tcoverage_p25\\tcoverage_p75\\n' > ${prefix}_nonpareil_curve.tsv
     touch ${prefix}.npo ${prefix}.npl
 
