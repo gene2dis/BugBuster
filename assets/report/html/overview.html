@@ -16,5 +16,9 @@
 <h2 id="qc">Samples and sequencing depth</h2>
 <p>{{ f.n_low }} of {{ f.n_samples }} samples have fewer than {{ f.min_pairs }} clean read pairs{% if f.n_low %} ({{ f.low_samples }}){% endif %}; a gene or taxon missing from a low-depth sample is unknown, not absent ({{ m.figref(s, "qc_read_fate") }}, {{ m.tabref(s, "samples") }}).</p>
 {{ m.figure(s, "qc_read_fate", specs) }}
+{% if s.figures.get("nonpareil_curves") %}
+<p>Nonpareil estimates how much of each sample's community its reads cover, from the redundancy of its R1 reads ({{ m.figref(s, "nonpareil_curves") }}): {{ f.n_low_cov }} of {{ f.n_samples }} samples are below {{ f.min_cov }}{% if f.n_low_cov %} ({{ f.low_cov_samples }}){% endif %}. The dashed model reaches the 95 % line at the read pairs a sample would need for 95 % coverage (samples_qc nonpareil_depth_95pct).</p>
+{{ m.figure(s, "nonpareil_curves", specs) }}
+{% endif %}
 {{ m.table(s, "samples") }}
 {% endblock %}

@@ -12,6 +12,7 @@ rerunning any tool, and merges any number of results directories (one per batch)
   01_quality_control/summary/Reads_report.csv     read counts per step (single reads)
   02_taxonomy/tables/Reads_report_taxonomy.csv    the same with the classified fraction (when a profiler ran)
   01_quality_control/fastp/*/*.fastp.json         mean read length
+  01_quality_control/nonpareil/*/*_nonpareil{,_curve}.tsv   Nonpareil coverage, diversity, curve (--nonpareil)
   02_taxonomy/tables/<label>_{otu,tax}_table.tsv   any taxonomic profiler (+ _read_counts.tsv)
   02_taxonomy/sylph/*_sylph_<db>.tsv              sylph ANI / coverage (optional)
   05_arg_prediction/read_level/kmarvel/*/*_kmarvel.tsv   K-MARVEL ARG calls
@@ -78,12 +79,13 @@ from summary_mags import load_mags, mag_abundance_frame, mags_table  # noqa: E40
 from summary_bin_args import arg_cluster_sharing_table, arg_mag_long_table, load_bin_clusters  # noqa: E402
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
+from summary_nonpareil import load_nonpareil, low_coverage, merge_nonpareil, sample_columns  # noqa: E402
 from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
                              contig_mobile_table, has_checkv, has_genomad, load_arg_gene_abundance,
                              load_contig_table)
 from summary_figures import (FigureWriter, fig_args, fig_arg_contig_hosts, fig_cog, fig_mag_abundance,  # noqa: E402
-                             fig_mag_quality, fig_method_by_category, fig_method_upset, fig_qc, fig_sarg,
-                             fig_taxonomy, fig_watchlist, short_count)
+                             fig_mag_quality, fig_method_by_category, fig_method_upset, fig_nonpareil, fig_qc,
+                             fig_sarg, fig_taxonomy, fig_watchlist, short_count)
 from summary_html import write_excel, write_tables  # noqa: E402
 from summary_docs import undocumented_columns, write_docs  # noqa: E402
 import summary_report  # noqa: E402
@@ -180,7 +182,8 @@ def load_versions(root):
 RESERVED_COLUMNS = {
     "batch",
     "raw_pairs", "qc_pass_pairs", "clean_pairs", "classified_fraction", "pct_removed_qc", "pct_removed_decontam",
-    "pct_clean", "low_depth", "depth_class", "mean_read_length", "taxonomy_db", "n_species", "shannon", "arg_status",
+    "pct_clean", "low_depth", "depth_class", "mean_read_length", "nonpareil_coverage", "nonpareil_diversity",
+    "nonpareil_depth_95pct", "taxonomy_db", "n_species", "shannon", "arg_status",
     "n_arg_calls_tier1", "n_arg_calls_tier2", "n_arg_calls_tier3", "n_arg_calls_tier4", "acquired_genes",
     "acquired_rpkm", "n_genes_kmarvel", "n_genes_rgi", "n_genes_all_methods",
     "taxon_id", "Domain", "Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species", "relative_abundance",
@@ -258,7 +261,7 @@ def tier1_table(calls, comparison, primary):
     return t1
 
 
-def attention_flags(tier1, comparison, low_samples, calls_by=None):
+def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_samples=(), min_coverage=None):
     """Short findings for the report header: [(kind, text, anchor)].
 
     Tier 1 genes come from the method comparison when several ARG methods ran (so a gene only one method found
@@ -314,6 +317,12 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None):
         flags.append(("low_depth", f"{len(low_samples)} low-depth sample{'s' if len(low_samples) > 1 else ''}: "
                                    f"{', '.join(low_samples)} (absence of a gene or taxon there is not informative)",
                       "qc"))
+    if low_coverage_samples:
+        n = len(low_coverage_samples)
+        flags.append(("low_coverage", f"{n} sample{'s' if n > 1 else ''} with Nonpareil coverage below "
+                                      f"{min_coverage:g}: {', '.join(low_coverage_samples)} (a large part of the "
+                                      "community is unsampled: a taxon or gene missing there is weak evidence, and "
+                                      "an assembly recovers mainly the dominant populations)", "qc"))
     return flags
 
 
@@ -380,6 +389,8 @@ def parse_args(argv=None):
     p.add_argument("--order-by", help="metadata column that orders samples within a group (e.g. visit, time)")
     p.add_argument("--min-clean-pairs", type=int, default=1_000_000,
                    help="flag samples below this many clean read pairs as low depth (default 1,000,000)")
+    p.add_argument("--min-nonpareil-coverage", type=float, default=0.6,
+                   help="note samples whose Nonpareil coverage (0-1) is below this (default 0.6)")
     p.add_argument("--kmarvel-db", help="K-MARVEL database directory (for CARD snps.txt)")
     p.add_argument("--card-prevalence", help="WildCARD card_prevalence.txt, for candidate ARG hosts")
     p.add_argument("--arg-priority", default=str(DEFAULT_ASSETS / "arg_priority_tiers.tsv"),
@@ -440,6 +451,7 @@ def main(argv=None):
         labels.add(label)
         reads = load_reads_report(root)
         fastp = load_fastp_lengths(root)
+        nonpareil = load_nonpareil(root)
         taxonomy = load_taxonomy(root)
         kmarvel, kran = load_kmarvel(root)
         rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
@@ -460,6 +472,7 @@ def main(argv=None):
             names |= set(taxonomy["otu"].columns)
         names |= kran | rgi_ran | sarg_ran | (func["ran"] if func else set()) | set(mc["sample"])
         names |= cfunc["ran"] if cfunc else set()
+        names |= set(nonpareil["values"]["sample"]) if nonpareil else set()
         if not names:
             die(f"{root}: no BugBuster outputs found (expected 01_quality_control/, 02_taxonomy/ or 05_arg_prediction/)")
         for s in names:
@@ -475,8 +488,9 @@ def main(argv=None):
                                 ("contig_functional", cfunc is not None),
                                 ("mag_functional", mags is not None and mags["bakta"]),
                                 ("gunc", mags is not None and mags.get("gunc", False)),
-                                ("checkv", has_checkv(contig_args))) if v}
-        batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "taxonomy": taxonomy,
+                                ("checkv", has_checkv(contig_args)), ("nonpareil", nonpareil is not None)) if v}
+        batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "nonpareil": nonpareil,
+                        "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
                         "sarg_ran": sarg_ran, "func": func, "mc": mc, "contig_args": contig_args,
@@ -536,12 +550,20 @@ def main(argv=None):
     lengths = pd.concat([b["fastp"] for b in batches])
     if not lengths.empty:
         samples = samples.join(lengths.set_index("sample"), how="left")
+    # Nonpareil: per-sample coverage of the community (R1 of the clean reads), valid in any batch
+    npar = merge_nonpareil([b["nonpareil"] for b in batches])
+    if npar is not None:
+        samples = samples.join(sample_columns(npar), how="left")
     low = set(samples.index[samples["low_depth"].fillna(False).astype(bool)]) if "low_depth" in samples else set()
 
     tables = {}
     figs = FigureWriter(outdir, args.min_clean_pairs)
     summary = {"n_samples": len(order), "n_batches": len(batches), "n_low_depth": len(low),
                "low_depth_samples": [s for s in order if s in low]}
+    if npar is not None:
+        low_cov = low_coverage(samples.loc[order], args.min_nonpareil_coverage)
+        summary.update({"nonpareil": True, "min_nonpareil_coverage": args.min_nonpareil_coverage,
+                        "n_low_coverage": len(low_cov), "low_coverage_samples": low_cov})
     if "clean_pairs" in samples:
         summary["depth_marks"] = [(m, int((samples["clean_pairs"] >= m).sum())) for m in depth_marks]
 
@@ -838,12 +860,15 @@ def main(argv=None):
     tier1_view = None
     if prim_arg is not None and not prim_arg.empty:
         tier1_view = tier1_table(calls_by[primary], comparison, primary)
-    summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"], calls_by)
+    summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"], calls_by,
+                                           summary.get("low_coverage_samples", ()), args.min_nonpareil_coverage)
 
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]
     tables = {"samples_qc": (qc.reset_index(), False), **tables}
     fig_qc(figs, samples, fig_cols, fig_groups, low, args.min_clean_pairs, depth_marks)
+    if npar is not None:
+        fig_nonpareil(figs, npar, fig_cols, fig_groups, low, args.min_nonpareil_coverage)
 
     write_tables(outdir, tables)
     if not args.no_excel:
@@ -862,7 +887,9 @@ def main(argv=None):
                       ("arg-priority", args.arg_priority), ("watchlist", args.watchlist),
                       ("min-clean-pairs", args.min_clean_pairs), ("rgi-min-coverage", args.rgi_min_coverage),
                       ("arg-primary", args.arg_primary), ("depth-marks", args.depth_marks),
-                      ("taxa-per-sample", args.taxa_per_sample)):
+                      ("taxa-per-sample", args.taxa_per_sample),
+                      # listed only when Nonpareil ran, the only stage it applies to
+                      ("min-nonpareil-coverage", args.min_nonpareil_coverage if npar is not None else None)):
         if val is not None and val != "":  # a 0 cutoff is a setting too
             inputs.append(f"--{flag} {Path(val).resolve().name if flag in file_flags else val}")
     stage_by_batch = {b["label"]: stage_status(b["processes"], b["found"]) for b in batches}

@@ -12,6 +12,13 @@ STAGES = [
         "summary": "samples_qc (read pairs per step, depth class, low-depth flag), figure qc_read_fate",
     },
     {
+        "key": "nonpareil", "title": "Sequencing coverage and diversity (Nonpareil)",
+        "params": "--nonpareil, --summary_min_nonpareil_coverage",
+        "processes": ["NONPAREIL"],
+        "summary": "samples_qc nonpareil_coverage, nonpareil_diversity, nonpareil_depth_95pct; figure "
+                   "nonpareil_curves; overview note for samples below the coverage cutoff",
+    },
+    {
         "key": "taxonomy", "title": "Taxonomic profiling",
         "params": "--taxonomic_profiler (sylph | kraken2 | sourmash | none)",
         "processes": ["SYLPH_PROFILE", "SYLPH_TAXPROF", "KRAKEN2", "BRACKEN", "SOURMASH",

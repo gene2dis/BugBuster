@@ -54,6 +54,15 @@ TABLE_DOCS = {
             ("low_depth", "clean_pairs below --min-clean-pairs: absence calls in this sample are not informative"),
             ("depth_class", "clean read pairs binned at --min-clean-pairs and --depth-marks (<1M, 1M-10M, ...)"),
             ("mean_read_length", "mean read length after fastp (mean of R1 and R2), bp"),
+            ("nonpareil_coverage", "Nonpareil (--nonpareil): estimated average coverage (0-1) of the sample's "
+                                   "community at its sequenced depth, from the redundancy of the k-mers of its R1 "
+                                   "reads; below --min-nonpareil-coverage the overview adds a note"),
+            ("nonpareil_diversity", "Nonpareil's sequence diversity index Nd (the fitted curve's location on a log "
+                                    "scale of sequencing effort; higher = more diverse); blank when the curve could "
+                                    "not be fitted"),
+            ("nonpareil_depth_95pct", "read pairs Nonpareil's model projects for 95 % coverage (LR* in read "
+                                      "pairs); blank when the curve could not be fitted. Above clean_pairs: more "
+                                      "sequencing would still find new sequence diversity"),
             ("taxonomy_db", "taxonomic profiler and database label of the taxonomy tables"),
             ("n_species, shannon", "named species detected and Shannon index (natural log) of their relative "
                                     "abundance, renormalised over them; taxa without a species name are left out"),
@@ -780,6 +789,14 @@ PITFALLS = [
 
 # Caveats of optional stages, listed only when the stage ran in some batch (stage key in summary_catalog.STAGES)
 STAGE_PITFALLS = {
+    "nonpareil": "Nonpareil coverage (samples_qc nonpareil_coverage, 0-1) is the share of the sample's community "
+                 "its reads already cover: the chance that a new read would match sequence seen before, estimated "
+                 "per sample from the redundancy of the k-mers of its R1 reads (R2 and singletons are not used). It "
+                 "depends on the sample alone, so it is valid in any batch and comparable across batches. "
+                 "nonpareil_depth_95pct is the read pairs the fitted model projects for 95 % coverage, and "
+                 "nonpareil_diversity (Nd) the curve's position on the log effort axis; both are blank when Nonpareil "
+                 "could not fit the curve (too few reads). Nonpareil's k-mer mode has no random seed: values move "
+                 "slightly from run to run.",
     "gunc": "GUNC (mags gunc_pass and scores) finds chimeras across distant lineages that CheckM2's completeness and "
             "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
             "quality_tier. Its reference (proGenomes 2.1, 2020; or GTDB r214) is older than GTDB r232: a MAG of a "

@@ -41,6 +41,8 @@ subread	featureCounts (Subread)	tool	liao2014	PMID 24227677
 bakta	Bakta	tool	schwengers2021	PMID 34739369
 bakta_db	Bakta (database)	database	schwengers2021	PMID 34739369; no separate database paper
 microbecensus	MicrobeCensus	tool	nayfach2015	PMID 25853934
+nonpareil	Nonpareil	tool	rodriguezr2018;rodriguezr2014	PMID 29657970 (Nonpareil 3, k-mer mode and Nd); PMID 24123672 (original)
+r-nonpareil	Nonpareil R package	helper		helper
 woltka	Woltka	tool	zhu2022	PMID 35369727
 wol_db	Web of Life 2 (database)	database	zhu2019;balaban2024	PMID 31792218 (WoL2 README citation); PMID 37500914 (uDance, WoL2 phylogeny)
 cog_def	COG (database)	database	galperin2025	PMID 39494517 (COG update 2024)
