@@ -13,6 +13,7 @@ include { COUNT_READS                } from '../../modules/local/count_reads/mai
 include { BOWTIE2_DECONTAMINATE      } from '../../modules/local/bowtie2_decontaminate/main'
 include { BWAMEM3_DECONTAMINATE      } from '../../modules/local/bwamem3_decontaminate/main'
 include { READS_REPORT               } from '../../modules/local/reads_report/main'
+include { NONPAREIL                  } from '../../modules/local/nonpareil/main'
 include { flagOn                     } from './utils_params'
 
 workflow QC {
@@ -156,9 +157,20 @@ workflow QC {
         ch_versions = ch_versions.mix(READS_REPORT.out.versions)
     }
 
+    //
+    // Sequencing coverage and diversity per sample (Nonpareil, R1 of the clean reads)
+    //
+    ch_nonpareil = channel.empty()
+    if ( flagOn(params.nonpareil) ) {
+        NONPAREIL(ch_clean_reads)
+        ch_versions = ch_versions.mix(NONPAREIL.out.versions.first())
+        ch_nonpareil = NONPAREIL.out.values.mix(NONPAREIL.out.curve).map { _meta, table -> table }
+    }
+
     emit:
     reads              = ch_clean_reads            // channel: [ val(meta), [ reads ] ]
     report             = ch_report                 // channel: path(report)
     fastp_json         = ch_fastp_json             // channel: path(<sample>.fastp.json); empty without QC
+    nonpareil          = ch_nonpareil              // channel: path(<sample>_nonpareil{,_curve}.tsv); empty without --nonpareil
     versions           = ch_versions               // channel: path(versions.yml)
 }
