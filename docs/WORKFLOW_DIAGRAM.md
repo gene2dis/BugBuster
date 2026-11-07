@@ -109,10 +109,12 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `NFCORE_SAMTOOLS_MERGE` (pooled co-assembly BAM) | `assembly_mode == 'coassembly'` and (`include_binning` or `contig_tax_and_arg`) | — |
 | `BINNING` | `include_binning` (and an assembly) | needs an assembly |
 | `BINETTE` / `CHECKM2_BATCH` | ≥ 2 `binners` / 1 binner (default `semibin`) | — |
+| `GUNC_RUN` | `gunc_prediction` and `include_binning` (assemblies without refined bins skipped) | `gunc_prediction` needs `include_binning` |
 | `PYRODIGAL` | (`contig_tax_and_arg` or `arg_bin_clustering` or `contig_level_functional`) and an assembly | — |
 | `DEEPARG_CONTIGS` | (`contig_tax_and_arg` or `arg_bin_clustering`) and an assembly | — |
 | `BIN_CONTIG_LABELS` | `include_binning` and (`contig_tax_and_arg` or `arg_bin_clustering`) | — |
 | `NFCORE_GENOMAD_ENDTOEND` | `genomad_prediction` and an assembly (assemblies without contigs skipped) | needs an assembly |
+| `CHECKV_ENDTOEND` | `checkv_prediction` and `genomad_prediction` (on each assembly geNomad ran on) | `checkv_prediction` needs `genomad_prediction` |
 | `DEEPARG_CONTIGS` hits in the summary (`.mapping.ARG`, ARG gene abundance) | `DEEPARG_CONTIGS` runs and `contig_level_functional` | — |
 | Contig taxonomy + ARG (`METABULI_CLASSIFY` … `ARG_BLOBPLOT`) | `contig_tax_and_arg` and an assembly | needs an assembly |
 | Bin-level ARG clustering | `arg_bin_clustering` and `include_binning` | `arg_bin_clustering` needs `include_binning` |
@@ -158,9 +160,11 @@ flowchart LR
     subgraph Asm["Assembly-side stages"]
         direction TB
         FORMAT_CHECKM2_DB["FORMAT_CHECKM2_DB + DOWNLOAD_GTDBTK_DB<br/>include_binning"]
+        FORMAT_GUNC_DB["FORMAT_GUNC_DB<br/>gunc_prediction"]
         DOWNLOAD_DEEPARG_DB["DOWNLOAD_DEEPARG_DB<br/>contig_tax_and_arg or arg_bin_clustering"]
         FORMAT_METABULI_DB["FORMAT_METABULI_DB<br/>contig_tax_and_arg<br/>(its taxdump feeds BLOBTOOLS_NODESDB)"]
         FORMAT_GENOMAD_DB["FORMAT_GENOMAD_DB<br/>genomad_prediction"]
+        FORMAT_CHECKV_DB["FORMAT_CHECKV_DB<br/>checkv_prediction"]
     end
     subgraph Func["Functional stages"]
         direction TB
@@ -179,7 +183,7 @@ flowchart LR
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class BWAMEM3_BUILD_COMBINED,FORMAT_SYLPH_DB on
-    class BOWTIE2_BUILD_COMBINED,FORMAT_KRAKEN_DB,SOURMASH_TAX_PREPARE,RGI_LOAD,FORMAT_KMARVEL_DB,FORMAT_CHECKM2_DB,DOWNLOAD_DEEPARG_DB,FORMAT_METABULI_DB,FORMAT_GENOMAD_DB,FORMAT_EGGNOG_DB,FORMAT_DBCAN_DB,FORMAT_COG_DB,FORMAT_BAKTA_DB,FORMAT_WOLTKA_DB,FORMAT_SUPERFOCUS_DB,FORMAT_HUMANN_DB opt
+    class BOWTIE2_BUILD_COMBINED,FORMAT_KRAKEN_DB,SOURMASH_TAX_PREPARE,RGI_LOAD,FORMAT_KMARVEL_DB,FORMAT_CHECKM2_DB,FORMAT_GUNC_DB,DOWNLOAD_DEEPARG_DB,FORMAT_METABULI_DB,FORMAT_GENOMAD_DB,FORMAT_CHECKV_DB,FORMAT_EGGNOG_DB,FORMAT_DBCAN_DB,FORMAT_COG_DB,FORMAT_BAKTA_DB,FORMAT_WOLTKA_DB,FORMAT_SUPERFOCUS_DB,FORMAT_HUMANN_DB opt
 ```
 
 Exceptions to the storeDir rule: the decontamination index built from
@@ -308,6 +312,8 @@ flowchart TD
     N -->|1| CHECKM2_BATCH["CHECKM2_BATCH<br/>the binner's bins"]
     BINETTE & CHECKM2_BATCH --> Bins(["refined_bins"])
     Bins --> GTDB_TK_BATCH["GTDB_TK_BATCH<br/>all samples in one run"]
+    Bins -->|gunc_prediction| GUNC_RUN["GUNC_RUN<br/>chimerism per assembly<br/>(skipped without bins)"]
+    GUNC_RUN -.->|"mags gunc_pass, scores"| Summary(["RESULTS_SUMMARY"])
 
     BINETTE & CHECKM2_BATCH --> Quality(["CheckM2 reports"])
 
@@ -322,13 +328,15 @@ flowchart TD
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT,CALCULATE_DEPTH,BIN_DEPTH on
-    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY opt
+    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY,GUNC_RUN opt
 ```
 
 The whole subworkflow needs `include_binning` (default `false`); the green boxes are what a
 binning run does with the default `binners`. Binette keeps bins at `bin_min_completeness` 50
 and `bin_max_contamination` 10. **Outputs:** `refined_bins`, `gtdbtk` (bac120/ar53
 summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (`BIN_DEPTH`, both assembly modes).
+`GUNC_RUN` (`gunc_prediction`) is called in `main.nf` on the subworkflow's refined bins; it
+adds columns to the summary's `mags` table and does not change the MIMAG tier.
 
 ### 8. Contig taxonomy, contig ARGs and geNomad
 
@@ -356,17 +364,21 @@ flowchart TD
     DEEPARG_CONTIGS & BLOBTOOLS & METABULI_CLASSIFY --> ARG_CONTIG_LEVEL_REPORT["ARG_CONTIG_LEVEL_REPORT<br/>Contig_tax_and_arg_prediction.tsv"]
     BIN_CONTIG_LABELS -->|bin| ARG_CONTIG_LEVEL_REPORT
     NFCORE_GENOMAD_ENDTOEND -->|"mobile_class columns<br/>(+ Pyrodigal GFF)"| ARG_CONTIG_LEVEL_REPORT
+    NFCORE_GENOMAD_ENDTOEND -->|"checkv_prediction:<br/>virus FASTA"| CHECKV_ENDTOEND["CHECKV_ENDTOEND<br/>CheckV 1.1.1, DB v1.5"]
+    CHECKV_ENDTOEND -->|"checkv_* columns"| ARG_CONTIG_LEVEL_REPORT
     ARG_CONTIG_LEVEL_REPORT --> ARG_BLOBPLOT["ARG_BLOBPLOT<br/>ARG blob plot per assembly"]
     ARG_CONTIG_LEVEL_REPORT -.-> RESULTS_SUMMARY
     DEEPARG_CONTIGS -.->|"contig_level_functional:<br/>.mapping.ARG (ARG gene abundance)"| RESULTS_SUMMARY
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
+    class PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
 ```
 
 `METABULI_CLASSIFY` through `ARG_BLOBPLOT` need `contig_tax_and_arg`; geNomad runs on its own
 with `genomad_prediction`, and adds its columns to the contig table only when
-`contig_tax_and_arg` is on too. `bin/blobtools_nodes_fix.sh` renames NCBI's `domain` rank to
+`contig_tax_and_arg` is on too. CheckV (`checkv_prediction`, which needs `genomad_prediction`)
+runs on geNomad's virus contigs and proviruses; its quality columns reach the contig table
+with `contig_tax_and_arg`. `bin/blobtools_nodes_fix.sh` renames NCBI's `domain` rank to
 `superkingdom` for BlobTools.
 
 ### 9. Bin-level ARG clustering
@@ -475,9 +487,11 @@ results directories outside the pipeline (manual, Example 13).
 | `RGI_LOAD` / `RGI_LOAD_WILDCARD` | CARD (+ WildCARD k-mers) for RGI |
 | `FORMAT_KMARVEL_DB` | CARD protein models and BLAST index for K-MARVEL |
 | `FORMAT_CHECKM2_DB` / `DOWNLOAD_GTDBTK_DB` | CheckM2 and GTDB-Tk databases |
+| `FORMAT_GUNC_DB` | GUNC reference (`gunc_db`, default `progenomes_2.1`) |
 | `DOWNLOAD_DEEPARG_DB` | DeepARG database |
 | `FORMAT_METABULI_DB` | Metabuli database (`metabuli_db`, default `refseq_standard`) with its taxdump |
 | `FORMAT_GENOMAD_DB` | geNomad database v1.9 |
+| `FORMAT_CHECKV_DB` | CheckV database v1.5 |
 | `FORMAT_EGGNOG_DB` / `FORMAT_DBCAN_DB` / `FORMAT_COG_DB` | eggNOG 7, dbCAN, NCBI COG definitions |
 | `FORMAT_BAKTA_DB` | Bakta database |
 | `FORMAT_WOLTKA_DB` / `FORMAT_SUPERFOCUS_DB` / `FORMAT_HUMANN_DB` | Read functional backends' databases |
@@ -530,6 +544,7 @@ results directories outside the pipeline (manual, Example 13).
 | `BIN_QUALITY_REPORT` / `BIN_TAX_REPORT` | `assembly` mode | Quality and taxonomy reports |
 | `BIN_DEPTH` | always (a refined bin set) | MAG depth per sample: the length-weighted mean of its contigs' jgi depths |
 | `BIN_SUMMARY` | `coassembly` mode | Bin summary (quality, taxonomy, depth per sample) |
+| `GUNC_RUN` | `gunc_prediction` | GUNC chimerism check of each assembly's refined bins (called from `main.nf`) |
 
 ### Contig taxonomy, contig and bin ARGs
 | Module | Description |
@@ -540,6 +555,7 @@ results directories outside the pipeline (manual, Example 13).
 | `NFCORE_SAMTOOLS_INDEX` | BAM index for BlobTools |
 | `BLOBTOOLS_NODESDB` / `BLOBTOOLS` / `BLOBPLOT` | BlobTools nodesDB (once), tables from Metabuli's hits, phylum blob plot |
 | `NFCORE_GENOMAD_ENDTOEND` | geNomad plasmid / virus / provirus calls |
+| `CHECKV_ENDTOEND` | CheckV quality of geNomad's virus contigs and proviruses (`checkv_prediction`) |
 | `BIN_CONTIG_LABELS` | Contig → refined bin (the report adds the bin's GTDB-Tk classification) |
 | `ARG_CONTIG_LEVEL_REPORT` / `ARG_BLOBPLOT` | `Contig_tax_and_arg_prediction.tsv` and the ARG blob plot |
 | `BIN_ARG_SPLIT` / `ARG_FASTA_FORMATTER` / `CLUSTERING` | DeepARG hits split by bin, ARG proteins per bin, MMseqs2 clusters |

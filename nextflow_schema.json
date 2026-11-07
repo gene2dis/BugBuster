@@ -134,6 +134,20 @@
                     "help_text": "geNomad 1.13.0 end-to-end on each assembly (1.1-5.5 CPU-h and ~18 GB per assembly in the Phase 9c benchmark); summaries in 06_contig_taxonomy/genomad/. With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains mobile_class, plasmid_score, virus_score, provirus, virus_taxonomy and plasmid_conjugation_genes, and 00_summary gains arg_contig_mobile. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo.",
                     "fa_icon": "fas fa-dna"
                 },
+                "checkv_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Estimate the quality of geNomad's virus contigs and proviruses with CheckV (needs --genomad_prediction).",
+                    "help_text": "CheckV 1.1.1 end_to_end (DIAMOND 2.1.8, HMMER 3.4) on each assembly's geNomad virus FASTA against --checkv_db; results in 06_contig_taxonomy/checkv/<sample>/ (co-assembly: checkv/coassembly/, or checkv/coassembly/<group>/ with --coassembly_group_by). With --contig_tax_and_arg, Contig_tax_and_arg_prediction.tsv gains checkv_quality, checkv_completeness, checkv_contamination and checkv_provirus, and arg_contig_mobile counts the ARG genes on virus contigs and in proviruses by CheckV tier. CheckV only reads its database.",
+                    "fa_icon": "fas fa-virus"
+                },
+                "gunc_prediction": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Check the refined MAGs for chimerism with GUNC (needs --include_binning).",
+                    "help_text": "GUNC 1.1.1 (DIAMOND 2.1.24) on each assembly's refined bins (Binette's, or the single binner's) against --gunc_db; its maxCSS-level table in 04_binning/per_sample/<sample>/quality/gunc/ (co-assembly: 04_binning/coassembly[/<group>]/quality/gunc/). The summary's mags table gains gunc_pass, clade_separation_score, contamination_portion and reference_representation_score. GUNC finds chimeras across lineages that CheckM2 can miss; a fail flags the MAG and does not change its MIMAG quality_tier.",
+                    "fa_icon": "fas fa-puzzle-piece"
+                },
                 "min_read_sample": {
                     "type": "integer",
                     "default": 0,
@@ -205,6 +219,13 @@
                     "type": "string",
                     "default": "v3",
                     "description": "CheckM2 database version.",
+                    "fa_icon": "fas fa-database"
+                },
+                "gunc_db": {
+                    "type": "string",
+                    "default": "progenomes_2.1",
+                    "enum": ["progenomes_2.1", "gtdb_214"],
+                    "description": "GUNC reference for --gunc_prediction (see config/databases.config): proGenomes 2.1 (7.2 GB download, 13.5 GB unpacked) or GTDB r214 (37.9 GB download).",
                     "fa_icon": "fas fa-database"
                 },
                 "gtdbtk_db": {
@@ -328,6 +349,13 @@
                     "description": "Path to custom CheckM2 database file.",
                     "fa_icon": "fas fa-file"
                 },
+                "custom_gunc_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "description": "Path to a local GUNC DIAMOND database file (.dmnd); skips the download.",
+                    "help_text": "Keep GUNC's file name (gunc_db_progenomes2.1.dmnd, gunc_db_gtdb214.dmnd): GUNC reads which reference it is, and so which taxonomy to use, from the file name, and takes any other name for proGenomes 2.1.",
+                    "fa_icon": "fas fa-file"
+                },
                 "custom_gtdbtk_db": {
                     "type": "string",
                     "format": "directory-path",
@@ -347,12 +375,26 @@
                     "description": "geNomad database release for --genomad_prediction (see config/databases.config): the pinned Zenodo file, 0.84 GB download, 2.2 GB unpacked.",
                     "fa_icon": "fas fa-database"
                 },
+                "checkv_db": {
+                    "type": "string",
+                    "default": "v1.5",
+                    "enum": ["v1.5"],
+                    "description": "CheckV database release for --checkv_prediction (see config/databases.config): the pinned NERSC file, 1.68 GB download, 6.4 GB unpacked with its DIAMOND index.",
+                    "fa_icon": "fas fa-database"
+                },
                 "custom_genomad_db": {
                     "type": "string",
                     "format": "directory-path",
                     "description": "Path to a local geNomad database directory (genomad_db, genomad_marker_metadata.tsv, version.txt, ...); skips the download.",
                     "help_text": "geNomad 1.10-1.13 take database 1.9; the version in version.txt is recorded in software_versions.yml.",
                     "fa_icon": "fas fa-folder"
+                },
+                "custom_checkv_db": {
+                    "type": "string",
+                    "format": "directory-path",
+                    "description": "Path to a local CheckV database directory (genome_db/, hmm_db/, README.txt); skips the download.",
+                    "help_text": "CheckV checks genome_db/checkv_reps.dmnd, checkv_reps.tsv, checkv_error.tsv, hmm_db/checkv_hmms.tsv and hmm_db/checkv_hmms/ before a run; the release in README.txt is recorded in software_versions.yml.",
+                    "fa_icon": "fas fa-folder-open"
                 },
                 "metabuli_db": {
                     "type": "string",

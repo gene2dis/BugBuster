@@ -16,7 +16,7 @@ import pandas as pd
 
 from summary_args import METHOD_LABELS
 from summary_common import NA_LOW_DEPTH, die, generated_date, warn
-from summary_docs import TIER_MEANING, table_doc, tier_categories
+from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
 from summary_figures import short_count
 
 PDF_MAX_ROWS = 60
@@ -229,7 +229,7 @@ def caveats(ctx):
                    "and of the CDC Antibiotic Resistance Threats Report 2019, and a few other species of clinical "
                    "interest; each row names its source. A species row matches the species, a genus row every "
                    "species of the genus, GTDB suffixes removed.")
-    return out + [n for n in ctx.get("method_notes", [])]
+    return out + stage_pitfalls(ctx) + [n for n in ctx.get("method_notes", [])]
 
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",

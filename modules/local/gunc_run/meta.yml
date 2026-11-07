@@ -1,0 +1,39 @@
+name: gunc_run
+description: Chimerism check of an assembly's refined bins with GUNC - the clade separation score of each bin's genes on GUNC's reference at the taxonomic level where they split the most (maxCSS level)
+keywords:
+  - chimerism
+  - contamination
+  - mag
+  - binning
+tools:
+  - gunc:
+      description: Genome UNClutterer, detection of chimerism and contamination in prokaryotic genomes
+      homepage: https://grp-bork.embl-community.io/gunc/
+      documentation: https://grp-bork.embl-community.io/gunc/usage.html
+      doi: "10.1186/s13059-021-02393-0"
+      licence: ["GPL-3.0-or-later"]
+
+input:
+  - meta:
+      type: map
+      description: Assembly metadata (meta.id is the sample name, or the co-assembly id; meta.coassembly true for a co-assembly)
+  - bins:
+      type: directory
+      description: Refined bin directory; each *.fa file is one bin, named in GUNC's table by its file name without .fa (CheckM2's Name)
+  - db:
+      type: file
+      description: GUNC DIAMOND reference under GUNC's own file name (gunc_db_progenomes2.1.dmnd, gunc_db_gtdb214.dmnd), from which GUNC reads the reference
+      pattern: "*.dmnd"
+
+output:
+  - maxcss:
+      type: tuple
+      description: Tuple of meta and GUNC's maxCSS-level table (genome, genes called and mapped, taxonomic_level, clade_separation_score, contamination_portion, reference_representation_score, pass.GUNC, ...)
+      pattern: "*_gunc_maxCSS_level.tsv"
+  - versions:
+      type: file
+      description: Software versions (gunc, diamond, prodigal, and the reference GUNC used)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

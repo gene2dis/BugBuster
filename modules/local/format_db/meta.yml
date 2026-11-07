@@ -93,6 +93,30 @@ processes:
           description: geNomad database directory
           pattern: "genomad_db"
 
+  - name: FORMAT_GUNC_DB
+    description: Runs bin/gunc_db_reformat.sh - downloads the GUNC DIAMOND reference GUNC 1.1.1's download_db fetches (Zenodo), checks the md5 of the .gz and of the unpacked .dmnd, which keeps GUNC's file name (GUNC reads the reference from it)
+    input:
+      - key:
+          type: value
+          description: GUNC reference registry key (params.gunc_db)
+    output:
+      - gunc_db:
+          type: file
+          description: GUNC DIAMOND reference
+          pattern: "gunc_db_*.dmnd"
+
+  - name: FORMAT_CHECKV_DB
+    description: Runs bin/checkv_db_reformat.sh in the CheckV image - downloads the pinned CheckV database release (NERSC), checks its byte count (CheckV publishes no checksum), extracts it, checks the release in README.txt, builds the DIAMOND index of checkv_reps.faa as checkv download_database does, and checks the files CheckV needs
+    input:
+      - key:
+          type: value
+          description: CheckV database registry key (params.checkv_db)
+    output:
+      - checkv_db:
+          type: directory
+          description: CheckV database directory (genome_db/, hmm_db/, README.txt)
+          pattern: "checkv_db"
+
   - name: DOWNLOAD_DEEPARG_DB
     description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date
     input: []

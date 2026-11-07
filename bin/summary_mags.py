@@ -8,13 +8,15 @@ Published inputs, per assembly <id> (a sample name, coassembly, or a co-assembly
 - taxonomy/gtdbtk/<id>_gtdbtk_{bac120,ar53}.tsv;
 - 07_functional_annotation/mags/<id>/<id>_<bin>.{tsv,txt} (Bakta, --mag_level_functional; a group's under
   mags/coassembly/<group>/);
+- quality/gunc/<id>_gunc_maxCSS_level.tsv (GUNC, --gunc_prediction: one row per refined bin, by its CheckM2 Name);
 - coverage/<sample>_bin_depth.tsv (BIN_DEPTH: each MAG's length-weighted mean depth from the jgi depths MetaBAT2
   bins on, one table per sample aligned to the assembly; before roadmap Phase 15 co-assembly only, from
   BEDTOOLS_BIN_DEPTH).
 
 MIMAG (Bowers et al. 2017): high = completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and >= 18 tRNA
 amino acids; medium = completeness >= 50 %, contamination < 10 %; low = the rest. Without Bakta the rRNA / tRNA
-part cannot be checked, so a MAG is at most medium (tier_basis checkm2_only).
+part cannot be checked, so a MAG is at most medium (tier_basis checkm2_only). GUNC does not change the tier: its
+pass / fail and scores are columns of their own (owner, roadmap Phase 16), added only when GUNC ran.
 """
 
 import re
@@ -28,6 +30,10 @@ RANK_PREFIXES = [("domain", "d__"), ("phylum", "p__"), ("class", "c__"), ("order
                  ("genus", "g__"), ("species", "s__")]
 AMINO_ACIDS = {"Ala", "Arg", "Asn", "Asp", "Cys", "Gln", "Glu", "Gly", "His", "Ile", "Leu", "Lys", "Met", "Phe",
                "Pro", "Ser", "Thr", "Trp", "Tyr", "Val"}
+# GUNC's maxCSS-level table -> mags columns
+GUNC_COLUMNS = {"pass.GUNC": "gunc_pass", "clade_separation_score": "clade_separation_score",
+                "contamination_portion": "contamination_portion",
+                "reference_representation_score": "reference_representation_score"}
 CHECKM2_COLUMNS = {"Name", "Completeness", "Contamination", "Completeness_Model_Used", "Coding_Density",
                    "Contig_N50", "Genome_Size", "GC_Content", "Total_Contigs"}
 
@@ -74,6 +80,23 @@ def _gtdb(gdir, asm):
                     die(f"{p}: not a GTDB-Tk summary (no user_genome / classification)")
                 frames.append(df)
     return pd.concat(frames, ignore_index=True) if frames else None
+
+
+def _gunc(gdir, asm):
+    """{bin: {gunc column: value}} from the assembly's GUNC table, or None when GUNC did not run. A bin GUNC could
+    not score (fewer mapped genes than its --min_mapped_genes) has nan everywhere: blank values."""
+    p = gdir / f"{asm}_gunc_maxCSS_level.tsv"
+    if not p.exists():
+        return None
+    df = pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False)
+    if not {"genome", *GUNC_COLUMNS} <= set(df.columns):
+        die(f"{p}: GUNC table lacks {sorted({'genome', *GUNC_COLUMNS} - set(df.columns))}")
+    out = {}
+    for r in df.to_dict("records"):
+        passed = {"True": True, "False": False}.get(r["pass.GUNC"])
+        scores = {GUNC_COLUMNS[c]: pd.to_numeric(r[c], errors="coerce") for c in GUNC_COLUMNS if c != "pass.GUNC"}
+        out[r["genome"]] = {"gunc_pass": passed, **{k: (None if pd.isna(v) else float(v)) for k, v in scores.items()}}
+    return out
 
 
 def split_lineage(classification):
@@ -132,7 +155,7 @@ def mimag_tier(completeness, contamination, rrna_all, trna_aa, have_bakta):
 def load_mags(root):
     """-> {"mags": DataFrame (one row per refined MAG of every assembly), "depth": DataFrame(assembly, sample, bin,
     mean_depth_x) from the published bin depth tables or None, "bakta": bool} or None when binning did not run."""
-    rows, have_bakta, reported = [], False, False
+    rows, have_bakta, have_gunc, reported = [], False, False, False
     groups = load_coassembly_groups(root)
     for asm, adir in _assembly_dirs(root, groups).items():
         q = _quality_report(asm, adir / "quality" / "checkm2")
@@ -145,6 +168,8 @@ def load_mags(root):
             die(f"{qpath}: CheckM2 report lacks {sorted(CHECKM2_COLUMNS - set(cm.columns))}")
         gtdb = _gtdb(adir / "taxonomy" / "gtdbtk", asm)
         gtdb = gtdb.set_index("user_genome") if gtdb is not None else None
+        gunc = _gunc(adir / "quality" / "gunc", asm)
+        have_gunc |= gunc is not None
         mdir = root / "07_functional_annotation" / "mags" / coassembly_subdir(asm, groups)
         for r in cm.itertuples(index=False):
             row = {"assembly": asm, "bin": r.Name, "binner": binner,
@@ -172,11 +197,13 @@ def load_mags(root):
             row["quality_tier"], row["tier_basis"] = mimag_tier(
                 row["completeness_pct"], row["contamination_pct"],
                 bool(feats["rrna_16s"] and feats["rrna_23s"] and feats["rrna_5s"]), feats["trna_aa_types"] or 0, bk)
+            if gunc is not None:
+                row.update(gunc.get(r.Name, {c: None for c in GUNC_COLUMNS.values()}))
             rows.append(row)
     if not rows:
         # binning ran but no bin passed refinement (header-only reports): an empty table, not a missing stage
         return {"mags": pd.DataFrame(columns=[c for c in MAG_COLUMNS if c != "batch"]), "depth": None,
-                "bakta": False} if reported else None
+                "bakta": False, "gunc": have_gunc} if reported else None
     depth = None
     dparts = []
     for asm, adir in _assembly_dirs(root, groups).items():
@@ -191,7 +218,7 @@ def load_mags(root):
                                         "mean_depth_x": pd.to_numeric(df["average_cov"], errors="coerce")}))
     if dparts:
         depth = pd.concat(dparts, ignore_index=True)
-    return {"mags": pd.DataFrame(rows), "depth": depth, "bakta": have_bakta, "groups": groups}
+    return {"mags": pd.DataFrame(rows), "depth": depth, "bakta": have_bakta, "gunc": have_gunc, "groups": groups}
 
 
 MAG_COLUMNS = ["assembly", "batch", "bin", "binner", "completeness_pct", "contamination_pct", "checkm2_model",
@@ -201,18 +228,28 @@ MAG_COLUMNS = ["assembly", "batch", "bin", "binner", "completeness_pct", "contam
                                                                 "crispr_arrays"]
 
 
+def mag_columns(with_gunc):
+    """MAG_COLUMNS, with GUNC's after tier_basis when GUNC ran on any assembly."""
+    if not with_gunc:
+        return MAG_COLUMNS
+    i = MAG_COLUMNS.index("tier_basis") + 1
+    return MAG_COLUMNS[:i] + list(GUNC_COLUMNS.values()) + MAG_COLUMNS[i:]
+
+
 def mags_table(parts):
-    """mags: one row per (batch, assembly, refined MAG). parts: [(batch label, load_mags result)]."""
+    """mags: one row per (batch, assembly, refined MAG). parts: [(batch label, load_mags result)]. The GUNC columns
+    only when GUNC ran on some assembly; a MAG without a GUNC row (another batch, or an unscored bin) is blank."""
+    columns = mag_columns(any(p.get("gunc") for _, p in parts if p is not None))
     frames = [p["mags"].assign(batch=label) for label, p in parts if p is not None]
     if not frames:
         return None
     frames = [f for f in frames if not f.empty]
     if not frames:
-        return pd.DataFrame(columns=MAG_COLUMNS)
-    df = pd.concat(frames, ignore_index=True)[MAG_COLUMNS]
+        return pd.DataFrame(columns=columns)
+    df = pd.concat(frames, ignore_index=True).reindex(columns=columns)
     for c in ("contigs", "trna_aa_types", "cds", "crispr_arrays"):
         df[c] = df[c].astype("Int64")
-    for c in ("rrna_16s", "rrna_23s", "rrna_5s"):
+    for c in ("rrna_16s", "rrna_23s", "rrna_5s") + (("gunc_pass",) if "gunc_pass" in columns else ()):
         df[c] = df[c].astype("boolean")
     keys = sorted(range(len(df)), key=lambda i: (df.at[i, "batch"], natural_key(df.at[i, "assembly"]),
                                                  natural_key(df.at[i, "bin"])))

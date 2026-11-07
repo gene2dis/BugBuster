@@ -10,6 +10,9 @@ score) and the DeepARG predictions. With binning, the contig's refined bin
 call of geNomad's summaries, else chromosome), its aggregated plasmid and
 virus scores, virus taxonomy and plasmid conjugation genes, and each ARG gene
 the provirus regions it overlaps (gene coordinates from the Pyrodigal GFF).
+With CheckV too (--checkv_prediction, on geNomad's virus FASTA), the virus
+contigs and the ARG genes inside proviruses get CheckV's quality tier,
+completeness, contamination and its own provirus call.
 Python migration of Contig_arg_unify.R
 """
 
@@ -64,6 +67,10 @@ GENOMAD_COLS = ['mobile_class', 'plasmid_score', 'virus_score', 'provirus', 'vir
 GENOMAD_SUFFIX = '_filtered_contigs_'
 
 
+CHECKV_COLS = ['checkv_quality', 'checkv_completeness', 'checkv_contamination', 'checkv_provirus']
+CHECKV_SUFFIX = '_checkv_quality_summary.tsv'
+
+
 def read_tsv(path):
     """A TSV as strings; a missing file (geNomad's aggregated classification is an optional output) or an empty
     one (a stub, or a table without rows) gives an empty frame."""
@@ -101,6 +108,23 @@ def genomad_tables():
                 columns={'seq_name': 'contig_name', 'conjugation_genes': 'plasmid_conjugation_genes'}),
                 on='contig_name', how='outer')
         out[sample] = (contig, proviruses, plasmid_names, set(whole_viruses['contig_name']))
+    return out
+
+
+def checkv_tables():
+    """{sample: {sequence id: [CHECKV_COLS values]}} from CheckV's quality summaries (<sample>_checkv_quality_summary.tsv);
+    a provirus region is <contig>|provirus_<start>_<end>, as geNomad names it."""
+    out = {}
+    for path in glob.glob(f'*{CHECKV_SUFFIX}'):
+        df = read_tsv(path)
+        rows = {}
+        if not df.empty:
+            missing = {'contig_id', 'checkv_quality', 'completeness', 'contamination', 'provirus'} - set(df.columns)
+            if missing:
+                sys.exit(f"ERROR: {path} is not a CheckV quality summary (no {', '.join(sorted(missing))})")
+            for r in df.itertuples(index=False):
+                rows[r.contig_id] = [r.checkv_quality, r.completeness, r.contamination, r.provirus]
+        out[path[:-len(CHECKV_SUFFIX)]] = rows
     return out
 
 
@@ -239,6 +263,10 @@ def main():
 
     # geNomad proviruses overlapping each ARG gene: their coordinates, and
     # their taxonomy when the contig itself is not a virus call
+    checkv = checkv_tables()
+    if checkv and not genomad:
+        sys.exit("ERROR: CheckV quality summaries but no geNomad tables (CheckV runs on geNomad's virus calls)")
+    regions = {}  # row -> the provirus regions (start, end) its ARG gene overlaps
     if genomad:
         all_data['provirus'] = ''
         for sample, (_contig, proviruses, _plasmids, _viruses) in genomad.items():
@@ -252,17 +280,38 @@ def main():
                 hits = [(a, b, tax) for a, b, tax in proviruses[all_data.at[i, 'contig_name']]
                         if gene[0] <= b and gene[1] >= a]
                 if hits:
+                    regions[i] = [(a, b) for a, b, _ in hits]
                     all_data.at[i, 'provirus'] = ';'.join(f'{a}-{b}' for a, b, _ in hits)
                     current = all_data.at[i, 'virus_taxonomy']
                     if pd.isna(current) or current == '':
                         all_data.at[i, 'virus_taxonomy'] = ' | '.join(tax for _, _, tax in hits)
+
+    # CheckV: a virus contig's own row, or the rows of the provirus regions an
+    # ARG gene overlaps (';'-joined in the order of the provirus column)
+    checkv_cols = []
+    if checkv:
+        for c in CHECKV_COLS:
+            all_data[c] = ''
+        for sample, rows in checkv.items():
+            in_sample = all_data['Sample'] == sample
+            for i in all_data.index[in_sample & (all_data['mobile_class'] == 'virus')]:
+                values = rows.get(all_data.at[i, 'contig_name'])
+                if values is not None:
+                    all_data.loc[i, CHECKV_COLS] = values
+            for i in all_data.index[in_sample & all_data.index.isin(list(regions))]:
+                contig = all_data.at[i, 'contig_name']
+                found = [rows.get(f'{contig}|provirus_{a}_{b}') for a, b in regions[i]]
+                if any(v is not None for v in found):
+                    found = [v if v is not None else [''] * len(CHECKV_COLS) for v in found]
+                    all_data.loc[i, CHECKV_COLS] = [';'.join(v[k] for v in found) for k in range(len(CHECKV_COLS))]
+        checkv_cols = CHECKV_COLS
 
     # Reorder columns
     all_data = all_data[[
         'Sample', 'contig_name', 'contig_length', 'GC', 'coverage'
     ] + RANKS + [
         'taxonomy_rank', 'taxonomy_score'
-    ] + bin_cols + genomad_cols + [
+    ] + bin_cols + genomad_cols + checkv_cols + [
         'ARG_gene', 'predicted_ARG_class', 'best_hit', 'probability',
         'identity', 'alignment_evalue', 'counts'
     ]]

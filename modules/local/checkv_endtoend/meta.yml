@@ -1,0 +1,43 @@
+name: checkv_endtoend
+description: Quality of geNomad's virus contigs and proviruses with CheckV end_to_end - completeness, host contamination, closed genomes and the quality tier
+keywords:
+  - virus
+  - provirus
+  - completeness
+  - quality
+tools:
+  - checkv:
+      description: Assessing the quality of metagenome-assembled viral genomes
+      homepage: https://bitbucket.org/berkeleylab/checkv
+      documentation: https://bitbucket.org/berkeleylab/checkv/src/master/README.md
+      doi: "10.1038/s41587-020-00774-7"
+      licence: ["BSD-3-Clause-LBNL"]
+
+input:
+  - meta:
+      type: map
+      description: Assembly metadata (meta.id is the sample name, or the co-assembly id; meta.coassembly true for a co-assembly)
+  - viruses:
+      type: file
+      description: geNomad's virus FASTA, whole virus contigs and provirus regions (<contig>|provirus_<start>_<end>)
+      pattern: "*_virus.fna.gz"
+  - db:
+      type: directory
+      description: CheckV database directory (genome_db/, hmm_db/, README.txt), read only
+
+output:
+  - results:
+      type: tuple
+      description: Tuple of meta and CheckV's output directory (quality_summary.tsv, completeness.tsv, contamination.tsv, complete_genomes.tsv, viruses.fna, proviruses.fna); only quality_summary.tsv, header only, when geNomad found no virus
+      pattern: "*_checkv"
+  - quality_summary:
+      type: tuple
+      description: Tuple of meta and a copy of quality_summary.tsv under the assembly's name, read by the contig report
+      pattern: "*_checkv_quality_summary.tsv"
+  - versions:
+      type: file
+      description: Software versions (checkv, diamond, hmmer, and the database release)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

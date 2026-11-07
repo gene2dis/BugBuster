@@ -133,6 +133,16 @@ and 1.1-5.5 CPU-h per assembly. Contig taxonomy no longer uses BLAST against nt
 `docs/benchmarks/contig_taxonomy_2026.md` and
 `docs/benchmarks/contig_classifiers_2026.md`.
 
+#### MAG and virus quality (GUNC, CheckV)
+
+`--gunc_prediction` (GUNC 1.1.1, 8 CPUs, 16 GB requested) took 15-35 min per
+assembly and 8.9-9.1 GB peak memory on the Phase 11a references (6-36 refined
+MAGs each, ~7 of the 8 CPUs busy): Prodigal on each bin, then one DIAMOND
+search of all the bins' genes against the 13.5 GB reference.
+`--checkv_prediction` (CheckV 1.1.1, 8 CPUs, 8 GB requested) runs on geNomad's
+virus calls only: 0.6-6.6 min and 1.6-2.5 GB per assembly (46-997 virus
+contigs and proviruses).
+
 ---
 
 ## 3. Installation
@@ -206,11 +216,13 @@ BugBuster automatically downloads required databases on first use and stores the
 | **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **Metabuli refseq_standard** | 80 GB download, 110 GB unpacked | Contig taxonomy; its own NCBI taxdump (2026-04-03) feeds BlobTools | `contig_tax_and_arg=true` |
 | **geNomad 1.9** | 0.84 GB download, 2.2 GB unpacked | Plasmid / virus / provirus classification of contigs | `genomad_prediction=true` |
+| **CheckV 1.5** | 1.68 GB download, 6.4 GB unpacked with its DIAMOND index | Quality of geNomad's virus contigs and proviruses | `checkv_prediction=true` |
 | **DeepARG** | 4.8 GB | Contig and bin ARG prediction | `contig_tax_and_arg=true` or `arg_bin_clustering=true` |
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.8.0; only R232 data works) | `include_binning=true` |
+| **GUNC proGenomes 2.1** | 7.2 GB download, 13.5 GB unpacked | MAG chimerism check | `gunc_prediction=true` (`gunc_db='gtdb_214'`: the GTDB r214 reference, 37.9 GB download) |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation | `contig_level_functional=true` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins | `contig_level_functional=true` (unless `functional_cazy=false`) |
 | **NCBI COG 2024 definitions (cog-24.def.tab)** | 410 KB | Maps eggNOG's and WoLr2's COG ids to COG functional categories | `contig_level_functional=true` or `read_level_functional=woltka` |
@@ -477,11 +489,13 @@ breaks `-resume`.
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
+| `--gunc_prediction` | `false` | `true`, `false` | GUNC chimerism check of the refined MAGs (needs `--include_binning`); see 6.8 |
 | `--args_oap_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP against SARG (see 6.12; `--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
 | `--kmarvel_prediction` | `false` | `true`, `false` | Read-level ARG assembly against CARD protein models with K-MARVEL (needs no assembly; see 6.11) |
 | `--contig_tax_and_arg` | `false` | `true`, `false` | Contig taxonomy (Metabuli; BlobTools tables and plots) and ARG prediction (DeepARG); see 6.9 |
 | `--genomad_prediction` | `false` | `true`, `false` | Plasmid / virus / provirus classification of the contigs with geNomad (needs an assembly); see 6.9 |
+| `--checkv_prediction` | `false` | `true`, `false` | CheckV quality of geNomad's virus contigs and proviruses (needs `--genomad_prediction`); see 6.9 |
 | `--contig_level_functional` | `false` | `true`, `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts gene abundance + TPM/CPGE summary tables); see engine note below |
 | `--microbecensus` | `true` | `true`, `false` | MicrobeCensus average genome size for CPGE normalization (with the contig or read functional branch; failure is non-fatal — affected samples get no CPGE: TPM-only in the contig tables, native read counts only in the read tables) |
 | `--functional_cazy` | `true` | `true`, `false` | run_dbcan v5 CAZy annotation of the predicted proteins (only with the functional branch; reported separately from the eggNOG CAZy calls, never merged) |
@@ -625,6 +639,7 @@ breaks `-resume`.
 | `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
 | `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
+| `--gunc_db` | `progenomes_2.1` | `progenomes_2.1`, `gtdb_214` | GUNC reference for `--gunc_prediction` (proGenomes 2.1, or GTDB release 214) |
 | `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.8.0) |
 | `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
 | `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
@@ -636,6 +651,7 @@ breaks `-resume`.
 | `--kmarvel_db` | `card_v4.0.1` | `card_v4.0.1` | CARD release for K-MARVEL (CARD 4.0.1 data tarball, the release upstream's `get_ref_db.sh` fetches) |
 | `--metabuli_db` | `refseq_standard` | `refseq_standard`, `gtdb232` | Metabuli database for contig taxonomy (`gtdb232`: GTDB names, 634 GB download, not benchmarked) |
 | `--genomad_db` | `v1.9` | `v1.9` | geNomad database release (pinned Zenodo file) |
+| `--checkv_db` | `v1.5` | `v1.5` | CheckV database release (pinned NERSC file) |
 
 ### 6.4 Custom Database Paths
 
@@ -649,10 +665,12 @@ breaks `-resume`.
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
+| `--custom_gunc_db` | Path to a GUNC DIAMOND database file under GUNC's own name (`gunc_db_progenomes2.1.dmnd`, `gunc_db_gtdb214.dmnd`: GUNC reads the reference from the name) |
 | `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.8.0, R220/R226 does not (see `docs/parameters.md`) |
 | `--custom_deeparg_db` | Path to DeepARG database directory |
 | `--custom_metabuli_db` | Path to a Metabuli database directory (`db.parameters`, `diffIdx`, `info`, `taxonomyDB`, and its taxdump `nodes.dmp`/`names.dmp` at most one directory down, e.g. `ncbi-taxdump/`) |
 | `--custom_genomad_db` | Path to a geNomad database directory (`genomad_db`, `version.txt`, ...; geNomad 1.13 takes database 1.9) |
+| `--custom_checkv_db` | Path to a CheckV database directory (`genome_db/`, `hmm_db/`, `README.txt`) |
 | `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
 | `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
 | `--custom_kmarvel_db` | Path to a K-MARVEL database directory: `CARD_protein_all.fasta`, `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`); no BLAST index needed. Its `DB_VERSION`, or the FASTA's md5 without one, goes to `software_versions.yml` |
@@ -785,6 +803,33 @@ binning runs, whether or not MetaBAT2 is one of the binners.
 > batches; if the last attempt fails too, its bin folder holds `FAILED.txt` and
 > the run goes on without it.
 
+**Chimerism check (GUNC).** `--gunc_prediction` runs GUNC 1.1.1 on each
+assembly's refined MAGs (Binette's, or the single binner's bins). GUNC calls
+each MAG's genes (Prodigal), maps them to its reference (`--gunc_db`,
+proGenomes 2.1 by default) and, at the taxonomic level where they split the
+most, scores how cleanly they separate into clades by contig: the clade
+separation score (CSS, 0-1). A MAG fails (`pass.GUNC` False) when the CSS is
+above 0.45: its genes come from different lineages and sit on different
+contigs, the mark of a chimera. CheckM2's completeness and contamination come
+from marker and protein features of the whole MAG, so they can miss a MAG
+assembled from two distant genomes; co-assembly bins are prone to such
+mixtures. `contamination_portion` is the share of mapped genes outside the
+main clade at that level, and `reference_representation_score` (RRS, 0-1) how
+close the MAG is to GUNC's reference genomes: with a low RRS (a lineage the
+reference lacks; proGenomes 2.1 dates from 2020, older than the GTDB r232
+GTDB-Tk uses) the score is unreliable. When fewer than 40 % of a MAG's genes
+fall in its abundant clades, GUNC sets the CSS to 0, so such a MAG passes by
+default. A MAG with fewer than 11 genes mapped is not scored (blank). The table is in
+`04_binning/per_sample/<sample>/quality/gunc/` (co-assembly:
+`04_binning/coassembly[/<group>]/quality/gunc/`), and the summary's `mags` table gains
+`gunc_pass`, `clade_separation_score`, `contamination_portion` and
+`reference_representation_score`. A GUNC fail flags the MAG; it does not
+change the MIMAG `quality_tier`: check the MAG (its contigs' taxonomy, its
+GTDB-Tk placement) before using it as one genome. On the Phase 11a reference
+runs GUNC failed 12 of the 45 per-sample MAGs (6 of the 27 that CheckM2 rates
+> 90 % complete and < 5 % contaminated) and 7 of the 36 co-assembly MAGs (3 of
+27); none of the five MIMAG high-quality MAGs failed.
+
 #### Basic Binning Parameters
 
 | Parameter | Default | Description |
@@ -836,7 +881,30 @@ has one row per contig, or per ARG gene on a contig with several:
   geNomad's plasmid class also takes integrative conjugative elements and
   transposon cargo. `00_summary/tables/arg_contig_mobile.tsv` counts the ARG
   genes per class on plasmid and virus contigs and in proviruses.
+- `checkv_quality`, `checkv_completeness`, `checkv_contamination`,
+  `checkv_provirus` (with `--checkv_prediction`): CheckV's quality tier,
+  completeness (%), contamination (%, host genes) and its own provirus call
+  (`Yes` when it trimmed host genes from the sequence), for virus contigs and,
+  for an ARG gene inside a provirus, for each overlapping region (`;`-joined,
+  in the order of `provirus`). `arg_contig_mobile.tsv` then counts the ARG
+  genes on virus contigs and in proviruses by tier
+  (`arg_genes_viral_checkv_high`, `_medium`, `_low`, `_not_determined`).
 - `ARG_gene` ... `counts`: DeepARG.
+
+**Virus quality (CheckV).** `--checkv_prediction` (needs
+`--genomad_prediction`) runs CheckV 1.1.1 `end_to_end` on each assembly's
+geNomad virus FASTA: whole virus contigs and the provirus regions geNomad cut
+out of contigs. CheckV estimates completeness from amino-acid identity to its
+database's genomes (or, without a close one, from its viral HMMs), finds host
+genes at a provirus's edges, and looks for terminal repeats. Its tiers:
+`Complete` (terminal repeats or flanking host regions), `High-quality`
+(> 90 % complete), `Medium-quality` (50-90 %), `Low-quality` (< 50 %),
+`Not-determined` (nothing to estimate completeness from). Low-quality and
+Not-determined mean a fragment, or a virus too novel for the database, not a
+false virus call. The database (`--checkv_db` v1.5, 6.4 GB unpacked) is only
+read. Outputs in `06_contig_taxonomy/checkv/<sample>/<sample>_checkv/`
+(co-assembly: `checkv/coassembly/coassembly_checkv/`, or
+`checkv/coassembly/<group>/<group>_checkv/` with `--coassembly_group_by`).
 
 BlobTools' tables and phylum plot use Metabuli's calls and the database's own
 taxdump; its 2025 `domain` rank is renamed `superkingdom` for BlobTools 1.1.1,
@@ -1270,7 +1338,8 @@ results/
 │   │       │   └── comebin/                    # COMEBin bins
 │   │       ├── refined_bins/                   # Binette refined bins (if >= 2 binners)
 │   │       ├── quality/                        # CheckM2 quality reports
-│   │       │   └── checkm2/
+│   │       │   ├── checkm2/
+│   │       │   └── gunc/                       # GUNC maxCSS-level table (if gunc_prediction=true)
 │   │       ├── taxonomy/                       # GTDB-TK taxonomy
 │   │       │   └── gtdbtk/
 │   │       └── coverage/                       # MAG depth in the sample ({sample}_bin_depth.tsv)
@@ -1278,7 +1347,8 @@ results/
 │   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
 │   │   ├── refined_bins/                       # Binette refined bins (if >= 2 binners)
 │   │   ├── quality/                            # CheckM2 quality reports
-│   │   │   └── checkm2/
+│   │   │   ├── checkm2/
+│   │   │   └── gunc/                           # GUNC maxCSS-level table (if gunc_prediction=true)
 │   │   ├── taxonomy/                           # GTDB-TK taxonomy
 │   │   │   └── gtdbtk/
 │   │   ├── coverage/                           # MAG depth per sample (<sample>_bin_depth.tsv)
@@ -1351,6 +1421,8 @@ results/
 │   │       └── {sample}_report.tsv             # Clade report
 │   ├── genomad/                                # geNomad (if genomad_prediction=true)
 │   │   └── {sample}/                           # *_summary/ (plasmid/virus summaries, genes, sequences), *_aggregated_classification/, *_find_proviruses/, ...
+│   ├── checkv/                                 # CheckV on geNomad's viruses (if checkv_prediction=true)
+│   │   └── {sample}/{sample}_checkv/           # quality_summary.tsv, completeness.tsv, contamination.tsv, complete_genomes.tsv, viruses.fna, proviruses.fna
 │   └── figures/                                # Phylum blob plot per assembly
 │       └── {sample}_Phylum_blob_plot.*         # (.pdf/.svg/.png, values in .csv; coassembly_* under co-assembly)
 └── 07_functional_annotation/                   # Functional annotation
@@ -1575,10 +1647,12 @@ databases/                            # Database storage (configurable via --dat
 ├── sylph/gtdb_r232/                  # Sylph database (sylph_db/*.syl2db) + sylph-tax metadata (sylph_db/*.tsv.gz)
 ├── metabuli/refseq_standard/         # Metabuli database for contig taxonomy (metabuli_db/, ~110 GB, with its taxdump)
 ├── genomad/v1.9/                     # geNomad database 1.9 (genomad_db/, ~2.2 GB)
+├── checkv/v1.5/                      # CheckV database 1.5 (checkv_db/, ~6.4 GB with its DIAMOND index)
 ├── deeparg/1.0.4/                    # DeepARG database (deeparg_db/; unversioned upstream, keyed by the deeparg version)
 ├── rgi/latest_wildcard_k61/          # CARD database for RGI (card_db/; --rgi_card_version, _wildcard_k<--rgi_kmer_size> with WildCARD)
 ├── kmarvel/card_v4.0.1_blastdb/      # CARD 4.0.1 protein models for K-MARVEL and their BLAST index (kmarvel_db/, ~7 MB)
 ├── checkm2/v3/                       # CheckM2 database (*.dmnd)
+├── gunc/progenomes_2.1/              # GUNC reference (gunc_db_progenomes2.1.dmnd, 13.5 GB)
 ├── gtdbtk/release_232/               # GTDB-TK database (gtdbtk_db/)
 ├── eggnog/emapper-3.0/               # eggNOG 7 data for eggNOG-mapper v3 (eggnog_db/, ~44 GB)
 ├── dbcan/db_v5-2-9_5-5-2026/         # dbCAN database for run_dbcan v5 (dbcan_db/, ~7.4 GB)

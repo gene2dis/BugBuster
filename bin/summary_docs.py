@@ -304,6 +304,16 @@ TABLE_DOCS = {
             ("arg_genes_on_virus", "genes on contigs geNomad calls virus (whole contig)"),
             ("arg_genes_in_provirus", "genes overlapping a provirus region geNomad found inside a contig"),
             ("pct_mobile", "% of arg_genes on a plasmid or virus contig or in a provirus (each gene counted once)"),
+            ("arg_genes_viral_checkv_high", "CheckV (--checkv_prediction): of the genes on virus contigs or in "
+                                            "proviruses, those whose virus CheckV rates Complete or High-quality "
+                                            "(>= 90 % complete); a gene in several proviruses counts once, at its "
+                                            "best tier; blank for a batch without CheckV"),
+            ("arg_genes_viral_checkv_medium", "those whose virus CheckV rates Medium-quality (50-90 % complete)"),
+            ("arg_genes_viral_checkv_low", "those whose virus CheckV rates Low-quality (< 50 % complete)"),
+            ("arg_genes_viral_checkv_not_determined", "those CheckV could not rate (Not-determined: no reference "
+                                                      "match or viral HMM to estimate completeness from), or with no "
+                                                      "CheckV row; the four columns sum to arg_genes_on_virus + "
+                                                      "arg_genes_in_provirus"),
         ],
     },
     "function_read_long": {
@@ -402,6 +412,14 @@ TABLE_DOCS = {
                              "rRNA and >= 18 tRNA amino acids; medium = completeness >= 50, contamination < 10; low = "
                              "the rest. Stricter on rRNA/tRNA than the High/Mid/Low of the run's 04_binning plots"),
             ("tier_basis", "checkm2_rrna_trna: Bakta's rRNA / tRNA checked; checkm2_only: no Bakta, so at most medium"),
+            ("gunc_pass", "GUNC (--gunc_prediction): true, or false for a likely chimera (clade_separation_score > "
+                          "0.45 at the level where the MAG's genes split the most); blank when GUNC could not score "
+                          "it (fewer than 11 genes mapped to its reference). A flag only: quality_tier does not use it"),
+            ("clade_separation_score", "GUNC's CSS (0-1) at that level: how cleanly the MAG's genes separate into "
+                                       "clades by contig; high = genes of different lineages on different contigs"),
+            ("contamination_portion", "GUNC: share of the mapped genes outside the MAG's main clade at that level"),
+            ("reference_representation_score", "GUNC's RRS (0-1): how close the MAG is to GUNC's reference genomes; "
+                                               "low values (a lineage the reference lacks) make the score unreliable"),
             ("domain, phylum, class, order, family, genus, species", "GTDB-Tk classification (GTDB names; blank where "
                                                                     "it stops)"),
             ("gtdb_closest_reference", "GTDB-Tk's closest reference genome (blank when there is none)"),
@@ -760,6 +778,32 @@ PITFALLS = [
 ]
 
 
+# Caveats of optional stages, listed only when the stage ran in some batch (stage key in summary_catalog.STAGES)
+STAGE_PITFALLS = {
+    "gunc": "GUNC (mags gunc_pass and scores) finds chimeras across distant lineages that CheckM2's completeness and "
+            "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
+            "quality_tier. Its reference (proGenomes 2.1, 2020; or GTDB r214) is older than GTDB r232: a MAG of a "
+            "lineage the reference lacks has a low reference_representation_score and an unreliable call.",
+    "checkv": "CheckV's quality tiers (arg_contig_mobile arg_genes_viral_checkv_*, and the contig table's "
+              "checkv_quality) estimate how complete geNomad's virus or provirus is: completeness from amino-acid "
+              "identity to CheckV's genomes, else from its HMMs. Low-quality and Not-determined mean too short or too "
+              "novel to judge, not 'not a virus'; Complete needs terminal repeats or flanking host regions. A "
+              "provirus's tier is that of the region geNomad cut out, and CheckV may trim host genes from it "
+              "(checkv_provirus).",
+}
+
+
+def stage_pitfalls(ctx):
+    """The caveats of the optional stages that ran in some batch (README, LLM guide and the report)."""
+    ran = {st["key"] for statuses in ctx.get("stage_status", {}).values() for st, status in statuses
+           if status.startswith("ran")}
+    return [text for key, text in STAGE_PITFALLS.items() if key in ran]
+
+
+def pitfalls(ctx):
+    """PITFALLS plus the caveats of the optional stages that ran."""
+    return PITFALLS + stage_pitfalls(ctx)
+
 def stage_rows(stage_status_by_batch):
     """[[stage, status per batch ..., what the summary takes]] for the README / guide stage table."""
     labels = list(stage_status_by_batch)
@@ -832,7 +876,7 @@ def readme_blocks(ctx):
     methods = ctx.get("method_notes", [])
     if methods:
         blocks += [("h", 2, "Methods"), ("ul", methods)]
-    blocks += [("h", 2, "Caveats"), ("ul", PITFALLS)]
+    blocks += [("h", 2, "Caveats"), ("ul", pitfalls(ctx))]
     if ctx.get("versions_table"):
         blocks += [("h", 2, "Software versions"),
                    ("table", ["Process", "Tool", "Version"], ctx["versions_table"])]
@@ -884,7 +928,7 @@ def llm_guide(ctx):
             "pipeline's results directory of each batch.", "",
             "## Units and codes", ""]
     out += [f"- **{t}**: {m}" for t, m in UNITS]
-    out += ["", "## Pitfalls", ""] + [f"- {p}" for p in PITFALLS]
+    out += ["", "## Pitfalls", ""] + [f"- {p}" for p in pitfalls(ctx)]
     labels, rows = stage_rows(ctx["stage_status"])
     out += ["", "## Pipeline stages", "",
             "Status per batch: `ran`, `not run`, or `ran, no table found` (the stage ran but its table was not "

@@ -14,6 +14,13 @@ from summary_common import die, load_coassembly_groups
 CONTIG_TABLE = ("05_arg_prediction", "contig_level", "summary", "Contig_tax_and_arg_prediction.tsv")
 NEEDED = {"Sample", "contig_name", "ARG_gene", "predicted_ARG_class"}
 GENOMAD = {"mobile_class", "provirus"}
+CHECKV = {"checkv_quality"}
+# CheckV's quality tiers -> arg_contig_mobile's count columns, best first; a blank tier (no CheckV row) is
+# not_determined
+CHECKV_TIERS = {"Complete": "high", "High-quality": "high", "Medium-quality": "medium", "Low-quality": "low",
+                "Not-determined": "not_determined"}
+CHECKV_TIER_ORDER = ["high", "medium", "low", "not_determined"]
+CHECKV_COUNTS = [f"arg_genes_viral_checkv_{t}" for t in CHECKV_TIER_ORDER]
 RANKS = ["superkingdom", "phylum", "class", "order", "family", "genus", "species"]
 MAPPING_COLUMNS = ["#ARG", "read_id", "predicted_ARG-class"]
 GENE_ABUNDANCE_COLUMNS = ["sample_id", "gene_id", "assembly_mode", "count", "length_bp", "tpm", "cpge"]
@@ -50,26 +57,51 @@ def has_genomad(df):
     return df is not None and GENOMAD <= set(df.columns)
 
 
+def has_checkv(df):
+    """The contig table carries CheckV's columns (--checkv_prediction, on geNomad's virus calls)."""
+    return df is not None and CHECKV <= set(df.columns)
+
+
+def checkv_tier(value):
+    """The best CheckV tier of a contig table cell (';'-joined for a gene in several proviruses), as a count
+    column suffix."""
+    tiers = [CHECKV_TIERS.get(v, "not_determined") for v in str(value).split(";")]
+    return min(tiers, key=CHECKV_TIER_ORDER.index)
+
+
 def contig_mobile_table(parts):
     """arg_contig_mobile: per batch, assembly (sample, or coassembly) and DeepARG class, the ARG genes and how many
     sit on plasmid contigs, on virus contigs and inside proviruses. parts: [(batch label, contig ARG rows)]. The
     batch is part of the key: every co-assembly is called 'coassembly'. None when no batch has the geNomad
-    columns."""
-    parts = [p.assign(batch=label) for label, p in parts if has_genomad(p) and not p.empty]
+    columns. With CheckV's columns in some batch, the genes on virus contigs or in proviruses are also counted by
+    CheckV tier (a gene in several proviruses at its best one); blank for a batch without CheckV."""
+    parts = [p.assign(batch=label, _checkv=has_checkv(p)) for label, p in parts if has_genomad(p) and not p.empty]
     if not parts:
         return None
+    # from the batches kept: a CheckV batch without ARG rows adds no column to count on
+    with_checkv = any(p["_checkv"].iat[0] for p in parts)
     df = pd.concat(parts, ignore_index=True)
     df["on_plasmid"] = df["mobile_class"] == "plasmid"
     df["on_virus"] = df["mobile_class"] == "virus"
     df["in_provirus"] = df["provirus"] != ""
     df["mobile"] = df["on_plasmid"] | df["on_virus"] | df["in_provirus"]
+    counts = {}
+    if with_checkv:
+        viral = df["on_virus"] | df["in_provirus"]
+        tier = df["checkv_quality"].fillna("").map(checkv_tier)
+        for col in CHECKV_COUNTS:
+            df[col] = viral & (tier == col.rsplit("_checkv_", 1)[1])
+            counts[col] = (col, "sum")
     out = (df.groupby(["batch", "Sample", "predicted_ARG_class"])
              .agg(arg_genes=("ARG_gene", "size"), arg_genes_on_plasmid=("on_plasmid", "sum"),
                   arg_genes_on_virus=("on_virus", "sum"), arg_genes_in_provirus=("in_provirus", "sum"),
-                  mobile=("mobile", "sum"))
+                  mobile=("mobile", "sum"), _checkv=("_checkv", "first"), **counts)
              .reset_index()
              .rename(columns={"Sample": "assembly", "predicted_ARG_class": "arg_class"}))
     out["pct_mobile"] = (out.pop("mobile") / out["arg_genes"] * 100).round(2)
+    no_checkv = ~out.pop("_checkv").astype(bool)
+    for col in CHECKV_COUNTS if with_checkv else []:
+        out[col] = out.pop(col).astype("Int64").mask(no_checkv)
     out = out[["assembly", "batch"] + [c for c in out.columns if c not in ("assembly", "batch")]]
     return out.sort_values(["batch", "assembly", "arg_genes"], ascending=[True, True, False],
                            kind="stable").reset_index(drop=True)

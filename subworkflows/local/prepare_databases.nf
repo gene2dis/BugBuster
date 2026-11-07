@@ -14,6 +14,8 @@ include { FORMAT_METABULI_DB      } from '../../modules/local/format_db/main'
 include { FORMAT_GENOMAD_DB       } from '../../modules/local/format_db/main'
 include { DOWNLOAD_DEEPARG_DB     } from '../../modules/local/format_db/main'
 include { FORMAT_CHECKM2_DB       } from '../../modules/local/format_db/main'
+include { FORMAT_GUNC_DB          } from '../../modules/local/format_db/main'
+include { FORMAT_CHECKV_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_EGGNOG_DB        } from '../../modules/local/format_db/main'
 include { FORMAT_DBCAN_DB         } from '../../modules/local/format_db/main'
 include { FORMAT_BAKTA_DB         } from '../../modules/local/format_db/main'
@@ -42,8 +44,10 @@ workflow PREPARE_DATABASES {
     ch_metabuli_db      = channel.empty()
     ch_metabuli_taxdump = channel.empty()
     ch_genomad_db       = channel.empty()
+    ch_checkv_db        = channel.empty()
     ch_gtdbtk_db        = channel.empty()
     ch_checkm2_db       = channel.empty()
+    ch_gunc_db          = channel.empty()
     ch_rgi_card_db      = channel.empty()
     ch_kmarvel_db       = channel.empty()
     ch_eggnog_db        = channel.empty()
@@ -226,6 +230,18 @@ workflow PREPARE_DATABASES {
     }
 
     //
+    // CheckV database for the quality of geNomad's virus calls (pinned
+    // release; CheckV's own download_database floats to the latest)
+    //
+    if ( flagOn(params.checkv_prediction) ) {
+        if ( params.custom_checkv_db ) {
+            ch_checkv_db = channel.fromPath(params.custom_checkv_db, type: 'dir', checkIfExists: true)
+        } else {
+            ch_checkv_db = FORMAT_CHECKV_DB(channel.of(params.checkv_db)).checkv_db
+        }
+    }
+
+    //
     // GTDB-TK and CheckM2 databases for binning
     //
     if ( flagOn(params.include_binning) ) {
@@ -241,6 +257,17 @@ workflow PREPARE_DATABASES {
         } else {
             ch_checkm2_ref = channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
             ch_checkm2_db = FORMAT_CHECKM2_DB(ch_checkm2_ref)
+        }
+    }
+
+    //
+    // GUNC's DIAMOND reference for the chimerism check of the refined MAGs
+    //
+    if ( flagOn(params.gunc_prediction) ) {
+        if ( params.custom_gunc_db ) {
+            ch_gunc_db = channel.fromPath(params.custom_gunc_db, type: 'file', checkIfExists: true)
+        } else {
+            ch_gunc_db = FORMAT_GUNC_DB(channel.of(params.gunc_db)).gunc_db
         }
     }
 
@@ -388,8 +415,10 @@ workflow PREPARE_DATABASES {
     metabuli_db            = ch_metabuli_db
     metabuli_taxdump       = ch_metabuli_taxdump     // [nodes.dmp, names.dmp] of the Metabuli database
     genomad_db             = ch_genomad_db
+    checkv_db              = ch_checkv_db
     gtdbtk_db              = ch_gtdbtk_db
     checkm2_db             = ch_checkm2_db
+    gunc_db                = ch_gunc_db
     rgi_card_db            = ch_rgi_card_db
     kmarvel_db             = ch_kmarvel_db
     eggnog_db              = ch_eggnog_db

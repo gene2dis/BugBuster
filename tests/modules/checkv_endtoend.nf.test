@@ -1,0 +1,85 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CHECKV_ENDTOEND Module Test
+
+    A real run needs the 6.4 GB CheckV database (checked on geNomad's virus
+    calls in the roadmap Phase 16 harness). Without virus sequences the
+    module writes a header-only quality summary and never calls CheckV, so
+    that path runs here for real: tests/data/checkv/no_viruses.fna.gz is an
+    empty gzip and tests/data/checkv/db/ holds only the README line the
+    version is read from. A truncated gzip must fail the task, not read as a
+    FASTA without viruses.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test CHECKV_ENDTOEND Process"
+    script "../../modules/local/checkv_endtoend/main.nf"
+    process "CHECKV_ENDTOEND"
+
+    test("no virus sequences: header-only quality summary without CheckV") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA', coassembly: false ],
+                    file("${projectDir}/tests/data/checkv/no_viruses.fna.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/checkv/db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def summary = path(process.out.quality_summary.get(0)[1]).readLines()
+            assert summary.size() == 1
+            assert summary[0].startsWith('contig_id\tcontig_length\tprovirus\t')
+            assert summary[0].contains('\tcheckv_quality\t') && summary[0].contains('\tcompleteness\t')
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('checkv: 1.1.1') && versions.contains('checkv_db: 1.5')
+        }
+    }
+
+    test("a corrupt virus FASTA fails the task instead of reading as no viruses") {
+        // tests/data/checkv/truncated_viruses.fna.gz: the first half of a gzip
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA', coassembly: false ],
+                    file("${projectDir}/tests/data/checkv/truncated_viruses.fna.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/checkv/db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+        }
+    }
+
+    test("stub: the quality summary under the assembly's name") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly', coassembly: true ],
+                    file("${projectDir}/tests/data/checkv/no_viruses.fna.gz", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/checkv/db", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert new File(process.out.quality_summary.get(0)[1].toString()).name == 'coassembly_checkv_quality_summary.tsv'
+            assert new File(process.out.results.get(0)[1].toString()).name == 'coassembly_checkv'
+        }
+    }
+}

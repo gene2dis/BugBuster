@@ -174,27 +174,33 @@
     <text class="n" x="107" y="15">SemiBin2 · MetaBAT2 · COMEBin</text>
     <text class="d" x="107" y="28">SemiBin2 is the default binner</text>
   </g>
-  <path class="step" d="M666,438 H680" marker-end="url(#arrow)"/>
-  <g class="box" transform="translate(682,420)">
-    <rect width="80" height="36" rx="6"/>
-    <text class="n" x="40" y="15">Binette</text>
-    <text class="d" x="40" y="28">≥ 2 binners</text>
+  <path class="step" d="M666,438 H676" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(678,420)">
+    <rect width="66" height="36" rx="6"/>
+    <text class="n" x="33" y="15">Binette</text>
+    <text class="d" x="33" y="28">≥ 2 binners</text>
   </g>
-  <path class="step" d="M762,438 H776" marker-end="url(#arrow)"/>
-  <g class="box" transform="translate(778,420)">
-    <rect width="70" height="36" rx="6"/>
-    <text class="n" x="35" y="22">CheckM2</text>
+  <path class="step" d="M744,438 H754" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(756,420)">
+    <rect width="68" height="36" rx="6"/>
+    <text class="n" x="34" y="22">CheckM2</text>
   </g>
-  <path class="step" d="M848,438 H862" marker-end="url(#arrow)"/>
-  <g class="box" transform="translate(864,420)">
-    <rect width="70" height="36" rx="6"/>
-    <text class="n" x="35" y="22">GTDB-Tk</text>
+  <path class="step" d="M824,438 H834" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(836,420)">
+    <rect width="54" height="36" rx="6"/>
+    <text class="n" x="27" y="15">GUNC</text>
+    <text class="d" x="27" y="28">chimeras</text>
   </g>
-  <path class="step" d="M934,438 H948" marker-end="url(#arrow)"/>
-  <g class="box" transform="translate(950,420)">
-    <rect width="76" height="36" rx="6"/>
-    <text class="n" x="38" y="15">Bakta</text>
-    <text class="d" x="38" y="28">MAG genes</text>
+  <path class="step" d="M890,438 H900" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(902,420)">
+    <rect width="62" height="36" rx="6"/>
+    <text class="n" x="31" y="22">GTDB-Tk</text>
+  </g>
+  <path class="step" d="M964,438 H974" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(976,420)">
+    <rect width="62" height="36" rx="6"/>
+    <text class="n" x="31" y="15">Bakta</text>
+    <text class="d" x="31" y="28">MAG genes</text>
   </g>
 
   <!-- Assembly to contig branches -->
@@ -243,6 +249,12 @@
     <rect width="286" height="36" rx="6"/>
     <text class="n" x="143" y="15">geNomad</text>
     <text class="d" x="143" y="28">plasmid, virus, provirus</text>
+  </g>
+  <path class="step" d="M738,632 H752" marker-end="url(#arrow)"/>
+  <g class="box" transform="translate(754,614)">
+    <rect width="184" height="36" rx="6"/>
+    <text class="n" x="92" y="15">CheckV</text>
+    <text class="d" x="92" y="28">virus and provirus quality</text>
   </g>
 
   <text class="rl" x="364" y="681">Function</text>

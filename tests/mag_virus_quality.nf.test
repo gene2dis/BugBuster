@@ -1,0 +1,276 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MAG and virus quality (roadmap Phase 16: GUNC, --gunc_prediction, G1;
+    CheckV, --checkv_prediction, G2)
+
+    - With both off, a per-sample run with every assembly-side stage on
+      publishes exactly the paths dev did (tests/data/stub_paths/assembly_dev.txt:
+      a stub run of dev de57f34 with the settings below).
+    - With both on, the same run publishes dev's paths plus GUNC's and CheckV's
+      only (and their stub databases, which -stub publishes under format/ as it
+      does every database's).
+    - Under co-assembly groups, both land in the group's folders.
+    - Each needs its stage (launch errors), and a database already in
+      databases_dir is not prepared again.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "MAG and virus quality (GUNC, CheckV)"
+    script "../main.nf"
+
+    test("Both off: a per-sample stub publishes the same paths as before them") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("GUNC") || task.name.contains("CHECKV") } == 0
+            assert TestData.publishedPaths(outputDir).sort() ==
+                new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines().sort()
+        }
+    }
+
+    test("Both on: dev's paths plus GUNC's and CheckV's only") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                gunc_prediction         = true
+                checkv_prediction       = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.startsWith(name) } }
+            assert count("GUNC_RUN (") == 2
+            assert count("CHECKV_ENDTOEND (") == 2
+            assert count("PREPARE_DATABASES:FORMAT_GUNC_DB") == 1
+            assert count("PREPARE_DATABASES:FORMAT_CHECKV_DB") == 1
+
+            def added = []
+            for (s in ["test_sample1", "test_sample2"]) {
+                added << "04_binning/per_sample/${s}/quality/gunc/${s}_gunc_maxCSS_level.tsv".toString()
+                added << "06_contig_taxonomy/checkv/${s}/${s}_checkv/quality_summary.tsv".toString()
+            }
+            added += ["format/gunc_db_progenomes2.1.dmnd", "format/checkv_db/README.txt",
+                      "format/checkv_db/genome_db/checkv_error.tsv", "format/checkv_db/genome_db/checkv_reps.dmnd",
+                      "format/checkv_db/genome_db/checkv_reps.tsv", "format/checkv_db/hmm_db/checkv_hmms.tsv"]
+            def dev = new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines()
+            assert TestData.publishedPaths(outputDir).sort() == (dev + added).sort()
+
+            // the CheckV quality summaries reach the contig report (its task: the one
+            // that writes the contig table from the BlobTools tables)
+            def report = new File("${outputDir}/../work").listFiles().collectMany { a ->
+                (a.listFiles() ?: []).findAll { d ->
+                    def names = d.list() ?: []
+                    'Contig_tax_and_arg_prediction.tsv' in names && names.any { n -> n.contains('_Blob_table') }
+                }
+            }
+            assert report.size() == 1
+            assert report[0].list().findAll { n -> n.endsWith('_checkv_quality_summary.tsv') }.sort() ==
+                ['test_sample1_checkv_quality_summary.tsv', 'test_sample2_checkv_quality_summary.tsv']
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains('"GUNC_RUN":') && vtext.contains("gunc: 1.1.1") && vtext.contains("gunc_db: progenomes_2.1")
+            assert vtext.contains('"CHECKV_ENDTOEND":') && vtext.contains("checkv: 1.1.1") && vtext.contains("checkv_db: 1.5")
+            assert new org.yaml.snakeyaml.Yaml().load(vtext) instanceof Map
+        }
+    }
+
+    test("Co-assembly groups: GUNC and CheckV under each group's folders") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet3(outputDir, projectDir)
+                output = "${outputDir}"
+                sample_metadata         = TestData.metadataTable(outputDir, "groups.tsv",
+                    "sample\tsite\ntest_sample1\tgroup A\ntest_sample2\tgroup A\ntest_sample3\tsolo\n")
+                coassembly_group_by     = "site"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "coassembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                gunc_prediction         = true
+                checkv_prediction       = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            for (g in ["group_A", "solo"]) {
+                assert path("${outputDir}/04_binning/coassembly/${g}/quality/gunc/${g}_gunc_maxCSS_level.tsv").exists()
+                assert path("${outputDir}/06_contig_taxonomy/checkv/coassembly/${g}/${g}_checkv/quality_summary.tsv").exists()
+            }
+            assert !path("${outputDir}/04_binning/per_sample").exists()
+        }
+    }
+
+    test("Ungrouped co-assembly: GUNC and CheckV under coassembly/") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "coassembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin"
+                genomad_prediction      = true
+                gunc_prediction         = true
+                checkv_prediction       = true
+                results_summary         = false
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            // one binner: GUNC checks the binner's bins
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("GUNC_RUN (coassembly)") } == 1
+            assert path("${outputDir}/04_binning/coassembly/quality/gunc/coassembly_gunc_maxCSS_level.tsv").exists()
+            assert path("${outputDir}/06_contig_taxonomy/checkv/coassembly/coassembly_checkv/quality_summary.tsv").exists()
+        }
+    }
+
+    test("Rejects gunc_prediction without include_binning") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode   = "assembly"
+                gunc_prediction = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--gunc_prediction requires --include_binning")
+        }
+    }
+
+    test("Rejects checkv_prediction without genomad_prediction") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode     = "assembly"
+                checkv_prediction = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--checkv_prediction requires --genomad_prediction")
+        }
+    }
+
+    test("Stub run skips GUNC and CheckV databases already stored in databases_dir") {
+        // FORMAT_GUNC_DB's and FORMAT_CHECKV_DB's storeDirs already hold their
+        // databases, as a previous run leaves them: both are skipped and
+        // GUNC_RUN / CHECKV_ENDTOEND read the stored copies
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                databases_dir = {
+                    def store = new File("${outputDir}", "store")
+                    def gunc = new File(store, "stub/gunc/progenomes_2.1")
+                    gunc.mkdirs()
+                    new File(gunc, "gunc_db_progenomes2.1.dmnd").text = ''
+                    def checkv = new File(store, "stub/checkv/v1.5/checkv_db")
+                    new File(checkv, "genome_db").mkdirs()
+                    new File(checkv, "hmm_db/checkv_hmms").mkdirs()
+                    ['genome_db/checkv_reps.dmnd', 'genome_db/checkv_reps.tsv', 'genome_db/checkv_error.tsv',
+                     'hmm_db/checkv_hmms.tsv'].each { name -> new File(checkv, name).text = '' }
+                    new File(checkv, "README.txt").text = '## Verion 1.5 (stored)\n'
+                    store.absolutePath
+                }()
+                quality_control    = true
+                custom_phiX_fasta  = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta  = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode      = "assembly"
+                taxonomic_profiler = "none"
+                include_binning    = true
+                binners            = "semibin"
+                genomad_prediction = true
+                gunc_prediction    = true
+                checkv_prediction  = true
+                results_summary    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.contains(name) } }
+            assert count("FORMAT_GUNC_DB") == 0
+            assert count("FORMAT_CHECKV_DB") == 0
+            assert count("GUNC_RUN (") == 2
+            assert count("CHECKV_ENDTOEND (") == 2
+        }
+    }
+}

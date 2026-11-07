@@ -65,11 +65,13 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
+      --gunc_prediction             GUNC chimerism check of the refined MAGs; needs --include_binning (default: ${params.gunc_prediction})
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) (default: ${params.contig_tax_and_arg})
       --genomad_prediction          Classify contigs as chromosome / plasmid / virus with geNomad (default: ${params.genomad_prediction})
+      --checkv_prediction           CheckV quality of geNomad's viruses and proviruses; needs --genomad_prediction (default: ${params.checkv_prediction})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
       --microbecensus               Estimate average genome size for CPGE normalization (contig/read functional branches; default: ${params.microbecensus})
       --functional_cazy             Run run_dbcan CAZy annotation on predicted proteins (functional branch; default: ${params.functional_cazy})
@@ -171,6 +173,8 @@ include { DEEPARG_CONTIGS          } from './modules/local/deeparg/main'
 include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_report/main'
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
+include { GUNC_RUN                 } from './modules/local/gunc_run/main'
+include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
@@ -300,6 +304,12 @@ workflow {
             error("--megahit_k_list ${params.megahit_k_list}: MEGAHIT needs odd k values from 15 to 255, at most 28 apart")
         }
     }
+    if (flagOn(params.checkv_prediction) && !flagOn(params.genomad_prediction)) {
+        error("--checkv_prediction requires --genomad_prediction (CheckV checks geNomad's virus contigs and proviruses)")
+    }
+    if (flagOn(params.gunc_prediction) && !flagOn(params.include_binning)) {
+        error("--gunc_prediction requires --include_binning (GUNC checks the refined bins)")
+    }
     if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
     }
@@ -417,11 +427,13 @@ workflow {
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
+    log.info "  GUNC (chimeras)      : ${params.gunc_prediction}"
     log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
     log.info "  Contig tax and ARG   : ${params.contig_tax_and_arg}"
     log.info "  geNomad (mobile)     : ${params.genomad_prediction}"
+    log.info "  CheckV (viruses)     : ${params.checkv_prediction}"
     log.info "  Contig functional    : ${params.contig_level_functional}"
     log.info "  MAG functional (Bakta): ${params.mag_level_functional}"
     log.info "  Read functional      : ${params.read_level_functional}${params.read_level_functional == 'superfocus' ? " (${params.superfocus_aligner})" : params.read_level_functional == 'humann' ? " (${params.custom_humann_db ? 'custom database' : params.humann_db})" : ''}"
@@ -644,6 +656,29 @@ workflow {
             )
 
             //
+            // MODULE: GUNC chimerism check of each assembly's refined bins
+            // (roadmap Phase 16, G1), next to their CheckM2 report. A bin set
+            // can be empty (Binette or SemiBin write only SKIPPED.txt when
+            // nothing passes): those assemblies are skipped
+            //
+            if ( flagOn(params.gunc_prediction) ) {
+                GUNC_RUN(
+                    ch_refined_bins.filter { meta, bins ->
+                        def has_bins = bins.listFiles().any { f -> f.name.endsWith('.fa') }
+                        if ( !has_bins ) {
+                            log.warn "No refined bins for ${meta.id}: skipping GUNC"
+                        }
+                        has_bins
+                    },
+                    PREPARE_DATABASES.out.gunc_db
+                        .ifEmpty { error "ERROR: GUNC database is empty. Ensure --gunc_prediction is enabled and a valid GUNC database is configured (--gunc_db, or --custom_gunc_db)." }
+                        .first()
+                )
+                ch_summary_reports = ch_summary_reports.mix(GUNC_RUN.out.maxcss.map { _meta, table -> table })
+                ch_versions = ch_versions.mix(GUNC_RUN.out.versions.first())
+            }
+
+            //
             // MODULE: contig -> refined bin, for the bin columns of the
             // contig report (which adds the bin's GTDB-Tk classification) and
             // the bin-level ARG split (Phase 9b, L5 a / M8). From the bins
@@ -835,6 +870,22 @@ workflow {
         ch_genomad_tables = NFCORE_GENOMAD_ENDTOEND.out.aggregated_classification
             .mix(NFCORE_GENOMAD_ENDTOEND.out.plasmid_summary, NFCORE_GENOMAD_ENDTOEND.out.virus_summary)
             .map { _meta, table -> table }
+
+        //
+        // MODULE: CheckV quality of geNomad's virus contigs and proviruses
+        // (roadmap Phase 16, G2); with --contig_tax_and_arg its columns join
+        // the contig table next to geNomad's
+        //
+        if ( flagOn(params.checkv_prediction) ) {
+            CHECKV_ENDTOEND(
+                NFCORE_GENOMAD_ENDTOEND.out.virus_fasta,
+                PREPARE_DATABASES.out.checkv_db
+                    .ifEmpty { error "ERROR: CheckV database is empty. Ensure --checkv_prediction is enabled and a valid CheckV database is configured (--checkv_db, or --custom_checkv_db)." }
+                    .first()
+            )
+            ch_genomad_tables = ch_genomad_tables.mix(CHECKV_ENDTOEND.out.quality_summary.map { _meta, table -> table })
+            ch_versions = ch_versions.mix(CHECKV_ENDTOEND.out.versions.first())
+        }
     }
 
     //

@@ -68,6 +68,15 @@ STAGES = [
         "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {
+        "key": "gunc", "title": "MAG chimerism (GUNC)",
+        "params": "--gunc_prediction (needs binning), --gunc_db",
+        "processes": ["GUNC_RUN"],
+        "summary": "mags columns gunc_pass, clade_separation_score, contamination_portion, "
+                   "reference_representation_score",
+        # its columns are added to the binning stage's table
+        "needs": "binning",
+    },
+    {
         "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
         "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
         "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
@@ -81,6 +90,15 @@ STAGES = [
         "summary": "arg_contig_mobile (ARG genes on plasmid / virus contigs and in proviruses; needs "
                    "--contig_tax_and_arg)",
         # its table comes from the contig stage's table: without that table, geNomad ran with nothing to summarise
+        "needs": "contig_arg",
+    },
+    {
+        "key": "checkv", "title": "Virus quality (CheckV)",
+        "params": "--checkv_prediction (needs --genomad_prediction; ARG columns with --contig_tax_and_arg), --checkv_db",
+        "processes": ["CHECKV_ENDTOEND"],
+        "summary": "arg_contig_mobile columns arg_genes_viral_checkv_* (ARG genes on virus contigs and in proviruses "
+                   "by CheckV tier; needs --contig_tax_and_arg)",
+        # its columns come with the contig stage's table, as geNomad's do
         "needs": "contig_arg",
     },
     {
