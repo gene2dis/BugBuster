@@ -119,6 +119,10 @@ process RESULTS_SUMMARY {
                 dest=${run_dir}/07_functional_annotation/summary ;;
             *.ags.tsv)
                 dest=${run_dir}/07_functional_annotation/microbecensus/\${name%.ags.tsv} ;;
+            *_nonpareil_curve.tsv)
+                dest=${run_dir}/01_quality_control/nonpareil/\${name%_nonpareil_curve.tsv} ;;
+            *_nonpareil.tsv)
+                dest=${run_dir}/01_quality_control/nonpareil/\${name%_nonpareil.tsv} ;;
             *.featureCounts.txt.summary)
                 dest=${run_dir}/07_functional_annotation/gene_abundance/\${name%.featureCounts.txt.summary} ;;
             Contig_tax_and_arg_prediction.tsv)

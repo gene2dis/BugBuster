@@ -397,7 +397,10 @@ allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_host
            # CheckV's tier counts (tested on a copy of this fixture with CheckV columns below)
            ("arg_contig_mobile", "arg_genes_viral_checkv_high"), ("arg_contig_mobile", "arg_genes_viral_checkv_medium"),
            ("arg_contig_mobile", "arg_genes_viral_checkv_low"),
-           ("arg_contig_mobile", "arg_genes_viral_checkv_not_determined")}
+           ("arg_contig_mobile", "arg_genes_viral_checkv_not_determined"),
+           # Nonpareil's columns (tested on a copy of this fixture with Nonpareil tables below)
+           ("samples_qc", "nonpareil_coverage"), ("samples_qc", "nonpareil_diversity"),
+           ("samples_qc", "nonpareil_depth_95pct")}
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
 
@@ -475,6 +478,125 @@ t[t["ARG_gene"] == ""].to_csv(sys.argv[1], sep="\t", index=False)
 PYEOF
 check "CheckV: a CheckV batch without ARGs merged with one without CheckV" \
     documented cv_noarg_out --results co1_cv_noarg/results co2/results --batch-labels cv plain --min-clean-pairs 10000
+
+# Nonpareil (--nonpareil, roadmap Phase 17 N1), from tests/data/nonpareil (tests/bin/make_nonpareil_fixtures.sh):
+# sampleA a real 2 M-pair curve with a model (coverage 0.18), sampleB 500 reads without one (coverage 0.04, Nd and
+# the 95 % depth blank). Its three samples_qc columns, figure, note and caveat are additions; nothing else changes
+NP="${REPO_DIR}/tests/data/nonpareil"
+add_nonpareil() {
+    # add_nonpareil <results dir> <sample>...: the NONPAREIL tables of the samples, at their published paths
+    local res="$1"
+    shift
+    for s in "$@"; do
+        mkdir -p "${res}/01_quality_control/nonpareil/${s}"
+        cp "${NP}/${s}_nonpareil.tsv" "${NP}/${s}_nonpareil_curve.tsv" "${res}/01_quality_control/nonpareil/${s}/"
+    done
+}
+cp -r run1 run1_np
+add_nonpareil run1_np/results sampleA sampleB
+check "Nonpareil: every column documented" \
+    documented run1_np_out --results run1_np/results --batch-labels run1 --min-clean-pairs 10000
+check "Nonpareil: three samples_qc columns added, every other table identical" py - <<'PYEOF'
+import filecmp, os
+import pandas as pd
+old = pd.read_csv("docs_plain_out/tables/samples_qc.tsv", sep="\t")
+new = pd.read_csv("run1_np_out/tables/samples_qc.tsv", sep="\t")
+np_cols = ["nonpareil_coverage", "nonpareil_diversity", "nonpareil_depth_95pct"]
+assert [c for c in new.columns if c not in old.columns] == np_cols, new.columns
+assert [c for c in new.columns if c in old.columns] == list(old.columns)
+assert new[list(old.columns)].equals(old), "Nonpareil changed another samples_qc column"
+q = new.set_index("sample")
+assert abs(q.at["sampleA", "nonpareil_coverage"] - 0.183501243) < 1e-9
+assert abs(q.at["sampleA", "nonpareil_diversity"] - 21.14216656) < 1e-6
+assert abs(q.at["sampleA", "nonpareil_depth_95pct"] - 629395994.1) < 1
+assert abs(q.at["sampleB", "nonpareil_coverage"] - 0.04188659059) < 1e-9
+assert pd.isna(q.at["sampleB", "nonpareil_diversity"]) and pd.isna(q.at["sampleB", "nonpareil_depth_95pct"])
+differ = [t for t in sorted(os.listdir("docs_plain_out/tables"))
+          if not filecmp.cmp(f"docs_plain_out/tables/{t}", f"run1_np_out/tables/{t}", shallow=False)]
+assert differ == ["samples_qc.tsv"], differ
+md = open("run1_np_out/README.md").read()
+plain = open("docs_plain_out/README.md").read()
+assert "Nonpareil coverage (samples_qc" in md and "Nonpareil coverage (samples_qc" not in plain
+assert "2 samples with Nonpareil coverage below 0.6: sampleA, sampleB" in md
+row = next(l for l in md.splitlines() if l.startswith("| Sequencing coverage and diversity (Nonpareil)"))
+assert "| ran |" in row, row
+row = next(l for l in plain.splitlines() if l.startswith("| Sequencing coverage and diversity (Nonpareil)"))
+assert "| not run |" in row, row
+assert "--min-nonpareil-coverage" in md and "--min-nonpareil-coverage" not in plain
+guide, plain_guide = open("run1_np_out/LLM_GUIDE.md").read(), open("docs_plain_out/LLM_GUIDE.md").read()
+assert "low_coverage_samples: [sampleA, sampleB]" in guide and "min_nonpareil_coverage: 0.6" in guide
+assert "low_coverage_samples" not in plain_guide
+PYEOF
+# nine samples (above the figure's seven sample colours: coloured by group) and a sample named NA, which pandas
+# would read as missing: every sample keeps its curve, values and colour. Nonpareil's tables only: Reads_report.csv
+# is read with pandas' default NA parsing, so a sample named NA does not survive it (not Nonpareil's to fix)
+mkdir -p np9/results
+py - "${NP}" <<'PYEOF'
+import os, sys
+import pandas as pd
+np_dir = sys.argv[1]
+names = ["NA", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"]
+for s in names:
+    d = f"np9/results/01_quality_control/nonpareil/{s}"
+    os.makedirs(d)
+    for kind in ("nonpareil", "nonpareil_curve"):
+        t = pd.read_csv(f"{np_dir}/sampleA_{kind}.tsv", sep="\t", dtype=str, keep_default_na=False)
+        t["sample"] = s
+        t.to_csv(f"{d}/{s}_{kind}.tsv", sep="\t", index=False)
+PYEOF
+printf 'sample\tsite\nNA\tx\ns2\tx\ns3\tx\ns4\tx\ns5\ty\ns6\ty\ns7\ty\ns8\ty\ns9\ty\n' > np9_meta.tsv
+check "Nonpareil: nine samples, one named NA" \
+    documented np9_out --results np9/results --metadata np9_meta.tsv --group-by site --min-clean-pairs 10000
+check "Nonpareil: every sample in the table and the figure, coloured by group" py - <<'PYEOF'
+import pandas as pd
+q = pd.read_csv("np9_out/tables/samples_qc.tsv", sep="\t", keep_default_na=False, na_values=[""])
+assert sorted(q["sample"]) == sorted(["NA"] + [f"s{i}" for i in range(2, 10)]), q["sample"]
+assert q["nonpareil_coverage"].notna().all()
+src = pd.read_csv("np9_out/figures/nonpareil_curves.csv", keep_default_na=False, na_values=[""])
+assert set(src["sample"]) == set(q["sample"]), set(src["sample"])
+html = open("np9_out/report/index.html").read()
+try:
+    import altair  # noqa: F401
+    assert 'id="vis-nonpareil_curves"' in html and '"field":"group"' in html.replace(" ", "")
+except ImportError:
+    pass
+PYEOF
+check "Nonpareil: curve figure (observed, model, sequenced depth) and its interactive version" py - <<'PYEOF'
+import os
+import pandas as pd
+for ext in ("pdf", "svg", "png", "csv"):
+    assert os.path.getsize(f"run1_np_out/figures/nonpareil_curves.{ext}") > 0, ext
+assert not os.path.exists("docs_plain_out/figures/nonpareil_curves.png")
+src = pd.read_csv("run1_np_out/figures/nonpareil_curves.csv")
+kinds = src.groupby("sample")["kind"].apply(set).to_dict()
+assert kinds == {"sampleA": {"observed", "model", "sequenced"}, "sampleB": {"observed", "sequenced"}}, kinds
+seq = src[src["kind"] == "sequenced"].set_index("sample")
+assert seq.at["sampleA", "read_pairs"] == 1876407 and abs(seq.at["sampleA", "coverage"] - 0.183501243) < 1e-9
+html = open("run1_np_out/report/index.html").read()
+assert "nonpareil_curves.svg" in html and "below 0.6 (sampleA, sampleB)" in html
+try:
+    import altair  # noqa: F401
+    assert 'id="vis-nonpareil_curves"' in html
+except ImportError:
+    pass
+PYEOF
+check "Nonpareil: the note follows --min-nonpareil-coverage" \
+    py "${SUMMARY}" --results run1_np/results --outdir np_cut --no-excel --no-pdf --min-clean-pairs 10000 \
+        --min-nonpareil-coverage 0.1
+check "Nonpareil: at 0.1 only sampleB is below" py - <<'PYEOF'
+md = open("np_cut/README.md").read()
+assert "1 sample with Nonpareil coverage below 0.1: sampleB" in md, [l for l in md.splitlines() if "Nonpareil" in l]
+PYEOF
+# a batch with Nonpareil merged with one without: the latter's columns are blank
+cp -r co1 co1_np
+add_nonpareil co1_np/results sampleA
+check "Nonpareil: a batch with Nonpareil merged with one without" \
+    documented np_merge_out --results co1_np/results co2/results --batch-labels np plain --min-clean-pairs 10000
+check "Nonpareil: the batch without it has blank values" py - <<'PYEOF'
+import pandas as pd
+q = pd.read_csv("np_merge_out/tables/samples_qc.tsv", sep="\t").set_index("sample")
+assert q.at["sampleA", "nonpareil_coverage"] > 0.18 and pd.isna(q.at["sampleB", "nonpareil_coverage"]), q
+PYEOF
 
 
 # a metadata table with a byte-order mark and spaces around its names and values reads as the trimmed one

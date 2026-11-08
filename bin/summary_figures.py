@@ -714,3 +714,96 @@ def fig_arg_contig_hosts(fw, hosts, top=20, top_classes=8):
             f"above in brackets), summed over the assemblies: the {min(top, len(hosts_kept))} hosts with the most "
             f"genes, plus contigs without a classification; colour: the {len(keep_cls)} most common ARG classes, "
             "the rest as 'other'. Physical linkage on one contig, counted in genes, not reads.", src, "contig_args")
+
+
+def fig_nonpareil(fw, npar, cols, groups, low, threshold):
+    """Nonpareil coverage curves: each sample's estimated coverage against read pairs (log), the model's projection
+    (dashed), its sequenced depth (point), and the 95 % and low-coverage lines. Coloured by sample up to 7 samples
+    (Okabe-Ito without vermillion, the cutoff line's colour), else by group (one colour without groups)."""
+    vals = npar["values"].drop_duplicates("sample").set_index("sample")
+    curves = npar["curves"]
+    samples = [s for s in cols if s in vals.index and (curves["sample"] == s).any()]
+    if not samples:
+        return
+    group_of = dict(zip(cols, groups))
+    palette = [c for c in fs.CATEGORY if c != fs.LOW_DEPTH]
+    by_sample = len(samples) <= len(palette)
+    gnames = list(dict.fromkeys(group_of[s] for s in samples if group_of[s] != ""))
+    if by_sample:
+        color = {s: palette[i] for i, s in enumerate(samples)}
+    elif gnames:
+        pal = fs.category_colors(gnames)
+        color = {s: pal.get(group_of[s], fs.OTHER) for s in samples}
+    else:
+        color = {s: fs.CATEGORY[0] for s in samples}
+    fig, ax = plt.subplots(figsize=fs.figsize("double", 90), layout="constrained")
+    alpha = 1.0 if by_sample else 0.55
+    xs, rows = [], []
+    for s in samples:
+        c = curves[(curves["sample"] == s)]
+        obs = c[(c["kind"] == "observed") & (c["x_pairs"] > 0)].sort_values("x_pairs")
+        mod = c[(c["kind"] == "model") & (c["x_pairs"] > 0)].sort_values("x_pairs")
+        if by_sample and len(obs):
+            ax.fill_between(obs["x_pairs"], obs["coverage_p25"], obs["coverage_p75"], color=color[s], alpha=0.18,
+                            lw=0)
+        ax.plot(obs["x_pairs"], obs["coverage"], color=color[s], lw=0.9, alpha=alpha)
+        if len(mod):
+            ax.plot(mod["x_pairs"], mod["coverage"], color=color[s], lw=0.7, ls="--", alpha=alpha)
+        r, cov = vals.at[s, "reads"], vals.at[s, "coverage"]
+        if np.isfinite(r) and np.isfinite(cov):
+            ax.plot([r], [cov], "o", color=color[s], ms=3.2, mec="white", mew=0.4, alpha=alpha, zorder=3)
+            xs.append(r)
+        xs += list(obs.loc[obs["coverage"] > 0.001, "x_pairs"])  # the axis starts where a curve leaves 0
+        for kind, d in (("observed", obs), ("model", mod)):
+            for x, y, lo, hi in zip(d["x_pairs"], d["coverage"], d["coverage_p25"], d["coverage_p75"]):
+                rows.append({"sample": s, "group": group_of[s], "kind": kind, "read_pairs": x, "coverage": y,
+                             "coverage_p25": lo, "coverage_p75": hi})
+        rows.append({"sample": s, "group": group_of[s], "kind": "sequenced", "read_pairs": r, "coverage": cov,
+                     "coverage_p25": np.nan, "coverage_p75": np.nan})
+    xs = [x for x in xs if np.isfinite(x) and x > 0]
+    if not xs:  # no curve leaves 0 and no sequenced depth: nothing to draw on a log axis
+        plt.close(fig)
+        return
+    depth = vals.loc[samples, "depth_95pct_pairs"].astype(float)
+    hi = max(xs) * 10
+    if depth.notna().any():  # show the projection to 95 % coverage, up to 1000x the deepest sample
+        hi = min(max(hi, float(depth.max()) * 1.5), max(xs) * 1000)
+    ax.set_xscale("log")
+    ax.set_xlim(10 ** math.floor(math.log10(min(xs))), 10 ** math.ceil(math.log10(hi)))
+    fs.count_axis(ax.xaxis)
+    ax.set_ylim(0, 1.02)
+    ax.axhline(0.95, color="#555555", ls=":", lw=0.6)
+    ax.text(1.0, 0.95, " 95 %", transform=ax.get_yaxis_transform(), color="#555555", fontsize=5, va="center",
+            ha="left", clip_on=False)
+    if threshold > 0:
+        ax.axhline(threshold, color=fs.LOW_DEPTH, ls="--", lw=0.6)
+        ax.text(1.0, threshold, f" {threshold:g}", transform=ax.get_yaxis_transform(), color=fs.LOW_DEPTH,
+                fontsize=5, va="center", ha="left", clip_on=False)
+    ax.set_xlabel("read pairs (R1 reads, log scale)")
+    ax.set_ylabel("estimated average coverage")
+    if by_sample:
+        handles = [Line2D([], [], color=color[s], lw=1.2, label=fs.label_text(s, low)) for s in samples]
+    elif gnames:
+        handles = [Line2D([], [], color=pal[g], lw=1.2, label=g) for g in gnames]
+    else:
+        handles = []
+    handles += [Line2D([], [], color="#555555", lw=0.9, label="observed"),
+                Line2D([], [], color="#555555", lw=0.7, ls="--", label="model"),
+                Line2D([], [], color="#555555", marker="o", ls="", ms=3.2, label="sequenced depth")]
+    fig.legend(handles=handles, loc="outside lower center", ncol=min(6, len(handles)), handlelength=1.6,
+               columnspacing=1.0)
+    src = pd.DataFrame(rows)
+    n_low = sum(1 for s in samples if vals.at[s, "coverage"] < threshold)
+    fw.save(fig, "nonpareil_curves", "Sequencing coverage per sample (Nonpareil)",
+            "Estimated average coverage of each sample's community against sequencing effort in read pairs (log "
+            "scale), from the redundancy of R1 k-mers (Nonpareil): observed curve"
+            + (" with its 25th-75th percentiles" if by_sample else "") + ", the fitted model (dashed) and the "
+            "sample's sequenced depth (point: its coverage, nonpareil_coverage in samples_qc). Where the dashed line "
+            "crosses the dotted 95 % line is the depth for 95 % coverage (nonpareil_depth_95pct); "
+            + (f"the dashed vermillion line is the low-coverage note's cutoff ({threshold:g}; {n_low} of "
+               f"{len(samples)} samples below). " if threshold > 0 else "")
+            + "No model is drawn for a sample whose curve Nonpareil could not fit.",
+            src, "overview", {"kind": "nonpareil", "frame": src, "samples": samples,
+                              "groups": [group_of[s] for s in samples], "low": sorted(low),
+                              "threshold": threshold, "by_sample": by_sample,
+                              "colors": [color[s] for s in samples] if by_sample else None})

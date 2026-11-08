@@ -29,6 +29,7 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 1. Read QC, clean, and filter reads. [`FastP`](https://github.com/OpenGene/fastp)
 2. Optionally remove samples that fall below a minimum read count after quality filtering (`--min_read_sample`, default `0` = filter disabled).
 3. Remove host contaminant reads. [`bwa-mem3`](https://github.com/fg-labs/bwa-mem3) (default) or [`Bowtie2`](https://github.com/BenLangmead/bowtie2) (`--read_aligner bowtie2`)
+   - Estimate each sample's sequencing coverage, sequence diversity (Nd) and the read pairs needed for 95 % coverage from the redundancy of R1 of its clean reads (`--nonpareil`, on by default). [`Nonpareil`](https://github.com/lmrodriguezr/nonpareil)
 4. If requested AMR gene prediction with pathogen-of-origin analysis using RGI [`RGI`](https://github.com/arpcard/rgi)
    - Independently, if requested, read-level ARG assembly with K-MARVEL: CARD protein ARGs assembled from the reads, chimera-filtered, checked for resistance SNPs and confirmed with blastp (needs no assembly). [`K-MARVEL`](https://bitbucket.org/amr-avengers/k-marvel)
 5. If requested (`--args_oap_prediction`), read-level ARG profiling against SARG with ARGs-OAP, normalised to copies per cell, per 16S copy and per million reads. [`ARGs-OAP`](https://github.com/xinehc/args_oap)
@@ -205,6 +206,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--input` | *required* | Path to samplesheet CSV |
 | `--output` | *required* | Output directory |
 | `--quality_control` | `true` | Enable QC and host filtering |
+| `--nonpareil` | `true` | Nonpareil sequencing coverage, diversity and read pairs for 95 % coverage per sample (R1 of the clean reads) |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, or `none` |
 | `--coassembly_group_by` | — | A `--sample_metadata` column: one co-assembly per value (with `coassembly`) |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, or `none` (default `sourmash` before 2.0.0) |
@@ -352,6 +354,7 @@ results/
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
 ├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
 │   ├── fastp/                  # Per-sample FastP reports
+│   ├── nonpareil/{sample}/     # Nonpareil coverage curve, values and model (if nonpareil=true, default)
 │   └── summary/                # Aggregated statistics
 ├── 02_taxonomy/                # Taxonomic profiling (if taxonomic_profiler != 'none')
 │   ├── kraken2/, sourmash/ or sylph/  # Per-sample profiler results (sylph: profile .tsv + sylph-tax .sylphmpa)

@@ -233,7 +233,8 @@ def caveats(ctx):
 
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",
-               "homolog": "Tier 1 calls that may be commensal relatives", "low_depth": "Depth"}
+               "homolog": "Tier 1 calls that may be commensal relatives", "low_depth": "Depth",
+               "low_coverage": "Sequencing coverage (Nonpareil)"}
 FLAG_SECTION = {"args": "args", "compare": "compare", "qc": "overview"}
 
 
@@ -336,6 +337,9 @@ def build(ctx, assets):
              (s["n_batches"], "results directories", False),
              (s["n_low_depth"], f"low-depth samples (< {short_count(ctx['min_pairs'])} clean pairs)",
               s["n_low_depth"] > 0)]
+    if s.get("nonpareil"):
+        cards.append((s["n_low_coverage"], f"samples with Nonpareil coverage < {s['min_nonpareil_coverage']:g}",
+                      s["n_low_coverage"] > 0))
     for mark, n in s.get("depth_marks", []):
         cards.append((n, f"samples with >= {short_count(mark)} clean pairs", False))
     if s.get("n_tier1") is not None:
@@ -347,7 +351,7 @@ def build(ctx, assets):
         cards.append((s["n_species"], "species detected (any sample)", False))
     ov.lists["cards"] = [{"value": fmt(v), "label": lab, "warn": bool(w)} for v, lab, w in cards]
     att = []
-    for kind in ("tier1", "single", "homolog", "low_depth"):
+    for kind in ("tier1", "single", "homolog", "low_depth", "low_coverage"):
         sub = [f for f in s.get("attention", []) if f[0] == kind]
         if sub:
             att.append({"kind": kind, "title": FLAG_TITLES[kind],
@@ -363,6 +367,10 @@ def build(ctx, assets):
              "Pipeline stages: whether each ran in each results directory (from software_versions.yml) and what "
              "this summary takes from it.", tsv="")
     ov.fig("qc_read_fate")
+    if s.get("nonpareil"):
+        ov.facts.update({"n_low_cov": s["n_low_coverage"], "min_cov": f"{s['min_nonpareil_coverage']:g}",
+                         "low_cov_samples": ", ".join(s["low_coverage_samples"])})
+    ov.fig("nonpareil_curves")
     qc_cols = [c for c in qc.columns if c not in ctx["meta_cols"] or c in ctx["key_meta"]]
     pdf_qc = [c for c in ["sample", "batch"] + ctx["key_meta"] + ["raw_pairs", "clean_pairs", "pct_clean",
                                                                   "low_depth", "depth_class", "classified_fraction",

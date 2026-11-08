@@ -484,6 +484,7 @@ breaks `-resume`.
 | Parameter | Default | Options | Description |
 |-----------|---------|---------|-------------|
 | `--quality_control` | `true` | `true`, `false` | Enable QC and host filtering |
+| `--nonpareil` | `true` | `true`, `false` | Nonpareil sequencing coverage, diversity (Nd) and read pairs for 95 % coverage per sample, from R1 of the clean reads; see 6.5 |
 | `--assembly_mode` | `assembly` | `assembly`, `coassembly`, `none` | Genome assembly strategy |
 | `--coassembly_group_by` | — | a `--sample_metadata` column | With `coassembly`: one co-assembly per value of the column (see 6.7) |
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
@@ -693,6 +694,45 @@ breaks `-resume`.
 | `--fastp_cut_front_mean_quality` | `20` | Mean quality threshold for front trimming |
 | `--fastp_cut_right_window_size` | `4` | Sliding window size for right trimming |
 | `--fastp_cut_right_mean_quality` | `20` | Mean quality threshold for right trimming |
+
+#### Sequencing coverage (Nonpareil)
+
+With `--nonpareil` (on by default), Nonpareil 3.5.5 estimates how much of each sample's community its reads cover, from the
+redundancy of the reads themselves: no reference database is involved. It takes 10,000 query reads from R1 of the
+clean reads and asks, at sequencing efforts from a fraction of the sample up to all of it, how often a query's
+k-mers (k = 24) are found in the other reads. A read that matches sequence seen before adds no new diversity, so
+this share, plotted against the effort, is the **coverage curve**. The Nonpareil R package (`Nonpareil.curve`)
+corrects it and fits a model that projects it to larger efforts. Three values come out per sample
+(`00_summary/tables/samples_qc.tsv`, and `01_quality_control/nonpareil/<sample>/<sample>_nonpareil.tsv`):
+
+- `nonpareil_coverage`: the estimated average coverage at the sample's sequenced depth (0-1). 0.9 means about
+  nine in ten new reads would match sequence already sequenced; the rest of the community is still unsampled.
+- `nonpareil_diversity`: the sequence diversity index Nd, the position of the fitted curve on the log scale of
+  sequencing effort. A more diverse community needs more sequencing to reach the same coverage and has a higher Nd.
+  It correlates with alpha diversity (Rodriguez-R et al. 2018) but does not depend on a reference database.
+- `nonpareil_depth_95pct`: the read pairs the model projects for 95 % coverage. Compare it with `clean_pairs`:
+  far above it, much of the community's diversity is still unsampled. It is an extrapolation, and from a low
+  coverage an uncertain one: a sample at coverage 0.09 projected 2.7 G read pairs from 2 M pairs of its reads and
+  10-13 G from 10 M pairs (roadmap Phase 17). Read it as an order of magnitude.
+
+**The figure** (`nonpareil_curves`, in the report's overview) draws each sample's observed curve (solid, with its
+25th-75th percentiles when there are few samples) and the model's projection (dashed) against read pairs on a log
+axis. The point is the sample's sequenced depth at its coverage. Where the dashed line crosses the dotted 95 % line
+is `nonpareil_depth_95pct`. A curve that is still climbing steeply at its point would gain much from more
+sequencing, and a flat one would gain little. The dashed vermillion line is the low-coverage cutoff,
+`--summary_min_nonpareil_coverage` (0.6 by default). Samples below it get a note in the overview and the README: a
+taxon or gene missing there is weak evidence, and an assembly recovers mainly the dominant populations. The
+low-depth flag (`--summary_min_clean_pairs`) stays a read count and is not changed by Nonpareil.
+
+Nonpareil uses R1 only (R2 comes from the same fragments and adds none of its own) and leaves the singleton file
+out. Its values are per sample, so they are valid in any batch and comparable across batches. Its k-mer mode has
+no random seed, so a rerun gives slightly different values. When the curve cannot be fitted (too few reads, or a
+curve the package rejects), the coverage is still reported and Nd and the 95 % depth are blank; the package's
+warning is in the `warning` column of `<sample>_nonpareil.tsv`. Failure is non-fatal: the sample has no Nonpareil
+values. Reads shorter than k (24 bp; fastp keeps reads down to 15 bp) stop Nonpareil's k-mer mode, so they are left
+out first (`reads_shorter_than_k`, about 0.1 % of the reads). Cost per 10 M read pairs: about 3 min with 2 CPUs (5
+CPU-minutes), a few MB of memory and 3 GB of transient disk; it grows with the read count, and more CPUs do not
+shorten it. `--nonpareil false` turns it off.
 
 ### 6.6 Taxonomy Profiling Options
 
@@ -1110,6 +1150,7 @@ each results directory.
 | `--summary_order_by` | none | Metadata column that orders samples within a group (visit, day, ...) in the figures and the per-group detection patterns |
 | `--summary_batch_label` | output directory name (its parent's when it is `results`) | Label in the `batch` column; set it when the default does not tell the batches apart |
 | `--summary_min_clean_pairs` | `1000000` | Samples with fewer clean read pairs are flagged as low depth; a gene or taxon not found there is reported as `NA_low_depth`, not as absent |
+| `--summary_min_nonpareil_coverage` | `0.6` | With `--nonpareil`: samples whose Nonpareil coverage is below this get a note in the overview (see 6.5) |
 | `--summary_top_n` | `40` | Maximum rows in the summary ARG heatmap |
 | `--summary_taxa_per_sample` | `5` | The taxonomy heatmaps show the union of each sample's N most abundant taxa (no row cap), grouped by phylum, A-Z within |
 | `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure and counted in the report header |
@@ -1132,6 +1173,7 @@ How the summary reports the results:
 - **Method comparison.** When K-MARVEL and RGI both ran, `arg_method_comparison.tsv`, `arg_method_overlap.tsv`, an UpSet plot and a per-category bar chart show, gene by gene (alleles collapsed), what each method found. A K-MARVEL gene RGI saw below its cutoff is marked `rgi_below_cutoff`, which is partial coverage, not absence. The ARG matrices and figures use one method (`--arg-primary` in the script; K-MARVEL when present); `arg_long.tsv` holds every method's calls.
 - **ARGs-OAP (SARG).** With `--args_oap_prediction`, the summary reads `ARGS_OAP_REPORT`'s tables into `arg_sarg_long` (one row per sample and SARG subtype), `arg_sarg_type_cpc` and `arg_sarg_subtype_cpc` (copies per cell, samples as columns), `samples_qc` `args_oap_n16S`, `args_oap_ncell`, `sarg_n_subtypes` and `sarg_copies_per_cell`, and a heatmap by SARG type. SARG names its types and subtypes differently from CARD, so ARGs-OAP is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only. A sample ARGs-OAP could not normalise (no 16S or cells) is blank, not 0.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
+- **Sequencing coverage (Nonpareil).** With `--nonpareil`, `samples_qc` adds `nonpareil_coverage`, `nonpareil_diversity` and `nonpareil_depth_95pct` (read pairs for 95 % coverage), the overview shows the coverage curves (`nonpareil_curves`) and notes the samples below `--summary_min_nonpareil_coverage`. See 6.5.
 - **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
 - **Assembly.** With an assembly, `assembly_stats` gives each assembly's contigs, length, N50 / L50, GC and the contigs the length filter kept, and `assembly_read_use` the share of each sample's reads on the contigs and on their predicted genes (with `--contig_level_functional`; `NA_not_run` otherwise). Reads not on contigs are outside every contig-based table.
 - **MAGs.** With binning, `mags` has one row per refined MAG: CheckM2 completeness and contamination, a MIMAG tier (`quality_tier`: high needs completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and at least 18 tRNA amino acids; medium completeness >= 50 %, contamination < 10 %), the GTDB-Tk lineage and, with `--mag_level_functional`, Bakta's rRNA, tRNA, CDS and CRISPR counts. Without Bakta the rRNA/tRNA part is unchecked and a MAG is at most medium (`tier_basis checkm2_only`). The High/Mid/Low classes of `04_binning/` are an older, different scheme. `mag_abundance` gives each MAG's depth per sample and `pct_sample_bases` (depth x MAG size / bases sequenced): the length-weighted mean of its contigs' MetaBAT2 depths (alignments at >= 97 % identity), for every sample under co-assembly and for the MAG's own sample under per-sample assembly.
@@ -1294,9 +1336,15 @@ results/
 │   │       ├── {sample}.fastp.html             # HTML report
 │   │       ├── {sample}.fastp.json             # JSON report
 │   │       └── {sample}.fastp.log              # Log file
-│   └── summary/                                # Aggregated read counts (also with quality_control=false)
-│       ├── Reads_report.csv                    # Read count summary
-│       └── Box_plot_reads.*                    # Reads per step (.pdf/.svg/.png, values in .csv)
+│   ├── summary/                                # Aggregated read counts (also with quality_control=false)
+│   │   ├── Reads_report.csv                    # Read count summary
+│   │   └── Box_plot_reads.*                    # Reads per step (.pdf/.svg/.png, values in .csv)
+│   └── nonpareil/                              # Sequencing coverage (if nonpareil=true)
+│       └── {sample}/
+│           ├── {sample}.npo                    # Nonpareil curve (R1 of the clean reads)
+│           ├── {sample}.npl                    # Nonpareil log
+│           ├── {sample}_nonpareil.tsv          # Coverage, diversity Nd, LR*, read pairs for 95 % coverage
+│           └── {sample}_nonpareil_curve.tsv    # Curve as the R package reads it + the model's projection
 ├── 02_taxonomy/                                # Taxonomic profiling (if taxonomic_profiler != 'none')
 │   ├── kraken2/                                # Kraken2 results (if taxonomic_profiler='kraken2')
 │   │   └── {sample}_*.report.txt               # Per-sample Kraken2 reports
@@ -1674,6 +1722,7 @@ The following outputs are only generated when specific parameters are enabled:
 |------------------|-------------------|-------------|
 | `00_summary/` | `results_summary=true` (default) | Run-level summary: tables, Excel workbook, figures, HTML report |
 | `01_quality_control/fastp/` | `quality_control=true` | FastP reports per sample |
+| `01_quality_control/nonpareil/` | `nonpareil=true` | Nonpareil curve, values and model per sample |
 | `01_quality_control/summary/` | always | Read-count report (`Reads_report.csv`; with a profiler, `02_taxonomy/tables/Reads_report_taxonomy.csv` adds the classified fraction) |
 | `02_taxonomy/` | `taxonomic_profiler != 'none'` | Taxonomic profiling results |
 | `02_taxonomy/phyloseq/*.RDS` | `create_phyloseq_rds=true` | R phyloseq object for downstream analysis |

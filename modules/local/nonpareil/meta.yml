@@ -1,0 +1,44 @@
+name: nonpareil
+description: Sequencing coverage, diversity (Nd) and the depth for 95 % coverage of one sample (Nonpareil k-mer mode on R1 of the clean reads, curve fit with the Nonpareil R package); failure is non-fatal
+keywords:
+  - sequencing coverage
+  - sequencing depth
+  - diversity
+  - metagenomics
+tools:
+  - nonpareil:
+      description: Estimates the average coverage of a metagenome from read redundancy and projects the sequencing effort for nearly complete coverage (binary 3.5.5, R package 3.5.3 in the pinned image)
+      homepage: https://github.com/lmrodriguezr/nonpareil
+      documentation: https://nonpareil.readthedocs.io
+      doi: "10.1128/mSystems.00039-18"
+      licence: ["Artistic-2.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: Clean reads (R1/R2, optional singleton file); only R1 (reads[0]) is used
+      pattern: "*.fastq.gz"
+
+output:
+  - values:
+      type: file
+      description: One-row table of the curve fit (reads, read length, kappa, coverage, diversity Nd, LR*, read pairs for 95 % coverage, model fit, the package's warnings); Nd and LR* blank without a model
+      pattern: "*_nonpareil.tsv"
+  - curve:
+      type: file
+      description: The coverage curve as Nonpareil.curve reads it (observed, with its 25th-75th percentiles) and the model's prediction on a log grid, the effort also in read pairs
+      pattern: "*_nonpareil_curve.tsv"
+  - raw:
+      type: file
+      description: Nonpareil's curve (.npo) and log (.npl)
+      pattern: "*.{npo,npl}"
+  - versions:
+      type: file
+      description: Software versions (nonpareil binary and the Nonpareil R package)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

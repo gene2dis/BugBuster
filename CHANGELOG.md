@@ -12,6 +12,22 @@ next release is tagged.
 
 ### Added
 
+- **Sequencing coverage with Nonpareil** (`--nonpareil`, on by default).
+  Nonpareil 3.5.5 (k-mer mode; `quay.io/biocontainers/nonpareil:3.5.5--r44h077b44d_2`
+  and its depot sif, with the Nonpareil R package 3.5.3) runs on R1 of each
+  sample's clean reads, and the R package's `Nonpareil.curve` fit gives the
+  estimated coverage at the sequenced depth, the diversity index Nd and the
+  read pairs for 95 % coverage, in `01_quality_control/nonpareil/<sample>/`.
+  The summary's `samples_qc` gains `nonpareil_coverage`,
+  `nonpareil_diversity` and `nonpareil_depth_95pct`, the overview a coverage
+  curve figure (static and interactive) and a note for samples below
+  `--summary_min_nonpareil_coverage` (0.6). The values are per sample, so
+  they hold in any batch; k-mer mode has no seed, so they change slightly
+  from run to run. About 3 min, 5 CPU-minutes and 3 GB of transient disk per
+  10 M read pairs (2 CPUs). On by default, so a default run gains these files
+  and columns; `--nonpareil false` gives the outputs of before, apart from a
+  "not run" row in the summary's stage list. Reads shorter than k (24 bp) are
+  left out first, since Nonpareil's k-mer mode stops on them.
 - **MAG chimerism check with GUNC** (`--gunc_prediction`, off by default; needs
   `--include_binning`). GUNC 1.1.1 (DIAMOND 2.1.24, Prodigal 2.6.3;
   `quay.io/biocontainers/gunc:1.1.1--pyhdfd78af_0` and its depot sif) checks

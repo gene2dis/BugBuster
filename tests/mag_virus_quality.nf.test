@@ -5,7 +5,8 @@
 
     - With both off, a per-sample run with every assembly-side stage on
       publishes exactly the paths dev did (tests/data/stub_paths/assembly_dev.txt:
-      a stub run of dev de57f34 with the settings below).
+      a stub run of dev de57f34 with the settings below; Nonpareil, on by default
+      since Phase 17, is switched off, tests/nonpareil.nf.test adds it).
     - With both on, the same run publishes dev's paths plus GUNC's and CheckV's
       only (and their stub databases, which -stub publishes under format/ as it
       does every database's).
@@ -28,6 +29,7 @@ nextflow_pipeline {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "assembly"
@@ -62,6 +64,7 @@ nextflow_pipeline {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "assembly"
@@ -131,6 +134,7 @@ nextflow_pipeline {
                     "sample\tsite\ntest_sample1\tgroup A\ntest_sample2\tgroup A\ntest_sample3\tsolo\n")
                 coassembly_group_by     = "site"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "coassembly"
@@ -165,6 +169,7 @@ nextflow_pipeline {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "coassembly"
@@ -249,6 +254,7 @@ nextflow_pipeline {
                     store.absolutePath
                 }()
                 quality_control    = true
+                nonpareil          = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta  = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta  = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode      = "assembly"

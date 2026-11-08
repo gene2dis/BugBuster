@@ -25,7 +25,7 @@
 {% else %}
 <img class="static" src="../figures/{{ key }}.svg" alt="{{ f.title }}" style="max-width: {{ (f.width_mm * 3.78 * 1.4) | round | int }}px">
 {% endif %}
-<figcaption><b>Figure {{ f.no }}. {{ f.title }}.</b> {{ f.caption }}{% if specs.get(key) %} <i>Interactive: hover for values{% if f.interactive and f.interactive.kind == "read_fate" %}, drag or scroll the right panel to zoom{% endif %}{% if f.interactive and (f.interactive.groups | select | list) %}, pick a group in the menu{% endif %}.</i>{% endif %}</figcaption>
+<figcaption><b>Figure {{ f.no }}. {{ f.title }}.</b> {{ f.caption }}{% if specs.get(key) %} <i>Interactive: hover for values{% if f.interactive and f.interactive.kind == "read_fate" %}, drag or scroll the right panel to zoom{% endif %}{% if f.interactive and f.interactive.kind == "nonpareil" %}, drag or scroll to zoom the read-pair axis{% endif %}{% if f.interactive and (f.interactive.groups | select | list) %}, pick a group in the menu{% endif %}.</i>{% endif %}</figcaption>
 <p class="downloads">Static figure: <a href="../figures/{{ key }}.svg">SVG</a> <a href="../figures/{{ key }}.pdf">PDF</a> <a href="../figures/{{ key }}.png">PNG (600 dpi)</a> · <a href="../figures/{{ key }}.csv">source data (CSV)</a></p>
 </figure>
 {% endif %}

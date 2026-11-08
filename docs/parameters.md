@@ -66,6 +66,12 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Enable quality control and host read filtering steps
 - **Example**: `--quality_control true`
 
+### `--nonpareil`
+- **Type**: Boolean
+- **Default**: `true`
+- **Description**: Estimate each sample's sequencing coverage with Nonpareil 3.5.5 (k-mer mode, `-k 24 -X 10000 -n 1024`) on R1 of the clean reads (the input reads with `--quality_control false`), and fit its curve with the Nonpareil R package (`Nonpareil.curve`). Coverage is the estimated share of the sample's community its reads already cover; the fit adds the sequence diversity index Nd and the read pairs needed for 95 % coverage. R2 and the singleton file are not used (R2 adds no fragments of its own). Outputs go to `01_quality_control/nonpareil/<sample>/` (`<sample>.npo` curve, `.npl` log, `<sample>_nonpareil.tsv` values, `<sample>_nonpareil_curve.tsv` curve and model); the summary adds `samples_qc` `nonpareil_coverage`, `nonpareil_diversity` and `nonpareil_depth_95pct`, the figure `nonpareil_curves` and a note for samples below `--summary_min_nonpareil_coverage`. Nd and the 95 % depth are blank when the curve cannot be fitted (too few reads). Nonpareil's k-mer mode has no seed, so values change slightly from run to run. Failure is non-fatal: the sample gets no Nonpareil values. Cost per 10 M read pairs (roadmap Phase 17): about 3 min with 2 CPUs (5 CPU-minutes, ~14 % of that sample's QC), a few MB of memory and 3 GB of transient disk (an uncompressed copy of R1, removed at the end); it grows with the read count, and more CPUs do not shorten it
+- **Example**: `--nonpareil false`
+
 ### `--assembly_mode`
 - **Type**: String
 - **Default**: `assembly`
@@ -661,6 +667,12 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Minimum**: `0`
 - **Description**: Samples with fewer clean read pairs are flagged as low depth. A gene or taxon not found in such a sample is reported as `NA_low_depth`, not as absent. Samples are never dropped
 - **Example**: `--summary_min_clean_pairs 5000000`
+
+### `--summary_min_nonpareil_coverage`
+- **Type**: Number (0-1)
+- **Default**: `0.6`
+- **Description**: With `--nonpareil`: samples whose Nonpareil coverage is below this get a note in the report's overview and README (a large part of their community is unsampled, so a taxon or gene missing there is weak evidence, and an assembly recovers mainly the dominant populations). It does not change the low-depth flag (`--summary_min_clean_pairs`) or any table value
+- **Example**: `--summary_min_nonpareil_coverage 0.8`
 
 ### `--summary_top_n`
 - **Type**: Integer

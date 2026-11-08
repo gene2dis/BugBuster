@@ -333,6 +333,26 @@ mcmurdie2013:
   number: "4"
   pages: "e61217"
   doi: "10.1371/journal.pone.0061217"
+rodriguezr2014:
+  type: "article"
+  author: "Rodriguez-R, Luis M and Konstantinidis, Konstantinos T"
+  title: "Nonpareil: a redundancy-based approach to assess the level of coverage in metagenomic datasets"
+  journal: "Bioinformatics"
+  year: 2014
+  volume: "30"
+  number: "5"
+  pages: "629--635"
+  doi: "10.1093/bioinformatics/btt584"
+rodriguezr2018:
+  type: "article"
+  author: "Rodriguez-R, Luis M and Gunturu, Santosh and Tiedje, James M and Cole, James R and Konstantinidis, Konstantinos T"
+  title: "Nonpareil 3: fast estimation of metagenomic coverage and sequence diversity"
+  journal: "mSystems"
+  year: 2018
+  volume: "3"
+  number: "3"
+  pages: "e00039-18"
+  doi: "10.1128/mSystems.00039-18"
 nayfach2015:
   type: "article"
   author: "Nayfach, Stephen and Pollard, Katherine S"

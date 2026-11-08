@@ -56,6 +56,7 @@ def printHelp() {
 
     \u001B[1;33mPipeline options:\u001B[0m
       --quality_control             Enable QC and host filtering (default: ${params.quality_control})
+      --nonpareil                   Nonpareil sequencing coverage, diversity and depth for 95 % coverage per sample (R1 of the clean reads) (default: ${params.nonpareil})
       --read_aligner                Aligner for host removal, reads->contigs and bin depth: 'bwamem3' (needs AVX2), 'bowtie2' (default: ${params.read_aligner})
       --assembly_mode               Assembly mode: 'assembly', 'coassembly', 'none' (default: ${params.assembly_mode})
       --coassembly_group_by         Column of --sample_metadata: one co-assembly per value (with --assembly_mode coassembly)
@@ -88,6 +89,7 @@ def printHelp() {
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)
       --summary_batch_label         Label in the summary's 'batch' column (default: the output directory's name)
       --summary_min_clean_pairs     Flag samples below this many clean read pairs as low depth (default: ${params.summary_min_clean_pairs})
+      --summary_min_nonpareil_coverage  Note samples whose Nonpareil coverage is below this, 0-1 (with --nonpareil; default: ${params.summary_min_nonpareil_coverage})
       --card_prevalence             WildCARD card_prevalence.txt, adds candidate ARG hosts (default: none)
 
     \u001B[1;33mResource options:\u001B[0m
@@ -418,6 +420,7 @@ workflow {
     log.info "  Input samplesheet    : ${params.input}"
     log.info "  Output directory     : ${params.output}"
     log.info "  Quality control      : ${params.quality_control}"
+    log.info "  Nonpareil (coverage) : ${params.nonpareil}"
     log.info "  Read aligner         : ${params.read_aligner}"
     log.info "  Assembly mode        : ${params.assembly_mode}${params.assembly_mode != 'none' && params.assembly_read_reduction != 'none' ? " (assembler input: ${params.assembly_read_reduction})" : ''}"
     if (coassembly_groups) {
@@ -483,7 +486,8 @@ workflow {
     ch_summary_rgi        = channel.empty()
     ch_summary_rgi_kmer   = channel.empty()
     // run-level tables of other stages, laid out by file name in RESULTS_SUMMARY
-    ch_summary_reports    = channel.empty()
+    // (Nonpareil's per-sample tables come from QC; empty without --nonpareil)
+    ch_summary_reports    = QC.out.nonpareil
 
     if ( params.taxonomic_profiler != "none" ) {
         TAXONOMY(

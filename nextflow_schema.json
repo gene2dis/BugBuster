@@ -45,6 +45,13 @@
                     "description": "Enable quality control and host read filtering steps.",
                     "fa_icon": "fas fa-filter"
                 },
+                "nonpareil": {
+                    "type": "boolean",
+                    "default": true,
+                    "description": "Estimate each sample's sequencing coverage, sequence diversity (Nd) and the read pairs needed for 95 % coverage with Nonpareil (k-mer mode on R1 of the clean reads; the summary's samples_qc columns nonpareil_* and its coverage-curve figure). Failure is non-fatal.",
+                    "help_text": "Runs after QC (or on the input reads with --quality_control false), once per sample: about 3 min, 5 CPU-minutes and 3 GB of transient disk per 10 M read pairs, a few MB of memory. Only R1 is used: Nonpareil estimates coverage from the redundancy of comparable reads, and R2 adds no fragments of its own. Values change slightly from run to run (k-mer mode has no seed). Outputs in 01_quality_control/nonpareil/<sample>/.",
+                    "fa_icon": "fas fa-chart-line"
+                },
                 "assembly_mode": {
                     "type": "string",
                     "default": "assembly",
@@ -1214,6 +1221,14 @@
                     "default": 1000000,
                     "minimum": 0,
                     "description": "Samples with fewer clean read pairs are flagged as low depth: an ARG or taxon not found there is reported as unknown (NA_low_depth), not absent. Samples are never dropped.",
+                    "fa_icon": "fas fa-filter"
+                },
+                "summary_min_nonpareil_coverage": {
+                    "type": "number",
+                    "default": 0.6,
+                    "minimum": 0,
+                    "maximum": 1,
+                    "description": "With --nonpareil: samples whose Nonpareil coverage (0-1) is below this get a note in the summary's overview (a large part of their community is unsampled). The low-depth flag (--summary_min_clean_pairs) is not changed.",
                     "fa_icon": "fas fa-filter"
                 },
                 "summary_top_n": {

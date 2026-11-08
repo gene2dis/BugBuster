@@ -24,6 +24,7 @@ nextflow_pipeline {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "coassembly"
@@ -73,6 +74,7 @@ nextflow_pipeline {
                     "sample\tsite\nother_batch\tgroup A\ntest_sample1\tgroup A\ntest_sample2\tgroup A\ntest_sample3\tsolo\n")
                 coassembly_group_by     = "site"
                 quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
                 custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
                 custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
                 assembly_mode           = "coassembly"
