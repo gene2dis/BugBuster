@@ -1,0 +1,83 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Sequencing coverage (roadmap Phase 17: Nonpareil, --nonpareil, N1)
+
+    - With --nonpareil, a per-sample run with every assembly-side stage on publishes
+      exactly the paths dev did (tests/data/stub_paths/assembly_dev.txt, a stub run of
+      dev de57f34 with these settings) plus Nonpareil's four files per sample.
+      The same settings without it are tests/mag_virus_quality.nf.test's "Both off".
+    - With --quality_control false it runs on the input reads.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Sequencing coverage (Nonpareil)"
+    script "../main.nf"
+
+    test("On: dev's paths plus Nonpareil's only") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                nonpareil               = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("QC:NONPAREIL (") } == 2
+            def added = []
+            for (s in ["test_sample1", "test_sample2"]) {
+                for (f in ["${s}.npo", "${s}.npl", "${s}_nonpareil.tsv", "${s}_nonpareil_curve.tsv"]) {
+                    added << "01_quality_control/nonpareil/${s}/${f}".toString()
+                }
+            }
+            assert TestData.publishedPaths(outputDir).sort() ==
+                (new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines() + added).sort()
+            assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains('nonpareil: 3.5.5')
+        }
+    }
+
+    test("Without QC: on the input reads") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = false
+                nonpareil          = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                results_summary    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("QC:NONPAREIL (") } == 2
+            assert path("${outputDir}/01_quality_control/nonpareil/test_sample1/test_sample1_nonpareil.tsv").exists()
+        }
+    }
+}

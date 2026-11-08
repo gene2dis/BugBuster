@@ -752,7 +752,7 @@ def fig_nonpareil(fw, npar, cols, groups, low, threshold):
         if np.isfinite(r) and np.isfinite(cov):
             ax.plot([r], [cov], "o", color=color[s], ms=3.2, mec="white", mew=0.4, alpha=alpha, zorder=3)
             xs.append(r)
-        xs += list(obs["x_pairs"])
+        xs += list(obs.loc[obs["coverage"] > 0.001, "x_pairs"])  # the axis starts where a curve leaves 0
         for kind, d in (("observed", obs), ("model", mod)):
             for x, y, lo, hi in zip(d["x_pairs"], d["coverage"], d["coverage_p25"], d["coverage_p75"]):
                 rows.append({"sample": s, "group": group_of[s], "kind": kind, "read_pairs": x, "coverage": y,

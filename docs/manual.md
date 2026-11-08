@@ -711,7 +711,9 @@ corrects it and fits a model that projects it to larger efforts. Three values co
   sequencing effort. A more diverse community needs more sequencing to reach the same coverage and has a higher Nd.
   It correlates with alpha diversity (Rodriguez-R et al. 2018) but does not depend on a reference database.
 - `nonpareil_depth_95pct`: the read pairs the model projects for 95 % coverage. Compare it with `clean_pairs`:
-  far above it, much of the community's diversity is still unsampled.
+  far above it, much of the community's diversity is still unsampled. It is an extrapolation, and from a low
+  coverage an uncertain one: a sample at coverage 0.09 projected 2.7 G read pairs from 2 M pairs of its reads and
+  10-13 G from 10 M pairs (roadmap Phase 17). Read it as an order of magnitude.
 
 **The figure** (`nonpareil_curves`, in the report's overview) draws each sample's observed curve (solid, with its
 25th-75th percentiles when there are few samples) and the model's projection (dashed) against read pairs on a log

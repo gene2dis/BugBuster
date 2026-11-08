@@ -1,0 +1,2 @@
+sample	reads	reads_shorter_than_k	read_length	al	kappa	coverage	diversity	lr_star	depth_95pct_pairs	model_r	has_model	consistent	warning
+sampleA	1876407		141.008	141.008	0.15648	0.183501243	21.14216656	88749870339	629395994.1	0.9991635973	true	true	

@@ -1,0 +1,2 @@
+sample	reads	reads_shorter_than_k	read_length	al	kappa	coverage	diversity	lr_star	depth_95pct_pairs	model_r	has_model	consistent	warning
+sampleB	500		126	126	0.03109	0.04188659059					false	false	Median of the curve is zero at 50% of the reads, check parameters and re-run (e.g., decrease -L in nonpareil -T alignment).

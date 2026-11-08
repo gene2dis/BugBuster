@@ -795,8 +795,10 @@ STAGE_PITFALLS = {
                  "depends on the sample alone, so it is valid in any batch and comparable across batches. "
                  "nonpareil_depth_95pct is the read pairs the fitted model projects for 95 % coverage, and "
                  "nonpareil_diversity (Nd) the curve's position on the log effort axis; both are blank when Nonpareil "
-                 "could not fit the curve (too few reads). Nonpareil's k-mer mode has no random seed: values move "
-                 "slightly from run to run.",
+                 "could not fit the curve (too few reads). The 95 % depth is an extrapolation: from a low coverage it "
+                 "is uncertain (one sample at coverage 0.09 projected 2.7 G read pairs from 2 M pairs and 10-13 G from "
+                 "10 M pairs of the same reads), so read it as an order of magnitude. Nonpareil's k-mer mode has no "
+                 "random seed: values move slightly from run to run.",
     "gunc": "GUNC (mags gunc_pass and scores) finds chimeras across distant lineages that CheckM2's completeness and "
             "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
             "quality_tier. Its reference (proGenomes 2.1, 2020; or GTDB r214) is older than GTDB r232: a MAG of a "
