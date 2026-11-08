@@ -922,8 +922,11 @@ def llm_guide(ctx):
         out.append(f"  - label: {b['label']}")
         out.append(f"    samples: [{', '.join(sorted(b['samples'], key=str))}]")
     out += [f"min_clean_pairs: {ctx['min_pairs']}",
-            f"low_depth_samples: [{', '.join(s['low_depth_samples'])}]",
-            f"arg_primary_method: {s.get('arg_primary', 'none')}",
+            f"low_depth_samples: [{', '.join(s['low_depth_samples'])}]"]
+    if s.get("nonpareil"):
+        out += [f"min_nonpareil_coverage: {s['min_nonpareil_coverage']:g}",
+                f"low_coverage_samples: [{', '.join(s['low_coverage_samples'])}]"]
+    out += [f"arg_primary_method: {s.get('arg_primary', 'none')}",
             f"arg_methods_card: [{', '.join(s.get('arg_methods', []))}]",
             f"rgi_min_coverage_percent: {ctx['rgi_min_coverage']:g}",
             f"metadata_columns: [{', '.join(ctx['meta_cols'])}]",

@@ -718,18 +718,19 @@ def fig_arg_contig_hosts(fw, hosts, top=20, top_classes=8):
 
 def fig_nonpareil(fw, npar, cols, groups, low, threshold):
     """Nonpareil coverage curves: each sample's estimated coverage against read pairs (log), the model's projection
-    (dashed), its sequenced depth (point), and the 95 % and low-coverage lines. Coloured by sample up to 8 samples,
-    else by group (one colour without groups)."""
+    (dashed), its sequenced depth (point), and the 95 % and low-coverage lines. Coloured by sample up to 7 samples
+    (Okabe-Ito without vermillion, the cutoff line's colour), else by group (one colour without groups)."""
     vals = npar["values"].drop_duplicates("sample").set_index("sample")
     curves = npar["curves"]
     samples = [s for s in cols if s in vals.index and (curves["sample"] == s).any()]
     if not samples:
         return
     group_of = dict(zip(cols, groups))
-    by_sample = len(samples) <= 8
+    palette = [c for c in fs.CATEGORY if c != fs.LOW_DEPTH]
+    by_sample = len(samples) <= len(palette)
     gnames = list(dict.fromkeys(group_of[s] for s in samples if group_of[s] != ""))
     if by_sample:
-        color = {s: fs.CATEGORY[i] for i, s in enumerate(samples)}
+        color = {s: palette[i] for i, s in enumerate(samples)}
     elif gnames:
         pal = fs.category_colors(gnames)
         color = {s: pal.get(group_of[s], fs.OTHER) for s in samples}
@@ -760,6 +761,9 @@ def fig_nonpareil(fw, npar, cols, groups, low, threshold):
         rows.append({"sample": s, "group": group_of[s], "kind": "sequenced", "read_pairs": r, "coverage": cov,
                      "coverage_p25": np.nan, "coverage_p75": np.nan})
     xs = [x for x in xs if np.isfinite(x) and x > 0]
+    if not xs:  # no curve leaves 0 and no sequenced depth: nothing to draw on a log axis
+        plt.close(fig)
+        return
     depth = vals.loc[samples, "depth_95pct_pairs"].astype(float)
     hi = max(xs) * 10
     if depth.notna().any():  # show the projection to 95 % coverage, up to 1000x the deepest sample
@@ -801,4 +805,5 @@ def fig_nonpareil(fw, npar, cols, groups, low, threshold):
             + "No model is drawn for a sample whose curve Nonpareil could not fit.",
             src, "overview", {"kind": "nonpareil", "frame": src, "samples": samples,
                               "groups": [group_of[s] for s in samples], "low": sorted(low),
-                              "threshold": threshold})
+                              "threshold": threshold, "by_sample": by_sample,
+                              "colors": [color[s] for s in samples] if by_sample else None})

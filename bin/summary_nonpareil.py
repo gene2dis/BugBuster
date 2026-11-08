@@ -30,7 +30,8 @@ def load_nonpareil(root):
         vals.append(df)
         cpath = path.with_name(path.name.replace("_nonpareil.tsv", "_nonpareil_curve.tsv"))
         if cpath.exists():
-            c = pd.read_csv(cpath, sep="\t", dtype={"sample": str, "kind": str})
+            c = pd.read_csv(cpath, sep="\t", dtype={"sample": str, "kind": str}, keep_default_na=False,
+                            na_values=[""])
             if CURVE_NEEDED <= set(c.columns):
                 curves.append(c)
             else:

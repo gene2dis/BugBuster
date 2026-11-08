@@ -13,7 +13,10 @@
     k-mer mode stops ("Reads are required to have a minimum length of kmer size") on any
     read shorter than k, and fastp keeps reads down to 15 bp: R1 reads shorter than k
     (-k in ext.args, 24 by default) are dropped first, into an uncompressed copy in the
-    task directory (the copy nonpareil makes of a .gz input anyway), removed at the end.
+    task directory (the copy nonpareil makes of a .gz input anyway), removed on exit. Its
+    name (<id>.nonpareil_input.fastq) cannot be a staged input's: writing to an input's
+    name would truncate the user's file through its link (--quality_control false with
+    an uncompressed <id>_R1.fastq).
     Their number is the reads_shorter_than_k column (0.09 % of the R1 reads of a real
     10 M-pair sample).
 
@@ -62,14 +65,19 @@ process NONPAREIL {
     def ram_mib = task.memory ? Math.min((task.memory.toMega() * 0.9) as long, 4194303L) : 1024
     """
     # R1 reads of at least k bp (nonpareil stops on a shorter one); one record per line, so the
-    # image's busybox awk tests whole records (3.6x faster than four lines at a time: 52 s for 10 M reads)
-    gzip -cdf ${r1} \\
-        | paste - - - - \\
-        | awk -F '\\t' -v k=${kmer} 'length(\$2) >= k { print; next } { short++ } END { print short + 0 > "reads_shorter_than_k.txt" }' \\
-        | tr '\\t' '\\n' > ${prefix}_R1.fastq
+    # image's busybox awk tests whole records (3.6x faster than four lines at a time: 52 s for 10 M reads).
+    # The fields are joined with \\001, which FASTQ never holds (a header may hold tabs)
+    trap 'rm -f ${prefix}.nonpareil_input.fastq' EXIT
+    sep=\$'\\001'
+    # busybox gzip -cdf rejects a plain file ("invalid magic"): decompress .gz only
+    if [[ ${r1} == *.gz ]]; then read_r1="gzip -cd"; else read_r1="cat"; fi
+    \$read_r1 ${r1} \\
+        | paste -d "\$sep" - - - - \\
+        | awk -F "\$sep" -v k=${kmer} 'length(\$2) >= k { print; next } { short++ } END { print short + 0 > "reads_shorter_than_k.txt" }' \\
+        | tr "\$sep" '\\n' > ${prefix}.nonpareil_input.fastq
 
     nonpareil \\
-        -s ${prefix}_R1.fastq \\
+        -s ${prefix}.nonpareil_input.fastq \\
         -T kmer \\
         -f fastq \\
         -b ${prefix} \\
@@ -77,7 +85,7 @@ process NONPAREIL {
         -R ${ram_mib} \\
         ${args}
 
-    rm ${prefix}_R1.fastq
+    rm ${prefix}.nonpareil_input.fastq
 
     nonpareil_fit.R ${prefix}.npo ${prefix} \$(cat reads_shorter_than_k.txt)
 

@@ -7,6 +7,7 @@ size). A spec whose JSON is larger than SPEC_BUDGET is not embedded: the page sh
 import json
 
 import numpy as np
+import pandas as pd
 
 import figure_style as fs
 from summary_common import warn
@@ -196,8 +197,16 @@ def nonpareil(d):
     x = alt.X("read_pairs:Q", scale=alt.Scale(type="log"), title="read pairs (R1 reads, log scale)",
               axis=alt.Axis(format="~s"))
     y = alt.Y("coverage:Q", scale=alt.Scale(domain=[0, 1.02]), title="estimated average coverage")
-    color = alt.Color("sample:N", sort=samples, legend=alt.Legend(title=None, orient="bottom", columns=6,
-                                                                  labelLimit=300))
+    # as the static figure: a colour per sample (its colours) up to 7 samples, else per group
+    if d.get("by_sample", True):
+        color = alt.Color("sample:N", sort=samples,
+                          scale=alt.Scale(domain=samples, range=d["colors"]) if d.get("colors") else alt.Undefined,
+                          legend=alt.Legend(title=None, orient="bottom", columns=6, labelLimit=300))
+    else:
+        names = list(dict.fromkeys(g for g in d["groups"] if g != ""))
+        color = (alt.Color("group:N", sort=names, legend=alt.Legend(title=None, orient="bottom", columns=6,
+                                                                     labelLimit=300))
+                 if names else alt.value(fs.CATEGORY[0]))
     tips = [alt.Tooltip("sample:N")] + tip_g + [alt.Tooltip("kind:N"), alt.Tooltip("read_pairs:Q", format=",.0f"),
                                                 alt.Tooltip("coverage:Q", format=".3f")]
     lines = alt.Chart(f[f["kind"] != "sequenced"]).mark_line(strokeWidth=1.6).encode(
@@ -210,12 +219,13 @@ def nonpareil(d):
     rules = [{"y": 0.95, "color": "#555555", "dash": [2, 2]}]
     if d.get("threshold"):
         rules.append({"y": d["threshold"], "color": fs.LOW_DEPTH, "dash": [4, 3]})
-    for r in rules:
-        layers.append(alt.Chart(f).mark_rule(color=r["color"], strokeDash=r["dash"], strokeWidth=1)
-                      .encode(y=alt.datum(r["y"])))
+    for r in rules:  # one row each: a rule per data row would repeat the frame
+        layers.append(alt.Chart(pd.DataFrame({"y": [r["y"]]}))
+                      .mark_rule(color=r["color"], strokeDash=r["dash"], strokeWidth=1).encode(y="y:Q"))
     if sel is not None:
         layers[0] = layers[0].add_params(sel)
-        layers = [layer.transform_filter(sel) for layer in layers]
+        # lines and points follow the group menu; the two rules stay
+        layers = [layer.transform_filter(sel) for layer in layers[:2]] + layers[2:]
     return alt.layer(*layers).properties(width=620, height=320)
 
 

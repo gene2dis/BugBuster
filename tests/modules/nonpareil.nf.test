@@ -67,6 +67,34 @@ nextflow_process {
         }
     }
 
+    test("uncompressed R1 named <id>_R1.fastq, a tab in a header: the input is left intact") {
+        // np_plain_R1.fastq is test_sample1's R1 uncompressed, a tab-separated tag on its first header. Its name is
+        // <id>_R1.fastq, the name the filtered copy once had: writing that name truncated the input through its link
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'np_plain' ],
+                    [
+                        file("${projectDir}/tests/data/nonpareil/np_plain_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def input = new File("${projectDir}/tests/data/nonpareil/np_plain_R1.fastq")
+            assert input.readLines().size() == 2000
+            assert input.readLines()[0].endsWith('\tBC:Z:ACGT')
+            def rows = path(process.out.values.get(0)[1]).readLines()*.split('\t', -1)
+            def v = [rows[0] as List, rows[1] as List].transpose().collectEntries()
+            assert v.reads == '500' && v.reads_shorter_than_k == '0'
+        }
+    }
+
     test("stub emits all declared outputs") {
         options "-stub"
 

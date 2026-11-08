@@ -523,6 +523,43 @@ assert "| ran |" in row, row
 row = next(l for l in plain.splitlines() if l.startswith("| Sequencing coverage and diversity (Nonpareil)"))
 assert "| not run |" in row, row
 assert "--min-nonpareil-coverage" in md and "--min-nonpareil-coverage" not in plain
+guide, plain_guide = open("run1_np_out/LLM_GUIDE.md").read(), open("docs_plain_out/LLM_GUIDE.md").read()
+assert "low_coverage_samples: [sampleA, sampleB]" in guide and "min_nonpareil_coverage: 0.6" in guide
+assert "low_coverage_samples" not in plain_guide
+PYEOF
+# nine samples (above the figure's seven sample colours: coloured by group) and a sample named NA, which pandas
+# would read as missing: every sample keeps its curve, values and colour. Nonpareil's tables only: Reads_report.csv
+# is read with pandas' default NA parsing, so a sample named NA does not survive it (not Nonpareil's to fix)
+mkdir -p np9/results
+py - "${NP}" <<'PYEOF'
+import os, sys
+import pandas as pd
+np_dir = sys.argv[1]
+names = ["NA", "s2", "s3", "s4", "s5", "s6", "s7", "s8", "s9"]
+for s in names:
+    d = f"np9/results/01_quality_control/nonpareil/{s}"
+    os.makedirs(d)
+    for kind in ("nonpareil", "nonpareil_curve"):
+        t = pd.read_csv(f"{np_dir}/sampleA_{kind}.tsv", sep="\t", dtype=str, keep_default_na=False)
+        t["sample"] = s
+        t.to_csv(f"{d}/{s}_{kind}.tsv", sep="\t", index=False)
+PYEOF
+printf 'sample\tsite\nNA\tx\ns2\tx\ns3\tx\ns4\tx\ns5\ty\ns6\ty\ns7\ty\ns8\ty\ns9\ty\n' > np9_meta.tsv
+check "Nonpareil: nine samples, one named NA" \
+    documented np9_out --results np9/results --metadata np9_meta.tsv --group-by site --min-clean-pairs 10000
+check "Nonpareil: every sample in the table and the figure, coloured by group" py - <<'PYEOF'
+import pandas as pd
+q = pd.read_csv("np9_out/tables/samples_qc.tsv", sep="\t", keep_default_na=False, na_values=[""])
+assert sorted(q["sample"]) == sorted(["NA"] + [f"s{i}" for i in range(2, 10)]), q["sample"]
+assert q["nonpareil_coverage"].notna().all()
+src = pd.read_csv("np9_out/figures/nonpareil_curves.csv", keep_default_na=False, na_values=[""])
+assert set(src["sample"]) == set(q["sample"]), set(src["sample"])
+html = open("np9_out/report/index.html").read()
+try:
+    import altair  # noqa: F401
+    assert 'id="vis-nonpareil_curves"' in html and '"field":"group"' in html.replace(" ", "")
+except ImportError:
+    pass
 PYEOF
 check "Nonpareil: curve figure (observed, model, sequenced depth) and its interactive version" py - <<'PYEOF'
 import os
