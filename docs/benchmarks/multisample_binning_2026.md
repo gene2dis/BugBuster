@@ -12,7 +12,7 @@ Both are run-level results. A study split across batches dereplicates its MAGs d
 **Outcome (recommendations):**
 
 - **B4: add multi-sample binning as an option, off by default, in the cheapest form measured.** In that form, each sample is aligned once more, to the concatenation of all assemblies in its group, and MetaBAT2 gets one depth column per sample from those alignments. SemiBin2 keeps its pre-trained model and the sample's own BAM, as today. On these four samples the refined bins went from 27 to 29 CheckM2 high-quality (> 90 % / < 5 %) and from 3 to 4 MIMAG high. Sequence in passing bins rose from 158.3 to 161.2 Mbp, and Σ(completeness − 5 × contamination) over all bins from 3,631 to 3,731. All 31 species were kept. The cost is one extra alignment per sample: 2.1 CPU-hours and 3.9 GiB of BAMs for the four samples, on top of today's 1.7 CPU-hours. Binning CPU is unchanged. This is the same split the pipeline already uses under co-assembly (pre-trained SemiBin2, per-sample depth columns for MetaBAT2; [binning_2026.md](binning_2026.md), (d) and (g)).
-- **The gain is modest and comes from MetaBAT2.** No variant found a genome that today's run misses. Every refined bin of every variant matches one of today's bins (≥ 50 % of its sequence shared), and the GTDB species are the same 31. Multi-sample coverage completes existing bins. Raw MetaBAT2 high-quality bins go from 14 to 24–25, while SemiBin2 moves from 24 to 26–27, and only when self-trained.
+- **The gain is modest and comes from MetaBAT2.** No variant found a genome that today's run misses. Every refined bin of every variant matches one of today's bins (≥ 50 % of its sequence shared), and the GTDB species are the same 31 (30 in (iii), which lost one). Multi-sample coverage completes existing bins. Raw MetaBAT2 high-quality bins go from 14 to 24–25, while SemiBin2 moves from 24 to 26–27, and only when self-trained.
 - **Not variant (ii) as specified (N × N alignments + self-trained SemiBin2).** It gave the same refined quality (29 high, Σ 3,745) for 28.3 CPU-hours against 5.8 today. SemiBin2's self-training is 18.6 of those, and the N × N alignments grow with the square of the samples: 400 alignments at 20 samples, 2,500 at 50.
 - **Not variant (iii), SemiBin2 `multi_easy_bin`.** Same quality (30 high), but the binning is one task: 4 h 41 min of wall time at N = 4, training one model per sample one after another. Its wall time grows with the number of samples, and Nextflow cannot spread it over tasks. It also lost one species (*Bacteroides ovatus*). (The roadmap's "one model" is not what `multi_easy_bin` does: SemiBin2 2.6.0 trains a separate self-supervised model for each sample, and refuses `--train-from-many` in multi-sample mode.)
 - **Groups:** cross-mapping happens inside each group of a metadata column, as Phase 15's co-assembly groups do. A group bounds the concatenation's size, which drives index memory and splits reads between copies of the same genome. It also bounds the alignment count of the N × N alternative.
@@ -23,13 +23,13 @@ Both are run-level results. A study split across batches dereplicates its MAGs d
 
 | Question | Measured (4 samples) | Recommendation |
 |---|---|---|
-| Multi-sample coverage, any form | 0 new genomes, same 31 species; CheckM2 high 27 → 27–30; Σ quality +50 to +114 | worth it only cheaply; optional |
+| Multi-sample coverage, any form | 0 new genomes, same 31 species (30 in (iii)); CheckM2 high 27 → 27–30; Σ quality +50 to +114 | worth it only cheaply; optional |
 | (ii) N × N + self-trained SemiBin2 | 29 high, 28.3 CPU-h (SemiBin2 18.6), 16 BAMs 14.9 GiB | no |
 | (iii) `multi_easy_bin` | 30 high, one 4.7 h task, one species lost | no |
 | N × N + pre-trained SemiBin2 (diagnostic) | 27 high, Σ 3,744, 10.5 CPU-h, 14.9 GiB | no (N² alignments for the same gain) |
-| **Concatenation coverage for MetaBAT2 + pre-trained SemiBin2 (diagnostic)** | **29 high, 4 MIMAG high, Σ 3,731, 7.3 CPU-h, 7.3 GiB** | **yes, optional, inside groups** |
-| Dereplication | dRep = galah partitions; galah ~2 s, dRep ~12–20 s | galah, formula `completeness-5contamination`; runs alone |
-| Abundance | CoverM vs BIN_DEPTH: ratio 1.00–1.02, Spearman ≥ 0.99 | CoverM on the representatives |
+| **Concatenation coverage for MetaBAT2 + pre-trained SemiBin2 (diagnostic)** | **29 high, 4 MIMAG high, Σ 3,731, 7.3 CPU-h, 7.2 GiB** | **yes, optional, inside groups** |
+| Dereplication | dRep = galah partitions; galah ~2–3 s, dRep 11–21 s | galah, formula `completeness-5contamination`; runs alone |
+| Abundance | CoverM vs BIN_DEPTH: ratio 1.00–1.02, Spearman ≥ 0.988 | CoverM on the representatives |
 
 ## Setup
 
@@ -130,9 +130,9 @@ The *C. innocuum* bin of sample C sits on the 5 % contamination line in every va
 | (i) today | 4 | 1.73 | 3.3 | 0.84 (15 min, 8 CPUs) | 0.06 | 3.02 | 5.8 | 15.8 GB (alignment) |
 | self | 4 | 1.73 | 3.3 | 18.0 (2 h 9 min) | 0.05 | 2.45 | 22.3 | 19.7 GB (SemiBin2) |
 | (ii) cross | 16 | 6.98 | 14.9 | 18.6 (2 h 16 min) | 0.12 | 2.44 | 28.3 | 19.6 GB (SemiBin2) |
-| (iii) multi | 4 + 4 | 3.87 | 7.3 | 16.7 (one task, 4 h 41 min) | 0.06 | 2.42 | 23.2 | 20.0 GB (SemiBin2) |
+| (iii) multi | 4 + 4 | 3.87 | 7.2 | 16.7 (one task, 4 h 41 min) | 0.06 | 2.42 | 23.2 | 20.0 GB (SemiBin2) |
 | hybrid | 16 | 6.98 | 14.9 | 0.84 | 0.12 | 2.45 | 10.5 | 16.0 GB (alignment) |
-| hybrid-concat | 4 + 4 | 3.87 | 7.3 | 0.84 | 0.06 | 2.35 | 7.3 | 16.7 GB (alignment) |
+| hybrid-concat | 4 + 4 | 3.87 | 7.2 | 0.84 | 0.06 | 2.35 | 7.3 | 16.7 GB (alignment) |
 
 The totals include the indexes: 0.10 CPU-hours for the four assemblies, and 0.09 CPU-hours and 2.3 GB for the 251 Mbp concatenation. Today's Binette ran in 11a under a different load; the bench's own Binette runs took 2.35–2.45 CPU-hours. Variants (iii) and hybrid-concat count today's N alignments as well. The pipeline needs each sample's BAM against its own assembly anyway: BIN_DEPTH, featureCounts and the other downstream steps read it.
 
@@ -151,7 +151,7 @@ Taking these samples' mean per alignment (0.43 CPU-hours, a 0.83 GiB BAM against
 
 | Samples | Today: alignments, CPU-h, BAM GiB | N × N | N × N in groups of 5 | Concatenation, one group | Concatenation in groups of 5 |
 |---|---|---|---|---|---|
-| 4 | 4, 1.7, 3.3 | 16, 7.0, 15 | (one group) | 8, 3.9, 7.3 | (one group) |
+| 4 | 4, 1.7, 3.3 | 16, 7.0, 15 | (one group) | 8, 3.9, 7.2 | (one group) |
 | 20 | 20, 8.6, 17 | 400, 172, 385 | 100, 43, 94 | 40, ≥ 19, 36 | 40, 19, 36 |
 | 50 | 50, 22, 42 | 2,500, 1,080, 2,420 | 250, 108, 236 | 100, ≥ 48, 91 | 100, 48, 91 |
 
@@ -175,16 +175,16 @@ dRep 4.0.3 (`dereplicate --genomeInfo <CheckM2> -comp 50 -con 10 -sa 0.95|0.99 -
 | self | 44 | 31 / 32 | yes / yes | 10 | 30 / 31 of 31 |
 | (ii) cross | 45 | 31 / 32 | yes / yes | 10 | 29 / 31 of 31 |
 | (iii) multi | 44 | 30 / 31 | yes / yes | 10 | 29 / 30 of 30 |
-| hybrid | 45 | 31 / 32 | yes / yes | 10 | 29 of 31 (default) |
-| hybrid-concat | 45 | 31 / 32 | yes / yes | 10 | 30 of 31 (default) |
+| hybrid | 45 | 31 / 32 | yes / yes | 10 | 29 / 31 of 31 |
+| hybrid-concat | 45 | 31 / 32 | yes / yes | 10 | 30 / 31 of 31 |
 
 - The 95 % clusters are the 31 GTDB species. Ten species were binned in two or three samples (six in two, four in all three), eight of them in both A and B; the 45 MAGs hold 31 species.
 - 99 % splits one cluster: *Clostridium_AQ innocuum*, whose sample B MAG separates from those of A and C.
-- **Representatives.** dRep scores completeness − 5 × contamination + contamination × strain heterogeneity + 0.5 log N50 + centrality. galah's default `Parks2020_reduced` also subtracts 5 × contigs / 100. On today's MAGs galah chose a 43-contig *Parabacteroides distasonis* bin (85.4 % / 0.35 %, MIMAG medium) where dRep chose a 271-contig one (93.4 % / 1.70 %, MIMAG high). The other differences were between near-equal bins. With `--quality-formula completeness-5contamination`, galah chose exactly dRep's representative in every cluster of all four variants tested. galah's `dRep` formula needs CheckM1 strain heterogeneity and stops with CheckM2 input.
+- **Representatives.** dRep scores completeness − 5 × contamination + contamination × strain heterogeneity + 0.5 log N50 + centrality. galah's default `Parks2020_reduced` also subtracts 5 × contigs / 100. On today's MAGs galah chose a 43-contig *Parabacteroides distasonis* bin (85.4 % / 0.35 %, MIMAG medium) where dRep chose a 271-contig one (93.4 % / 1.70 %, MIMAG high). The other differences were between near-equal bins. With `--quality-formula completeness-5contamination`, galah chose exactly dRep's representative in every cluster of all six variants (at 95 %). galah's `dRep` formula needs CheckM1 strain heterogeneity and stops with CheckM2 input.
 
 Cost (cgroup, 8 CPUs):
 
-| | 45 MAGs | 178 MAGs (all variants together) |
+| | 45 MAGs | 178 MAGs (today, self, (ii) and (iii) together) |
 |---|---|---|
 | dRep | 11–16 s, 15–18 CPU-s, 0.2–0.5 GB | 21 s, 41 CPU-s, 0.37 GB |
 | galah | ~3 s with container start, under 1 CPU-s (below the 2 s sampler) | 2.2 s, 13.7 CPU-s, 0.23 GB (mean of 10 runs) |
@@ -234,19 +234,19 @@ All three ran with a read-only root filesystem (`--read-only`, `/tmp` as tmpfs),
 - The manual should give the cost: one extra alignment per sample, against a reference that grows with the group. It should warn that large groups need memory to index the concatenation and lower each copy's depth. A size above which to warn was not measured here (N = 4). The owner chose a launch warning by the number of samples in a group; Phase 18b sets the number.
 - Not chosen: N × N alignments, as an alternative coverage source, give no better bins for g × N alignments. Self-trained SemiBin2 on N BAMs costs ~20× the binning CPU for the same result. `multi_easy_bin` is one serial task.
 
-**B5, dereplication: optional, off by default, and allowed without B4.** The roadmap's section 4 currently says "Run-level dereplication only with multi-sample binning (Phase 18)". The measurements say it does not depend on it, so this needs the owner's word.
+**B5, dereplication: optional, off by default, and allowed without B4.** The roadmap's section 4 said "Run-level dereplication only with multi-sample binning (Phase 18)". The measurements say it does not depend on it, and the owner allowed it on its own (2026-11-08).
 
 - `--dereplicate_mags` (boolean, default false). It needs `--include_binning` with Binette, which supplies the CheckM2 reports. galah 0.6.2 clusters the refined MAGs of all the run's assemblies with `--quality-formula completeness-5contamination` and Binette's thresholds (`--bin_min_completeness` / `--bin_max_contamination`, 50 / 10). CoverM 0.8.0 `genome` then maps every sample's reads to the representatives (`--min-read-percent-identity 97`, as jgi). Representatives, clusters and abundance (mean depth, relative abundance, covered fraction) go to the summary as new tables.
 - `--dereplicate_ani` (default 95): 95 for species. 99 split one species here.
 - Documented as covering this run's samples only. A study processed in batches dereplicates downstream, from the merged results.
-- dRep is not needed: it gives the same clusters and representatives, but its image is 2.5 GB and it is ~10× slower.
+- dRep is not needed: it gives the same clusters and representatives, but its image is 2.5 GB and it is ~4–10× slower (11–16 s against ~3 s on one variant's 45 MAGs, 21 s against 2.2 s on 178).
 
 **For Phase 18b:** with the recommended B4, the abundance across samples comes from CoverM, not from BIN_DEPTH. The concatenation's depths serve only MetaBAT2.
 
 ## Caveats
 
 - Four samples, one of them too shallow to bin (D). Ten species were shared between samples, most between A and B. A run with more samples of the same environment may gain more from extra coverage columns than this one did; this benchmark does not show that.
-- The differences in CheckM2 high-quality bins between the variants with multi-sample coverage (27–30) come down to one or two bins near the 90 % / 5 % line. The consistent signals are the aggregate score (Σ +100–114 over today for every variant but (iii) and self) and the median completeness (+2.3–3.5 points).
+- The differences in CheckM2 high-quality bins between the variants with multi-sample coverage (27–30) come down to one or two bins near the 90 % / 5 % line. The consistent signals are the aggregate score (Σ +100–114 over today for every variant but (iii) and self) and the median completeness (+2.3–3.5 points, from the unrounded medians).
 - The two diagnostics were added after (ii) and (iii). They reuse the bench's MetaBAT2 bins and 11a's SemiBin2 bins, with Binette run per assembly the same way.
 - The extrapolation to 20 and 50 samples assumes these samples' mean read count and alignment cost. Index memory and read splitting in the concatenation are linear guesses beyond N = 4.
 - SemiBin2's pre-trained model was `global`, as in Phase 11a; the pipeline's per-sample default is `human_gut`.
