@@ -47,9 +47,9 @@
                 },
                 "nonpareil": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Estimate each sample's sequencing coverage, sequence diversity (Nd) and the read pairs needed for 95 % coverage with Nonpareil (k-mer mode on R1 of the clean reads; the summary's samples_qc columns nonpareil_* and its coverage-curve figure). Failure is non-fatal.",
-                    "help_text": "Runs after QC (or on the input reads with --quality_control false), once per sample. Only R1 is used: Nonpareil estimates coverage from the redundancy of comparable reads, and R2 adds no fragments of its own. Values change slightly from run to run (k-mer mode has no seed). Outputs in 01_quality_control/nonpareil/<sample>/.",
+                    "help_text": "Runs after QC (or on the input reads with --quality_control false), once per sample: about 3 min, 5 CPU-minutes and 3 GB of transient disk per 10 M read pairs, a few MB of memory. Only R1 is used: Nonpareil estimates coverage from the redundancy of comparable reads, and R2 adds no fragments of its own. Values change slightly from run to run (k-mer mode has no seed). Outputs in 01_quality_control/nonpareil/<sample>/.",
                     "fa_icon": "fas fa-chart-line"
                 },
                 "assembly_mode": {

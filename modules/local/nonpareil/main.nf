@@ -14,7 +14,8 @@
     read shorter than k, and fastp keeps reads down to 15 bp: R1 reads shorter than k
     (-k in ext.args, 24 by default) are dropped first, into an uncompressed copy in the
     task directory (the copy nonpareil makes of a .gz input anyway), removed at the end.
-    Their number is the reads_shorter_than_k column (0.09 % of a 10 M-pair gut sample).
+    Their number is the reads_shorter_than_k column (0.09 % of the R1 reads of a real
+    10 M-pair sample).
 
     k-mer mode has no seed (nonpareil's -r applies to alignment mode only), so the curve
     and its values change slightly from run to run.
