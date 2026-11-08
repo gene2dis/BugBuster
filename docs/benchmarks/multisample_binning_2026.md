@@ -7,7 +7,7 @@ Benchmark run 2026-11-08 (roadmap Phase 18a, items B4 and B5). No pipeline code 
 
 Both are run-level results. A study split across batches dereplicates its MAGs downstream, from the merged results, not in the pipeline (roadmap decision "Study-level analyses", 2026-11-05).
 
-**Decision:** pending (owner).
+**Decision (owner, 2026-11-08):** add both as recommended below, optional and off by default. Multi-sample binning in the concatenation form (MetaBAT2 gets the extra depth columns; SemiBin2 as today), cross-mapped inside the groups of a metadata column, with a launch warning when a group has more samples than a set number. COMEBin with the same columns is measured in Phase 18b before it is enabled. Dereplication (galah, then CoverM) may run without multi-sample binning.
 
 **Outcome (recommendations):**
 
@@ -229,9 +229,9 @@ All three ran with a read-only root filesystem (`--read-only`, `/tmp` as tmpfs),
 
 **B4, multi-sample binning: optional, off by default, per-sample mode only.** Under co-assembly MetaBAT2 already has one column per sample of the group.
 
-- `--multisample_binning` (boolean, default false). Each sample is aligned once more, to the concatenation of its group's assemblies (contig names prefixed with the sample). The concatenation's jgi depth table is split per assembly, and MetaBAT2 bins each assembly with one depth column per sample of the group. SemiBin2 keeps the pre-trained model on the sample's own BAM. BIN_DEPTH, the abundance tables and every other step that uses the per-sample BAM are unchanged. It needs `--include_binning` with MetaBAT2 among the binners. COMEBin, if selected, could take the same columns; that was not measured here.
+- `--multisample_binning` (boolean, default false). Each sample is aligned once more, to the concatenation of its group's assemblies (contig names prefixed with the sample). The concatenation's jgi depth table is split per assembly, and MetaBAT2 bins each assembly with one depth column per sample of the group. SemiBin2 keeps the pre-trained model on the sample's own BAM. BIN_DEPTH, the abundance tables and every other step that uses the per-sample BAM are unchanged. It needs `--include_binning` with MetaBAT2 among the binners. COMEBin, if selected, could take the same columns; that was not measured here, and Phase 18b measures it before it is enabled (owner).
 - `--multisample_group_by <column>` of `--sample_metadata`: samples are cross-mapped only within their group, the way Phase 15's `--coassembly_group_by` forms co-assembly groups. It would reuse the same rules: label sanitising, startup errors for a missing table, column or value, metadata rows for other batches ignored. Without it, the run is one group. A one-sample group is binned as today. Phase 15's helper (`coassemblyGroups()`) is tied to `--coassembly_group_by` and co-assembly mode and would need to take the param as an argument.
-- The manual should give the cost: one extra alignment per sample, against a reference that grows with the group. It should warn that large groups need memory to index the concatenation and lower each copy's depth. A size above which to warn was not measured here (N = 4); the owner's choice.
+- The manual should give the cost: one extra alignment per sample, against a reference that grows with the group. It should warn that large groups need memory to index the concatenation and lower each copy's depth. A size above which to warn was not measured here (N = 4). The owner chose a launch warning by the number of samples in a group; Phase 18b sets the number.
 - Not chosen: N × N alignments, as an alternative coverage source, give no better bins for g × N alignments. Self-trained SemiBin2 on N BAMs costs ~20× the binning CPU for the same result. `multi_easy_bin` is one serial task.
 
 **B5, dereplication: optional, off by default, and allowed without B4.** The roadmap's section 4 currently says "Run-level dereplication only with multi-sample binning (Phase 18)". The measurements say it does not depend on it, so this needs the owner's word.
