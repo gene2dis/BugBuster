@@ -34,6 +34,7 @@ flowchart TD
     Clean -->|"args_oap_prediction<br/>(or deprecated read_arg_prediction)"| ARGS_OAP["ARGS_OAP → ARGS_OAP_REPORT<br/>SARG, stage one + two"]
     Clean -->|rgi_prediction| RgiSteps["RGI_BWT → RGI_KMER → RGI_REPORT<br/>CARD + pathogen of origin"]
     Clean -->|kmarvel_prediction| KMARVEL["KMARVEL → KMARVEL_REPORT<br/>CARD ARG assembly from reads"]
+    QC -->|"nonpareil (default)"| NONPAREIL["NONPAREIL<br/>sequencing coverage (R1)"]
     Clean -->|"microbecensus (default)<br/>and a contig or read<br/>functional branch"| MICROBECENSUS["MICROBECENSUS<br/>average genome size"]
     Clean -->|"read_level_functional != 'none'"| READ_FUNCTIONAL["READ_FUNCTIONAL<br/>woltka | superfocus | humann"]
     MICROBECENSUS --> READ_FUNCTIONAL
@@ -59,6 +60,7 @@ flowchart TD
     Versions{{versions.yml files +<br/>topic 'versions' tuples<br/>from every stage}} --> SOFTWARE_VERSIONS["SOFTWARE_VERSIONS<br/>pipeline_info/software_versions.yml"]
     SOFTWARE_VERSIONS --> RESULTS_SUMMARY
     QC -.-> RESULTS_SUMMARY
+    NONPAREIL -.-> RESULTS_SUMMARY
     TAXONOMY -.-> RESULTS_SUMMARY
     ARGS_OAP -.-> RESULTS_SUMMARY
     RgiSteps -.-> RESULTS_SUMMARY
@@ -76,7 +78,7 @@ flowchart TD
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     classDef data fill:#FFF8E6,stroke:#E69F00,stroke-width:1.5px,color:#111
-    class INPUT_CHECK,PREPARE_DATABASES,QC,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
+    class INPUT_CHECK,PREPARE_DATABASES,QC,NONPAREIL,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
     class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
     class Input,Clean,Versions data
 ```
@@ -97,6 +99,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 |-------|-----------|--------------|
 | `INPUT_CHECK`, `PREPARE_DATABASES`, `QC`, `SOFTWARE_VERSIONS` | always | — |
 | `QC`: fastp + decontamination | `quality_control` (default `true`); otherwise `COUNT_READS` only | — |
+| `NONPAREIL` (in `QC`, on the clean reads) | `nonpareil` (default `true`) | — |
 | `TAXONOMY` | `taxonomic_profiler != 'none'` (default `sylph`) | `custom_sylph_db` and `custom_sylph_taxonomy` given together |
 | `ARGS_OAP`, `ARGS_OAP_REPORT` | `args_oap_prediction` or `read_arg_prediction` (deprecated alias, with a warning) | — |
 | `RGI_BWT`, `RGI_REPORT` | `rgi_prediction` | — |
@@ -206,9 +209,10 @@ flowchart TD
     Q -->|false| COUNT_READS["COUNT_READS<br/>counts only"]
     COUNT_READS --> READS_REPORT["READS_REPORT<br/>Reads_report.csv + Box_plot_reads"]
     BWAMEM3_DECONTAMINATE & BOWTIE2_DECONTAMINATE & COUNT_READS --> Clean(["clean reads"])
+    Clean -->|"nonpareil (default true)<br/>(R1 only)"| NONPAREIL["NONPAREIL<br/>k-mer redundancy curve<br/>+ Nonpareil.curve fit"]
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
-    class FASTP,QFILTER,BWAMEM3_DECONTAMINATE,READS_REPORT on
+    class FASTP,QFILTER,BWAMEM3_DECONTAMINATE,READS_REPORT,NONPAREIL on
 ```
 
 ### 4. TAXONOMY
@@ -504,6 +508,7 @@ results directories outside the pipeline (manual, Example 13).
 | `BWAMEM3_DECONTAMINATE` / `BOWTIE2_DECONTAMINATE` | Single-pass phiX + host removal (bwa-mem3 by default) |
 | `COUNT_READS` | Read counting when `quality_control` is false |
 | `READS_REPORT` | `Reads_report.csv` and the reads-per-step figure |
+| `NONPAREIL` | Nonpareil k-mer coverage curve of R1 of the clean reads and its fit (coverage, diversity Nd, read pairs for 95 % coverage; `nonpareil`) |
 
 ### Taxonomic profiling (TAXONOMY)
 | Module | Description |
@@ -594,7 +599,7 @@ results/
 │                                # results_summary.html / .pdf / .xlsx, README.md, LLM_GUIDE.md,
 │                                # tables/, figures/
 ├── clean_reads/                 # Decontaminated reads (only if --store_clean_reads)
-├── 01_quality_control/          # fastp reports, Reads_report.csv
+├── 01_quality_control/          # fastp reports, Reads_report.csv, nonpareil/ (--nonpareil)
 ├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
 │                                # phyloseq, figures
 ├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
@@ -616,7 +621,7 @@ Databases go to `--databases_dir` (default `<output>/../databases`), apart from 
 ## Execution modes
 
 ### Default run
-QC (fastp + bwa-mem3 decontamination) → sylph taxonomy → per-sample assembly (MEGAHIT +
+QC (fastp + bwa-mem3 decontamination, Nonpareil coverage) → sylph taxonomy → per-sample assembly (MEGAHIT +
 BBMap filter) → run summary. Binning, ARG prediction and functional annotation are off by
 default; for the full pipeline add their flags, for example
 `--include_binning true --binners semibin,metabat2 --args_oap_prediction true --rgi_prediction true --kmarvel_prediction true --contig_tax_and_arg true --contig_level_functional true`.
