@@ -460,6 +460,48 @@ TABLE_DOCS = {
                                  "comparable between samples, unlike raw depth"),
         ],
     },
+    "mag_clusters": {
+        "title": "Run-level MAG clusters",
+        "description": "--dereplicate_mags: galah's clusters of the run's refined MAGs at ani_pct average nucleotide "
+                       "identity (skani), one row per clustered MAG. The representative of a cluster is its MAG with "
+                       "the highest completeness - 5 x contamination (Binette's CheckM2); MAGs below "
+                       "--bin_min_completeness or above --bin_max_contamination are in no cluster. The clusters cover "
+                       "this run's samples only: merged batches keep their own clusters, and the same species has "
+                       "different cluster names in two batches.",
+        "columns": [
+            ("batch", "results directory (--batch-labels / --summary_batch_label); clusters never span batches"),
+            ("cluster", "the cluster's representative, <assembly>_<bin> (the name of its FASTA in "
+                        "04_binning/dereplicated/representatives/)"),
+            ("assembly", "the assembly the MAG comes from: a sample name, coassembly, or a co-assembly group's "
+                         "label"),
+            ("bin", "MAG name (mags)"),
+            ("is_representative", "True for the cluster's representative"),
+            ("cluster_size", "MAGs in the cluster (1: a genome binned in one assembly only)"),
+            ("ani_pct", "the ANI (%) galah clustered at (--dereplicate_ani; 95 ~ species, 99 ~ strain)"),
+        ],
+    },
+    "mag_cluster_abundance": {
+        "title": "Run-level MAG clusters per sample",
+        "description": "--dereplicate_mags: CoverM genome on the clusters' representatives with each sample's read "
+                       "pairs (strobealign; reads at >= 97 % identity), every representative in every sample of the "
+                       "run. A read counts once, on the representative it maps best to, so a genome assembled in "
+                       "several samples is counted once. Unlike mag_abundance (each MAG against its own assembly's "
+                       "alignments), these values compare one set of genomes across all the run's samples; they do "
+                       "not extend to other batches.",
+        "columns": [
+            ("cluster", "the cluster's representative, <assembly>_<bin> (mag_clusters)"),
+            ("batch", "results directory (--batch-labels / --summary_batch_label)"),
+            ("assembly", "the representative's assembly"),
+            ("bin", "the representative's MAG name (mags)"),
+            ("sample", "sample whose reads were mapped"),
+            ("<metadata>", "columns of the --metadata table"),
+            ("relative_abundance_pct", "CoverM relative abundance: % of the sample's reads on the representative "
+                                       "(the reads on no representative are the rest)"),
+            ("mean_depth_x", "CoverM mean read depth over the representative's bases"),
+            ("trimmed_mean_x", "CoverM mean depth without the 5 % highest- and lowest-covered positions"),
+            ("covered_fraction", "share of the representative's bases covered by at least one read (0-1)"),
+        ],
+    },
     "arg_contig_long": {
         "title": "Contig ARGs with their taxon and bin",
         "description": "One row per DeepARG hit on an assembled contig (--contig_tax_and_arg), with the contig's "
@@ -778,7 +820,8 @@ PITFALLS = [
     "genomes are missing, and DeepARG calls below 80 % identity are common. Under co-assembly the contig depth is "
     "pooled over all samples; arg_contig_abundance gives each sample's reads on the gene.",
     "MAG quality: the mags quality_tier is MIMAG; the High/Mid/Low classes of the run's 04_binning plots and tables "
-    "are another, older scheme. MAGs of different per-sample assemblies are not dereplicated.",
+    "are another, older scheme. MAGs of different per-sample assemblies are not dereplicated unless --dereplicate_mags ran "
+    "(mag_clusters).",
     "MAG depth (mag_abundance) is MetaBAT2's contig depth (alignments at >= 97 % identity) averaged over the MAG's "
     "contigs weighted by their length, the same in both assembly modes; compare samples with pct_sample_bases "
     "rather than raw depth.",
@@ -803,6 +846,17 @@ STAGE_PITFALLS = {
             "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
             "quality_tier. Its reference (proGenomes 2.1, 2020; or GTDB r214) is older than GTDB r232: a MAG of a "
             "lineage the reference lacks has a low reference_representation_score and an unreliable call.",
+    "dereplication": "MAG clusters (mag_clusters, mag_cluster_abundance) are galah's clusters of one run's MAGs: "
+                     "they cover that run's samples only. A study processed in several runs (batches) has one set of "
+                     "clusters per batch, whose names do not match across batches; dereplicate the merged MAGs "
+                     "downstream for study-wide clusters. Two MAG abundances: mag_abundance is each MAG's depth "
+                     "against its own assembly's alignments (BIN_DEPTH), mag_cluster_abundance each representative's "
+                     "share of every sample's reads (CoverM); do not mix them.",
+    "multisample": "Multi-sample binning (--multisample_binning) gave MetaBAT2 one depth column per sample of the "
+                   "assembly's group, from each sample's alignment to the concatenation of the group's assemblies. "
+                   "Those depths are competitive (a read of a genome assembled in several samples counts on one copy "
+                   "only) and fed MetaBAT2 alone: the MAG depth (mag_abundance) is still each sample's own alignment. "
+                   "Bins differ from those of a run without the option.",
     "checkv": "CheckV's quality tiers (arg_contig_mobile arg_genes_viral_checkv_*, and the contig table's "
               "checkv_quality) estimate how complete geNomad's virus or provirus is: completeness from amino-acid "
               "identity to CheckV's genomes, else from its HMMs. Low-quality and Not-determined mean too short or too "
@@ -1002,6 +1056,9 @@ def llm_guide(ctx):
             "`tables/function_contig_<ontology>.tsv` / `function_contig_long.tsv` (never mix the two).",
             "- Good-quality genomes: `tables/mags.tsv` with `quality_tier == 'high'` (or 'medium'), lineage in "
             "`phylum` ... `species`; their depth per sample in `tables/mag_abundance.tsv` (`pct_sample_bases`).",
+            "- One genome per species across the run's samples (--dereplicate_mags): `tables/mag_clusters.tsv` rows "
+            "with `is_representative == True`; their share of each sample's reads in "
+            "`tables/mag_cluster_abundance.tsv` (`relative_abundance_pct`), this run's samples only.",
             "- Which organisms carry an ARG (linkage, assembled contigs): `tables/arg_contig_long.tsv` (`host_taxon`, "
             "`bin`, `mobile_class`), summarised in `tables/arg_contig_hosts.tsv`; ARGs shared between MAGs in "
             "`tables/arg_cluster_sharing.tsv`.",

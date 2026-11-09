@@ -20,7 +20,7 @@
             reports: each assembly's CheckM2 report of its refined bins (Name = bin)
 
     Output:
-        clusters:        path("mag_clusters.tsv") - assembly, bin, genome, representative
+        clusters:        path("mag_clusters.tsv") - assembly, bin, genome, representative, ani_pct
         representatives: path("representatives") - <assembly>_<bin>.fa of each cluster's representative
         versions:        path(versions.yml)
 ----------------------------------------------------------------------------------------
@@ -47,6 +47,8 @@ process GALAH_CLUSTER {
 
     script:
     def args = task.ext.args ?: ''
+    // the ANI galah clustered at, a column of the cluster table (ext.ani: --dereplicate_ani)
+    def ani = task.ext.ani ?: ''
     def bin_list = bins instanceof List ? bins : [bins]
     def report_list = reports instanceof List ? reports : [reports]
     if (ids.size() != bin_list.size() || ids.size() != report_list.size()) {
@@ -90,15 +92,16 @@ process GALAH_CLUSTER {
         --threads ${task.cpus} \\
         --output-cluster-definition clusters.tsv
 
-    # assembly, bin, genome, representative (galah writes representative,
-    # member paths); a MAG galah's quality filter left out is in no cluster
+    # assembly, bin, genome, representative, ani_pct (galah writes
+    # representative, member paths); a MAG galah's quality filter left out is
+    # in no cluster
     mkdir representatives
-    awk -F '\\t' -v OFS='\\t' '
+    awk -F '\\t' -v OFS='\\t' -v ani='${ani}' '
         NR == FNR { if (FNR > 1) { asm[\$1] = \$2; bin[\$1] = \$3 } next }
         function name(p) { sub(/.*\\//, "", p); sub(/[.]fa\$/, "", p); return p }
-        { g = name(\$2); r = name(\$1); print asm[g], bin[g], g, r }
+        { g = name(\$2); r = name(\$1); print asm[g], bin[g], g, r, ani }
     ' manifest.tsv clusters.tsv | sort -t "\$(printf '\\t')" -k4,4 -k3,3 > body.tsv
-    { printf 'assembly\\tbin\\tgenome\\trepresentative\\n'; cat body.tsv; } > mag_clusters.tsv
+    { printf 'assembly\\tbin\\tgenome\\trepresentative\\tani_pct\\n'; cat body.tsv; } > mag_clusters.tsv
     cut -f4 body.tsv | sort -u | while read -r r; do
         cp -L "genomes/\${r}.fa" representatives/
     done
@@ -114,9 +117,9 @@ process GALAH_CLUSTER {
     """
     mkdir representatives
     printf '>contig_1\\nACGTACGTACGTACGTACGTACGTACGTACGT\\n' > representatives/${ids[0]}_binette_bin1.fa
-    printf 'assembly\\tbin\\tgenome\\trepresentative\\n' > mag_clusters.tsv
+    printf 'assembly\\tbin\\tgenome\\trepresentative\\tani_pct\\n' > mag_clusters.tsv
     for id in ${ids.join(' ')}; do
-        printf '%s\\tbinette_bin1\\t%s_binette_bin1\\t${ids[0]}_binette_bin1\\n' "\$id" "\$id" >> mag_clusters.tsv
+        printf '%s\\tbinette_bin1\\t%s_binette_bin1\\t${ids[0]}_binette_bin1\\t${task.ext.ani ?: ''}\\n' "\$id" "\$id" >> mag_clusters.tsv
     done
 
     cat <<-END_VERSIONS > versions.yml

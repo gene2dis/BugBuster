@@ -1092,6 +1092,49 @@ assert ab.at[("binette_bin10", "sampleA"), "mean_depth_x"] == 7.25, ab
 assert ab.at[("binette_bin2", "sampleA"), "mean_depth_x"] == 0.5, ab
 assert len(ab) == 2, ab
 PYEOF
+# Run-level dereplication (--dereplicate_mags, roadmap Phase 18b, B5): galah's cluster table and CoverM's per-sample
+# tables become mag_clusters and mag_cluster_abundance; every other table is unchanged, and a merged batch without
+# them adds no rows
+cp -r st_asm st_asm_derep
+D=st_asm_derep/results/04_binning/dereplicated
+mkdir -p "$D/abundance"
+printf '%s\n' $'assembly\tbin\tgenome\trepresentative\tani_pct' \
+    $'sampleA\tbinette_bin10\tsampleA_binette_bin10\tsampleA_binette_bin10\t95' \
+    $'sampleA\tbinette_bin2\tsampleA_binette_bin2\tsampleA_binette_bin10\t95' > "$D/mag_clusters.tsv"
+for s in sampleA sampleB; do
+    printf '%s\n' $'Genome\tRelative Abundance (%)\tMean\tTrimmed Mean\tCovered Fraction' $'unmapped\t60.5\tNA\tNA\tNA' \
+        $'sampleA_binette_bin10\t39.5\t12.25\t12\t0.98' > "$D/abundance/${s}_coverm_genome.tsv"
+done
+check "dereplicated MAG tables documented" \
+    documented st_asm_derep_out --results st_asm_derep/results --min-clean-pairs 10000
+check "mag_clusters and mag_cluster_abundance from galah and CoverM, other tables unchanged" py - <<'PYEOF'
+import os
+import pandas as pd
+mc = pd.read_csv("st_asm_derep_out/tables/mag_clusters.tsv", sep="\t")
+assert list(mc.columns) == ["batch", "cluster", "assembly", "bin", "is_representative", "cluster_size", "ani_pct"], mc
+assert list(mc["bin"]) == ["binette_bin10", "binette_bin2"] and list(mc["is_representative"]) == [True, False], mc
+assert (mc["cluster"] == "sampleA_binette_bin10").all() and (mc["cluster_size"] == 2).all() and (mc["ani_pct"] == 95).all()
+ab = pd.read_csv("st_asm_derep_out/tables/mag_cluster_abundance.tsv", sep="\t")
+assert list(ab.columns[:5]) == ["cluster", "batch", "assembly", "bin", "sample"], ab.columns
+assert len(ab) == 2 and set(ab["sample"]) == {"sampleA", "sampleB"} and (ab["bin"] == "binette_bin10").all(), ab
+assert (ab["relative_abundance_pct"] == 39.5).all() and (ab["mean_depth_x"] == 12.25).all()
+for f in sorted(os.listdir("st_asm_out/tables")):
+    a = pd.read_csv(f"st_asm_out/tables/{f}", sep="\t")
+    b = pd.read_csv(f"st_asm_derep_out/tables/{f}", sep="\t")
+    if "batch" in b.columns:  # the batch label is the results directory's name
+        b["batch"] = b["batch"].replace("st_asm_derep", "st_asm")
+    assert a.equals(b), f
+guide = open("st_asm_derep_out/LLM_GUIDE.md").read()
+assert "cover that run's samples only" in guide and "mag_cluster_abundance" in guide
+assert "Run-level clusters" in open("st_asm_derep_out/report/mags.html").read()
+PYEOF
+check "a merged batch without dereplication adds no cluster rows" \
+    documented st_derep_merge --results st_asm_derep/results st_co --batch-labels asm co --min-clean-pairs 10000
+check "merged: the clusters stay the dereplicated batch's" py - <<'PYEOF'
+import pandas as pd
+mc = pd.read_csv("st_derep_merge/tables/mag_clusters.tsv", sep="\t")
+assert set(mc["batch"]) == {"asm"} and len(mc) == 2, mc
+PYEOF
 # GUNC (--gunc_prediction, roadmap Phase 16 G1): its maxCSS-level table adds four mags columns after tier_basis and
 # changes nothing else; bin10 passes, bin2 fails, a third genome GUNC could not score is not a MAG of the run
 cp -r st_asm st_asm_gunc

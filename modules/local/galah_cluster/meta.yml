@@ -28,7 +28,7 @@ input:
 output:
   - clusters:
       type: file
-      description: One row per clustered MAG (assembly, bin, genome = <assembly>_<bin>, representative = its cluster representative's genome name)
+      description: One row per clustered MAG (assembly, bin, genome = <assembly>_<bin>, representative = its cluster representative's genome name, ani_pct = the clustering ANI)
       pattern: "mag_clusters.tsv"
   - representatives:
       type: directory

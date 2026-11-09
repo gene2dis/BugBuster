@@ -151,6 +151,10 @@ process RESULTS_SUMMARY {
             *_gtdbtk_bac120.tsv|*_gtdbtk_ar53.tsv)
                 id=\${name%_gtdbtk_*}
                 dest=${run_dir}/04_binning/\$(asm_dir "\$id")/taxonomy/gtdbtk ;;
+            mag_clusters.tsv)
+                dest=${run_dir}/04_binning/dereplicated ;;
+            *_coverm_genome.tsv)
+                dest=${run_dir}/04_binning/dereplicated/abundance ;;
             *_gunc_maxCSS_level.tsv)
                 dest=${run_dir}/04_binning/\$(asm_dir "\${name%_gunc_maxCSS_level.tsv}")/quality/gunc ;;
             *_quality_report.tsv)

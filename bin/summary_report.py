@@ -495,6 +495,16 @@ def build(ctx, assets):
         if "mag_abundance" in t:
             mg.table("abundance", t["mag_abundance"][0], "mag_abundance", "MAG depth per sample; pct_sample_bases "
                      "compares samples of one assembly mode, raw depth does not.", html_rows=1000)
+        if "mag_clusters" in t:
+            mc_ = t["mag_clusters"][0]
+            mg.facts.update({"n_clusters": int(mc_["is_representative"].sum()), "n_clustered": len(mc_),
+                             "derep_ani": ", ".join(f"{v:g}" for v in sorted(mc_["ani_pct"].dropna().unique()))})
+            mg.table("clusters", mc_, "mag_clusters", "Run-level MAG clusters (galah): each MAG's cluster and "
+                     "representative; this run's samples only.", html_rows=1000)
+        if "mag_cluster_abundance" in t:
+            mg.table("cluster_abundance", t["mag_cluster_abundance"][0], "mag_cluster_abundance", "Each cluster "
+                     "representative's share of every sample's reads (CoverM); this run's samples only, not "
+                     "comparable with mag_abundance's depths.", html_rows=1000)
         secs.append(mg)
 
     if "arg_contig_long" in t or "arg_contig_mobile" in t:

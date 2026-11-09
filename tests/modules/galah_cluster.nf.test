@@ -42,10 +42,10 @@ nextflow_process {
         then {
             assert process.success
             assert path(process.out.clusters.get(0)).readLines() == [
-                "assembly\tbin\tgenome\trepresentative",
-                "A\tbinette_bin1\tA_binette_bin1\tA_binette_bin1",
-                "site_1\tbinette_bin1\tsite_1_binette_bin1\tA_binette_bin1",
-                "A\tbinette_bin2\tA_binette_bin2\tA_binette_bin2"
+                "assembly\tbin\tgenome\trepresentative\tani_pct",
+                "A\tbinette_bin1\tA_binette_bin1\tA_binette_bin1\t95",
+                "site_1\tbinette_bin1\tsite_1_binette_bin1\tA_binette_bin1\t95",
+                "A\tbinette_bin2\tA_binette_bin2\tA_binette_bin2\t95"
             ]
             def reps = new File(process.out.representatives.get(0).toString())
             assert reps.list().sort() == ['A_binette_bin1.fa', 'A_binette_bin2.fa']
@@ -79,7 +79,7 @@ nextflow_process {
 
         then {
             assert process.success
-            assert path(process.out.clusters.get(0)).readLines()[0] == "assembly\tbin\tgenome\trepresentative"
+            assert path(process.out.clusters.get(0)).readLines()[0] == "assembly\tbin\tgenome\trepresentative\tani_pct"
         }
     }
 }

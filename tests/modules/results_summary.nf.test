@@ -191,6 +191,57 @@ nextflow_process {
         }
     }
 
+    test("lays out the dereplication files (--dereplicate_mags)") {
+        // the per-sample assembly stage files plus GALAH_CLUSTER's mag_clusters.tsv and a CoverM table, flat as
+        // main.nf gives them: they go to 04_binning/dereplicated/ and its abundance/ folder
+        when {
+            params {
+                output                  = "${outputDir}"
+                summary_min_clean_pairs = 10000
+                summary_batch_label     = "asm"
+            }
+            process {
+                """
+                def fix = "${projectDir}/tests/data/summary"
+                def d = new File("${outputDir}/derep")
+                d.mkdirs()
+                new File(d, 'mag_clusters.tsv').text = "assembly\\tbin\\tgenome\\trepresentative\\tani_pct\\n" +
+                    "sampleA\\tbinette_bin10\\tsampleA_binette_bin10\\tsampleA_binette_bin10\\t95\\n" +
+                    "sampleA\\tbinette_bin2\\tsampleA_binette_bin2\\tsampleA_binette_bin10\\t95\\n"
+                new File(d, 'sampleA_coverm_genome.tsv').text = "Genome\\tRelative Abundance (%)\\tMean\\tTrimmed Mean\\tCovered Fraction\\n" +
+                    "unmapped\\t60.5\\tNA\\tNA\\tNA\\nsampleA_binette_bin10\\t39.5\\t12.25\\t12\\t0.98\\n"
+                input[0]  = file("\${fix}/Reads_report.csv", checkIfExists: true)
+                input[1]  = []
+                input[2]  = []
+                input[3]  = []
+                input[4]  = []
+                input[5]  = []
+                input[6]  = []
+                input[7]  = []
+                input[8]  = []
+                input[9]  = []
+                input[10] = []
+                input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
+                input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
+                input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
+                input[14] = (files("\${fix}/stages/assembly/**", type: 'file') + files("${outputDir}/derep/*")).sort { f -> f.name }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.tables.get(0).collectEntries { f -> [ (file(f).name): path(f).readLines() ] }
+            assert tables["mag_clusters.tsv"] == [
+                "batch\tcluster\tassembly\tbin\tis_representative\tcluster_size\tani_pct",
+                "asm\tsampleA_binette_bin10\tsampleA\tbinette_bin10\tTrue\t2\t95",
+                "asm\tsampleA_binette_bin10\tsampleA\tbinette_bin2\tFalse\t2\t95"
+            ]
+            assert tables["mag_cluster_abundance.tsv"].size() == 2
+            assert tables["mag_cluster_abundance.tsv"][1].startsWith("sampleA_binette_bin10\tasm\tsampleA\tbinette_bin10\tsampleA\t39.5\t12.25\t")
+        }
+    }
+
     test("lays out the co-assembly stage files") {
         // tests/data/summary/stages/coassembly: the coassembly_* names go to the coassembly/ folders, the bin
         // depth files (one with the padded fields of older runs) to 04_binning/coassembly/coverage/

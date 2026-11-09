@@ -75,6 +75,20 @@ STAGES = [
         "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {
+        "key": "multisample", "title": "Multi-sample binning (MetaBAT2 depth columns from every sample of the group)",
+        "params": "--multisample_binning (per-sample assembly, MetaBAT2 among the binners), --multisample_group_by",
+        "processes": ["MULTISAMPLE_CONCAT", "MULTISAMPLE_BWAMEM3_SAMTOOLS", "MULTISAMPLE_CALCULATE_DEPTH",
+                      "MULTISAMPLE_SPLIT_DEPTH"],
+        "summary": "no table of its own: MetaBAT2's bins, so the mags table; the MAG depth is unchanged",
+    },
+    {
+        "key": "dereplication", "title": "Run-level MAG dereplication and abundance (galah, CoverM)",
+        "params": "--dereplicate_mags (needs binning with >= 2 binners), --dereplicate_ani",
+        "processes": ["GALAH_CLUSTER", "COVERM_GENOME"],
+        "summary": "mag_clusters (clusters of the run's MAGs and their representatives); mag_cluster_abundance "
+                   "(each representative's share of every sample's reads); this run's samples only",
+    },
+    {
         "key": "gunc", "title": "MAG chimerism (GUNC)",
         "params": "--gunc_prediction (needs binning), --gunc_db",
         "processes": ["GUNC_RUN"],

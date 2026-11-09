@@ -7,4 +7,10 @@
 {{ m.figure(s, "mag_abundance_heatmap", specs) }}
 {{ m.table(s, "mags") }}
 {{ m.table(s, "abundance") }}
+{% if f.n_clusters is defined %}
+<h2>Run-level clusters</h2>
+<p>{{ f.n_clustered }} MAGs fall into {{ f.n_clusters }} clusters at {{ f.derep_ani }} % ANI (galah; the representative of each has the highest completeness − 5 × contamination). {{ m.tabref(s, "cluster_abundance") }} gives each representative's share of every sample's reads (CoverM). The clusters cover this run's samples only.</p>
+{% endif %}
+{{ m.table(s, "clusters") }}
+{{ m.table(s, "cluster_abundance") }}
 {% endblock %}

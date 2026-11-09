@@ -24,9 +24,15 @@ next release is tagged.
   identity) for their relative abundance, mean and trimmed mean depth and
   covered fraction. Outputs in `04_binning/dereplicated/`
   (`mag_clusters.tsv`, `representatives/`, `abundance/<sample>_coverm_genome.tsv`).
-  With or without `--multisample_binning`, in either assembly mode. The
-  clusters cover the run's samples only: a study processed in several runs
-  dereplicates downstream. Runs without the option keep every output as before.
+  The run summary gains `mag_clusters` (each MAG's cluster, representative,
+  cluster size and ANI) and `mag_cluster_abundance` (each representative's
+  share of every sample's reads, mean and trimmed mean depth, covered
+  fraction), a "Run-level clusters" part of the MAGs page and the caveats in
+  README / LLM guide; galah, skani, CoverM and strobealign join the methods'
+  references. With or without `--multisample_binning`, in either assembly
+  mode. The clusters cover the run's samples only: a study processed in
+  several runs dereplicates downstream. Runs without the option keep every
+  output as before.
 - **Multi-sample binning** (`--multisample_binning`, off by default; per-sample
   assembly mode, needs `--include_binning`, `metabat2` in `--binners` and
   `--read_aligner bwamem3`). MetaBAT2 bins each assembly with one depth column
