@@ -502,7 +502,7 @@ breaks `-resume`.
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
-| `--multisample_binning` | `false` | `true`, `false` | Per-sample assemblies: MetaBAT2 and COMEBin get a coverage column per sample of the group (needs `metabat2` in `--binners`); see 6.8 |
+| `--multisample_binning` | `false` | `true`, `false` | Per-sample assemblies: MetaBAT2 gets a depth column per sample of the group (needs `metabat2` in `--binners`); see 6.8 |
 | `--multisample_group_by` | — | a `--sample_metadata` column | With `--multisample_binning`: groups to cross-map within (see 6.8) |
 | `--dereplicate_mags` | `false` | `true`, `false` | Run-level MAG clusters (galah) and their abundance in every sample (CoverM); needs ≥2 `--binners`; see 6.8 |
 | `--gunc_prediction` | `false` | `true`, `false` | GUNC chimerism check of the refined MAGs (needs `--include_binning`); see 6.8 |
@@ -905,7 +905,7 @@ Both are optional and off by default; a run without them keeps its outputs.
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
-| `--multisample_binning` | `false` | Per-sample assemblies: MetaBAT2 (and COMEBin) bin each one with a coverage column per sample of its group |
+| `--multisample_binning` | `false` | Per-sample assemblies: MetaBAT2 bins each one with a depth column per sample of its group |
 | `--multisample_group_by` | none (the whole run) | Column of `--sample_metadata`: cross-mapping inside each group only |
 | `--dereplicate_mags` | `false` | galah clusters the run's refined MAGs; CoverM gives each representative's abundance in every sample |
 | `--dereplicate_ani` | `95` | galah ANI (%): 95 for species, 99 for strains |
@@ -917,10 +917,9 @@ filters) to the concatenation of all its group's assemblies, contigs named
 `<sample>:<contig>`; the concatenation's depth table is split back per assembly,
 and MetaBAT2 bins each assembly with one depth column per sample of the group:
 contigs of one genome rise and fall together across samples, which separates
-genomes that composition alone cannot. COMEBin, when selected, reads the
-group's concatenation BAMs (one coverage column per sample). SemiBin2 keeps its
-pre-trained model on the sample's own alignment (a pre-trained model takes one
-coverage column), and Binette refines as before. On four samples (the Phase 18a benchmark,
+genomes that composition alone cannot. SemiBin2 keeps its pre-trained model on
+the sample's own alignment (a pre-trained model takes one coverage column), and
+Binette refines as before. On four samples (the Phase 18a benchmark,
 [multisample_binning_2026.md](benchmarks/multisample_binning_2026.md)) the
 refined bins went from 27 to 29 CheckM2 high-quality and from 3 to 4 MIMAG high,
 with the same 31 species: multi-sample coverage completes existing bins rather
@@ -947,16 +946,12 @@ already gives MetaBAT2 one column per sample), `--include_binning`, `metabat2` i
 - **The concatenation's depths are not abundance.** Because reads split
   between copies of a genome, a sample's depth on a contig of the
   concatenation was 0.32-0.97 of its true depth in the benchmark. They feed
-  the binners only: the MAG depth (`coverage/<sample>_bin_depth.tsv`,
+  MetaBAT2 only: the MAG depth (`coverage/<sample>_bin_depth.tsv`,
   `mag_abundance`), featureCounts and everything else keep the sample's own
   alignment. Nothing new is published apart from the group table.
-- **COMEBin** bins each assembly of a group on the group's concatenation BAMs,
-  with the assembly's contigs under their `<sample>:` names (its bins keep the
-  plain names). On two of the benchmark's samples its refined bins scored
-  +3.7 % and +17 points of completeness − 5 × contamination over COMEBin on
-  the sample's own BAM, with the same bins and at the same cost (the
-  benchmark's Phase 18b appendix). COMEBin stays costly either way (about
-  1-1.6 CPU-hours per Mbp of contigs).
+- COMEBin keeps the sample's own BAM. With the group's columns its own bins
+  improved, but the refined bins did not change by more than COMEBin's spread
+  under a change of contig names (Phase 18b, in the benchmark).
 
 **Run-level dereplication.** Per-sample assemblies recover the same genome
 from several samples. `--dereplicate_mags` clusters the refined MAGs of every

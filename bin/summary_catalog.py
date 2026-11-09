@@ -75,7 +75,7 @@ STAGES = [
         "summary": "mags (CheckM2, MIMAG quality_tier, GTDB-Tk lineage); mag_abundance (depth per sample)",
     },
     {
-        "key": "multisample", "title": "Multi-sample binning (MetaBAT2 and COMEBin coverage from every sample of the group)",
+        "key": "multisample", "title": "Multi-sample binning (MetaBAT2 depth columns from every sample of the group)",
         "params": "--multisample_binning (per-sample assembly, MetaBAT2 among the binners), --multisample_group_by",
         "processes": ["MULTISAMPLE_CONCAT", "MULTISAMPLE_BWAMEM3_SAMTOOLS", "MULTISAMPLE_CALCULATE_DEPTH",
                       "MULTISAMPLE_SPLIT_DEPTH"],

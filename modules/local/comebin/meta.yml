@@ -25,9 +25,6 @@ input:
       type: file
       description: Sorted reads-vs-contigs BAM file(s), read by COMEBin from the task directory (-p ./)
       pattern: "*.bam"
-  - contig_prefix:
-      type: string
-      description: "Empty as a rule. With --multisample_binning, '<sample>:' when the BAMs are the group's alignments to the concatenation of its assemblies: COMEBin then reads this assembly's contigs under the concatenation's names, and the bins keep the plain names"
 
 output:
   - bins:

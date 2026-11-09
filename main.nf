@@ -66,7 +66,7 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
-      --multisample_binning         MetaBAT2 and COMEBin coverage from every sample of the group (per-sample assembly; needs metabat2, bwamem3) (default: ${params.multisample_binning})
+      --multisample_binning         MetaBAT2 depth columns from every sample of the group (per-sample assembly; needs metabat2, bwamem3) (default: ${params.multisample_binning})
       --multisample_group_by        Column of --sample_metadata: multi-sample binning within each group (default: the whole run)
       --dereplicate_mags            galah + CoverM on the run's refined MAGs; needs --include_binning and >= 2 --binners (default: ${params.dereplicate_mags})
       --dereplicate_ani             ANI (%) for --dereplicate_mags: 95 species, 99 strain (default: ${params.dereplicate_ani})
@@ -346,10 +346,9 @@ workflow {
     // runs here, before any download
     def coassembly_groups = coassemblyGroups()
 
-    // Multi-sample binning (roadmap Phase 18b, B4): MetaBAT2 (and COMEBin,
-    // if selected) gets the coverage of every sample of the group, from one
-    // extra bwa-mem3 alignment per sample to the concatenation of the group's
-    // per-sample assemblies
+    // Multi-sample binning (roadmap Phase 18b, B4): MetaBAT2 gets the depth of
+    // every sample of the group, from one extra bwa-mem3 alignment per sample
+    // to the concatenation of the group's per-sample assemblies
     if (params.multisample_group_by && !flagOn(params.multisample_binning)) {
         error("--multisample_group_by ${params.multisample_group_by} groups the samples of multi-sample binning: add --multisample_binning")
     }
@@ -690,15 +689,13 @@ workflow {
         //
         if ( flagOn(params.include_binning) ) {
             //
-            // SUBWORKFLOW: multi-sample coverage for MetaBAT2 and COMEBin
-            // (per-sample assemblies, --multisample_binning)
+            // SUBWORKFLOW: multi-sample coverage for MetaBAT2 (per-sample
+            // assemblies, --multisample_binning)
             //
             ch_multisample_depth = channel.empty()
-            ch_multisample_bams  = channel.empty()
             if ( flagOn(params.multisample_binning) ) {
                 MULTISAMPLE_COVERAGE(ch_clean_reads, ASSEMBLY.out.contigs_meta)
                 ch_multisample_depth = MULTISAMPLE_COVERAGE.out.depth
-                ch_multisample_bams  = MULTISAMPLE_COVERAGE.out.bams
                 ch_versions = ch_versions.mix(MULTISAMPLE_COVERAGE.out.versions)
                 // pipeline_info/multisample_groups.tsv: each sample's group (--multisample_group_by only)
                 if ( params.multisample_group_by ) {
@@ -715,8 +712,7 @@ workflow {
                 PREPARE_DATABASES.out.gtdbtk_db
                     .ifEmpty { error "ERROR: GTDB-Tk database is empty. Ensure params.include_binning is enabled and a valid GTDB-Tk database is configured." },
                 ch_counting_bam,
-                ch_multisample_depth,
-                ch_multisample_bams
+                ch_multisample_depth
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)

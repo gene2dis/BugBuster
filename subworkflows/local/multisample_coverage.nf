@@ -13,12 +13,9 @@
         jgi_summarize_bam_contig_depths gives one depth column per sample, and
         the table is split back per assembly. Read pairs from a genome
         assembled in several samples count on one copy only, so these depths
-        are competitive: the binners' input only (docs/benchmarks/
-        multisample_binning_2026.md: 0.32-0.97 of a sample's depth). COMEBin,
-        which reads BAMs itself, takes the group's concatenation BAMs (one
-        coverage column per sample; Phase 18b appendix of the benchmark). The
-        MAG depth (BIN_DEPTH), featureCounts and SemiBin2 keep the per-sample
-        BAM.
+        are competitive: MetaBAT2's input only (docs/benchmarks/
+        multisample_binning_2026.md: 0.32-0.97 of a sample's depth). The MAG
+        depth (BIN_DEPTH), featureCounts and SemiBin2 keep the per-sample BAM.
         Groups of one sample are left out: their assembly is binned as without
         the option.
 
@@ -28,7 +25,6 @@
 
     OUTPUTS:
         depth:    [sample id, <sample>_multisample_depth.txt]
-        bams:     [sample id, [the group's concatenation BAMs, in sample order]]
         versions: Tool version information
 
     The concatenation waits for every assembly of the run (a sample QC drops
@@ -86,20 +82,19 @@ workflow MULTISAMPLE_COVERAGE {
     )
     ch_versions = ch_versions.mix(MULTISAMPLE_BWAMEM3_SAMTOOLS.out.versions.first())
 
-    // [group meta, concatenation, the group's BAMs in sample order] (the
-    // group knows its samples, so it is complete once its BAMs are done)
-    ch_group_bams = MULTISAMPLE_BWAMEM3_SAMTOOLS.out.bam_only
-        .map { meta, bam -> [meta.group, meta.id, bam] }
-        .combine(ch_references.map { label, gmeta, fasta, _index -> [label, gmeta, fasta] }, by: 0)
-        .map { _label, id, bam, gmeta, fasta -> [groupKey([gmeta, fasta], gmeta.samples.size()), id, bam] }
-        .groupTuple()
-        .map { key, ids, bams ->
-            def (gmeta, fasta) = key.getGroupTarget()
-            [gmeta, fasta, [ids, bams].transpose().sort { a, b -> a[0] <=> b[0] }.collect { pair -> pair[1] }]
-        }
-
-    // One depth table per group, one column per sample in sample order
-    MULTISAMPLE_CALCULATE_DEPTH(ch_group_bams)
+    // One depth table per group, one column per sample in sample order (the
+    // group knows its samples, so its depths start once its BAMs are done)
+    MULTISAMPLE_CALCULATE_DEPTH(
+        MULTISAMPLE_BWAMEM3_SAMTOOLS.out.bam_only
+            .map { meta, bam -> [meta.group, meta.id, bam] }
+            .combine(ch_references.map { label, gmeta, fasta, _index -> [label, gmeta, fasta] }, by: 0)
+            .map { _label, id, bam, gmeta, fasta -> [groupKey([gmeta, fasta], gmeta.samples.size()), id, bam] }
+            .groupTuple()
+            .map { key, ids, bams ->
+                def (gmeta, fasta) = key.getGroupTarget()
+                [gmeta, fasta, [ids, bams].transpose().sort { a, b -> a[0] <=> b[0] }.collect { pair -> pair[1] }]
+            }
+    )
     ch_versions = ch_versions.mix(MULTISAMPLE_CALCULATE_DEPTH.out.versions.first())
 
     MULTISAMPLE_SPLIT_DEPTH(MULTISAMPLE_CALCULATE_DEPTH.out.depth.map { gmeta, _fasta, depth -> [gmeta, depth] })
@@ -107,6 +102,5 @@ workflow MULTISAMPLE_COVERAGE {
 
     emit:
     depth    = MULTISAMPLE_SPLIT_DEPTH.out.depth.flatten().map { f -> [f.name - '_multisample_depth.txt', f] } // channel: [ val(sample id), path(depth) ]
-    bams     = ch_group_bams.flatMap { gmeta, _fasta, bams -> gmeta.samples.collect { id -> [id, bams] } } // channel: [ val(sample id), [ path(bam) ] ]
     versions = ch_versions // channel: path(versions.yml)
 }

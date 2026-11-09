@@ -852,11 +852,10 @@ STAGE_PITFALLS = {
                      "downstream for study-wide clusters. Two MAG abundances: mag_abundance is each MAG's depth "
                      "against its own assembly's alignments (BIN_DEPTH), mag_cluster_abundance each representative's "
                      "share of every sample's reads (CoverM); do not mix them.",
-    "multisample": "Multi-sample binning (--multisample_binning) gave MetaBAT2 (and COMEBin, if it ran) one coverage "
-                   "column per sample of the assembly's group, from each sample's alignment to the concatenation of "
-                   "the group's assemblies. Those depths are competitive (a read of a genome assembled in several "
-                   "samples counts on one copy only) and fed the binners alone: the MAG depth (mag_abundance) is still "
-                   "each sample's own alignment. "
+    "multisample": "Multi-sample binning (--multisample_binning) gave MetaBAT2 one depth column per sample of the "
+                   "assembly's group, from each sample's alignment to the concatenation of the group's assemblies. "
+                   "Those depths are competitive (a read of a genome assembled in several samples counts on one copy "
+                   "only) and fed MetaBAT2 alone: the MAG depth (mag_abundance) is still each sample's own alignment. "
                    "Bins differ from those of a run without the option.",
     "checkv": "CheckV's quality tiers (arg_contig_mobile arg_genes_viral_checkv_*, and the contig table's "
               "checkv_quality) estimate how complete geNomad's virus or provirus is: completeness from amino-acid "

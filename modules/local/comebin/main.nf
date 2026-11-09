@@ -9,12 +9,7 @@
     failure on the last attempt leaves FAILED.txt instead of failing the run
 
     Input:
-        tuple val(meta), path(contigs), path(bam), val(contig_prefix)
-        contig_prefix: '' as a rule. With --multisample_binning the BAMs are
-        the group's alignments to the concatenation of its assemblies, whose
-        contigs are named <sample>:<contig> (MULTISAMPLE_CONCAT); the prefix
-        '<sample>:' names this assembly's contigs the same way for COMEBin,
-        and the bins get the plain names back
+        tuple val(meta), path(contigs), path(bam)
 
     Output:
         bins: tuple val(meta), path(comebin_bins/comebin_res/comebin_res_bins)
@@ -31,7 +26,7 @@ process COMEBIN {
         'quay.io/biocontainers/comebin:1.1.0--hdfd78af_2' }"
 
     input:
-    tuple val(meta), path(contigs), path(bam), val(contig_prefix)
+    tuple val(meta), path(contigs), path(bam)
 
     output:
     tuple val(meta), path("${meta.id}_comebin_bins/comebin_res/comebin_res_bins"), emit: bins
@@ -57,7 +52,6 @@ process COMEBIN {
     if (!contigs) {
         error "COMEBIN: No contig file provided for sample ${meta.id}"
     }
-    def comebin_contigs = contig_prefix ? 'comebin_contigs.fa' : contigs
 
     """
     set -euo pipefail
@@ -117,16 +111,11 @@ process COMEBIN {
     chmod +x realpath_shim/realpath
     export PATH="\$PWD/realpath_shim:\$PATH"
 
-    # The concatenation BAMs name this assembly's contigs '<sample>:<contig>'
-    if [[ -n "${contig_prefix}" ]]; then
-        awk -v p='${contig_prefix}' '/^>/ { \$0 = ">" p substr(\$0, 2) } { print }' ${contigs} > ${comebin_contigs}
-    fi
-
     # -d cpu: the default device is cuda, and the image's PyTorch has no CUDA.
     # -s: a fixed seed, so reruns give the same bins
     exit_code=0
     bash run_comebin.sh \\
-        -a ${comebin_contigs} \\
+        -a ${contigs} \\
         -p ./ \\
         -o ${prefix}_comebin_bins \\
         -t ${task.cpus} \\
@@ -149,13 +138,6 @@ process COMEBIN {
         # 'flag=... multi=... len=...') in its bins; refiners and the bin
         # depth step match contigs by name, so keep the name only
         find "\$bins_dir" -name '*.fa' -exec sed -i '/^>/s/[[:space:]].*//' {} +
-        if [[ -n "${contig_prefix}" ]]; then
-            for bin in "\$bins_dir"/*.fa; do
-                [[ -e "\$bin" ]] || continue
-                awk -v p='>${contig_prefix}' 'index(\$0, p) == 1 { \$0 = ">" substr(\$0, length(p) + 1) } { print }' "\$bin" > "\$bin.tmp"
-                mv "\$bin.tmp" "\$bin"
-            done
-        fi
     fi
 
     write_versions
