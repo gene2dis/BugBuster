@@ -768,7 +768,10 @@ workflow {
                         .filter { items -> items }
                         .map { items -> [items.collect { item -> item[0] }, items.collect { item -> item[1] }, items.collect { item -> item[2] }] }
                 )
-                COVERM_GENOME(ch_clean_reads.combine(GALAH_CLUSTER.out.representatives))
+                // no representative (galah's quality filter kept no MAG): no abundance
+                COVERM_GENOME(ch_clean_reads.combine(
+                    GALAH_CLUSTER.out.representatives.filter { reps -> reps.listFiles().any { f -> f.name.endsWith('.fa') } }
+                ))
                 ch_summary_reports = ch_summary_reports.mix(
                     GALAH_CLUSTER.out.clusters,
                     COVERM_GENOME.out.abundance.map { _meta, table -> table }

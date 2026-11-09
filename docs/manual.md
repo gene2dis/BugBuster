@@ -941,8 +941,9 @@ already gives MetaBAT2 one column per sample), `--include_binning`, `metabat2` i
   indexing it takes memory that grows with the group (2.3 GB for 252 Mbp; a
   human genome's 3 Gbp takes ~60-75 GB), and a read from a genome assembled in
   k samples is placed on one of its k copies. The run warns at launch when a
-  group (or the ungrouped run) has more than 20 samples. A one-sample group is
-  binned as without the option.
+  group (or the ungrouped run) has more than 20 samples. A group with one
+  sample in the samplesheet is binned as without the option; one that QC
+  leaves with a single sample still goes through the concatenation alone.
 - **The concatenation's depths are not abundance.** Because reads split
   between copies of a genome, a sample's depth on a contig of the
   concatenation was 0.32-0.97 of its true depth in the benchmark. They feed

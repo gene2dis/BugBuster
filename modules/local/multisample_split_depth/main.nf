@@ -32,7 +32,9 @@ process MULTISAMPLE_SPLIT_DEPTH {
         'quay.io/biocontainers/metabat2:2.18--h38e344b_2' }"
 
     input:
-    tuple val(meta), path(depth)
+    // staged apart from the outputs: a group label may make the table's
+    // name '<sample>_multisample_depth.txt' (label 'x_multisample', sample x)
+    tuple val(meta), path(depth, stageAs: 'in/*')
 
     output:
     path "*_multisample_depth.txt", emit: depth

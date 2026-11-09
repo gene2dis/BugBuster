@@ -5,7 +5,9 @@
     The jgi depth table of a group's concatenation split per assembly
     (roadmap Phase 18b, B4). tests/data/multisample/g_depth.txt: two sample
     columns, contigs s1:k141_1, s1:k141_2 and s2:k141_1; sample s3 has no
-    contigs and gets the header only.
+    contigs and gets the header only. collision/s1_multisample_depth.txt is
+    the same table under the name a group labelled 's1_multisample' gets from
+    CALCULATE_DEPTH, which is also sample s1's output name.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -35,6 +37,27 @@ nextflow_process {
             assert tables['s1_multisample_depth.txt'] == [header, "k141_1\t12\t3\t2\t0.5\t1\t0.1", "k141_2\t4\t1\t1\t0\t0\t0"]
             assert tables['s2_multisample_depth.txt'] == [header, "k141_1\t10\t5\t0\t0\t5\t1.2"]
             assert tables['s3_multisample_depth.txt'] == [header]
+        }
+    }
+
+    test("an input named like a sample's output is not overwritten") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 's1_multisample', samples: ['s1', 's2', 's3'] ],
+                    file("${projectDir}/tests/data/multisample/collision/s1_multisample_depth.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def header = "contigName\tcontigLen\ttotalAvgDepth\ts1_all_reads.bam\ts1_all_reads.bam-var\ts2_all_reads.bam\ts2_all_reads.bam-var"
+            def tables = process.out.depth.get(0).collectEntries { f -> [(new File(f.toString()).name): path(f).readLines()] }
+            assert tables['s1_multisample_depth.txt'] == [header, "k141_1\t12\t3\t2\t0.5\t1\t0.1", "k141_2\t4\t1\t1\t0\t0\t0"]
+            assert tables['s2_multisample_depth.txt'] == [header, "k141_1\t10\t5\t0\t0\t5\t1.2"]
         }
     }
 
