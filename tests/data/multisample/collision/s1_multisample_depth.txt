@@ -1,3 +1,4 @@
 contigName	contigLen	totalAvgDepth	s1_all_reads.bam	s1_all_reads.bam-var	s2_all_reads.bam	s2_all_reads.bam-var
-k141_1	12	3	2	0.5	1	0.1
-k141_2	4	1	1	0	0	0
+s1:k141_1	12	3	2	0.5	1	0.1
+s1:k141_2	4	1	1	0	0	0
+s2:k141_1	10	5	0	0	5	1.2
