@@ -297,3 +297,5 @@ Reheadering took seconds per BAM. Binette took 2–5 min per assembly (≤ 6.6 G
 - The multi columns add less on top of that: Σ +17.8 on C (+3.7 %) and +17.0 on D, with the same bin counts and no change in high-quality bins. The raw COMEBin bins move the same way (Σ +77 on C, +26 on D).
 - They cost nothing extra: COMEBin's time and memory are the same with four BAMs as with one, and the alignments are the ones `--multisample_binning` already makes.
 - The gain is small, on two assemblies, from one run per variant. It could be inside COMEBin's run-to-run spread, which was not measured.
+
+**Decision (owner, 2026-11-09):** COMEBin takes the group's concatenation BAMs under `--multisample_binning`. The pipeline gives COMEBin the assembly's contigs under their `<sample>:` names and the unmodified concatenation BAMs, rather than one reheadered copy of every BAM per assembly (N² BAM copies on disk); the bins get the plain names back.

@@ -19,6 +19,9 @@
         multisample_depth: [sample id, depth] - MetaBAT2's depth table with a
                 column per sample of the group (MULTISAMPLE_COVERAGE, per-sample
                 mode with --multisample_binning; empty otherwise)
+        multisample_bams: [sample id, [bams]] - the group's alignments to the
+                concatenation of its assemblies, COMEBin's BAMs (the same;
+                empty otherwise)
     
     OUTPUTS:
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
@@ -60,6 +63,7 @@ workflow BINNING {
     gtdbtk_db       // channel: path(gtdbtk_db)
     sample_bams     // channel: [ val(meta), path(bam) ] - per sample vs the co-assembly; used only under co-assembly
     multisample_depth // channel: [ val(sample id), path(depth) ] - --multisample_binning only
+    multisample_bams  // channel: [ val(sample id), [ path(bam) ] ] - --multisample_binning only
 
     main:
     ch_versions = channel.empty()
@@ -107,11 +111,25 @@ workflow BINNING {
 
     // --multisample_binning (roadmap Phase 18b, B4): MetaBAT2 bins an
     // assembly of a group of two or more samples on the depth columns of every
-    // sample of the group (MULTISAMPLE_COVERAGE); the MAG depth below keeps
-    // the assembly's own table. Other assemblies bin as without the option
+    // sample of the group (MULTISAMPLE_COVERAGE), and COMEBin on the group's
+    // concatenation BAMs, which name the assembly's contigs '<sample>:<contig>'
+    // (owner, 2026-11-09, after the Phase 18b measurement); the MAG depth
+    // below keeps the assembly's own table. Other assemblies bin as without
+    // the option
     ch_metabat_input = CALCULATE_DEPTH.out.depth
+    ch_comebin_input = ch_depth_input.map { meta, contigs, bams -> [meta, contigs, bams, ''] }
     if (flagOn(params.multisample_binning)) {
         def shared = multisampleSharedGroups()
+        ch_comebin_input = contigs_and_bam
+            .filter { meta, _contigs, _bam -> !shared.containsKey(meta.id) }
+            .map { meta, contigs, bam -> [meta, contigs, bam, ''] }
+            .mix(
+                contigs_and_bam
+                    .filter { meta, _contigs, _bam -> shared.containsKey(meta.id) }
+                    .map { meta, contigs, _bam -> [meta.id, meta, contigs] }
+                    .join(multisample_bams)
+                    .map { id, meta, contigs, bams -> [meta, contigs, bams, "${id}:"] }
+            )
         ch_metabat_input = CALCULATE_DEPTH.out.depth
             .filter { meta, _contigs, _depth -> !shared.containsKey(meta.id) }
             .mix(
@@ -135,7 +153,7 @@ workflow BINNING {
     }
 
     if (use_comebin) {
-        COMEBIN(ch_depth_input)
+        COMEBIN(ch_comebin_input)
         ch_versions = ch_versions.mix(COMEBIN.out.versions.first())
     }
 

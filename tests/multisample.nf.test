@@ -8,7 +8,8 @@
       alignments and depths are intermediate), and MetaBAT2 bins each assembly
       on its split table of the run's concatenation.
     - With groups, one concatenation per group of two or more samples; a
-      one-sample group's MetaBAT2 gets its own depth table.
+      one-sample group's MetaBAT2 gets its own depth table. COMEBin gets the
+      group's concatenation BAMs, a one-sample group's COMEBin its own BAM.
     - One launch-time error per misuse, and the warning for a group of more
       than 20 samples.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -75,7 +76,7 @@ nextflow_pipeline {
         }
     }
 
-    test("Groups: one concatenation per group of two or more, a one-sample group as without the option") {
+    test("Groups: one concatenation per group of two or more, a one-sample group as without the option, COMEBin on the group's BAMs") {
         options "-stub"
 
         when {
@@ -91,7 +92,7 @@ nextflow_pipeline {
                 assembly_mode           = "assembly"
                 taxonomic_profiler      = "none"
                 include_binning         = true
-                binners                 = "semibin,metabat2"
+                binners                 = "semibin,metabat2,comebin"
                 multisample_binning     = true
                 multisample_group_by    = "site"
                 results_summary         = true
@@ -116,6 +117,26 @@ nextflow_pipeline {
             }
             assert metabat.collect { d -> d.list().find { n -> n.endsWith('depth.txt') } }.findAll { n -> n != null }.sort() ==
                 ['test_sample1_multisample_depth.txt', 'test_sample2_multisample_depth.txt', 'test_sample3_depth.txt']
+
+            // COMEBin: each site_A assembly on both samples' alignments to the
+            // site_A concatenation, test_sample3 on its own BAM
+            assert count("BINNING:COMEBIN (") == 3
+            def comebin = new File("${outputDir}/../work").listFiles().collectMany { a ->
+                (a.listFiles() ?: []).findAll { d -> (d.list() ?: []).any { n -> n.endsWith('_comebin_bins') } }
+            }
+            def bams = comebin.collectEntries { d ->
+                def id = d.list().find { n -> n.endsWith('_comebin_bins') } - '_comebin_bins'
+                def staged_bams = d.listFiles().findAll { f -> f.name.endsWith('.bam') }
+                [id, staged_bams.collect { f ->
+                    def origin = f.toPath().toRealPath().parent.resolve('.command.run').toFile().text
+                    "${f.name}${origin.contains('site_A_multisample_contigs.fa') ? ' (site_A)' : ''}"
+                }.sort()]
+            }
+            assert bams == [
+                test_sample1: ['test_sample1_all_reads.bam (site_A)', 'test_sample2_all_reads.bam (site_A)'],
+                test_sample2: ['test_sample1_all_reads.bam (site_A)', 'test_sample2_all_reads.bam (site_A)'],
+                test_sample3: ['test_sample3_all_reads.bam'],
+            ]
         }
     }
 

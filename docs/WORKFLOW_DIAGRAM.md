@@ -318,6 +318,7 @@ flowchart TD
     CALCULATE_DEPTH --> METABAT2
     MultiDepth(["MULTISAMPLE_COVERAGE depths<br/>(multisample_binning)"]) -->|"instead, for groups<br/>of ≥ 2 samples"| METABAT2
     Sel -->|comebin| COMEBIN["COMEBIN<br/>CPU only, slow<br/>coassembly: per-sample BAMs"]
+    MultiDepth -->|"the group's BAMs instead,<br/>for groups of ≥ 2 samples"| COMEBIN
 
     SEMIBIN & METABAT2 & COMEBIN --> N{number of binners}
     N -->|"≥ 2"| BINETTE["BINETTE<br/>refinement; CheckM2 of raw<br/>and refined bins"]
@@ -368,14 +369,17 @@ flowchart TD
     MULTISAMPLE_BWAMEM3_SAMTOOLS --> MULTISAMPLE_CALCULATE_DEPTH["MULTISAMPLE_CALCULATE_DEPTH<br/>jgi depths, one column<br/>per sample of the group"]
     MULTISAMPLE_CALCULATE_DEPTH --> MULTISAMPLE_SPLIT_DEPTH["MULTISAMPLE_SPLIT_DEPTH<br/>one table per assembly"]
     MULTISAMPLE_SPLIT_DEPTH --> Out(["BINNING: METABAT2"])
+    MULTISAMPLE_BWAMEM3_SAMTOOLS -->|"the group's BAMs,<br/>in sample order"| OutC(["BINNING: COMEBIN"])
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class MULTISAMPLE_CONCAT,MULTISAMPLE_BWAMEM3_INDEX,MULTISAMPLE_BWAMEM3_SAMTOOLS,MULTISAMPLE_CALCULATE_DEPTH,MULTISAMPLE_SPLIT_DEPTH opt
 ```
 
 Called in `main.nf` before `BINNING` with `multisample_binning` (per-sample assembly mode). The
-split tables replace MetaBAT2's depth table only: `CALCULATE_DEPTH` on the sample's own BAM
-still gives the MAG depth, and SemiBin2, COMEBin and featureCounts keep the per-sample BAM. A
+split tables replace MetaBAT2's depth table, and COMEBin takes the group's concatenation BAMs
+(the assembly's contigs under their `<sample>:` names; its bins keep the plain names) instead
+of the sample's own: `CALCULATE_DEPTH` on the sample's own BAM still gives the MAG depth, and
+SemiBin2 and featureCounts keep the per-sample BAM. A
 one-sample group's assembly is binned as without the option. Nothing is published except
 `pipeline_info/multisample_groups.tsv` (with `multisample_group_by`).
 
@@ -514,7 +518,7 @@ results directories outside the pipeline (manual, Example 13).
 | `TAXONOMY` | Read-level profiling with sylph (default), Kraken2 + Bracken or sourmash |
 | `ASSEMBLY` | MEGAHIT per sample or co-assembly, BBMap filter, reads → contigs alignment |
 | `BINNING` | SemiBin2 / MetaBAT2 / COMEBin, Binette, CheckM2, GTDB-Tk, mode-specific reports |
-| `MULTISAMPLE_COVERAGE` | Multi-sample depth columns for MetaBAT2: each sample aligned to its group's concatenated assemblies (`multisample_binning`) |
+| `MULTISAMPLE_COVERAGE` | Multi-sample coverage for MetaBAT2 and COMEBin: each sample aligned to its group's concatenated assemblies (`multisample_binning`) |
 | `FUNCTIONAL_ANNOTATION` | Contig branch (eggNOG-mapper v3, run_dbcan, featureCounts, TPM/CPGE tables) and MAG branch (Bakta per refined bin) |
 | `READ_FUNCTIONAL` | Read-level functional profiling, one backend per run (Woltka, SUPER-FOCUS or HUMAnN) |
 | `SOFTWARE_VERSIONS` | `pipeline_info/software_versions.yml` from `versions.yml` files and topic tuples |
@@ -580,7 +584,7 @@ results directories outside the pipeline (manual, Example 13).
 | `SEMIBIN` | `semibin` in `binners` (default) | SemiBin2 (pre-trained `global` model under co-assembly) |
 | `CALCULATE_DEPTH` | always | jgi contig depths (one column per sample under co-assembly): MetaBAT2's input and the MAG depth |
 | `METABAT2` | `metabat2` in `binners` | MetaBAT2 |
-| `COMEBIN` | `comebin` in `binners` | COMEBin, CPU only |
+| `COMEBIN` | `comebin` in `binners` | COMEBin, CPU only (with `multisample_binning`, on the group's concatenation BAMs) |
 | `BINETTE` | ≥ 2 binners | Refinement, with CheckM2 of the raw and refined bins |
 | `CHECKM2_BATCH` | 1 binner | CheckM2 of the binner's bins |
 | `GTDB_TK_BATCH` | always | GTDB-Tk classification of every sample's bins in one run |
