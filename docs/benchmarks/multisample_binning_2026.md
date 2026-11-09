@@ -252,3 +252,48 @@ All three ran with a read-only root filesystem (`--read-only`, `/tmp` as tmpfs),
 - SemiBin2's pre-trained model was `global`, as in Phase 11a; the pipeline's per-sample default is `human_gut`.
 - "Today" is the Phase 11a reference configuration: SemiBin2 and MetaBAT2, refined by Binette. The pipeline's default `--binners` is `semibin` alone, which runs neither MetaBAT2 nor Binette. Multi-sample binning needs MetaBAT2 and dereplication needs Binette, so both need `--binners` with at least two binners (MetaBAT2 among them for B4); the gains above are against that configuration, not against the default.
 - Wall times are from a shared host.
+
+## Appendix: COMEBin with the multi-sample columns (Phase 18b)
+
+**Question.** COMEBin reads the BAMs itself (one coverage column per BAM). With `--multisample_binning` the pipeline already aligns every sample of a group to the concatenation, so COMEBin could take the same N columns at no extra alignment cost. Does that improve the refined bins?
+
+**Setup.** Samples C and D (the 11a contigs), the bench's concatenation BAMs from hybrid-concat. For each assembly the four concatenation BAMs were reheadered to that assembly's contig names (`samtools reheader`; COMEBin computes coverage with `bedtools genomecov` and ignores the other assemblies' contigs). COMEBin 1.1.0 (`comebin:1.1.0--hdfd78af_2`, the pipeline's COMEBIN module and its `config/modules.config` settings, 8 CPUs) ran in two variants:
+- **own**: the sample's own BAM, as the pipeline runs it today;
+- **multi**: the four reheadered BAMs.
+
+Each was refined by Binette per assembly from SemiBin2 pre-trained `global` (11a), MetaBAT2 with the concatenation's columns (hybrid-concat) and the COMEBin variant. The baseline is hybrid-concat, which has no COMEBin. COMEBin was run once per variant; its run-to-run spread was not measured.
+
+**Refined bins** (CheckM2 from Binette's reports; Σ = Σ(completeness − 5 × contamination)):
+
+| Assembly | Refinement | Bins | > 90 % / < 5 % | ≥ 50 % / < 10 % | Σ | Mbp |
+|---|---|---|---|---|---|---|
+| C | hybrid-concat (no COMEBin) | 6 | 2 | 6 | 412.6 | 19.8 |
+| C | + COMEBin own | 7 | 2 | 7 | 479.2 | 26.6 |
+| C | + COMEBin multi | 7 | 2 | 7 | 497.0 | 27.1 |
+| D | hybrid-concat (no COMEBin) | 0 | 0 | 0 | 0 | 0 |
+| D | + COMEBin own | 1 | 0 | 1 | 61.7 | 0.7 |
+| D | + COMEBin multi | 1 | 0 | 1 | 78.7 | 1.0 |
+
+**COMEBin's own bins**, before refinement (Σ over every bin):
+
+| Assembly | Variant | Bins | > 90 % / < 5 % | ≥ 50 % / < 10 % | Σ | Mbp |
+|---|---|---|---|---|---|---|
+| C | own | 16 | 1 | 7 | 525.1 | 35.9 |
+| C | multi | 15 | 1 | 7 | 602.4 | 36.1 |
+| D | own | 6 | 0 | 0 | 115.3 | 1.9 |
+| D | multi | 8 | 0 | 1 | 141.4 | 3.2 |
+
+**Cost** (Nextflow trace; CPU-hours = realtime × %CPU; host at load 28–43):
+
+| Variant | C | D | CPU-h (both) | Peak RSS |
+|---|---|---|---|---|
+| own | 3 h 2 min, 22.3 CPU-h | 26 min, 3.1 CPU-h | 25.3 | 7.3 GB |
+| multi | 3 h 5 min, 21.9 CPU-h | 31 min, 3.1 CPU-h | 25.0 | 7.2 GB |
+
+Reheadering took seconds per BAM. Binette took 2–5 min per assembly (≤ 6.6 GB) in either variant.
+
+**Reading.**
+- Adding COMEBin to the refinement helps either way: on C, Σ +66.6 (own) and +84.4 (multi) over hybrid-concat, one more bin and +7 Mbp; on D, the first bin of that sample.
+- The multi columns add less on top of that: Σ +17.8 on C (+3.7 %) and +17.0 on D, with the same bin counts and no change in high-quality bins. The raw COMEBin bins move the same way (Σ +77 on C, +26 on D).
+- They cost nothing extra: COMEBin's time and memory are the same with four BAMs as with one, and the alignments are the ones `--multisample_binning` already makes.
+- The gain is small, on two assemblies, from one run per variant. It could be inside COMEBin's run-to-run spread, which was not measured.
