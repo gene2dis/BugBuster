@@ -1135,6 +1135,17 @@ import pandas as pd
 mc = pd.read_csv("st_derep_merge/tables/mag_clusters.tsv", sep="\t")
 assert set(mc["batch"]) == {"asm"} and len(mc) == 2, mc
 PYEOF
+# galah's quality filter kept no MAG: a header-only cluster table and no CoverM tables; the report says so instead of
+# describing zero clusters
+cp -r st_asm st_asm_derep0
+mkdir -p st_asm_derep0/results/04_binning/dereplicated
+printf '%s\n' $'assembly\tbin\tgenome\trepresentative\tani_pct' > st_asm_derep0/results/04_binning/dereplicated/mag_clusters.tsv
+check "no MAG passes galah's filter: documented" \
+    documented st_asm_derep0_out --results st_asm_derep0/results --min-clean-pairs 10000
+check "no MAG passes galah's filter: the report has no cluster sentence" py - <<'PYEOF'
+html = open("st_asm_derep0_out/report/mags.html").read()
+assert "No refined MAG passed galah's quality filter" in html and "clusters at" not in html, html
+PYEOF
 # GUNC (--gunc_prediction, roadmap Phase 16 G1): its maxCSS-level table adds four mags columns after tier_basis and
 # changes nothing else; bin10 passes, bin2 fails, a third genome GUNC could not score is not a MAG of the run
 cp -r st_asm st_asm_gunc

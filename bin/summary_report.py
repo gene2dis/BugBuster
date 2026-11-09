@@ -495,7 +495,10 @@ def build(ctx, assets):
         if "mag_abundance" in t:
             mg.table("abundance", t["mag_abundance"][0], "mag_abundance", "MAG depth per sample; pct_sample_bases "
                      "compares samples of one assembly mode, raw depth does not.", html_rows=1000)
-        if "mag_clusters" in t:
+        if "mag_clusters" in t and len(t["mag_clusters"][0]) == 0:
+            # galah's quality filter kept no MAG: no clusters, no CoverM table
+            mg.facts["derep_empty"] = True
+        elif "mag_clusters" in t:
             mc_ = t["mag_clusters"][0]
             mg.facts.update({"n_clusters": int(mc_["is_representative"].sum()), "n_clustered": len(mc_),
                              "derep_ani": ", ".join(f"{v:g}" for v in sorted(mc_["ani_pct"].dropna().unique()))})

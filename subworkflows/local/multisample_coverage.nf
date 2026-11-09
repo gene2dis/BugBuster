@@ -27,9 +27,9 @@
         depth:    [sample id, <sample>_multisample_depth.txt]
         versions: Tool version information
 
-    The concatenation waits for every assembly of the run (a sample QC drops
-    is not known at launch, so a group's size is not); its alignments and
-    depths start group by group from there.
+    A group's concatenation starts once all its samplesheet samples are
+    assembled; a group QC left smaller (a sample QC drops is not known at
+    launch) starts when every assembly of the run is done.
 ----------------------------------------------------------------------------------------
 */
 
@@ -49,15 +49,18 @@ workflow MULTISAMPLE_COVERAGE {
     ch_versions = channel.empty()
     // sample -> group label, groups of two or more samples only
     def shared = multisampleSharedGroups()
+    def group_sizes = shared.values().countBy { label -> label }
 
-    // [group meta (id: label, samples: sorted ids), contigs in sample order]
+    // [group meta (id: label, samples: sorted ids), contigs in sample order].
+    // A group goes as soon as all its samplesheet samples are assembled; one
+    // that QC left smaller goes when the assemblies are all done (remainder)
     ch_group_contigs = contigs
         .filter { meta, _contigs -> shared.containsKey(meta.id) }
-        .map { meta, contigs_file -> [shared[meta.id], meta.id, contigs_file] }
-        .groupTuple(by: 0)
-        .map { label, ids, files ->
+        .map { meta, contigs_file -> [groupKey(shared[meta.id], group_sizes[shared[meta.id]]), meta.id, contigs_file] }
+        .groupTuple(by: 0, remainder: true)
+        .map { key, ids, files ->
             def members = [ids, files].transpose().sort { a, b -> a[0] <=> b[0] }
-            [[id: label, samples: members.collect { m -> m[0] }], members.collect { m -> m[1] }]
+            [[id: key.getGroupTarget(), samples: members.collect { m -> m[0] }], members.collect { m -> m[1] }]
         }
 
     MULTISAMPLE_CONCAT(ch_group_contigs)

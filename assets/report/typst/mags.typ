@@ -12,6 +12,9 @@
 #if "n_clusters" in f [
   == Run-level clusters
   #f.n_clustered MAGs fall into #f.n_clusters clusters at #f.derep_ani % ANI (galah; the representative of each has the highest completeness − 5 × contamination). #tabref(s, "cluster_abundance") gives each representative's share of every sample's reads (CoverM). The clusters cover this run's samples only.
+] else if "derep_empty" in f [
+  == Run-level clusters
+  No refined MAG passed galah's quality filter (`--bin_min_completeness`, `--bin_max_contamination`), so the run has no clusters.
 ]
 #datatable(s, "clusters")
 #datatable(s, "cluster_abundance")
