@@ -298,4 +298,29 @@ Reheadering took seconds per BAM. Binette took 2–5 min per assembly (≤ 6.6 G
 - They cost nothing extra: COMEBin's time and memory are the same with four BAMs as with one, and the alignments are the ones `--multisample_binning` already makes.
 - The gain is small, on two assemblies, from one run per variant. It could be inside COMEBin's run-to-run spread, which was not measured.
 
-**Decision (owner, 2026-11-09):** COMEBin takes the group's concatenation BAMs under `--multisample_binning`. The pipeline gives COMEBin the assembly's contigs under their `<sample>:` names and the unmodified concatenation BAMs, rather than one reheadered copy of every BAM per assembly (N² BAM copies on disk); the bins get the plain names back.
+**Decision (owner, 2026-11-09):** COMEBin takes the group's concatenation BAMs under `--multisample_binning`.
+
+**Implementation.** Rather than one reheadered copy of every BAM per assembly (N² BAM copies on disk), the pipeline gives COMEBin the assembly's contigs under their `<sample>:` names and the unmodified concatenation BAMs; the bins get the plain names back. COMEBin's coverage is the same either way. Only the contig names change.
+
+### Confirmation of the pipeline's wiring
+
+The `prefix` variant is the wiring above, run with the pipeline's COMEBIN module on the same inputs, then refined by Binette as before.
+
+- **D twice.** Two runs gave byte-identical bins: COMEBin is deterministic for a given input (its seed is fixed).
+- **But it is sensitive to contig names.** The prefix and the reheader variants give COMEBin the same coverage and differ only in the contig names, yet their bins differ, as two seeds would.
+
+| Assembly | Refinement | Bins | > 90 % / < 5 % | ≥ 50 % / < 10 % | Σ | Mbp |
+|---|---|---|---|---|---|---|
+| C | + COMEBin own | 7 | 2 | 7 | 479.2 | 26.6 |
+| C | + COMEBin multi (reheader) | 7 | 2 | 7 | 497.0 | 27.1 |
+| C | + COMEBin multi (prefix) | 6 | 2 | 6 | 434.8 | 21.3 |
+| D | + COMEBin own | 1 | 0 | 1 | 61.7 | 0.7 |
+| D | + COMEBin multi (reheader) | 1 | 0 | 1 | 78.7 | 1.0 |
+| D | + COMEBin multi (prefix) | 1 | 0 | 1 | 75.8 | 1.0 |
+
+COMEBin's own bins with the prefix variant: C 12 bins, Σ 593.8, 36.0 Mbp; D 8 bins, Σ 146.8, 3.5 Mbp. Cost: C 2 h 25 min, 16.9 CPU-h; D 26 min, 2.8 CPU-h; peak RSS 7.2 GB.
+
+**Reading.**
+- The raw COMEBin gain holds in all four multi-sample runs: Σ +69 to +77 on C and +26 to +31 on D over the own BAM.
+- The refined gain does not. On C the prefix variant loses an 80 %-complete bin that the other two refinements keep, and ends 44.4 below the own BAM. The spread between two runs with identical coverage (Σ 62.2 on C) is larger than the gain measured between own and multi (+17.8).
+- One run per variant cannot separate the effect of the extra columns on the refined bins from COMEBin's sensitivity to the contig names.
