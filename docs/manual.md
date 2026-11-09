@@ -28,14 +28,16 @@ Green boxes run by default; dashed boxes are switched on by a parameter. Every s
 
 BugBuster is a comprehensive Nextflow pipeline for microbial metagenomic analysis and antimicrobial resistance gene (ARG) prediction. Built following bioinformatics best practices, it provides:
 
-- **Read Quality Control**: Filtering, trimming, and host decontamination
+- **Read Quality Control**: Filtering, trimming, and host decontamination, and each sample's sequencing coverage with Nonpareil
 - **Taxonomic Profiling**: Species identification using Kraken2, Sourmash or Sylph
-- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT, with optional BBNorm normalization of the assembler input
-- **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin
+- **Genome Assembly**: Per-sample or co-assembly using MEGAHIT (one co-assembly per group of a metadata column with `--coassembly_group_by`), with optional BBNorm normalization of the assembler input
+- **Metagenomic Binning**: MAG recovery with SemiBin (default), MetaBAT2 and COMEBin; optionally with every sample of a group's coverage for per-sample assemblies (multi-sample binning)
 - **Bin Refinement**: Quality improvement with Binette, scored with CheckM2 (when two or more binners run)
-- **Bin Quality Assessment**: Completeness and contamination with CheckM2
+- **Bin Quality Assessment**: Completeness and contamination with CheckM2, and optionally chimerism with GUNC
+- **MAG Dereplication**: Optional run-level clusters of the refined MAGs with galah, and each representative's abundance in every sample with CoverM
 - **Taxonomic Classification**: Bin taxonomy with GTDB-TK
 - **ARG Prediction**: At read, contig, and bin levels
+- **Mobile Elements**: Optional plasmid, virus and provirus calls on the contigs with geNomad, and the viruses' quality with CheckV
 - **Functional Annotation**: Contig-level with eggNOG-mapper v3 (Pyrodigal gene calling + eggNOG 7 orthology transfer), run_dbcan v5 CAZy annotation with substrate prediction, per-gene abundance quantification (featureCounts), average genome size estimation (MicrobeCensus) and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy; see the container note under the feature toggles); MAG-level with Bakta (per-bin annotation of Binette-refined bins); optional read-level profiling with Woltka against the Web of Life (WoLr2) genomes (KO, EC, COG, Pfam, MetaCyc pathway read counts and copies per genome equivalent) or with SUPER-FOCUS against its SEED subsystem database (SEED subsystem levels 1–3 read counts), or with HUMAnN 4 (alpha 4.0.0a2, MetaPhlAn 4.1.2 prescreen; MetaCyc pathway, KO and EC abundances in RPK with copies per genome equivalent), one backend per run, reported separately from the contig branch; needs no assembly
 
 ### Pipeline Workflow
@@ -142,6 +144,16 @@ search of all the bins' genes against the 13.5 GB reference.
 `--checkv_prediction` (CheckV 1.1.1, 8 CPUs, 8 GB requested) runs on geNomad's
 virus calls only: 0.6-6.6 min and 1.6-2.5 GB per assembly (46-997 virus
 contigs and proviruses).
+
+#### Multi-sample binning and dereplication
+
+`--multisample_binning` aligns each sample once more, to the concatenation of
+its group's assemblies. On the Phase 18a/18b samples (four per-sample
+assemblies, 252 Mbp concatenated) the concatenation's bwa-mem3 index took
+40 s and 2.3-2.5 GB, and an alignment took from 22 s to 12 min and up to 17.7 GB,
+like the sample's own alignment; the index's memory grows with the group
+(see 6.8). `--dereplicate_mags`: galah took seconds for 45 MAGs; CoverM
+22 s to 8 min and 1.3-9.8 GB per sample (8 CPUs, 16 GB requested).
 
 ---
 
@@ -490,6 +502,9 @@ breaks `-resume`.
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, `none` | Taxonomic profiling tool (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | `true`, `false` | Enable binning and refinement |
 | `--binners` | `semibin` | `comebin`, `semibin`, `metabat2` | Comma-separated binners to run; ≥2 enables Binette refinement |
+| `--multisample_binning` | `false` | `true`, `false` | Per-sample assemblies: MetaBAT2 and COMEBin get a coverage column per sample of the group (needs `metabat2` in `--binners`); see 6.8 |
+| `--multisample_group_by` | — | a `--sample_metadata` column | With `--multisample_binning`: groups to cross-map within (see 6.8) |
+| `--dereplicate_mags` | `false` | `true`, `false` | Run-level MAG clusters (galah) and their abundance in every sample (CoverM); needs ≥2 `--binners`; see 6.8 |
 | `--gunc_prediction` | `false` | `true`, `false` | GUNC chimerism check of the refined MAGs (needs `--include_binning`); see 6.8 |
 | `--args_oap_prediction` | `false` | `true`, `false` | Read-level ARG prediction with ARGs-OAP against SARG (see 6.12; `--read_arg_prediction` is a deprecated alias) |
 | `--rgi_prediction` | `false` | `true`, `false` | AMR prediction with pathogen-of-origin (RGI/CARD) |
@@ -683,7 +698,13 @@ breaks `-resume`.
 | `--custom_humann_db` | Path to a HUMAnN database ROOT with `chocophlan/`, `uniref/`, `utility_mapping/` and `metaphlan/` (see `docs/parameters.md`) |
 | `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
 
-### 6.5 FastP Quality Filtering Options
+### 6.5 Quality Control Options (FastP, Nonpareil)
+
+Read filtering and trimming with FastP (below) and, from the clean reads, each
+sample's sequencing coverage with Nonpareil (`--nonpareil`, on by default; see
+*Sequencing coverage* below).
+
+#### FastP quality filtering
 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
@@ -796,6 +817,8 @@ each sample's group; in the run summary the `assembly` column holds the label.
 A one-sample group is allowed: it is that sample's assembly, binned like a
 co-assembly (SemiBin2's `--semibin_coassembly_env_model`). Without
 `--coassembly_group_by` nothing changes: one co-assembly called `coassembly`.
+To keep per-sample assemblies but bin them with every sample of a group's
+coverage, see *Multi-sample binning* in 6.8.
 
 **Keep each group's samples in one batch.** A co-assembly only sees the samples
 of its run: a group split across two runs is co-assembled twice, and the two
@@ -803,6 +826,11 @@ co-assemblies' MAGs are not the same genomes. The summary of several batches
 keeps same-named groups of different batches apart by the `batch` column.
 
 ### 6.8 Binning Options
+
+Binning runs with `--include_binning`. This section covers the binners and
+their refinement, the coverage they bin on (co-assembly and its groups, 6.7;
+multi-sample binning of per-sample assemblies), the MAG depth, the GUNC
+chimerism check and run-level dereplication.
 
 #### Binner Selection
 
@@ -815,7 +843,8 @@ keeps same-named groups of different batches apart by the `batch` column.
 - **≥2 binners selected** → runs selected binners + Binette bin refinement; Binette's own CheckM2 run scores the raw and the refined bins, and the pipeline publishes those reports in `quality/checkm2/` (no separate CheckM2 step)
 
 **Co-assembly coverage.** Under `--assembly_mode coassembly` each sample's reads
-are aligned once against the co-assembly. Those per-sample BAMs give MetaBAT2
+are aligned once against the co-assembly (its group's, with
+`--coassembly_group_by`). Those per-sample BAMs give MetaBAT2
 and COMEBin one coverage column per sample, count genes for the functional
 branch and give each refined bin its per-sample depth; SemiBin2 (whose
 pre-trained models take one coverage column) gets their `samtools merge`, the
@@ -828,7 +857,7 @@ instead of 8 (`docs/benchmarks/coassembly_comebin_bams_2026.md`).
 **MAG depth.** In both assembly modes `coverage/<sample>_bin_depth.tsv` gives
 each refined bin's mean read depth in each sample aligned to its assembly (its
 own sample under per-sample assembly, every sample under co-assembly): the
-contig depths MetaBAT2 bins on (`jgi_summarize_bam_contig_depths`: alignments
+contig depths MetaBAT2 bins on without multi-sample binning (`jgi_summarize_bam_contig_depths`: alignments
 at >= 97 % identity, 75 bp at each contig end left out), averaged over the
 bin's contigs weighted by their length. These depths are computed whenever
 binning runs, whether or not MetaBAT2 is one of the binners.
@@ -1386,6 +1415,8 @@ results/
 │   ├── execution_trace_*.txt                   # Task trace: timing, %CPU, peak RSS, I/O, requested cpus/memory/time, attempt, work dir
 │   ├── pipeline_dag_*.svg                      # Pipeline DAG
 │   ├── software_versions.yml                   # Versions of every tool used in the run
+│   ├── coassembly_groups.tsv                   # Each sample's co-assembly group (if coassembly_group_by is set)
+│   ├── multisample_groups.tsv                  # Each sample's multi-sample binning group (if multisample_group_by is set)
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── 00_summary/                                 # Run-level summary (if results_summary=true)
 │   ├── report/                                 # HTML report: index.html (overview), a page per section, methods,
@@ -1474,7 +1505,7 @@ results/
 │   │       ├── taxonomy/                       # GTDB-TK taxonomy
 │   │       │   └── gtdbtk/
 │   │       └── coverage/                       # MAG depth in the sample ({sample}_bin_depth.tsv)
-│   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly')
+│   ├── coassembly/                             # Co-assembly binning (if assembly_mode='coassembly'; one {group}/ level per group with coassembly_group_by)
 │   │   ├── raw_bins/                           # Raw bins, one folder per selected binner
 │   │   ├── refined_bins/                       # Binette refined bins (if >= 2 binners)
 │   │   ├── quality/                            # CheckM2 quality reports
@@ -1817,6 +1848,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `03_assembly/per_sample/` | `assembly_mode='assembly'` | Per-sample assemblies |
 | `03_assembly/coassembly/` | `assembly_mode='coassembly'` | Co-assembly results |
 | `04_binning/` | `include_binning=true` | Binning and bin refinement results |
+| `04_binning/*/quality/gunc/` | `gunc_prediction=true` | GUNC chimerism table of each assembly's refined MAGs |
 | `04_binning/dereplicated/` | `dereplicate_mags=true` | Run-level MAG clusters, their representatives and CoverM abundance per sample |
 | `05_arg_prediction/read_level/args_oap/`, `args_oap_summary/` | `args_oap_prediction=true` | ARGs-OAP (SARG) ARG profiles and read, 16S and cell estimates |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
@@ -1824,6 +1856,7 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
 | `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
+| `06_contig_taxonomy/checkv/` | `checkv_prediction=true` | CheckV quality of geNomad's viruses and proviruses |
 | `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions (one `coassembly/` set under co-assembly) |
@@ -1919,6 +1952,26 @@ bin_max_contamination: 10
 ```
 ```bash
 nextflow run main.nf -params-file params.yaml -profile singularity
+```
+
+With every sample's coverage for MetaBAT2 and COMEBin (samples cross-mapped
+within each `site` of the metadata table), GUNC, and run-level MAG clusters
+with their abundance in every sample (see 6.8):
+
+```bash
+nextflow run main.nf \
+    --input samplesheet.csv \
+    --output ./results \
+    --assembly_mode assembly \
+    --include_binning true \
+    --binners semibin,metabat2 \
+    --semibin_env_model human_gut \
+    --multisample_binning true \
+    --sample_metadata samples.tsv \
+    --multisample_group_by site \
+    --gunc_prediction true \
+    --dereplicate_mags true \
+    -profile singularity
 ```
 
 ### Example 4: ARG-Focused Analysis

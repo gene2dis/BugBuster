@@ -525,6 +525,8 @@ Override automatic downloads by providing custom database paths:
 
 ## Quality Control Parameters
 
+FastP's filters below; the switches are `--quality_control` and `--nonpareil` (sequencing coverage per sample, from the clean reads) under [Pipeline Execution Parameters](#pipeline-execution-parameters), and the low-coverage note's cutoff is `--summary_min_nonpareil_coverage` (Results Summary Parameters).
+
 ### `--fastp_n_base_limit`
 - **Type**: Integer
 - **Default**: `5`
@@ -773,6 +775,8 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ---
 
 ## Binning Parameters
+
+The switches are under [Pipeline Execution Parameters](#pipeline-execution-parameters): `--include_binning`, `--binners`, `--multisample_binning` and `--multisample_group_by` (multi-sample binning of per-sample assemblies), `--dereplicate_mags` and `--dereplicate_ani` (run-level MAG clusters), `--gunc_prediction` (chimerism); co-assembly groups are `--coassembly_group_by`. The parameters below tune the binners and the refinement.
 
 ### Basic Binning Parameters
 
