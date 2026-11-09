@@ -1,0 +1,44 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MULTISAMPLE_CONCAT Module Test
+
+    A --multisample_binning group's assemblies in one FASTA (roadmap Phase
+    18b, B4): headers <sample>:<first word>, sequences on one line, samples in
+    the order given. tests/data/multisample/: s1 has two wrapped contigs with
+    MEGAHIT headers, s2 one contig whose description follows a tab, s3 none.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test MULTISAMPLE_CONCAT Process"
+    script "../../modules/local/multisample_concat/main.nf"
+    process "MULTISAMPLE_CONCAT"
+
+    test("prefixed names, one sequence line, an empty assembly adds nothing") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'g', samples: ['s1', 's2', 's3'] ],
+                    [
+                        file("${projectDir}/tests/data/multisample/s1_filtered_contigs.fa", checkIfExists: true),
+                        file("${projectDir}/tests/data/multisample/s2_filtered_contigs.fa", checkIfExists: true),
+                        file("${projectDir}/tests/data/multisample/s3_filtered_contigs.fa", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.fasta.get(0)[1]).readLines() == [
+                ">s1:k141_1", "ACGTACGTACGT",
+                ">s1:k141_2", "TTTT",
+                ">s2:k141_1", "GGGGCCCCAA"
+            ]
+            assert path(process.out.versions.get(0)).text.contains("busybox: 1.36.1")
+        }
+    }
+}

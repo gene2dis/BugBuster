@@ -1,0 +1,252 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Multi-sample binning (--multisample_binning, --multisample_group_by;
+    roadmap Phase 18b, B4)
+
+    - Without groups, a per-sample run publishes exactly the paths dev did
+      (tests/data/stub_paths/assembly_dev.txt; the concatenation, its
+      alignments and depths are intermediate), and MetaBAT2 bins each assembly
+      on its split table of the run's concatenation.
+    - With groups, one concatenation per group of two or more samples; a
+      one-sample group's MetaBAT2 gets its own depth table.
+    - One launch-time error per misuse, and the warning for a group of more
+      than 20 samples.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Multi-sample binning"
+    script "../main.nf"
+
+    test("Ungrouped: dev's paths, MetaBAT2 on the split depths of one concatenation") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                multisample_binning     = true
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.startsWith(name) } }
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_CONCAT (multisample)") == 1
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_BWAMEM3_INDEX (multisample)") == 1
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_BWAMEM3_SAMTOOLS (") == 2
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_CALCULATE_DEPTH (multisample)") == 1
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_SPLIT_DEPTH (multisample)") == 1
+            assert TestData.publishedPaths(outputDir).sort() ==
+                new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines().sort()
+
+            // each MetaBAT2 task binned on its split table, BIN_DEPTH on the own one
+            // (Binette's tasks also stage the MetaBAT2 bins, without a depth table)
+            def staged = { suffix -> new File("${outputDir}/../work").listFiles().collectMany { a ->
+                (a.listFiles() ?: []).findAll { d -> (d.list() ?: []).any { n -> n.endsWith(suffix) } }
+            } }
+            def metabat = staged('_metabat_bins')
+            assert metabat.collect { d -> d.list().find { n -> n.endsWith('depth.txt') } }.findAll { n -> n != null }.sort() ==
+                ['test_sample1_multisample_depth.txt', 'test_sample2_multisample_depth.txt']
+            assert staged('_bin_depth.tsv').collect { d -> d.list().find { n -> n.endsWith('depth.txt') } }.findAll { n -> n != null }.sort() ==
+                ['test_sample1_depth.txt', 'test_sample2_depth.txt']
+
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains('"MULTISAMPLE_COVERAGE:MULTISAMPLE_BWAMEM3_SAMTOOLS":')
+            assert vtext.contains('"MULTISAMPLE_COVERAGE:MULTISAMPLE_SPLIT_DEPTH":')
+        }
+    }
+
+    test("Groups: one concatenation per group of two or more, a one-sample group as without the option") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet3(outputDir, projectDir)
+                output = "${outputDir}/results"
+                sample_metadata         = TestData.metadataTable(outputDir, "groups.tsv",
+                    "sample\tsite\ntest_sample1\tsite A\ntest_sample2\tsite A\ntest_sample3\tsolo\n")
+                quality_control         = true
+                nonpareil               = false
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                multisample_binning     = true
+                multisample_group_by    = "site"
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.startsWith(name) } }
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_CONCAT (site_A)") == 1
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_CONCAT (") == 1
+            assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_BWAMEM3_SAMTOOLS (") == 2
+            assert count("BINNING:METABAT2 (") == 3
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("Multi-sample binning : 2 groups by site (site_A: 2, solo: 1)")
+            assert path("${outputDir}/results/pipeline_info/multisample_groups.tsv").readLines() ==
+                ["sample\tgroup", "test_sample1\tsite_A", "test_sample2\tsite_A", "test_sample3\tsolo"]
+
+            def metabat = new File("${outputDir}/../work").listFiles().collectMany { a ->
+                (a.listFiles() ?: []).findAll { d -> (d.list() ?: []).any { n -> n.endsWith('_metabat_bins') } }
+            }
+            assert metabat.collect { d -> d.list().find { n -> n.endsWith('depth.txt') } }.findAll { n -> n != null }.sort() ==
+                ['test_sample1_multisample_depth.txt', 'test_sample2_multisample_depth.txt', 'test_sample3_depth.txt']
+        }
+    }
+
+    test("Warns when a group has more than 20 samples") {
+        // the --summary_group_by check after the warning stops the run before any task
+        when {
+            params {
+                input  = TestData.localSamplesheetN(outputDir, projectDir, 21)
+                output = "${outputDir}"
+                assembly_mode       = "assembly"
+                include_binning     = true
+                binners             = "semibin,metabat2"
+                multisample_binning = true
+                summary_group_by    = "subject"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            // warnings go to the log, not to the console nf-test captures
+            def text = path("${outputDir}/../meta/nextflow.log").text
+            assert text.contains("--multisample_binning: the run (one group without --multisample_group_by) has 21 samples, more than 20")
+        }
+    }
+
+    test("Rejects --multisample_group_by without --multisample_binning") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode        = "assembly"
+                include_binning      = true
+                binners              = "semibin,metabat2"
+                multisample_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--multisample_group_by site groups the samples of multi-sample binning: add --multisample_binning")
+        }
+    }
+
+    test("Rejects --multisample_binning under co-assembly") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "coassembly"
+                include_binning     = true
+                binners             = "semibin,metabat2"
+                multisample_binning = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--multisample_binning bins per-sample assemblies with every sample's coverage, but --assembly_mode is 'coassembly'")
+        }
+    }
+
+    test("Rejects --multisample_binning without binning") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "assembly"
+                multisample_binning = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--multisample_binning requires --include_binning")
+        }
+    }
+
+    test("Rejects --multisample_binning without MetaBAT2") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "assembly"
+                include_binning     = true
+                binners             = "semibin,comebin"
+                multisample_binning = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("add metabat2 to --binners (got: semibin, comebin)")
+        }
+    }
+
+    test("Rejects --multisample_binning with --read_aligner bowtie2") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "assembly"
+                include_binning     = true
+                binners             = "semibin,metabat2"
+                read_aligner        = "bowtie2"
+                multisample_binning = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("use --read_aligner bwamem3")
+        }
+    }
+
+    test("Rejects the group label multisample") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                sample_metadata      = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\tmultisample\ntest_sample2\tb\n")
+                assembly_mode        = "assembly"
+                include_binning      = true
+                binners              = "semibin,metabat2"
+                multisample_binning  = true
+                multisample_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--multisample_group_by site: the value 'multisample' gives the label 'multisample', the name of the ungrouped run's multi-sample group")
+        }
+    }
+}

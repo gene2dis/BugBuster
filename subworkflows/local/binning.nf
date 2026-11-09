@@ -16,6 +16,9 @@
         sample_bams: [meta, bam] - One BAM per sample against its co-assembly
                 (meta.group: the co-assembly's id; used only under co-assembly:
                 MetaBAT2 depths and bin coverage)
+        multisample_depth: [sample id, depth] - MetaBAT2's depth table with a
+                column per sample of the group (MULTISAMPLE_COVERAGE, per-sample
+                mode with --multisample_binning; empty otherwise)
     
     OUTPUTS:
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
@@ -47,6 +50,8 @@ include { BIN_DEPTH                  } from '../../modules/local/bin_depth/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
+include { flagOn                     } from './utils_params'
+include { multisampleSharedGroups    } from './utils_coassembly'
 
 workflow BINNING {
     take:
@@ -54,6 +59,7 @@ workflow BINNING {
     checkm2_db      // channel: path(checkm2_db)
     gtdbtk_db       // channel: path(gtdbtk_db)
     sample_bams     // channel: [ val(meta), path(bam) ] - per sample vs the co-assembly; used only under co-assembly
+    multisample_depth // channel: [ val(sample id), path(depth) ] - --multisample_binning only
 
     main:
     ch_versions = channel.empty()
@@ -99,8 +105,26 @@ workflow BINNING {
     ch_depth_samples = CALCULATE_DEPTH.out.depth
         .map { meta, _contigs, depth -> [meta.id, depth, meta.coassembly ? meta.samples : [meta.id]] }
 
+    // --multisample_binning (roadmap Phase 18b, B4): MetaBAT2 bins an
+    // assembly of a group of two or more samples on the depth columns of every
+    // sample of the group (MULTISAMPLE_COVERAGE); the MAG depth below keeps
+    // the assembly's own table. Other assemblies bin as without the option
+    ch_metabat_input = CALCULATE_DEPTH.out.depth
+    if (flagOn(params.multisample_binning)) {
+        def shared = multisampleSharedGroups()
+        ch_metabat_input = CALCULATE_DEPTH.out.depth
+            .filter { meta, _contigs, _depth -> !shared.containsKey(meta.id) }
+            .mix(
+                CALCULATE_DEPTH.out.depth
+                    .filter { meta, _contigs, _depth -> shared.containsKey(meta.id) }
+                    .map { meta, contigs, _depth -> [meta.id, meta, contigs] }
+                    .join(multisample_depth)
+                    .map { _id, meta, contigs, depth -> [meta, contigs, depth] }
+            )
+    }
+
     if (use_metabat2) {
-        METABAT2(CALCULATE_DEPTH.out.depth)
+        METABAT2(ch_metabat_input)
         ch_versions = ch_versions.mix(METABAT2.out.versions.first())
     }
 

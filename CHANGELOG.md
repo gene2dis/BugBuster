@@ -12,6 +12,26 @@ next release is tagged.
 
 ### Added
 
+- **Multi-sample binning** (`--multisample_binning`, off by default; per-sample
+  assembly mode, needs `--include_binning`, `metabat2` in `--binners` and
+  `--read_aligner bwamem3`). MetaBAT2 bins each assembly with one depth column
+  per sample of its group: each sample is aligned once more (bwa-mem3, the
+  per-sample alignment's filters) to the concatenation of its group's
+  assemblies (contigs named `<sample>:<contig>`), and the concatenation's jgi
+  depth table is split back per assembly. `--multisample_group_by <column>` of
+  `--sample_metadata` forms the groups, with the rules of
+  `--coassembly_group_by` (`pipeline_info/multisample_groups.tsv`); without it
+  the run is one group, and a one-sample group is binned as before. A launch
+  warning when a group has more than 20 samples (the concatenation's index
+  memory, and reads of a genome assembled in several samples split between
+  its copies). SemiBin2, COMEBin, the MAG depth (BIN_DEPTH) and featureCounts
+  keep the sample's own alignment: the concatenation's depths are competitive
+  and serve MetaBAT2 only. Nothing new is published apart from the group table;
+  bins change where MetaBAT2's do. On 4 samples (Phase 18a benchmark,
+  `docs/benchmarks/multisample_binning_2026.md`): CheckM2 high-quality refined
+  bins 27 → 29, MIMAG high 3 → 4, the same 31 species, for one extra alignment
+  per sample (~40 % more alignment-plus-binning CPU). Runs without the option
+  keep every output as before.
 - **Sequencing coverage with Nonpareil** (`--nonpareil`, on by default).
   Nonpareil 3.5.5 (k-mer mode; `quay.io/biocontainers/nonpareil:3.5.5--r44h077b44d_2`
   and its depot sif, with the Nonpareil R package 3.5.3) runs on R1 of each

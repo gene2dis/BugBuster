@@ -1,0 +1,58 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    MULTISAMPLE_SPLIT_DEPTH Module Test
+
+    The jgi depth table of a group's concatenation split per assembly
+    (roadmap Phase 18b, B4). tests/data/multisample/g_depth.txt: two sample
+    columns, contigs s1:k141_1, s1:k141_2 and s2:k141_1; sample s3 has no
+    contigs and gets the header only.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test MULTISAMPLE_SPLIT_DEPTH Process"
+    script "../../modules/local/multisample_split_depth/main.nf"
+    process "MULTISAMPLE_SPLIT_DEPTH"
+
+    test("one table per sample, names without the prefix, the header kept") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'g', samples: ['s1', 's2', 's3'] ],
+                    file("${projectDir}/tests/data/multisample/g_depth.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def header = "contigName\tcontigLen\ttotalAvgDepth\ts1_all_reads.bam\ts1_all_reads.bam-var\ts2_all_reads.bam\ts2_all_reads.bam-var"
+            def tables = process.out.depth.get(0).collectEntries { f -> [(new File(f.toString()).name): path(f).readLines()] }
+            assert tables.keySet() == ['s1_multisample_depth.txt', 's2_multisample_depth.txt', 's3_multisample_depth.txt'] as Set
+            assert tables['s1_multisample_depth.txt'] == [header, "k141_1\t12\t3\t2\t0.5\t1\t0.1", "k141_2\t4\t1\t1\t0\t0\t0"]
+            assert tables['s2_multisample_depth.txt'] == [header, "k141_1\t10\t5\t0\t0\t5\t1.2"]
+            assert tables['s3_multisample_depth.txt'] == [header]
+        }
+    }
+
+    test("fails on a contig named after no sample of the group") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'g', samples: ['s1'] ],
+                    file("${projectDir}/tests/data/multisample/g_depth.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("is named after no sample of the group") }
+        }
+    }
+}

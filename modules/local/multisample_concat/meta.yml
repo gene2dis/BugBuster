@@ -1,0 +1,35 @@
+name: multisample_concat
+description: Concatenates the per-sample assemblies of one --multisample_binning group into one reference, contigs named <sample>:<contig>, for the extra per-sample alignment that gives MetaBAT2 one depth column per sample of the group
+keywords:
+  - binning
+  - multi-sample
+  - coverage
+  - concatenation
+tools:
+  - metabat2:
+      description: Metagenome binning tool; its image provides the BusyBox awk this module runs
+      homepage: https://bitbucket.org/berkeleylab/metabat
+      documentation: https://bitbucket.org/berkeleylab/metabat/src/master/README.md
+      doi: "10.7717/peerj.7359"
+
+input:
+  - meta:
+      type: map
+      description: Group metadata (meta.id is the group label, 'multisample' without --multisample_group_by; meta.samples its sample ids, sorted)
+  - contigs:
+      type: file
+      description: The group's filtered contigs, one file per sample in meta.samples order
+      pattern: "*_filtered_contigs.fa"
+
+output:
+  - fasta:
+      type: tuple
+      description: Tuple of meta and the concatenation (headers <sample>:<first word of the contig header>, one sequence line per contig)
+      pattern: "*_multisample_contigs.fa"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

@@ -66,6 +66,8 @@ def printHelp() {
       --taxonomic_profiler          Profiler: 'kraken2', 'sourmash', 'sylph', 'none' (default: ${params.taxonomic_profiler})
       --include_binning             Enable binning and refinement (default: ${params.include_binning})
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
+      --multisample_binning         MetaBAT2 depth columns from every sample of the group (per-sample assembly; needs metabat2, bwamem3) (default: ${params.multisample_binning})
+      --multisample_group_by        Column of --sample_metadata: multi-sample binning within each group (default: the whole run)
       --gunc_prediction             GUNC chimerism check of the refined MAGs; needs --include_binning (default: ${params.gunc_prediction})
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
@@ -131,6 +133,7 @@ include { QC                 } from './subworkflows/local/qc'
 include { TAXONOMY           } from './subworkflows/local/taxonomy'
 include { ASSEMBLY           } from './subworkflows/local/assembly'
 include { BINNING            } from './subworkflows/local/binning'
+include { MULTISAMPLE_COVERAGE } from './subworkflows/local/multisample_coverage'
 include { FUNCTIONAL_ANNOTATION } from './subworkflows/local/functional_annotation'
 include { READ_FUNCTIONAL    } from './subworkflows/local/read_functional'
 include { SOFTWARE_VERSIONS  } from './subworkflows/local/software_versions'
@@ -180,7 +183,7 @@ include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
 include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
-include { coassemblyGroups         } from './subworkflows/local/utils_coassembly'
+include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
 /*
@@ -333,6 +336,35 @@ workflow {
     // runs here, before any download
     def coassembly_groups = coassemblyGroups()
 
+    // Multi-sample binning (roadmap Phase 18b, B4): MetaBAT2 gets the depth of
+    // every sample of the group, from one extra bwa-mem3 alignment per sample
+    // to the concatenation of the group's per-sample assemblies
+    if (params.multisample_group_by && !flagOn(params.multisample_binning)) {
+        error("--multisample_group_by ${params.multisample_group_by} groups the samples of multi-sample binning: add --multisample_binning")
+    }
+    if (flagOn(params.multisample_binning)) {
+        if (params.assembly_mode != 'assembly') {
+            error("--multisample_binning bins per-sample assemblies with every sample's coverage, but --assembly_mode is '${params.assembly_mode}': use --assembly_mode assembly (a co-assembly already gives MetaBAT2 one depth column per sample)")
+        }
+        if (!flagOn(params.include_binning)) {
+            error("--multisample_binning requires --include_binning")
+        }
+        if (!('metabat2' in binners_list)) {
+            error("--multisample_binning gives MetaBAT2 the extra depth columns: add metabat2 to --binners (got: ${binners_list.join(', ')})")
+        }
+        if (params.read_aligner != 'bwamem3') {
+            error("--multisample_binning aligns each sample to its group's concatenated assemblies with bwa-mem3 (one index per group); --read_aligner bowtie2 would build that index inside every sample's alignment: use --read_aligner bwamem3")
+        }
+    }
+    // sample -> group label ('multisample' without --multisample_group_by); [:] when off
+    def multisample_groups = multisampleGroups()
+    def multisample_max_group = 20
+    multisample_groups.groupBy { _sample, label -> label }.each { label, members ->
+        if (members.size() > multisample_max_group) {
+            log.warn "--multisample_binning: ${params.multisample_group_by ? "group ${label}" : 'the run (one group without --multisample_group_by)'} has ${members.size()} samples, more than ${multisample_max_group}. Each of them is aligned to the concatenation of all ${members.size()} assemblies: indexing it needs more memory as the group grows (2.3 GB for 252 Mbp; ~60-75 GB near a human genome's 3 Gbp), and a genome assembled in k samples has its reads split k ways. Bound the groups with --multisample_group_by"
+        }
+    }
+
     // The summary's grouping/ordering columns live in the metadata table
     if (flagOn(params.results_summary) && (params.summary_group_by || params.summary_order_by) && !params.sample_metadata) {
         error("--summary_group_by and --summary_order_by name columns of --sample_metadata: pass a metadata table (TSV/CSV with a 'sample' column) as well")
@@ -430,6 +462,10 @@ workflow {
     log.info "  Taxonomic profiler   : ${params.taxonomic_profiler}${params.taxonomic_profiler == 'sylph' ? " (${params.custom_sylph_db ? 'custom database: ' : ''}${sylphDbLabel()})" : ''}"
     log.info "  Include binning      : ${params.include_binning}"
     log.info "  Binners              : ${binners_list.join(', ')}${binners_list.size() >= 2 ? ' (+ Binette refinement)' : ''}"
+    if (multisample_groups) {
+        def members = multisample_groups.groupBy { _sample, label -> label }
+        log.info "  Multi-sample binning : ${params.multisample_group_by ? "${members.size()} groups by ${params.multisample_group_by} (${members.collect { label, samples -> "${label}: ${samples.size()}" }.sort().join(', ')})" : "one group of ${multisample_groups.size()} samples"}"
+    }
     log.info "  GUNC (chimeras)      : ${params.gunc_prediction}"
     log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
@@ -641,13 +677,31 @@ workflow {
         // SUBWORKFLOW: Binning
         //
         if ( flagOn(params.include_binning) ) {
+            //
+            // SUBWORKFLOW: multi-sample coverage for MetaBAT2 (per-sample
+            // assemblies, --multisample_binning)
+            //
+            ch_multisample_depth = channel.empty()
+            if ( flagOn(params.multisample_binning) ) {
+                MULTISAMPLE_COVERAGE(ch_clean_reads, ASSEMBLY.out.contigs_meta)
+                ch_multisample_depth = MULTISAMPLE_COVERAGE.out.depth
+                ch_versions = ch_versions.mix(MULTISAMPLE_COVERAGE.out.versions)
+                // pipeline_info/multisample_groups.tsv: each sample's group (--multisample_group_by only)
+                if ( params.multisample_group_by ) {
+                    channel
+                        .of("sample\tgroup\n" + multisample_groups.collect { sample, label -> "${sample}\t${label}\n" }.join(''))
+                        .collectFile(name: 'multisample_groups.tsv', storeDir: "${params.output}/pipeline_info")
+                }
+            }
+
             BINNING(
                 ASSEMBLY.out.bam,
                 PREPARE_DATABASES.out.checkm2_db
                     .ifEmpty { error "ERROR: CheckM2 database is empty. Ensure params.include_binning is enabled and a valid CheckM2 database is configured." },
                 PREPARE_DATABASES.out.gtdbtk_db
                     .ifEmpty { error "ERROR: GTDB-Tk database is empty. Ensure params.include_binning is enabled and a valid GTDB-Tk database is configured." },
-                ch_counting_bam
+                ch_counting_bam,
+                ch_multisample_depth
             )
             ch_refined_bins = BINNING.out.refined_bins
             ch_versions = ch_versions.mix(BINNING.out.versions)

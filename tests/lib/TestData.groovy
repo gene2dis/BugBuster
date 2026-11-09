@@ -31,6 +31,18 @@ class TestData {
         return sheet.absolutePath
     }
 
+    // n samples (sample1 ... sample<n>) on test_sample1's reads, for launch
+    // checks that count samples (the --multisample_binning group size warning)
+    static String localSamplesheetN(outputDir, projectDir, int n) {
+        def sheet = new File("${outputDir}", "local_test_samplesheet_n.csv")
+        sheet.parentFile.mkdirs()
+        def reads = "${projectDir}/tests/data/reads"
+        sheet.text = "sample,r1,r2,s\n" + (1..n).collect { i ->
+            "sample${i},${reads}/test_sample1_R1.fastq.gz,${reads}/test_sample1_R2.fastq.gz,\n"
+        }.join('')
+        return sheet.absolutePath
+    }
+
     // A --sample_metadata table with the given text (TSV, or CSV by a .csv name)
     static String metadataTable(outputDir, String name, String text) {
         def table = new File("${outputDir}", name)

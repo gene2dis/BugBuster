@@ -17,6 +17,7 @@
 */
 
 include { get_sample_ids } from './input_check'
+include { flagOn         } from './utils_params'
 
 /**
  * Sample -> co-assembly label under --coassembly_group_by, [:] without it.
@@ -128,4 +129,31 @@ def coassemblyLabel(groups, id) {
         error("--coassembly_group_by ${params.coassembly_group_by}: sample ${id} is in no co-assembly group (groups were read for: ${groups.keySet().join(', ')})")
     }
     return groups[id]
+}
+
+/**
+ * Sample -> multi-sample binning group under --multisample_binning: its
+ * --multisample_group_by group's label, or 'multisample' for every sample of
+ * the samplesheet. [:] when --multisample_binning is off.
+ */
+def multisampleGroups() {
+    if (!flagOn(params.multisample_binning)) {
+        return [:]
+    }
+    def groups = metadataGroups('multisample_group_by', 'multisample', "the ungrouped run's multi-sample group")
+    if (groups) {
+        return groups
+    }
+    return get_sample_ids(file(params.input, checkIfExists: true)).sort(false).collectEntries { id -> [(id): 'multisample'] }
+}
+
+/**
+ * The samples whose assembly is binned with multi-sample coverage: sample ->
+ * group label for the groups of two or more samples of the samplesheet. A
+ * one-sample group is binned as without --multisample_binning.
+ */
+def multisampleSharedGroups() {
+    def groups = multisampleGroups()
+    def sizes = groups.values().countBy { label -> label }
+    return groups.findAll { _sample, label -> sizes[label] > 1 }
 }
