@@ -1,0 +1,55 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    COVERM_GENOME Module Test
+
+    The abundance of the dereplicated MAGs in one sample (roadmap Phase 18b,
+    B5): tests/data/derep/ reads (2,000 error-free pairs from genome Y,
+    tests/bin/make_derep_fixtures.py) on the representatives of genomes X and
+    Y. Y holds every read and is covered about 2,000 x 200 / 60,000 = 6.7
+    times; X holds none. The table's columns lose the read file's name.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test COVERM_GENOME Process"
+    script "../../modules/local/coverm_genome/main.nf"
+    process "COVERM_GENOME"
+
+    test("relative abundance, depth and covered fraction per representative") {
+        when {
+            process {
+                """
+                def reps = new File("${outputDir}/reps")
+                reps.mkdirs()
+                new File(reps, 'A_binette_bin1.fa').text = new File("${projectDir}/tests/data/derep/A_binette_bins/binette_bin1.fa").text
+                new File(reps, 'A_binette_bin2.fa').text = new File("${projectDir}/tests/data/derep/A_binette_bins/binette_bin2.fa").text
+                input[0] = [
+                    [ id: 'sample1' ],
+                    [
+                        file("${projectDir}/tests/data/derep/reads_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/derep/reads_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${outputDir}/reps")
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def table = process.out.abundance.get(0)[1]
+            assert new File(table.toString()).name == 'sample1_coverm_genome.tsv'
+            def rows = path(table).readLines().collect { r -> r.split('\t') }
+            assert rows[0] as List == ['Genome', 'Relative Abundance (%)', 'Mean', 'Trimmed Mean', 'Covered Fraction']
+            def by = rows.drop(1).collectEntries { r -> [(r[0]): r] }
+            assert by.keySet() == ['unmapped', 'A_binette_bin1', 'A_binette_bin2'] as Set
+            assert (by['A_binette_bin2'][1] as Double) > 99
+            assert Math.abs((by['A_binette_bin2'][2] as Double) - 6.67) < 0.5
+            assert (by['A_binette_bin2'][4] as Double) > 0.99
+            assert (by['A_binette_bin1'][2] as Double) == 0
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("coverm: 0.8.0") && versions.contains("strobealign: 0.17.0")
+        }
+    }
+}

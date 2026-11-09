@@ -12,6 +12,47 @@ next release is tagged.
 
 ### Added
 
+- **Run-level MAG dereplication** (`--dereplicate_mags`, off by default; needs
+  `--include_binning` and at least two `--binners`). galah 0.6.2 (skani
+  0.4.0; `quay.io/biocontainers/galah:0.6.2--hfa8f182_0` and its depot sif)
+  clusters the refined MAGs of every assembly of the run at
+  `--dereplicate_ani` (95 % by default, 80-100) and picks each cluster's
+  representative by completeness − 5 × contamination from Binette's CheckM2
+  reports (the representatives dRep chooses; Phase 18a). CoverM 0.8.0
+  (strobealign 0.17.0; `quay.io/biocontainers/coverm:0.8.0--h750ce8b_0` and its
+  depot sif) then maps each sample's read pairs to the representatives (≥ 97 %
+  identity) for their relative abundance, mean and trimmed mean depth and
+  covered fraction. Outputs in `04_binning/dereplicated/`
+  (`mag_clusters.tsv`, `representatives/`, `abundance/<sample>_coverm_genome.tsv`).
+  The run summary gains `mag_clusters` (each MAG's cluster, representative,
+  cluster size and ANI) and `mag_cluster_abundance` (each representative's
+  share of every sample's reads, mean and trimmed mean depth, covered
+  fraction), a "Run-level clusters" part of the MAGs page and the caveats in
+  README / LLM guide; galah, skani, CoverM and strobealign join the methods'
+  references. With or without `--multisample_binning`, in either assembly
+  mode. The clusters cover the run's samples only: a study processed in
+  several runs dereplicates downstream. Runs without the option keep every
+  output as before.
+- **Multi-sample binning** (`--multisample_binning`, off by default; per-sample
+  assembly mode, needs `--include_binning`, `metabat2` in `--binners` and
+  `--read_aligner bwamem3`). MetaBAT2 bins each assembly with one depth column
+  per sample of its group: each sample is aligned once more (bwa-mem3, the
+  per-sample alignment's filters) to the concatenation of its group's
+  assemblies (contigs named `<sample>:<contig>`), and the concatenation's jgi
+  depth table is split back per assembly. `--multisample_group_by <column>` of
+  `--sample_metadata` forms the groups, with the rules of
+  `--coassembly_group_by` (`pipeline_info/multisample_groups.tsv`); without it
+  the run is one group, and a one-sample group is binned as before. A launch
+  warning when a group has more than 20 samples (the concatenation's index
+  memory, and reads of a genome assembled in several samples split between
+  its copies). SemiBin2, COMEBin, the MAG depth (BIN_DEPTH) and featureCounts
+  keep the sample's own alignment: the concatenation's depths are competitive
+  and serve MetaBAT2 only. Nothing new is published apart from the group table;
+  bins change where MetaBAT2's do. On 4 samples (Phase 18a benchmark,
+  `docs/benchmarks/multisample_binning_2026.md`): CheckM2 high-quality refined
+  bins 27 → 29, MIMAG high 3 → 4, the same 31 species, for one extra alignment
+  per sample (~40 % more alignment-plus-binning CPU). Runs without the option
+  keep every output as before.
 - **Sequencing coverage with Nonpareil** (`--nonpareil`, on by default).
   Nonpareil 3.5.5 (k-mer mode; `quay.io/biocontainers/nonpareil:3.5.5--r44h077b44d_2`
   and its depot sif, with the Nonpareil R package 3.5.3) runs on R1 of each

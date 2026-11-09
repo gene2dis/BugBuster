@@ -1,0 +1,35 @@
+name: multisample_split_depth
+description: "Splits the jgi depth table of a --multisample_binning group's concatenation into one table per assembly (contig names without the <sample>: prefix, one depth column per sample of the group), MetaBAT2's input under multi-sample binning"
+keywords:
+  - binning
+  - multi-sample
+  - depth
+  - metabat2
+tools:
+  - metabat2:
+      description: Metagenome binning tool; its image provides the BusyBox awk this module runs on CALCULATE_DEPTH's jgi_summarize_bam_contig_depths table
+      homepage: https://bitbucket.org/berkeleylab/metabat
+      documentation: https://bitbucket.org/berkeleylab/metabat/src/master/README.md
+      doi: "10.7717/peerj.7359"
+
+input:
+  - meta:
+      type: map
+      description: Group metadata (meta.id is the group label; meta.samples its sample ids)
+  - depth:
+      type: file
+      description: CALCULATE_DEPTH's table of the group's concatenation (contigName, contigLen, totalAvgDepth, then <sample>_all_reads and its -var column per sample)
+      pattern: "*_depth.txt"
+
+output:
+  - depth:
+      type: file
+      description: One table per sample of the group, its assembly's rows under the concatenation's header (header only when the assembly has no contigs)
+      pattern: "*_multisample_depth.txt"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

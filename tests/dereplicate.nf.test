@@ -1,0 +1,145 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Run-level MAG dereplication (--dereplicate_mags, --dereplicate_ani;
+    roadmap Phase 18b, B5)
+
+    - With multi-sample binning, a per-sample run publishes dev's paths
+      (tests/data/stub_paths/assembly_dev.txt) plus 04_binning/dereplicated/
+      only: one galah task over every assembly, one CoverM task per sample.
+    - Without it, under co-assembly groups, galah takes each group's MAGs and
+      CoverM every sample of the run.
+    - Launch errors: no binning, one binner.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Run-level MAG dereplication"
+    script "../main.nf"
+
+    test("With multi-sample binning: dev's paths plus 04_binning/dereplicated/ only") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                nonpareil               = false  // dev's path lists predate Nonpareil (on by default)
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                multisample_binning     = true
+                dereplicate_mags        = true
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.startsWith(name) } }
+            assert count("GALAH_CLUSTER (") == 1
+            assert count("COVERM_GENOME (") == 2
+            def added = ["04_binning/dereplicated/mag_clusters.tsv",
+                         "04_binning/dereplicated/representatives/test_sample1_binette_bin1.fa",
+                         "04_binning/dereplicated/abundance/test_sample1_coverm_genome.tsv",
+                         "04_binning/dereplicated/abundance/test_sample2_coverm_genome.tsv"]
+            def dev = new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines()
+            assert TestData.publishedPaths(outputDir).sort() == (dev + added).sort()
+            assert path("${outputDir}/04_binning/dereplicated/mag_clusters.tsv").readLines() == [
+                "assembly\tbin\tgenome\trepresentative\tani_pct",
+                "test_sample1\tbinette_bin1\ttest_sample1_binette_bin1\ttest_sample1_binette_bin1\t95",
+                "test_sample2\tbinette_bin1\ttest_sample2_binette_bin1\ttest_sample1_binette_bin1\t95"
+            ]
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains('"GALAH_CLUSTER":') && vtext.contains("galah: 0.6.2") && vtext.contains("skani: 0.4.0")
+            assert vtext.contains('"COVERM_GENOME":') && vtext.contains("coverm: 0.8.0") && vtext.contains("strobealign: 0.17.0")
+        }
+    }
+
+    test("Without multi-sample binning, under co-assembly groups: every group's MAGs, every sample's reads") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet3(outputDir, projectDir)
+                output = "${outputDir}/results"
+                sample_metadata         = TestData.metadataTable(outputDir, "groups.tsv",
+                    "sample\tsite\ntest_sample1\tA\ntest_sample2\tA\ntest_sample3\tsolo\n")
+                quality_control         = true
+                nonpareil               = false
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "coassembly"
+                coassembly_group_by     = "site"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                dereplicate_mags        = true
+                dereplicate_ani         = 99
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.startsWith(name) } }
+            assert count("GALAH_CLUSTER (") == 1
+            assert count("COVERM_GENOME (") == 3
+            assert count("MULTISAMPLE_COVERAGE") == 0
+            def clusters = path("${outputDir}/results/04_binning/dereplicated/mag_clusters.tsv").readLines()
+            assert clusters.drop(1).collect { r -> r.split('\t')[0] }.sort() == ['A', 'solo']
+            assert clusters.drop(1).every { r -> r.endsWith('\t99') }
+            assert new File("${outputDir}/results/04_binning/dereplicated/abundance").list().sort() ==
+                ['test_sample1_coverm_genome.tsv', 'test_sample2_coverm_genome.tsv', 'test_sample3_coverm_genome.tsv']
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("Dereplicate MAGs     : true (galah 99 % ANI + CoverM)")
+        }
+    }
+
+    test("Rejects --dereplicate_mags without binning") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode    = "assembly"
+                dereplicate_mags = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--dereplicate_mags requires --include_binning")
+        }
+    }
+
+    test("Rejects --dereplicate_mags with one binner") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode    = "assembly"
+                include_binning  = true
+                binners          = "semibin"
+                dereplicate_mags = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--dereplicate_mags requires at least two --binners")
+        }
+    }
+}

@@ -1,0 +1,43 @@
+name: galah_cluster
+description: Run-level dereplication of the refined MAGs (--dereplicate_mags) with galah at --dereplicate_ani, each cluster's representative chosen by completeness - 5 x contamination from Binette's CheckM2 reports
+keywords:
+  - dereplication
+  - mag
+  - ani
+  - binning
+tools:
+  - galah:
+      description: Metagenome assembled genome (MAG) dereplication method, clustering genomes by ANI (skani) and choosing representatives by quality
+      homepage: https://github.com/wwood/galah
+      documentation: https://wwood.github.io/galah/
+      licence: ["GPL-3.0"]
+
+input:
+  - ids:
+      type: list
+      description: Assembly ids (sample names, coassembly or group labels), in the order of bins and reports
+  - bins:
+      type: directory
+      description: Each assembly's refined bin directory (*.fa)
+      pattern: "*_binette_bins"
+  - reports:
+      type: file
+      description: Each assembly's CheckM2 report of its refined bins (Name = bin file name without .fa)
+      pattern: "*_binette_quality_report.tsv"
+
+output:
+  - clusters:
+      type: file
+      description: One row per clustered MAG (assembly, bin, genome = <assembly>_<bin>, representative = its cluster representative's genome name, ani_pct = the clustering ANI)
+      pattern: "mag_clusters.tsv"
+  - representatives:
+      type: directory
+      description: The representatives' FASTA files, <assembly>_<bin>.fa
+      pattern: "representatives"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

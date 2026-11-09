@@ -112,6 +112,30 @@ Complete reference for all BugBuster pipeline parameters.
   - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
 - **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
 
+### `--multisample_binning`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Multi-sample binning of per-sample assemblies: MetaBAT2 bins each assembly with one depth column per sample of its group (`--multisample_group_by`, or the whole run). Each sample is aligned once more (bwa-mem3, with the per-sample alignment's identity and length filters) to the concatenation of its group's assemblies, whose contigs are named `<sample>:<contig>`; the concatenation's depth table is split back per assembly for MetaBAT2. SemiBin2 keeps its pre-trained model and COMEBin its coverage on the sample's own BAM, and everything else that reads the per-sample alignment (the MAG depth, featureCounts, BlobTools) is unchanged: the concatenation's depths are competitive (a read from a genome assembled in several samples counts on one copy only) and are not abundance. A group with one sample in the samplesheet is binned as without the option (a group that QC leaves with one sample still goes through the concatenation, with that sample alone). Cost: one extra alignment per sample, against a reference that grows with the group; a launch warning when a group has more than 20 samples (index memory: 2.3 GB for 252 Mbp; a genome assembled in k samples has its reads split k ways). Needs `--assembly_mode assembly` (a co-assembly already gives MetaBAT2 one depth column per sample), `--include_binning`, `metabat2` in `--binners` and `--read_aligner bwamem3`; rejected at launch otherwise. Nothing new is published apart from `pipeline_info/multisample_groups.tsv` with `--multisample_group_by`. On 4 samples (Phase 18a benchmark, `docs/benchmarks/multisample_binning_2026.md`): CheckM2 high-quality refined bins 27 → 29, MIMAG high 3 → 4, the same 31 species, for ~40 % more alignment-plus-binning CPU (COMEBin on the group's BAMs was measured in Phase 18b and gave no reliable gain in the refined bins)
+- **Example**: `--include_binning true --binners semibin,metabat2 --multisample_binning true`
+
+### `--multisample_group_by`
+- **Type**: String (a column name)
+- **Default**: none (the whole run is one group)
+- **Description**: Multi-sample binning within groups: each sample is aligned to the concatenation of its own group's assemblies only, one depth column per sample of the group. A column of `--sample_metadata`, with the rules of `--coassembly_group_by`: every samplesheet sample needs a row and a value; labels are the values with characters outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` replaced by `_`, and may not clash with each other (also by letter case), be a sample id or `multisample`, or start with anything but a letter or digit. `pipeline_info/multisample_groups.tsv` lists each sample's group. Groups bound the concatenation each sample is aligned to. Needs `--multisample_binning`
+- **Example**: `--multisample_binning true --sample_metadata samples.tsv --multisample_group_by site`
+
+### `--dereplicate_mags`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Run-level dereplication of the refined MAGs and their abundance in every sample. galah 0.6.2 (skani 0.4.0) clusters the refined MAGs of every assembly of the run at `--dereplicate_ani` and picks each cluster's representative by completeness − 5 × contamination (`--quality-formula completeness-5contamination`, from Binette's CheckM2 reports; the MAGs below `--bin_min_completeness` / above `--bin_max_contamination` are left out, as Binette leaves them out). CoverM 0.8.0 `genome` then maps each sample's clean read pairs to the representatives (strobealign, reads at ≥ 97 % identity, every representative reported) for its relative abundance (% of the sample's reads, with an `unmapped` row), mean and trimmed mean depth and covered fraction. Outputs in `04_binning/dereplicated/`: `mag_clusters.tsv` (assembly, bin, genome = `<assembly>_<bin>`, representative), `representatives/<assembly>_<bin>.fa` and `abundance/<sample>_coverm_genome.tsv`; the summary gains `mag_clusters` and `mag_cluster_abundance`. With or without `--multisample_binning`, in either assembly mode. Needs `--include_binning` and at least two `--binners` (rejected at launch otherwise). **The clusters and the abundance cover this run's samples only**: a study processed in several runs dereplicates its MAGs downstream, from the merged results. Cost on 4 samples (Phase 18a): galah seconds, CoverM ~1.3 CPU-hours and ~14 GB in all
+- **Example**: `--include_binning true --binners semibin,metabat2 --dereplicate_mags true`
+
+### `--dereplicate_ani`
+- **Type**: Number (80-100)
+- **Default**: `95`
+- **Description**: Average nucleotide identity (%) at which `--dereplicate_mags` clusters MAGs: 95 for species, 99 for strains (galah `--ani`; below 90 its 90 % pre-clustering is lowered to the same value). In the Phase 18a benchmark, 99 split one species of four samples' MAGs into two clusters
+- **Example**: `--dereplicate_ani 99`
+
 ### `--gunc_prediction`
 - **Type**: Boolean
 - **Default**: `false`
@@ -501,6 +525,8 @@ Override automatic downloads by providing custom database paths:
 
 ## Quality Control Parameters
 
+FastP's filters below; the switches are `--quality_control` and `--nonpareil` (sequencing coverage per sample, from the clean reads) under [Pipeline Execution Parameters](#pipeline-execution-parameters), and the low-coverage note's cutoff is `--summary_min_nonpareil_coverage` (Results Summary Parameters).
+
 ### `--fastp_n_base_limit`
 - **Type**: Integer
 - **Default**: `5`
@@ -749,6 +775,8 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ---
 
 ## Binning Parameters
+
+The switches are under [Pipeline Execution Parameters](#pipeline-execution-parameters): `--include_binning`, `--binners`, `--multisample_binning` and `--multisample_group_by` (multi-sample binning of per-sample assemblies), `--dereplicate_mags` and `--dereplicate_ani` (run-level MAG clusters), `--gunc_prediction` (chimerism); co-assembly groups are `--coassembly_group_by`. The parameters below tune the binners and the refinement.
 
 ### Basic Binning Parameters
 

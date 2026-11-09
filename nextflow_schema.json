@@ -624,8 +624,37 @@
                 "binners": {
                     "type": "string",
                     "default": "semibin",
-                    "description": "Comma-separated list of binners to use. Options: comebin, semibin, metabat2. At least one required. If >=2 selected, MetaWRAP refinement is used.",
+                    "description": "Comma-separated list of binners to use. Options: comebin, semibin, metabat2. At least one required. If >=2 selected, Binette refines their bins.",
                     "fa_icon": "fas fa-cubes"
+                },
+                "multisample_binning": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Multi-sample binning in per-sample assembly mode: MetaBAT2 bins each assembly with one depth column per sample of its group (--multisample_group_by, or the whole run). Needs --assembly_mode assembly, --include_binning, metabat2 in --binners and --read_aligner bwamem3.",
+                    "help_text": "Each sample is aligned once more (bwa-mem3) to the concatenation of its group's assemblies; the concatenation's jgi depth table is split per assembly for MetaBAT2. SemiBin2 keeps its pre-trained model on the sample's own BAM, and the MAG depth, featureCounts and every other step keep the per-sample alignment: the concatenation's depths are competitive (a read of a genome assembled in several samples counts on one copy only) and are not abundance. Cost: one extra alignment per sample against a reference that grows with the group (a launch warning above 20 samples per group). A group of one sample is binned as without the option. Phase 18a benchmark (docs/benchmarks/multisample_binning_2026.md): CheckM2 high-quality refined bins 27 -> 29 on 4 samples, ~40 % more alignment-plus-binning CPU.",
+                    "fa_icon": "fas fa-layer-group"
+                },
+                "multisample_group_by": {
+                    "type": "string",
+                    "description": "Column of --sample_metadata that groups the samples of multi-sample binning: each assembly gets the depth columns of its group's samples only (needs --multisample_binning and --sample_metadata). Without it the whole run is one group.",
+                    "help_text": "The same rules as --coassembly_group_by: every sample of the samplesheet needs a row and a value; labels are the values with characters outside A-Z, a-z, 0-9, '.', '_' and '-' replaced by '_', and may not be a sample id or 'multisample'. Groups bound the concatenation each sample is aligned to (its index memory, and how many copies of a genome split its reads).",
+                    "fa_icon": "fas fa-object-group"
+                },
+                "dereplicate_mags": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Run-level dereplication of the refined MAGs: galah clusters the MAGs of every assembly of the run at --dereplicate_ani, and CoverM gives each representative's abundance in every sample. Needs --include_binning and at least two --binners (Binette's CheckM2 reports choose the representatives).",
+                    "help_text": "galah 0.6.2 (skani) with --quality-formula completeness-5contamination and Binette's --bin_min_completeness / --bin_max_contamination; CoverM 0.8.0 genome maps each sample's read pairs to the representatives (strobealign, >= 97 % identity). Outputs in 04_binning/dereplicated/ (mag_clusters.tsv, representatives/, abundance/<sample>_coverm_genome.tsv) and the summary tables mag_clusters and mag_cluster_abundance. With or without --multisample_binning, in either assembly mode. The clusters cover this run's samples only: a study processed in several runs dereplicates its MAGs downstream, from the merged results.",
+                    "fa_icon": "fas fa-compress-alt"
+                },
+                "dereplicate_ani": {
+                    "type": "number",
+                    "default": 95,
+                    "minimum": 80,
+                    "maximum": 100,
+                    "description": "Average nucleotide identity (%) at which --dereplicate_mags clusters MAGs: 95 for species, 99 for strains.",
+                    "help_text": "galah's --ani; below 90 its pre-clustering ANI is lowered to the same value. 99 split one species of four samples' MAGs in the Phase 18a benchmark.",
+                    "fa_icon": "fas fa-percent"
                 },
                 "metabat_minContig": {
                     "type": "integer",

@@ -510,3 +510,33 @@ zhu2022:
   number: "2"
   pages: "e0016722"
   doi: "10.1128/msystems.00167-22"
+aroney2025:
+  type: "article"
+  author: "Aroney, Samuel T N and Newell, Rhys J P and Nissen, Jakob N and Camargo, Antonio Pedro and Tyson, Gene W and Woodcroft, Ben J"
+  title: "CoverM: read alignment statistics for metagenomics"
+  journal: "Bioinformatics"
+  year: 2025
+  volume: "41"
+  number: "4"
+  pages: "btaf147"
+  doi: "10.1093/bioinformatics/btaf147"
+shaw2023:
+  type: "article"
+  author: "Shaw, Jim and Yu, Yun William"
+  title: "Fast and robust metagenomic sequence comparison through sparse chaining with skani"
+  journal: "Nature Methods"
+  year: 2023
+  volume: "20"
+  number: "11"
+  pages: "1661--1665"
+  doi: "10.1038/s41592-023-02018-3"
+sahlin2022:
+  type: "article"
+  author: "Sahlin, Kristoffer"
+  title: "Strobealign: flexible seed size enables ultra-fast and accurate read alignment"
+  journal: "Genome Biology"
+  year: 2022
+  volume: "23"
+  number: "1"
+  pages: "260"
+  doi: "10.1186/s13059-022-02831-7"

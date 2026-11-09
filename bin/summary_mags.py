@@ -13,6 +13,12 @@ Published inputs, per assembly <id> (a sample name, coassembly, or a co-assembly
   bins on, one table per sample aligned to the assembly; before roadmap Phase 15 co-assembly only, from
   BEDTOOLS_BIN_DEPTH).
 
+Run-level dereplication (--dereplicate_mags, roadmap Phase 18b), 04_binning/dereplicated/:
+- mag_clusters.tsv (GALAH_CLUSTER: assembly, bin, genome = <assembly>_<bin>, representative, ani_pct);
+- abundance/<sample>_coverm_genome.tsv (CoverM genome on the representatives: Genome, Relative Abundance (%), Mean,
+  Trimmed Mean, Covered Fraction, with an 'unmapped' row).
+The clusters cover one run's samples only, so they are kept per batch.
+
 MIMAG (Bowers et al. 2017): high = completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and >= 18 tRNA
 amino acids; medium = completeness >= 50 %, contamination < 10 %; low = the rest. Without Bakta the rRNA / tRNA
 part cannot be checked, so a MAG is at most medium (tier_basis checkm2_only). GUNC does not change the tier: its
@@ -305,3 +311,73 @@ def mag_abundance_frame(parts, contig_tables, sample_bases):
         return round(r.mean_depth_x * r.genome_bp / bases * 100, 4)
     df["pct_sample_bases"] = [share(r) for r in df.itertuples(index=False)]
     return df.drop(columns="genome_bp")
+
+
+DEREP_COVERM = {"Relative Abundance (%)": "relative_abundance_pct", "Mean": "mean_depth_x",
+                "Trimmed Mean": "trimmed_mean_x", "Covered Fraction": "covered_fraction"}
+
+
+def load_dereplication(root):
+    """-> {"clusters": DataFrame(assembly, bin, genome, representative, ani_pct), "abundance": DataFrame(genome,
+    sample, relative_abundance_pct, mean_depth_x, trimmed_mean_x, covered_fraction) or None} from
+    04_binning/dereplicated/, or None when the run did not dereplicate (--dereplicate_mags)."""
+    ddir = root / "04_binning" / "dereplicated"
+    cpath = ddir / "mag_clusters.tsv"
+    if not cpath.exists():
+        return None
+    clusters = pd.read_csv(cpath, sep="\t", dtype=str, keep_default_na=False)
+    need = {"assembly", "bin", "genome", "representative", "ani_pct"}
+    if not need <= set(clusters.columns):
+        die(f"{cpath}: not a cluster table (lacks {sorted(need - set(clusters.columns))})")
+    parts = []
+    for p in sorted((ddir / "abundance").glob("*_coverm_genome.tsv")) if (ddir / "abundance").is_dir() else []:
+        df = pd.read_csv(p, sep="\t", dtype={"Genome": str})
+        if not {"Genome"} | set(DEREP_COVERM) <= set(df.columns):
+            die(f"{p}: not a CoverM genome table (Genome, {', '.join(DEREP_COVERM)})")
+        df = df[df["Genome"] != "unmapped"].rename(columns={"Genome": "genome", **DEREP_COVERM})
+        parts.append(df.assign(sample=p.name[:-len("_coverm_genome.tsv")])[["genome", "sample"] + list(DEREP_COVERM.values())])
+    return {"clusters": clusters, "abundance": pd.concat(parts, ignore_index=True) if parts else None}
+
+
+def mag_clusters_table(parts):
+    """mag_clusters: one row per (batch, clustered MAG): its cluster (the representative's <assembly>_<bin>),
+    whether it is the representative, the cluster's size and the ANI galah clustered at. parts: [(batch label,
+    load_dereplication result)]; None when no batch dereplicated."""
+    frames = []
+    for label, d in parts:
+        if d is None:
+            continue
+        c = d["clusters"].copy()
+        size = c.groupby("representative")["genome"].transform("size")
+        frames.append(pd.DataFrame({
+            "batch": label, "cluster": c["representative"], "assembly": c["assembly"], "bin": c["bin"],
+            "is_representative": c["genome"] == c["representative"], "cluster_size": size.astype("Int64"),
+            "ani_pct": pd.to_numeric(c["ani_pct"], errors="coerce")}))
+    if not frames:
+        return None
+    df = pd.concat(frames, ignore_index=True)
+    keys = sorted(range(len(df)), key=lambda i: (df.at[i, "batch"], natural_key(df.at[i, "cluster"]),
+                                                 not df.at[i, "is_representative"], natural_key(df.at[i, "assembly"]),
+                                                 natural_key(df.at[i, "bin"])))
+    return df.loc[keys].reset_index(drop=True)
+
+
+def mag_cluster_abundance_frame(parts):
+    """mag_cluster_abundance: per (batch, cluster representative, sample) CoverM's relative abundance (% of the
+    sample's reads), mean and trimmed mean depth and covered fraction; the representative's assembly and bin from
+    the cluster table. -> DataFrame(cluster, batch, assembly, bin, sample, ...) or None."""
+    frames = []
+    for label, d in parts:
+        if d is None or d["abundance"] is None:
+            continue
+        reps = d["clusters"][d["clusters"]["genome"] == d["clusters"]["representative"]].set_index("genome")
+        ab = d["abundance"]
+        unknown = sorted(set(ab["genome"]) - set(reps.index))
+        if unknown:
+            die(f"batch {label}: CoverM reports genomes that are no cluster's representative: {unknown[:3]}")
+        frames.append(ab.assign(batch=label, cluster=ab["genome"], assembly=ab["genome"].map(reps["assembly"]),
+                                bin=ab["genome"].map(reps["bin"])).drop(columns="genome"))
+    if not frames:
+        return None
+    df = pd.concat(frames, ignore_index=True)
+    return df[["cluster", "batch", "assembly", "bin", "sample"] + list(DEREP_COVERM.values())]

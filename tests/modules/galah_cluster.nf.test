@@ -1,0 +1,85 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    GALAH_CLUSTER Module Test
+
+    Run-level MAG dereplication (roadmap Phase 18b, B5) on
+    tests/data/derep/ (tests/bin/make_derep_fixtures.py): genome X in
+    assemblies A and site_1 (1 % apart), genome Y in A only. galah clusters
+    the two X MAGs and, by completeness - 5 x contamination, picks A's
+    (90 / 1 -> 85) over site_1's (95 / 3 -> 80); the cluster table takes the
+    assembly and the bin from the inputs, not from the '_'-joined name.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test GALAH_CLUSTER Process"
+    script "../../modules/local/galah_cluster/main.nf"
+    process "GALAH_CLUSTER"
+
+    test("one cluster per genome, the representative by completeness - 5 x contamination") {
+        when {
+            params {
+                dereplicate_ani = 95
+            }
+            process {
+                """
+                input[0] = [
+                    ['A', 'site_1'],
+                    [
+                        file("${projectDir}/tests/data/derep/A_binette_bins", checkIfExists: true),
+                        file("${projectDir}/tests/data/derep/site_1_binette_bins", checkIfExists: true)
+                    ],
+                    [
+                        file("${projectDir}/tests/data/derep/A_binette_quality_report.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/derep/site_1_binette_quality_report.tsv", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.clusters.get(0)).readLines() == [
+                "assembly\tbin\tgenome\trepresentative\tani_pct",
+                "A\tbinette_bin1\tA_binette_bin1\tA_binette_bin1\t95",
+                "site_1\tbinette_bin1\tsite_1_binette_bin1\tA_binette_bin1\t95",
+                "A\tbinette_bin2\tA_binette_bin2\tA_binette_bin2\t95"
+            ]
+            def reps = new File(process.out.representatives.get(0).toString())
+            assert reps.list().sort() == ['A_binette_bin1.fa', 'A_binette_bin2.fa']
+            // real files, not links into the task's genomes/ folder
+            assert reps.listFiles().every { f -> !java.nio.file.Files.isSymbolicLink(f.toPath()) }
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("galah: 0.6.2") && versions.contains("skani: 0.4.0")
+        }
+    }
+
+    test("stub: the cluster table and one representative") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    ['A', 'site_1'],
+                    [
+                        file("${projectDir}/tests/data/derep/A_binette_bins", checkIfExists: true),
+                        file("${projectDir}/tests/data/derep/site_1_binette_bins", checkIfExists: true)
+                    ],
+                    [
+                        file("${projectDir}/tests/data/derep/A_binette_quality_report.tsv", checkIfExists: true),
+                        file("${projectDir}/tests/data/derep/site_1_binette_quality_report.tsv", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert path(process.out.clusters.get(0)).readLines()[0] == "assembly\tbin\tgenome\trepresentative\tani_pct"
+        }
+    }
+}

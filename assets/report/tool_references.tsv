@@ -23,6 +23,10 @@ semibin	SemiBin2	tool	pan2023;pan2022	PMID 37387171 (SemiBin2 method); PMID 3548
 comebin	COMEBin	tool	wang2024	PMID 38233391
 binette	Binette	tool	mainguy2024	crossref; JOSS
 checkm2	CheckM2	tool	chklovski2023	PMID 37500759
+galah	galah	tool		no paper (GitHub wwood/galah)
+skani	skani	tool	shaw2023	PMID 37735570 (used by galah)
+coverm	CoverM	tool	aroney2025	PMID 40193404
+strobealign	strobealign	tool	sahlin2022	PMID 36522758 (CoverM's mapper)
 gtdbtk	GTDB-Tk	tool	chaumeil2022	PMID 36218463 (GTDB-Tk v2)
 gtdbtk_db	GTDB (database)	database	parks2026	PMID 41123020 (GTDB R10 paper, newest; pipeline uses R232)
 sylph_db	GTDB (database)	database	parks2026	PMID 41123020 (GTDB R10 paper, newest; pipeline uses R232)

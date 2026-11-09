@@ -75,7 +75,8 @@ from summary_functional import (cog_matrix, contig_function_long, contig_functio
                                 function_tables, load_contig_functional, load_microbecensus, load_read_functional,
                                 merge_contig_functional, merge_read_functional)
 from summary_assembly import assembly_stats_table, load_assembly, read_use_frame  # noqa: E402
-from summary_mags import load_mags, mag_abundance_frame, mags_table  # noqa: E402
+from summary_mags import (load_dereplication, load_mags, mag_abundance_frame, mag_cluster_abundance_frame,  # noqa: E402
+                          mag_clusters_table, mags_table)
 from summary_bin_args import arg_cluster_sharing_table, arg_mag_long_table, load_bin_clusters  # noqa: E402
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
@@ -462,6 +463,7 @@ def main(argv=None):
         contig_args = arg_rows(contig_table)
         assembly = load_assembly(root)
         mags = load_mags(root)
+        derep = load_dereplication(root)
         clusters = load_bin_clusters(root)
         cfunc = load_contig_functional(root)
         arg_abund = load_arg_gene_abundance(root) if cfunc is not None else None
@@ -480,6 +482,7 @@ def main(argv=None):
                 die(f"sample {s} is in both {seen[s]} and {root}; sample names must be unique across results directories")
             seen[s] = str(root)
         versions = load_versions(root)
+        processes = parse_versions(versions)
         found = {k for k, v in (("qc", reads is not None), ("taxonomy", taxonomy is not None), ("kmarvel", kran),
                                 ("rgi", rgi_ran), ("args_oap", sarg_ran), ("read_functional", func is not None),
                                 ("microbecensus", not mc.empty), ("contig_arg", contig_args is not None),
@@ -488,16 +491,20 @@ def main(argv=None):
                                 ("contig_functional", cfunc is not None),
                                 ("mag_functional", mags is not None and mags["bakta"]),
                                 ("gunc", mags is not None and mags.get("gunc", False)),
-                                ("checkv", has_checkv(contig_args)), ("nonpareil", nonpareil is not None)) if v}
+                                ("checkv", has_checkv(contig_args)), ("nonpareil", nonpareil is not None),
+                                ("dereplication", derep is not None),
+                                # no table of its own: MetaBAT2's depth columns (the binning tables)
+                                ("multisample", "MULTISAMPLE_SPLIT_DEPTH" in processes)) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "nonpareil": nonpareil,
                         "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
                         "rgi_kmer_ran": rgi_kmer_ran, "sarg": sarg, "sarg_cells": sarg_cells,
                         "sarg_ran": sarg_ran, "func": func, "mc": mc, "contig_args": contig_args,
-                        "contig_table": contig_table, "assembly": assembly, "mags": mags, "clusters": clusters,
+                        "contig_table": contig_table, "assembly": assembly, "mags": mags, "derep": derep,
+                        "clusters": clusters,
                         "cfunc": cfunc, "arg_abund": arg_abund, "samples": names,
                         "versions": versions,
-                        "processes": parse_versions(versions), "found": found})
+                        "processes": processes, "found": found})
         print(f"{root}: {len(names)} samples (batch '{label}')")
 
     samples = pd.DataFrame(
@@ -810,6 +817,18 @@ def main(argv=None):
             lead = ["assembly", "batch", "bin", "sample"]
             tables["mag_abundance"] = (ab[lead + [c for c in ab.columns if c not in lead]], False)
             fig_mag_abundance(figs, tables["mag_abundance"][0], mags, fig_cols, fig_groups, low)
+
+    # ---- run-level MAG clusters (--dereplicate_mags) and their abundance per sample: per batch, each batch's
+    # clusters cover its own samples only
+    derep_parts = [(b["label"], b["derep"]) for b in batches]
+    mclusters = mag_clusters_table(derep_parts)
+    if mclusters is not None:
+        tables["mag_clusters"] = (mclusters, False)
+        cab = mag_cluster_abundance_frame(derep_parts)
+        if cab is not None:
+            cab = with_meta(cab.drop(columns="batch"), samples, meta_cols, order, ["cluster"])
+            lead = ["cluster", "batch", "assembly", "bin", "sample"]
+            tables["mag_cluster_abundance"] = (cab[lead + [c for c in cab.columns if c not in lead]], False)
 
     # ---- contig ARGs with their taxon and bin (linkage), and their abundance per sample
     clong = arg_contig_long_table([(b["label"], b["contig_args"]) for b in batches], mags)
