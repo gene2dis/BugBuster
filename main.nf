@@ -68,6 +68,8 @@ def printHelp() {
       --binners                     Comma-separated binners: comebin, semibin, metabat2 (default: ${params.binners})
       --multisample_binning         MetaBAT2 depth columns from every sample of the group (per-sample assembly; needs metabat2, bwamem3) (default: ${params.multisample_binning})
       --multisample_group_by        Column of --sample_metadata: multi-sample binning within each group (default: the whole run)
+      --dereplicate_mags            galah + CoverM on the run's refined MAGs; needs --include_binning and >= 2 --binners (default: ${params.dereplicate_mags})
+      --dereplicate_ani             ANI (%) for --dereplicate_mags: 95 species, 99 strain (default: ${params.dereplicate_ani})
       --gunc_prediction             GUNC chimerism check of the refined MAGs; needs --include_binning (default: ${params.gunc_prediction})
       --args_oap_prediction         Enable ARGs-OAP read-level ARG prediction (SARG) (default: ${params.args_oap_prediction})
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
@@ -179,6 +181,8 @@ include { ARG_CONTIG_LEVEL_REPORT  } from './modules/local/arg_contig_level_repo
 include { ARG_FASTA_FORMATTER      } from './modules/local/arg_fasta_formatter/main'
 include { BIN_CONTIG_LABELS        } from './modules/local/bin_contig_labels/main'
 include { GUNC_RUN                 } from './modules/local/gunc_run/main'
+include { GALAH_CLUSTER            } from './modules/local/galah_cluster/main'
+include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
@@ -314,6 +318,12 @@ workflow {
     }
     if (flagOn(params.gunc_prediction) && !flagOn(params.include_binning)) {
         error("--gunc_prediction requires --include_binning (GUNC checks the refined bins)")
+    }
+    if (flagOn(params.dereplicate_mags) && !flagOn(params.include_binning)) {
+        error("--dereplicate_mags requires --include_binning (galah clusters the refined bins)")
+    }
+    if (flagOn(params.dereplicate_mags) && binners_list.size() < 2) {
+        error("--dereplicate_mags requires at least two --binners: galah picks each cluster's representative from Binette's CheckM2 reports, and Binette only runs with >= 2 binners. Got: ${binners_list.join(', ')}")
     }
     if (flagOn(params.arg_bin_clustering) && !flagOn(params.include_binning)) {
         error("--arg_bin_clustering requires --include_binning (it runs on the refined bins)")
@@ -467,6 +477,7 @@ workflow {
         log.info "  Multi-sample binning : ${params.multisample_group_by ? "${members.size()} groups by ${params.multisample_group_by} (${members.collect { label, samples -> "${label}: ${samples.size()}" }.sort().join(', ')})" : "one group of ${multisample_groups.size()} samples"}"
     }
     log.info "  GUNC (chimeras)      : ${params.gunc_prediction}"
+    log.info "  Dereplicate MAGs     : ${params.dereplicate_mags}${flagOn(params.dereplicate_mags) ? " (galah ${params.dereplicate_ani} % ANI + CoverM)" : ''}"
     log.info "  ARGs-OAP prediction  : ${run_args_oap}"
     log.info "  RGI AMR prediction   : ${params.rgi_prediction}"
     log.info "  K-MARVEL prediction  : ${params.kmarvel_prediction}"
@@ -734,6 +745,31 @@ workflow {
                 )
                 ch_summary_reports = ch_summary_reports.mix(GUNC_RUN.out.maxcss.map { _meta, table -> table })
                 ch_versions = ch_versions.mix(GUNC_RUN.out.versions.first())
+            }
+
+            //
+            // MODULES: run-level MAG dereplication (roadmap Phase 18b, B5):
+            // galah over the refined MAGs of every assembly, then CoverM with
+            // each sample's reads on the representatives. The clusters and the
+            // abundance cover this run's samples only. Assemblies without
+            // refined bins are left out; no task without any
+            //
+            if ( flagOn(params.dereplicate_mags) ) {
+                GALAH_CLUSTER(
+                    ch_refined_bins
+                        .filter { _meta, bins -> bins.listFiles().any { f -> f.name.endsWith('.fa') } }
+                        .map { meta, bins -> [meta.id, bins] }
+                        .join(BINNING.out.refined_quality.map { meta, report -> [meta.id, report] })
+                        .toSortedList { a, b -> a[0] <=> b[0] }
+                        .filter { items -> items }
+                        .map { items -> [items.collect { item -> item[0] }, items.collect { item -> item[1] }, items.collect { item -> item[2] }] }
+                )
+                COVERM_GENOME(ch_clean_reads.combine(GALAH_CLUSTER.out.representatives))
+                ch_summary_reports = ch_summary_reports.mix(
+                    GALAH_CLUSTER.out.clusters,
+                    COVERM_GENOME.out.abundance.map { _meta, table -> table }
+                )
+                ch_versions = ch_versions.mix(GALAH_CLUSTER.out.versions, COVERM_GENOME.out.versions.first())
             }
 
             //

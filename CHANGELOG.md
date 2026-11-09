@@ -12,6 +12,21 @@ next release is tagged.
 
 ### Added
 
+- **Run-level MAG dereplication** (`--dereplicate_mags`, off by default; needs
+  `--include_binning` and at least two `--binners`). galah 0.6.2 (skani
+  0.4.0; `quay.io/biocontainers/galah:0.6.2--hfa8f182_0` and its depot sif)
+  clusters the refined MAGs of every assembly of the run at
+  `--dereplicate_ani` (95 % by default, 80-100) and picks each cluster's
+  representative by completeness − 5 × contamination from Binette's CheckM2
+  reports (the representatives dRep chooses; Phase 18a). CoverM 0.8.0
+  (strobealign 0.17.0; `quay.io/biocontainers/coverm:0.8.0--h750ce8b_0` and its
+  depot sif) then maps each sample's read pairs to the representatives (≥ 97 %
+  identity) for their relative abundance, mean and trimmed mean depth and
+  covered fraction. Outputs in `04_binning/dereplicated/`
+  (`mag_clusters.tsv`, `representatives/`, `abundance/<sample>_coverm_genome.tsv`).
+  With or without `--multisample_binning`, in either assembly mode. The
+  clusters cover the run's samples only: a study processed in several runs
+  dereplicates downstream. Runs without the option keep every output as before.
 - **Multi-sample binning** (`--multisample_binning`, off by default; per-sample
   assembly mode, needs `--include_binning`, `metabat2` in `--binners` and
   `--read_aligner bwamem3`). MetaBAT2 bins each assembly with one depth column

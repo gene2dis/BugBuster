@@ -124,6 +124,18 @@ Complete reference for all BugBuster pipeline parameters.
 - **Description**: Multi-sample binning within groups: each sample is aligned to the concatenation of its own group's assemblies only, one depth column per sample of the group. A column of `--sample_metadata`, with the rules of `--coassembly_group_by`: every samplesheet sample needs a row and a value; labels are the values with characters outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` replaced by `_`, and may not clash with each other (also by letter case), be a sample id or `multisample`, or start with anything but a letter or digit. `pipeline_info/multisample_groups.tsv` lists each sample's group. Groups bound the concatenation each sample is aligned to. Needs `--multisample_binning`
 - **Example**: `--multisample_binning true --sample_metadata samples.tsv --multisample_group_by site`
 
+### `--dereplicate_mags`
+- **Type**: Boolean
+- **Default**: `false`
+- **Description**: Run-level dereplication of the refined MAGs and their abundance in every sample. galah 0.6.2 (skani 0.4.0) clusters the refined MAGs of every assembly of the run at `--dereplicate_ani` and picks each cluster's representative by completeness − 5 × contamination (`--quality-formula completeness-5contamination`, from Binette's CheckM2 reports; the MAGs below `--bin_min_completeness` / above `--bin_max_contamination` are left out, as Binette leaves them out). CoverM 0.8.0 `genome` then maps each sample's clean read pairs to the representatives (strobealign, reads at ≥ 97 % identity, every representative reported) for its relative abundance (% of the sample's reads, with an `unmapped` row), mean and trimmed mean depth and covered fraction. Outputs in `04_binning/dereplicated/`: `mag_clusters.tsv` (assembly, bin, genome = `<assembly>_<bin>`, representative), `representatives/<assembly>_<bin>.fa` and `abundance/<sample>_coverm_genome.tsv`; the summary gains `mag_clusters` and `mag_cluster_abundance`. With or without `--multisample_binning`, in either assembly mode. Needs `--include_binning` and at least two `--binners` (rejected at launch otherwise). **The clusters and the abundance cover this run's samples only**: a study processed in several runs dereplicates its MAGs downstream, from the merged results. Cost on 4 samples (Phase 18a): galah seconds, CoverM ~1.3 CPU-hours and ~14 GB in all
+- **Example**: `--include_binning true --binners semibin,metabat2 --dereplicate_mags true`
+
+### `--dereplicate_ani`
+- **Type**: Number (80-100)
+- **Default**: `95`
+- **Description**: Average nucleotide identity (%) at which `--dereplicate_mags` clusters MAGs: 95 for species, 99 for strains (galah `--ani`; below 90 its 90 % pre-clustering is lowered to the same value). In the Phase 18a benchmark, 99 split one species of four samples' MAGs into two clusters
+- **Example**: `--dereplicate_ani 99`
+
 ### `--gunc_prediction`
 - **Type**: Boolean
 - **Default**: `false`

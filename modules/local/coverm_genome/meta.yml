@@ -1,0 +1,38 @@
+name: coverm_genome
+description: Abundance of the run's dereplicated MAGs in one sample (--dereplicate_mags) - CoverM genome maps the sample's read pairs to the representatives and reports relative abundance, mean and trimmed mean depth and covered fraction
+keywords:
+  - abundance
+  - coverage
+  - mag
+  - dereplication
+tools:
+  - coverm:
+      description: Read coverage calculator for metagenomics; genome mode maps reads with strobealign (or minimap2) and summarises per genome
+      homepage: https://github.com/wwood/CoverM
+      documentation: https://wwood.github.io/CoverM/coverm-genome.html
+      licence: ["GPL-3.0"]
+
+input:
+  - meta:
+      type: map
+      description: Sample metadata (meta.id is the sample name)
+  - reads:
+      type: file
+      description: The sample's clean reads, R1, R2[, singleton]; the pairs are mapped
+      pattern: "*.fastq.gz"
+  - representatives:
+      type: directory
+      description: GALAH_CLUSTER's representatives (<assembly>_<bin>.fa)
+
+output:
+  - abundance:
+      type: tuple
+      description: Tuple of meta and the table (Genome, Relative Abundance (%), Mean, Trimmed Mean, Covered Fraction; an 'unmapped' row)
+      pattern: "*_coverm_genome.tsv"
+  - versions:
+      type: file
+      description: Software versions
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

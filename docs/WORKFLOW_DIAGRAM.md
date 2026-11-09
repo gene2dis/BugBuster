@@ -44,6 +44,8 @@ flowchart TD
     ASSEMBLY -->|include_binning| BINNING["BINNING<br/>SemiBin2 | MetaBAT2 | COMEBin<br/>→ Binette, CheckM2, GTDB-Tk"]
     ASSEMBLY -->|"multisample_binning<br/>(per-sample assembly)"| MULTISAMPLE_COVERAGE["MULTISAMPLE_COVERAGE<br/>each sample → its group's<br/>concatenated assemblies"]
     MULTISAMPLE_COVERAGE -->|MetaBAT2 depth columns| BINNING
+    BINNING -->|"dereplicate_mags<br/>(≥ 2 binners)"| Derep["GALAH_CLUSTER → COVERM_GENOME<br/>run-level MAG clusters and<br/>their abundance per sample"]
+    Clean -->|dereplicate_mags| Derep
     ASSEMBLY -->|"contig_tax_and_arg or<br/>arg_bin_clustering or<br/>contig_level_functional"| PYRODIGAL["PYRODIGAL<br/>shared gene calling"]
     PYRODIGAL -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| DEEPARG_CONTIGS
     ASSEMBLY -->|genomad_prediction| NFCORE_GENOMAD_ENDTOEND["NFCORE_GENOMAD_ENDTOEND<br/>plasmid / virus / provirus"]
@@ -71,6 +73,7 @@ flowchart TD
     READ_FUNCTIONAL -.-> RESULTS_SUMMARY
     ASSEMBLY -.-> RESULTS_SUMMARY
     BINNING -.-> RESULTS_SUMMARY
+    Derep -.-> RESULTS_SUMMARY
     ContigTax -.-> RESULTS_SUMMARY
     BinARG -.-> RESULTS_SUMMARY
     FUNCTIONAL_ANNOTATION -.-> RESULTS_SUMMARY
@@ -81,7 +84,7 @@ flowchart TD
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     classDef data fill:#FFF8E6,stroke:#E69F00,stroke-width:1.5px,color:#111
     class INPUT_CHECK,PREPARE_DATABASES,QC,NONPAREIL,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
-    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
+    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,Derep,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
     class Input,Clean,Versions data
 ```
 
@@ -116,6 +119,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `BINETTE` / `CHECKM2_BATCH` | ≥ 2 `binners` / 1 binner (default `semibin`) | — |
 | `MULTISAMPLE_COVERAGE` | `multisample_binning` and `include_binning` (groups of ≥ 2 samples; by `multisample_group_by`, else the whole run) | needs `assembly_mode == 'assembly'`, `include_binning`, `metabat2` in `binners`, `read_aligner == 'bwamem3'`; `multisample_group_by` needs `multisample_binning` and `sample_metadata`, with the group rules of `coassembly_group_by` (label not `multisample`); warning above 20 samples per group |
 | `GUNC_RUN` | `gunc_prediction` and `include_binning` (assemblies without refined bins skipped) | `gunc_prediction` needs `include_binning` |
+| `GALAH_CLUSTER`, `COVERM_GENOME` | `dereplicate_mags` and `include_binning` (assemblies without refined bins left out; no task without any); either assembly mode, with or without `multisample_binning` | `dereplicate_mags` needs `include_binning` and ≥ 2 `binners`; `dereplicate_ani` 80-100 |
 | `PYRODIGAL` | (`contig_tax_and_arg` or `arg_bin_clustering` or `contig_level_functional`) and an assembly | — |
 | `DEEPARG_CONTIGS` | (`contig_tax_and_arg` or `arg_bin_clustering`) and an assembly | — |
 | `BIN_CONTIG_LABELS` | `include_binning` and (`contig_tax_and_arg` or `arg_bin_clustering`) | — |
@@ -322,6 +326,10 @@ flowchart TD
     Bins --> GTDB_TK_BATCH["GTDB_TK_BATCH<br/>all samples in one run"]
     Bins -->|gunc_prediction| GUNC_RUN["GUNC_RUN<br/>chimerism per assembly<br/>(skipped without bins)"]
     GUNC_RUN -.->|"mags gunc_pass, scores"| Summary(["RESULTS_SUMMARY"])
+    Bins -->|dereplicate_mags| GALAH_CLUSTER["GALAH_CLUSTER<br/>every assembly's MAGs,<br/>dereplicate_ani (95)"]
+    Quality -->|Binette's reports| GALAH_CLUSTER
+    GALAH_CLUSTER -->|representatives| COVERM_GENOME["COVERM_GENOME<br/>each sample's reads"]
+    GALAH_CLUSTER & COVERM_GENOME -.->|"mag_clusters,<br/>mag_cluster_abundance"| Summary
 
     BINETTE & CHECKM2_BATCH --> Quality(["CheckM2 reports"])
 
@@ -336,7 +344,7 @@ flowchart TD
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     class SEMIBIN,CHECKM2_BATCH,GTDB_TK_BATCH,BIN_QUALITY_REPORT,BIN_TAX_REPORT,CALCULATE_DEPTH,BIN_DEPTH on
-    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY,GUNC_RUN opt
+    class METABAT2,COMEBIN,BINETTE,BIN_SUMMARY,GUNC_RUN,GALAH_CLUSTER,COVERM_GENOME opt
 ```
 
 The whole subworkflow needs `include_binning` (default `false`); the green boxes are what a
@@ -345,6 +353,9 @@ and `bin_max_contamination` 10. **Outputs:** `refined_bins`, `gtdbtk` (bac120/ar
 summaries), `refined_quality` (CheckM2 of the refined bins), `bin_depth` (`BIN_DEPTH`, both assembly modes).
 `GUNC_RUN` (`gunc_prediction`) is called in `main.nf` on the subworkflow's refined bins; it
 adds columns to the summary's `mags` table and does not change the MIMAG tier.
+`GALAH_CLUSTER` and `COVERM_GENOME` (`dereplicate_mags`) are called in `main.nf` too, on the
+refined bins of every assembly of the run and each sample's clean reads; the clusters and the
+abundance cover this run's samples only (`04_binning/dereplicated/`).
 
 #### Multi-sample coverage (MULTISAMPLE_COVERAGE)
 
@@ -577,6 +588,8 @@ results directories outside the pipeline (manual, Example 13).
 | `BIN_DEPTH` | always (a refined bin set) | MAG depth per sample: the length-weighted mean of its contigs' jgi depths |
 | `BIN_SUMMARY` | `coassembly` mode | Bin summary (quality, taxonomy, depth per sample) |
 | `GUNC_RUN` | `gunc_prediction` | GUNC chimerism check of each assembly's refined bins (called from `main.nf`) |
+| `GALAH_CLUSTER` | `dereplicate_mags` | galah dereplication of every assembly's refined MAGs, representative by completeness − 5 × contamination (called from `main.nf`) |
+| `COVERM_GENOME` | `dereplicate_mags` | CoverM genome abundance of the representatives in each sample (called from `main.nf`) |
 | `MULTISAMPLE_CONCAT` | `multisample_binning` | A group's assemblies in one FASTA, contigs named `<sample>:<contig>` |
 | `MULTISAMPLE_BWAMEM3_INDEX` / `MULTISAMPLE_BWAMEM3_SAMTOOLS` | `multisample_binning` | bwa-mem3 index of the concatenation; each sample of the group aligned to it (the per-sample alignment's filters) |
 | `MULTISAMPLE_CALCULATE_DEPTH` | `multisample_binning` | jgi depths of the concatenation, one column per sample of the group |
