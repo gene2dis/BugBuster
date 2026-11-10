@@ -819,9 +819,12 @@ assert v == {"KARGVA": {"kargva": "1.0"}, "FASTP": {"fastp": "1.0.1"},
 from summary_catalog import stage_status
 kv = parse_versions('"TAXONOMY:KRAKEN2":\n    kraken2: 2.1.6\n"TAXONOMY:BRACKEN":\n    bracken: 3.0.1\n')
 assert dict((st["key"], s) for st, s in stage_status(kv, set()))["taxonomy"] == "ran, no table found"
-# Pyrodigal for the contig ARGs alone does not make the contig functional stage look run
-cv = parse_versions('"PYRODIGAL":\n    pyrodigal: 3.6.3\n"DEEPARG_CONTIGS":\n    deeparg: 1.0.4\n')
-assert dict((st["key"], s) for st, s in stage_status(cv, {"contig_arg"}))["contig_functional"] == "not run"
+# the gene calling and DeepARG shared with the bin ARGs (--arg_bin_clustering alone) do not make the contig
+# functional or contig ARG stage look run
+cv = parse_versions('"PYRODIGAL":\n    pyrodigal: 3.6.3\n"DEEPARG_CONTIGS":\n    deeparg: 1.0.4\n'
+                    '"BIN_ARG_SPLIT":\n    python: 3.12.0\n')
+st_bin = dict((st["key"], s) for st, s in stage_status(cv, {"bin_arg"}))
+assert st_bin["contig_functional"] == "not run" and st_bin["contig_arg"] == "not run", st_bin
 # one tier per gene across methods: the first method's tier wins
 k = pd.DataFrame({"gene": ["g1"], "tier": [2], "category": ["a"], "tier_note": [""],
                   "resistance_snp_status": [""], "resistance_snps_found": [""]})

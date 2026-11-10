@@ -1,7 +1,9 @@
 """The pipeline's stages, for the README and LLM_GUIDE.md of bin/results_summary.py.
 
 Each stage lists the params that turn it on, the processes whose software_versions.yml entries show it ran,
-and what the summary takes from it. Keep it in step with main.nf when a stage or process is added.
+and what the summary takes from it. Keep it in step with main.nf when a stage or process is added. List only
+processes that run for this stage alone: one that other options also run (PYRODIGAL, DEEPARG_CONTIGS) would
+mark the stage as run, and its table as missing, when only another option ran it.
 """
 
 STAGES = [
@@ -100,7 +102,8 @@ STAGES = [
     {
         "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
         "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
-        "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "DEEPARG_CONTIGS", "ARG_CONTIG_LEVEL_REPORT"],
+        # not DEEPARG_CONTIGS: it also runs for the bin ARGs alone
+        "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "ARG_CONTIG_LEVEL_REPORT"],
         "summary": "arg_contig_long (each contig ARG with its taxon, bin and geNomad class), arg_contig_hosts; "
                    "arg_contig_abundance (with --contig_level_functional)",
     },
