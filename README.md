@@ -41,19 +41,22 @@ The pipeline is built using [Nextflow](https://www.nextflow.io), a workflow tool
 9. Read traceback and taxonomic reports (abundance tables and Phyloseq-compatible outputs).
 10. Genome assembly [`Megahit`](https://github.com/voutcn/megahit)
 11. Contig filter [`BBmap`](https://jgi.doe.gov/data-and-tools/software-tools/bbtools/bb-tools-user-guide/bbmap-guide/)
-12. Taxonomic annotation of contigs with Metabuli (`refseq_standard`, NCBI taxonomy), tabulated and plotted with BlobTools; with binning, each contig's bin and the bin's GTDB-Tk classification as separate columns. If requested (`--genomad_prediction`), plasmid / virus / provirus classification of the contigs with geNomad. [`Metabuli`](https://github.com/steineggerlab/Metabuli), [`BlobTools`](https://github.com/DRL/blobtools), [`geNomad`](https://github.com/apcamargo/genomad)
+12. Taxonomic annotation of contigs with Metabuli (`refseq_standard`, NCBI taxonomy), tabulated and plotted with BlobTools; with binning, each contig's bin and the bin's GTDB-Tk classification as separate columns. If requested (`--genomad_prediction`), plasmid / virus / provirus classification of the contigs with geNomad, and (`--checkv_prediction`) the quality of its viruses and proviruses with CheckV 1.1.1. [`Metabuli`](https://github.com/steineggerlab/Metabuli), [`BlobTools`](https://github.com/DRL/blobtools), [`geNomad`](https://github.com/apcamargo/genomad), [`CheckV`](https://bitbucket.org/berkeleylab/checkv)
 13. ORF prediction in contigs with Pyrodigal (one shared gene-calling pass feeding DeepARG and functional annotation). [`Pyrodigal`](https://github.com/althonos/pyrodigal)
 14. If requested contig-level functional annotation with eggNOG-mapper, CAZy annotation with run_dbcan, per-gene abundance quantification with featureCounts, average genome size estimation with MicrobeCensus, and study-level TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — with the eggNOG and dbCAN CAZy calls reported separately). [`eggNOG-mapper`](https://github.com/eggnogdb/eggnog-mapper), [`run_dbcan`](https://github.com/bcb-unl/run_dbcan), [`featureCounts`](https://subread.sourceforge.net), [`MicrobeCensus`](https://github.com/snayfach/MicrobeCensus)
 15. Prediction of resistance genes at the contig level with DeepARG (one run per assembly; the bin-level ARGs are its hits split by bin). [`DeepARG`](https://github.com/gaarangoa/deeparg)
 16. Contig reports, scatter plot of taxonomy at Phylum level and scatter plot of resistance genes in contigs.
 17. Binning with user-selectable tools (default: SemiBin; options: [`Metabat2`](https://bitbucket.org/berkeleylab/metabat/src/master/), [`SemiBin`](https://github.com/BigDataBiology/SemiBin), [`COMEBin`](https://github.com/ziyewang/COMEBin))
+   - If requested (`--multisample_binning`, per-sample assemblies), MetaBAT2 gets one depth column per sample of the run or of its `--multisample_group_by` group, from one extra bwa-mem3 alignment of each sample to the concatenation of the group's assemblies.
 18. Binning refinement with [`Binette`](https://github.com/genotoul-bioinfo/Binette) (only when ≥2 binners are selected)
 19. Bin quality prediction [`CheckM2`](https://github.com/chklovski/CheckM2) (with ≥2 binners, taken from Binette's own CheckM2 run on the raw and refined bins)
 20. Bin taxonomic prediction [`GTDB-TK`](https://github.com/Ecogenomics/GTDBTk)
+   - If requested (`--gunc_prediction`), chimerism check of the refined bins with GUNC 1.1.1. [`GUNC`](https://github.com/grp-bork/gunc)
+   - If requested (`--dereplicate_mags`, ≥2 binners), run-level dereplication of the refined MAGs with galah 0.6.2 and each representative's abundance in every sample with CoverM 0.8.0. [`galah`](https://github.com/wwood/galah), [`CoverM`](https://github.com/wwood/CoverM)
 21. Bin reports.
 22. If requested MAG-level functional annotation of the refined bins with Bakta, one annotation per bin (requires ≥2 binners so only Binette quality-filtered bins are annotated). [`Bakta`](https://github.com/oschwengers/bakta)
 23. If requested ARG clustering [`mmseqs2`](https://github.com/soedinglab/MMseqs2)
-24. Run-level results summary (`00_summary/`, on by default): QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus tables, an Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
+24. Run-level results summary (`00_summary/`, on by default): tables of every stage that ran (QC and Nonpareil, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus, assembly, MAGs with GUNC and the dereplicated clusters, contig ARGs with geNomad / CheckV, bin ARG clusters, contig functional), an Excel workbook, figures, a multi-page offline HTML report, a PDF report, a README and a guide to the results for language models, with depth flags, RPKM-normalised ARGs in reporting tiers, RGI's pathogen of origin, a K-MARVEL vs RGI comparison and a watchlist of priority pathogens. The same script merges several finished runs (batches).
 25. Assembly modes: "coassembly", "assembly", "none"
 
 ## Quick Start
@@ -149,6 +152,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **CARD (RGI)** | 500 MB - 50 GB | AMR gene prediction with pathogen-of-origin | `rgi_prediction=true` | `--custom_rgi_card_db`, `--custom_rgi_wildcard` |
 | **CARD 4.0.1 (K-MARVEL)** | 4.6 MB download, 4.1 MB stored | Read-level ARG assembly with K-MARVEL | `kmarvel_prediction=true` | `--custom_kmarvel_db` |
 | **CheckM2** | 2.9 GB | Bin quality assessment | `include_binning=true` | `--custom_checkm2_db` |
+| **GUNC proGenomes 2.1** | 7.2 GB download, 13.5 GB unpacked (`gtdb_214` is the GTDB-based one) | Chimerism check of the refined bins | `gunc_prediction=true` | `--custom_gunc_db` |
+| **CheckV 1.5** | 1.68 GB download, 6.4 GB unpacked | Quality of geNomad's viruses and proviruses | `checkv_prediction=true` | `--custom_checkv_db` |
 | **GTDB-TK r232** | ~61 GB download | Bin taxonomic classification (GTDB-Tk 2.8.0; only R232 data works) | `include_binning=true` | `--custom_gtdbtk_db` |
 | **eggNOG 7 (emapper-3.0)** | 44 GB | Contig functional annotation (eggNOG-mapper v3) | `contig_level_functional=true` | `--custom_eggnog_db` |
 | **dbCAN (db_v5-2-9_5-5-2026)** | 7.4 GB | CAZy annotation of predicted proteins (run_dbcan v5) | `contig_level_functional=true` (and `functional_cazy=true`, the default) | `--custom_dbcan_db` |
@@ -171,6 +176,8 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 - **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
 - **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
 - **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+- **gunc_db**: [`GUNC proGenomes 2.1 database`](https://zenodo.org/records/19631736)
+- **checkv_db**: [`CheckV database 1.5`](https://portal.nersc.gov/CheckV/)
 - **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
 - **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
 - **dbcan_db**: [`dbCAN S3 release db_v5-2-9_5-5-2026`](https://dbcan.s3.us-west-2.amazonaws.com/db_v5-2-9_5-5-2026/)
@@ -223,13 +230,19 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--kmarvel_prediction` | `false` | Read-level ARG assembly against CARD with K-MARVEL (needs no assembly) |
 | `--contig_tax_and_arg` | `false` | Contig taxonomy (Metabuli, BlobTools tables/plots) and ARG prediction (DeepARG) |
 | `--genomad_prediction` | `false` | Plasmid / virus / provirus classification of contigs with geNomad (needs an assembly; ARG columns and `00_summary/tables/arg_contig_mobile.tsv` with `--contig_tax_and_arg`) |
+| `--checkv_prediction` | `false` | CheckV quality of geNomad's viruses and proviruses (needs `--genomad_prediction`) |
+| `--gunc_prediction` | `false` | GUNC chimerism check of the refined bins (needs `--include_binning`) |
+| `--multisample_binning` | `false` | MetaBAT2 depth columns from every sample of the run or group (needs `--assembly_mode assembly`, `metabat2` in `--binners` and `--read_aligner bwamem3`) |
+| `--multisample_group_by` | none | Column of `--sample_metadata`: multi-sample binning within each group (a launch warning above 20 samples per group) |
+| `--dereplicate_mags` | `false` | galah + CoverM over the run's refined MAGs (needs `--include_binning` and ≥2 `--binners`); `04_binning/dereplicated/` |
+| `--dereplicate_ani` | `95` | ANI (%) of the dereplication clusters: 95 species, 99 strain |
 | `--contig_level_functional` | `false` | Contig functional annotation (Pyrodigal + eggNOG-mapper v3 + run_dbcan CAZy + featureCounts + TPM/CPGE tables); needs an assembly |
 | `--mag_level_functional` | `false` | Bakta annotation of every refined bin (needs `--include_binning` and ≥2 `--binners`) |
 | `--read_level_functional` | `none` | Read-level functional profiling: `woltka`, `superfocus`, `humann` or `none` (needs no assembly) |
 | `--microbecensus` | `true` | MicrobeCensus average genome size for CPGE normalization (with a contig or read functional branch) |
 | `--functional_cazy` | `true` | run_dbcan CAZy annotation in the contig functional branch |
 | `--arg_bin_clustering` | `false` | Bin-level ARGs (DEEPARG_CONTIGS hits split by bin) and clustering |
-| `--results_summary` | `true` | Run-level summary in `00_summary/` (tables, Excel, figures, HTML report) |
+| `--results_summary` | `true` | Run-level summary in `00_summary/` (tables, Excel, figures, HTML and PDF reports) |
 
 ### Database Selection
 
@@ -240,6 +253,8 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
 | `--metabuli_db` | `refseq_standard` | `refseq_standard`, `gtdb232` | Metabuli database for contig taxonomy (`gtdb232` not benchmarked) |
 | `--genomad_db` | `v1.9` | `v1.9` | geNomad database release |
+| `--checkv_db` | `v1.5` | `v1.5` | CheckV database release |
+| `--gunc_db` | `progenomes_2.1` | `progenomes_2.1`, `gtdb_214` | GUNC reference database |
 | `--databases_dir` | `<output>/../databases` | Path | Database storage location |
 
 ### Quality Control Options
@@ -322,6 +337,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--summary_group_by` / `--summary_order_by` | none | Metadata columns that group and order the samples |
 | `--summary_batch_label` | output directory name (its parent's when it is `results`) | `batch` column of the summary tables |
 | `--summary_min_clean_pairs` | `1000000` | Samples below this many clean read pairs are flagged low depth |
+| `--summary_min_nonpareil_coverage` | `0.6` | Samples below this Nonpareil coverage (0-1) get a note (with `--nonpareil`) |
 | `--summary_depth_marks` | `10000000,20000000` | Clean read-pair depths marked in the QC figure |
 | `--summary_taxa_per_sample` | `5` | Taxonomy heatmaps: union of each sample's N most abundant taxa |
 | `--summary_top_n` | `40` | Maximum rows in the ARG heatmap |
@@ -349,7 +365,7 @@ The pipeline generates organized output with numbered prefixes:
 
 ```
 results/
-├── pipeline_info/              # Execution reports, logs, contig filtering summary
+├── pipeline_info/              # Execution reports, logs, contig filtering summary, coassembly_groups.tsv / multisample_groups.tsv (with groups)
 ├── 00_summary/                 # Run-level summary (if results_summary=true): report/ (HTML report), results_summary.pdf, results_summary.xlsx, README.md, LLM_GUIDE.md, tables/, figures/
 ├── clean_reads/                # Decontaminated reads (only if --store_clean_reads)
 ├── 01_quality_control/         # FastP reports (if quality_control=true) + read-count summary
@@ -366,8 +382,9 @@ results/
 │   ├── per_sample/             # Per-sample assemblies
 │   └── coassembly/             # Co-assembly results (coassembly/{group}/ per group with --coassembly_group_by)
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
-│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/ (MAG depth)
+│   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2; gunc/ if gunc_prediction=true), taxonomy/ (GTDB-TK), coverage/ (MAG depth)
 │   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/ (coassembly/{group}/ per group)
+│   ├── dereplicated/           # galah clusters (mag_clusters.tsv), representatives/, CoverM abundance/ (if dereplicate_mags=true)
 │   ├── quality/summary/        # Aggregated quality reports (assembly mode)
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)
 ├── 05_arg_prediction/          # ARG predictions
@@ -388,9 +405,10 @@ results/
 │       ├── deeparg/            # Per-bin DeepARG hits (DEEPARG_CONTIGS split by bin)
 │       ├── arg_fasta/          # ARG proteins per bin (the clustering input)
 │       └── clustering/         # MMseqs2 ARG clusters
-├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true)
+├── 06_contig_taxonomy/         # Contig taxonomy (if contig_tax_and_arg=true), geNomad and CheckV
 │   ├── metabuli/{sample}/      # Metabuli per-contig calls (with lineage) and clade report
 │   ├── genomad/{sample}/       # geNomad summaries, scores and proviruses (if genomad_prediction=true)
+│   ├── checkv/{sample}/        # CheckV quality summary of geNomad's viruses (if checkv_prediction=true)
 │   └── figures/                # BlobTools plots
 └── 07_functional_annotation/   # Functional annotation
     ├── gene_calling/{sample}/  # Pyrodigal ORFs (if contig_tax_and_arg, arg_bin_clustering or contig_level_functional; coassembly/ under co-assembly)
@@ -422,6 +440,7 @@ For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output
 | [`docs/RGI_WILDCARD_USAGE.md`](docs/RGI_WILDCARD_USAGE.md) | Manual CARD/WildCARD database preparation for RGI |
 | [`docs/YAML_PARAMETERS_GUIDE.md`](docs/YAML_PARAMETERS_GUIDE.md) | Running the pipeline with `-params-file` YAML files |
 | [`docs/DISK_OPTIMIZATION.md`](docs/DISK_OPTIMIZATION.md) | Reducing disk usage (`low_disk` profile, work-dir cleanup) |
+| [`docs/benchmarks/`](docs/benchmarks/) | Benchmarks behind the defaults (aligner, assembly, binning, multi-sample binning, contig taxonomy, report system) |
 
 ## Credits
 
