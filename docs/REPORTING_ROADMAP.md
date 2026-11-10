@@ -81,14 +81,14 @@ ARGS_OAP runs ARGs-OAP 4.0.0 stages one and two; `bin/args_oap_report.py` (ARGS_
 - **Open: `extracted.fa` and `blastout.txt`** (the stage-one candidate reads and the raw BLASTX hits, ~90 MB per
   full-depth sample) are published but only the filtered files are read.
 
-## Read functional (Woltka) and MicrobeCensus (verified on Pudahuel, 2026-10-17)
+## Read functional (Woltka) and MicrobeCensus (verified on a real sample set, 2026-10-17)
 
 `results_summary.py` reads AGGREGATE_READ_FUNCTIONS' tables and MicrobeCensus (`bin/summary_functional.py`); the
 tables match the pipeline's own CPGE matrices exactly.
 
 - **Open: MetaCyc mixes reactions with pathways.** WoLr2's `function/metacyc/reaction-to-pathway.map` has 159 targets
   that are reaction IDs (`1.1.1.39-RXN`, ...), not pathways, and absent from `pathway_name.txt`.
-  `bin/woltka_function_profile.py` follows the map, so 135 such IDs appear as MetaCyc "pathways" in a Pudahuel sample.
+  `bin/woltka_function_profile.py` follows the map, so 135 such IDs appear as MetaCyc "pathways" in one of its samples.
   Fix: keep only targets listed in `pathway_name.txt` (changes WOLTKA_CLASSIFY's output; ask first).
 - The per-sample ORF table's sample column is `<sample>.wol` (the SAM name), unlike every other table.
 - ARGs-OAP's cell estimate (`nCell`) and MicrobeCensus genome equivalents differ by 16-22% on the same samples; the
@@ -99,7 +99,7 @@ tables match the pipeline's own CPGE matrices exactly.
 - **Fixed: RGI_BWT / RGI_KMER** wrote multi-line junk (`rgi:` with no version, `kma --version` is not a KMA option);
   both now record `rgi main --version` and `kma -v`.
 
-## Read-level ARGs: RGI bwt / kmer (verified on batch1, 32 samples, 2026-10-16)
+## Read-level ARGs: RGI bwt / kmer (verified on a 32-sample batch, 2026-10-16)
 
 `RGI_REPORT` (inline Python in `modules/local/rgi_report/main.nf`) publishes `RGI_summary_report.csv` and four PNGs;
 `RESULTS_SUMMARY` reads the RGI allele and k-mer gene tables.
@@ -107,13 +107,13 @@ tables match the pipeline's own CPGE matrices exactly.
 Done:
 
 - **RGI in the summary.** Genes count at `--rgi_summary_min_coverage` (80) % coverage of their best reference
-  sequence (`rgi bwt` lists every gene with any mapped read: 38-548 per batch1 sample, 0-140 at 80%). Rows go into
+  sequence (`rgi bwt` lists every gene with any mapped read: 38-548 per sample of that batch, 0-140 at 80%). Rows go into
   `arg_long.tsv` with a `method` column; RGI is the primary method when K-MARVEL did not run.
 - **Pathogen of origin is parsed** from `<sample>_rgi_kmer_61mer_analysis.gene.txt` (`CARD*kmer Prediction`):
-  `rgi_kmer_hosts` and `rgi_host_check` (top host a watchlist pathogen or not). On batch1 it separated real
+  `rgi_kmer_hosts` and `rgi_host_check` (top host a watchlist pathogen or not). On that batch it separated real
   priority genes (KPC, NDM -> *K. pneumoniae*; vanB -> *E. faecium*) from WildCARD sequences of gut commensals
   (poxtA -> *Blautia producta*, *Enterocloster*; vanD in one sample -> *Enterocloster clostridioformis*).
-- **K-MARVEL vs RGI.** Gene-level comparison (alleles collapsed): batch1 212 genes found by both, 47 K-MARVEL only
+- **K-MARVEL vs RGI.** Gene-level comparison (alleles collapsed): 212 genes found by both in that batch, 47 K-MARVEL only
   (24 of them seen by RGI below the cutoff, 16 mutation-dependent genes RGI bwt does not test), 43 RGI only.
 - **`RGI_REPORT` counts at the cutoff.** `*_cov<N>` columns beside the unfiltered ones; the plots use them.
 
@@ -123,7 +123,7 @@ Still open:
   `bin/rgi_bwt_lowcov_fallback.sh` are those of `rgi main` (16 and 27 columns), not RGI's `rgi bwt` tables
   (26 and 24). RGI_REPORT and the summary treat a table without hits as "no hits" whatever its header; anything else
   reading them would not.
-- **vanG is tier 1 and RGI finds it in 26 of 32 batch1 samples**, mostly from WildCARD sequences of Clostridia
+- **vanG is tier 1 and RGI finds it in 26 of the batch's 32 samples**, mostly from WildCARD sequences of Clostridia
   (*Ruthenibacterium*, *Faecalibacterium*); K-MARVEL calls none. The host check flags them; decide whether vanG
   belongs in tier 1 at all for gut metagenomes.
 - **Tier 4 for RGI.** `rgi bwt` reports homolog matches; mutation-dependent genes get `not_checked_rgi`.

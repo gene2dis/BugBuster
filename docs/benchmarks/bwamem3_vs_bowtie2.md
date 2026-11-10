@@ -91,13 +91,15 @@ The mock had 7.75M pairs after fastp, plus 943,056 simulated human pairs.
 
 ### Real samples
 
+Samples are labelled A–E (A–D as in the other benchmarks).
+
 | Sample | Clean pairs, bowtie2 | Clean pairs, bwa-mem3 | Removed by bwa-mem3 only | Removed by bowtie2 only |
 |---|---|---|---|---|
-| AR-3 | 29,280,649 | 27,702,591 | 2,178,326 | 600,268 |
-| BZ-10 | 1,637,616 | 226,925 | 1,451,734 | 41,043 |
-| EG-9 | 4,445,971 | 2,935,647 | 1,625,902 | 115,578 |
-| KP-10 | 1,356,426 | 1,415,758 | 153,815 | 213,147 |
-| NH-10 | 16,392,314 | 14,301,179 | 2,525,866 | 434,731 |
+| A | 16,392,314 | 14,301,179 | 2,525,866 | 434,731 |
+| B | 29,280,649 | 27,702,591 | 2,178,326 | 600,268 |
+| C | 4,445,971 | 2,935,647 | 1,625,902 | 115,578 |
+| D | 1,356,426 | 1,415,758 | 153,815 | 213,147 |
+| E | 1,637,616 | 226,925 | 1,451,734 | 41,043 |
 
 20,000 pairs of each disagreement class were re-aligned to the host with both aligners.
 
@@ -121,15 +123,15 @@ Gene counts are compared as Spearman correlations between the two arms.
 | Contig depth, co-assembly | 0.997 | 1.023 |
 | Gene counts, per-sample assemblies | 0.985–0.997 | 1.00–1.04 |
 | Gene counts, co-assembly, well-covered samples | 0.986–0.992 | 1.00–1.02 |
-| Gene counts, co-assembly, poorly covered samples (EG-9, BZ-10, KP-10) | 0.930 / 0.814 / 0.738 | 1.00–1.13 |
+| Gene counts, co-assembly, poorly covered samples (C, D, E) | 0.930 / 0.738 / 0.814 | 1.00–1.13 |
 
 Bin counts are given as HQ / MQ (CheckM2: HQ = completeness ≥ 90%, contamination < 5%; MQ = ≥ 50%, < 10%).
 
 | MetaWRAP bins | bowtie2 | bwa-mem3 | GTDB-Tk species |
 |---|---|---|---|
-| AR-3 | 9 / 8 | 9 / 8 | 17 = 17 |
-| EG-9 | 1 / 4 | 1 / 4 | 5 = 5 |
-| NH-10 | 11 / 11 | 12 / 10 | 22 = 22 |
+| A | 11 / 11 | 12 / 10 | 22 = 22 |
+| B | 9 / 8 | 9 / 8 | 17 = 17 |
+| C | 1 / 4 | 1 / 4 | 5 = 5 |
 | Co-assembly (35 bins each) | 18 / 17 | 17 / 18 | 35 = 35 |
 
 **Mapped reads with < 50 aligned bases:**
@@ -155,11 +157,11 @@ Below 0.1× the filtered value is lower than bowtie2's. The old per-bin method a
 
 | Sample | Both unfiltered | bwa-mem3 filtered vs bowtie2 | Both filtered |
 |---|---|---|---|
-| AR-3 | 0.986 | 0.998 | 0.999 |
-| BZ-10 | 0.814 | 0.931 | 0.993 |
-| EG-9 | 0.930 | 0.988 | 0.996 |
-| KP-10 | 0.738 | 0.959 | 0.990 |
-| NH-10 | 0.992 | 0.999 | 0.999 |
+| A | 0.992 | 0.999 | 0.999 |
+| B | 0.986 | 0.998 | 0.999 |
+| C | 0.930 | 0.988 | 0.996 |
+| D | 0.738 | 0.959 | 0.990 |
+| E | 0.814 | 0.931 | 0.993 |
 
 **What the filter results show:**
 - MAPQ does not remove these hits: such a hit is often the read's only placement.
@@ -179,7 +181,7 @@ The co-assembly was re-run with the filter in `BWAMEM3_SAMTOOLS`. Everything dow
 | | Unfiltered bwa-mem3 | Filtered bwa-mem3 |
 |---|---|---|
 | Contig depth, Spearman / median ratio | 0.997 / 1.023 | 0.998 / 1.006 |
-| Gene counts, Spearman (AR-3, BZ-10, EG-9, KP-10, NH-10) | 0.986, 0.814, 0.930, 0.738, 0.992 | 0.998, 0.931, 0.988, 0.959, 0.999 |
+| Gene counts, Spearman (samples A, B, C, D, E) | 0.992, 0.986, 0.930, 0.738, 0.814 | 0.999, 0.998, 0.988, 0.959, 0.931 |
 | Bin depth, Spearman / median ratio (33 paired bins × 5 samples) | 0.989 / 1.17 | 0.994 / 0.94 |
 | Mapped %, difference from bowtie2 | +0.6 to +18 points | −0.5 to −1.8 points |
 | Mapped reads with < 50 aligned bases | 1.0–28% | 0% (bowtie2: 0.5–3.6%) |
@@ -192,7 +194,7 @@ The co-assembly was re-run with the filter in `BWAMEM3_SAMTOOLS`. Everything dow
 - Net bin quality is slightly higher: median completeness is 93.3% against bowtie2's 92.6%.
 
 **Cost:**
-- Wall time rises 20–40% on the large mapping tasks: AR-3 3.7 → 5.1 min, pooled co-assembly 8.1 → 9.9 min. CPU time stays the same.
+- Wall time rises 20–40% on the large mapping tasks: B 3.7 → 5.1 min, pooled co-assembly 8.1 → 9.9 min. CPU time stays the same.
 - bowtie2 takes 26.5 and 38.1 min for these tasks.
 - Bin depth takes 7.7 min, against 266 min for bowtie2.
 
