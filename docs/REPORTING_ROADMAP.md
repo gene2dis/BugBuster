@@ -96,8 +96,8 @@ tables match the pipeline's own CPGE matrices exactly.
 
 ## Software versions (found 2026-10-17)
 
-- **Open: RGI_BWT / RGI_KMER** write multi-line junk (`rgi:` with no version, `kma --version` is not a KMA option).
-  Fixing the modules reruns RGI_BWT on `-resume` (hours per sample).
+- **Fixed: RGI_BWT / RGI_KMER** wrote multi-line junk (`rgi:` with no version, `kma --version` is not a KMA option);
+  both now record `rgi main --version` and `kma -v`.
 
 ## Read-level ARGs: RGI bwt / kmer (verified on batch1, 32 samples, 2026-10-16)
 

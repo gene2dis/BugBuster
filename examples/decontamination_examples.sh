@@ -160,9 +160,10 @@ nextflow run main.nf \
 # ==============================================================================
 # Example 12: Custom Database Directory
 # ==============================================================================
-# Publish the downloaded databases and built indexes to a shared location. Later
-# runs reuse them only when passed back with the --custom_* options (e.g.
-# --custom_decontamination_index /shared/databases/bwamem3_index/contaminants_index)
+# Store the downloaded databases and built indexes in a shared location. A later
+# run with the same --databases_dir reuses them without downloading or building
+# again. Only an index built from --custom_host_fasta / --custom_phiX_fasta is
+# not stored there: pass it back with --custom_decontamination_index.
 
 nextflow run main.nf \
   --input samplesheet.csv \

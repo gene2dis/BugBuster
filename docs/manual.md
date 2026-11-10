@@ -53,8 +53,8 @@ The figure at the top of this manual shows the stages from reads to results. [WO
 | Software | Minimum Version | Purpose |
 |----------|-----------------|---------|
 | Nextflow | ≥25.10.0 | Workflow engine |
-| Java | 11-17 | Nextflow runtime |
-| Container runtime | - | Docker, Singularity, or Podman |
+| Java | 17-26 | Nextflow runtime (the Nextflow launcher refuses other versions) |
+| Container runtime | - | Docker, Singularity, Apptainer, or Podman |
 
 ### Hardware Requirements
 
@@ -948,7 +948,8 @@ already gives MetaBAT2 one column per sample), `--include_binning`, `metabat2` i
   concatenation was 0.32-0.97 of its true depth in the benchmark. They feed
   MetaBAT2 only: the MAG depth (`coverage/<sample>_bin_depth.tsv`,
   `mag_abundance`), featureCounts and everything else keep the sample's own
-  alignment. Nothing new is published apart from the group table.
+  alignment. Nothing new is published apart from the group table
+  (`pipeline_info/multisample_groups.tsv`, with `--multisample_group_by`).
 - COMEBin keeps the sample's own BAM. With the group's columns its own bins
   improved, but the refined bins did not change by more than COMEBin's spread
   under a change of contig names (Phase 18b, in the benchmark).
@@ -1337,11 +1338,13 @@ nextflow run main.nf \
 | `conda` | Run with Conda environments |
 | `slurm` | Submit jobs to SLURM scheduler |
 | `slurm_singularity` | SLURM with Singularity |
+| `local_docker` | Docker with the container user mapped to yours (`-u $(id -u):$(id -g)`) |
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
 | `low_disk` | Deletes the work dir after a successful run (`cleanup = true`; does not lower peak usage during the run; a completed run cannot be resumed, an interrupted one can) plus `--store_clean_reads` — see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md) |
 | `test` | Run with minimal test data |
+| `debug` | Keeps the work dir, dumps task hashes and prints each task's host name (for `-resume` problems) |
 
 > **`low_disk` with the functional branches:** the profile only cleans the work
 > directory. The functional annotation databases are stored at
@@ -1432,11 +1435,13 @@ results/
 │   │                                           # assembly_stats, assembly_read_use (assembly), mags, mag_abundance
 │   │                                           # (binning), arg_contig_long, arg_contig_hosts, arg_contig_abundance
 │   │                                           # (contig ARGs), arg_mag_long, arg_cluster_sharing (bin ARG clustering),
-│   │                                           # function_contig_long, function_contig_<ontology> (contig functional)
+│   │                                           # function_contig_long, function_contig_<ontology> (contig functional),
+│   │                                           # arg_contig_mobile (geNomad / CheckV), mag_clusters,
+│   │                                           # mag_cluster_abundance (dereplication)
 │   └── figures/                                # qc_read_fate, taxonomy heatmaps and genus bars, watchlist, ARG heatmaps,
 │                                               # arg_vs_depth, arg_method_upset, arg_method_by_category,
 │                                               # arg_sarg_type_heatmap, function_cog_heatmap, function_contig_cog_heatmap,
-│                                               # mag_quality, mag_abundance_heatmap, arg_contig_hosts
+│                                               # mag_quality, mag_abundance_heatmap, arg_contig_hosts, nonpareil_curves
 │                                               # (.pdf/.svg/.png, plotted values in .csv)
 ├── clean_reads/                                # Decontaminated reads (only if --store_clean_reads)
 │   └── {sample}/                               # Per-sample clean R1/R2/Singleton FASTQs
@@ -1576,7 +1581,7 @@ results/
 │       │   └── {sample}/                       # {sample}_{bin}_ARGs.faa (coassembly/ under co-assembly)
 │       └── clustering/                         # MMseqs2 clustering results
 │           └── *_cluster.tsv
-├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true)
+├── 06_contig_taxonomy/                         # Contig taxonomy (if contig_tax_and_arg=true), geNomad and CheckV
 │   ├── metabuli/                               # Metabuli per contig
 │   │   └── {sample}/                           # (coassembly/ under co-assembly)
 │   │       ├── {sample}_classifications.tsv    # Per-contig call, score, rank and lineage
@@ -1849,11 +1854,12 @@ The following outputs are only generated when specific parameters are enabled:
 | `05_arg_prediction/read_level/args_oap/`, `args_oap_summary/` | `args_oap_prediction=true` | ARGs-OAP (SARG) ARG profiles and read, 16S and cell estimates |
 | `05_arg_prediction/read_level/rgi/` | `rgi_prediction=true` | RGI AMR predictions with pathogen-of-origin |
 | `05_arg_prediction/read_level/kmarvel/` | `kmarvel_prediction=true` | K-MARVEL per-sample ARG tables and the `kmarvel_summary/` matrices |
-| `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` | Contig-level ARG predictions |
+| `05_arg_prediction/contig_level/` | `contig_tax_and_arg=true` (`deeparg/` also with `arg_bin_clustering=true`) | Contig-level ARG predictions |
 | `05_arg_prediction/bin_level/` | `arg_bin_clustering=true` | Bin-level ARG clustering |
-| `06_contig_taxonomy/` | `contig_tax_and_arg=true` | Contig taxonomic annotation (BlobTools) |
+| `06_contig_taxonomy/metabuli/`, `figures/` | `contig_tax_and_arg=true` | Contig taxonomy with Metabuli and BlobTools plots |
+| `06_contig_taxonomy/genomad/` | `genomad_prediction=true` | geNomad plasmid / virus / provirus calls |
 | `06_contig_taxonomy/checkv/` | `checkv_prediction=true` | CheckV quality of geNomad's viruses and proviruses |
-| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs (one `coassembly/` set under co-assembly) |
+| `07_functional_annotation/gene_calling/` | `contig_tax_and_arg=true`, `arg_bin_clustering=true` or `contig_level_functional=true` | Pyrodigal ORF predictions on contigs (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/eggnog/` | `contig_level_functional=true` | eggNOG-mapper functional annotation of predicted proteins (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/dbcan/` | `contig_level_functional=true` and `functional_cazy=true` | run_dbcan CAZy annotation with per-tool calls and substrate predictions (one `coassembly/` set under co-assembly) |
 | `07_functional_annotation/gene_abundance/` | `contig_level_functional=true` | featureCounts per-gene read counts (per sample in both assembly modes) |
@@ -1950,7 +1956,7 @@ bin_max_contamination: 10
 nextflow run main.nf -params-file params.yaml -profile singularity
 ```
 
-With every sample's coverage for MetaBAT2 and COMEBin (samples cross-mapped
+With every sample's coverage for MetaBAT2 (samples cross-mapped
 within each `site` of the metadata table), GUNC, and run-level MAG clusters
 with their abundance in every sample (see 6.8):
 

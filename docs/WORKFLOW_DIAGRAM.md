@@ -44,6 +44,7 @@ flowchart TD
     ASSEMBLY -->|include_binning| BINNING["BINNING<br/>SemiBin2 | MetaBAT2 | COMEBin<br/>→ Binette, CheckM2, GTDB-Tk"]
     ASSEMBLY -->|"multisample_binning<br/>(per-sample assembly)"| MULTISAMPLE_COVERAGE["MULTISAMPLE_COVERAGE<br/>each sample → its group's<br/>concatenated assemblies"]
     MULTISAMPLE_COVERAGE -->|MetaBAT2 depth columns| BINNING
+    BINNING -->|gunc_prediction| GUNC_RUN["GUNC_RUN<br/>chimerism of the refined MAGs"]
     BINNING -->|"dereplicate_mags<br/>(≥ 2 binners)"| Derep["GALAH_CLUSTER → COVERM_GENOME<br/>run-level MAG clusters and<br/>their abundance per sample"]
     Clean -->|dereplicate_mags| Derep
     ASSEMBLY -->|"contig_tax_and_arg or<br/>arg_bin_clustering or<br/>contig_level_functional"| PYRODIGAL["PYRODIGAL<br/>shared gene calling"]
@@ -52,6 +53,8 @@ flowchart TD
     ASSEMBLY -->|contig_tax_and_arg| ContigTax["Contig taxonomy + ARG<br/>METABULI_CLASSIFY, BLOBTOOLS,<br/>ARG_CONTIG_LEVEL_REPORT"]
     DEEPARG_CONTIGS --> ContigTax
     NFCORE_GENOMAD_ENDTOEND -->|with contig_tax_and_arg| ContigTax
+    NFCORE_GENOMAD_ENDTOEND -->|checkv_prediction| CHECKV_ENDTOEND["CHECKV_ENDTOEND<br/>quality of the viruses<br/>and proviruses"]
+    CHECKV_ENDTOEND -->|with contig_tax_and_arg| ContigTax
     BINNING -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| BIN_CONTIG_LABELS
     BIN_CONTIG_LABELS --> ContigTax
     BIN_CONTIG_LABELS -->|arg_bin_clustering| BinARG["Bin-level ARG clustering<br/>BIN_ARG_SPLIT → ARG_FASTA_FORMATTER<br/>→ CLUSTERING"]
@@ -73,6 +76,7 @@ flowchart TD
     READ_FUNCTIONAL -.-> RESULTS_SUMMARY
     ASSEMBLY -.-> RESULTS_SUMMARY
     BINNING -.-> RESULTS_SUMMARY
+    GUNC_RUN -.-> RESULTS_SUMMARY
     Derep -.-> RESULTS_SUMMARY
     ContigTax -.-> RESULTS_SUMMARY
     BinARG -.-> RESULTS_SUMMARY
@@ -84,7 +88,7 @@ flowchart TD
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     classDef data fill:#FFF8E6,stroke:#E69F00,stroke-width:1.5px,color:#111
     class INPUT_CHECK,PREPARE_DATABASES,QC,NONPAREIL,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
-    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,Derep,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
+    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,GUNC_RUN,Derep,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
     class Input,Clean,Versions data
 ```
 
@@ -488,7 +492,7 @@ flowchart TD
     QCin(["Reads_report.csv (taxonomy's copy with a profiler)<br/>+ fastp JSON"]) --> RESULTS_SUMMARY
     Taxin(["profiler OTU / tax / read-count tables<br/>+ sylph profiles"]) --> RESULTS_SUMMARY
     ARGin(["K-MARVEL tables + its CARD dir<br/>RGI alleles + k-mer genes"]) --> RESULTS_SUMMARY
-    Stage(["stage_reports, by file name:<br/>ARGs-OAP tables, MicrobeCensus AGS,<br/>BBMap stats, contig filter summary,<br/>CheckM2 / GTDB-Tk / bin depth,<br/>contig ARG table, DeepARG mapping,<br/>bin ARG clusters, contig + read<br/>functional tables, featureCounts<br/>summaries, Bakta tsv / txt"]) --> RESULTS_SUMMARY
+    Stage(["stage_reports, by file name:<br/>Nonpareil tables, ARGs-OAP tables,<br/>MicrobeCensus AGS, co-assembly groups,<br/>BBMap stats, contig filter summary,<br/>CheckM2 / GTDB-Tk / bin depth,<br/>GUNC maxCSS, galah clusters +<br/>CoverM abundance,<br/>contig ARG table, DeepARG mapping,<br/>bin ARG clusters, contig + read<br/>functional tables, featureCounts<br/>summaries, Bakta tsv / txt"]) --> RESULTS_SUMMARY
     User(["sample_metadata, card_prevalence,<br/>ARG priority table, watchlist,<br/>assets/report (+ content hash)"]) --> RESULTS_SUMMARY
     RESULTS_SUMMARY["RESULTS_SUMMARY<br/>results_summary (default true)"] --> Out(["00_summary/<br/>tables/, figures/, results_summary.xlsx,<br/>report/ (HTML site), results_summary.html,<br/>results_summary.pdf, README.md, LLM_GUIDE.md"])
 
@@ -638,7 +642,8 @@ Top level of `--output`; the full tree, with every file, is in
 ```
 results/
 ├── pipeline_info/               # Execution report, timeline, trace, DAG, software_versions.yml,
-│                                # contig_filtering_summary.txt
+│                                # contig_filtering_summary.txt, coassembly_groups.tsv /
+│                                # multisample_groups.tsv (with groups)
 ├── 00_summary/                  # Run summary (results_summary=true, default): report/ (HTML),
 │                                # results_summary.html / .pdf / .xlsx, README.md, LLM_GUIDE.md,
 │                                # tables/, figures/
@@ -647,12 +652,13 @@ results/
 ├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
 │                                # phyloseq, figures
 ├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
-├── 04_binning/                  # Raw and refined bins, CheckM2 quality, GTDB-Tk taxonomy,
-│                                # coverage and summary (co-assembly)
+├── 04_binning/                  # Raw and refined bins, CheckM2 quality (+ quality/gunc/),
+│                                # GTDB-Tk taxonomy, coverage and summary (co-assembly),
+│                                # dereplicated/ (galah clusters, representatives, CoverM)
 ├── 05_arg_prediction/           # read_level/ (args_oap, rgi, rgi_kmer, kmarvel + summaries),
 │                                # contig_level/ (DeepARG, contig ARG table, ARG blob plot),
 │                                # bin_level/ (proteins, deeparg, arg_fasta, clustering)
-├── 06_contig_taxonomy/          # metabuli/, genomad/, phylum blob plots
+├── 06_contig_taxonomy/          # metabuli/, genomad/, checkv/, phylum blob plots
 └── 07_functional_annotation/    # gene_calling/, eggnog/, dbcan/, gene_abundance/,
                                  # microbecensus/, summary/ (TPM/CPGE + read_* tables),
                                  # reads/ (woltka, superfocus, humann), mags/ (Bakta)

@@ -183,7 +183,8 @@ databases_dir: "/shared/databases"
 
 # Assembly and profiling
 assembly_mode: "assembly"
-taxonomic_profiler: "sourmash"
+taxonomic_profiler: "sylph"     # default; or "kraken2", "sourmash", "none"
+nonpareil: true                 # default: sequencing coverage per sample
 
 # Feature toggles
 args_oap_prediction: false
@@ -453,7 +454,7 @@ output: "results"
 
 # Pipeline
 assembly_mode: "assembly"
-taxonomic_profiler: "sourmash"
+taxonomic_profiler: "sylph"
 include_binning: true
 
 # Binner selection — ≥2 enables Binette refinement automatically
@@ -474,7 +475,7 @@ metabat_minContig: 2500
 
 | Value | Tool | Notes |
 |-------|------|-------|
-| `semibin` | SemiBin2 | Fast; requires `--semibin_env_model` |
+| `semibin` | SemiBin2 | Fast; set `--semibin_env_model` (without it, `human_gut` with a launch warning) |
 | `metabat2` | MetaBAT2 | Requires contig depth calculation |
 | `comebin` | COMEBin | CPU only and costly: ~38 CPU-hours on a 37 Mbp assembly (1-1.6 CPU-hours per Mbp) |
 
