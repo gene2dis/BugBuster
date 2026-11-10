@@ -97,7 +97,7 @@ tables match the pipeline's own CPGE matrices exactly.
 ## Software versions (found 2026-10-17)
 
 - **Fixed: RGI_BWT / RGI_KMER** wrote multi-line junk (`rgi:` with no version, `kma --version` is not a KMA option);
-  both now record `rgi main --version` and `kma -v`.
+  both now record `rgi main --version`, and RGI_BWT also the aligner in use (`kma -v`, bwa or bowtie2).
 
 ## Read-level ARGs: RGI bwt / kmer (verified on a 32-sample batch, 2026-10-16)
 

@@ -49,12 +49,12 @@ ERROR: Cannot find Java or it's a wrong version
 
 **Solution:**
 ```bash
-# Nextflow 25.10 and later need Java 17 to 26
+# Nextflow 25.10 needs Java 17 to 25, Nextflow 26.04 Java 17 to 26
 sudo apt-get install openjdk-17-jdk
 
 # Or use SDKMAN
 curl -s "https://get.sdkman.io" | bash
-sdk list java              # pick a Temurin build from 17 to 26
+sdk list java              # pick a Temurin build from 17 to 25 (26 with Nextflow 26.04)
 sdk install java <version>
 ```
 

@@ -232,7 +232,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--genomad_prediction` | `false` | Plasmid / virus / provirus classification of contigs with geNomad (needs an assembly; ARG columns and `00_summary/tables/arg_contig_mobile.tsv` with `--contig_tax_and_arg`) |
 | `--checkv_prediction` | `false` | CheckV quality of geNomad's viruses and proviruses (needs `--genomad_prediction`) |
 | `--gunc_prediction` | `false` | GUNC chimerism check of the refined bins (needs `--include_binning`) |
-| `--multisample_binning` | `false` | MetaBAT2 depth columns from every sample of the run or group (needs `--assembly_mode assembly`, `metabat2` in `--binners` and `--read_aligner bwamem3`) |
+| `--multisample_binning` | `false` | MetaBAT2 depth columns from every sample of the run or group (needs `--include_binning`, `--assembly_mode assembly`, `metabat2` in `--binners` and `--read_aligner bwamem3`) |
 | `--multisample_group_by` | none | Column of `--sample_metadata`: multi-sample binning within each group (a launch warning above 20 samples per group) |
 | `--dereplicate_mags` | `false` | galah + CoverM over the run's refined MAGs (needs `--include_binning` and ≥2 `--binners`); `04_binning/dereplicated/` |
 | `--dereplicate_ani` | `95` | ANI (%) of the dereplication clusters: 95 species, 99 strain |
@@ -383,7 +383,7 @@ results/
 │   └── coassembly/             # Co-assembly results (coassembly/{group}/ per group with --coassembly_group_by)
 ├── 04_binning/                 # Metagenomic binning (if include_binning=true)
 │   ├── per_sample/{sample}/    # Assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2; gunc/ if gunc_prediction=true), taxonomy/ (GTDB-TK), coverage/ (MAG depth)
-│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2), taxonomy/ (GTDB-TK), coverage/, summary/ (coassembly/{group}/ per group)
+│   ├── coassembly/             # Co-assembly mode: raw_bins/, refined_bins/ (if >= 2 binners), quality/ (CheckM2; gunc/ if gunc_prediction=true), taxonomy/ (GTDB-TK), coverage/, summary/ (coassembly/{group}/ per group)
 │   ├── dereplicated/           # galah clusters (mag_clusters.tsv), representatives/, CoverM abundance/ (if dereplicate_mags=true)
 │   ├── quality/summary/        # Aggregated quality reports (assembly mode)
 │   └── taxonomy/summary/       # Aggregated taxonomy reports (assembly mode)

@@ -162,8 +162,9 @@ nextflow run main.nf \
 # ==============================================================================
 # Store the downloaded databases and built indexes in a shared location. A later
 # run with the same --databases_dir reuses them without downloading or building
-# again. Only an index built from --custom_host_fasta / --custom_phiX_fasta is
-# not stored there: pass it back with --custom_decontamination_index.
+# again. An index built from --custom_host_fasta / --custom_phiX_fasta is only
+# copied there, and a later run reuses it only when passed back, e.g.
+# --custom_decontamination_index /shared/databases/bwamem3_index/contaminants_index
 
 nextflow run main.nf \
   --input samplesheet.csv \
