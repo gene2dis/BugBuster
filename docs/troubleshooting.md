@@ -8,7 +8,10 @@ This guide covers common issues and solutions when running BugBuster.
 - [Input/Samplesheet Errors](#inputsamplesheet-errors)
 - [Resource Errors](#resource-errors)
 - [Container Issues](#container-issues)
+- [ARG Prediction Issues](#arg-prediction-issues)
+- [Functional Annotation Issues](#functional-annotation-issues)
 - [Database Issues](#database-issues)
+- [Taxonomy and Contig Classification Issues](#taxonomy-and-contig-classification-issues)
 - [Decontamination Issues](#decontamination-issues)
 - [Cloud Execution Issues](#cloud-execution-issues)
 - [Output Issues](#output-issues)
@@ -46,12 +49,13 @@ ERROR: Cannot find Java or it's a wrong version
 
 **Solution:**
 ```bash
-# Install Java 11 or later
-sudo apt-get install openjdk-11-jdk
+# Nextflow 25.10 needs Java 17 to 25, Nextflow 26.04 Java 17 to 26
+sudo apt-get install openjdk-17-jdk
 
 # Or use SDKMAN
 curl -s "https://get.sdkman.io" | bash
-sdk install java 11.0.21-tem
+sdk list java              # pick a Temurin build from 17 to 25 (26 with Nextflow 26.04)
+sdk install java <version>
 ```
 
 ---
@@ -125,8 +129,9 @@ java.lang.String`.
 
 **Solution:** fixed in the current release, which reads every on/off option and numeric
 comparison in a way that works on both Nextflow versions. On an older release, omit the flag
-instead of passing `false` (all on/off options except `--quality_control`, `--microbecensus`,
-`--functional_cazy`, `--rgi_include_wildcard` and `--azure_delete_pools` are off by default),
+instead of passing `false` (all on/off options except `--quality_control`, `--nonpareil`, `--microbecensus`,
+`--functional_cazy`, `--rgi_include_wildcard`, `--results_summary` and `--azure_delete_pools`
+are off by default),
 or set the values in a `-params-file` YAML, where `false` and numbers keep their types.
 
 ---
@@ -171,7 +176,8 @@ A process that runs out of memory is retried twice with more memory each time
 too (`bin/megahit_run.sh`), and its graph build is held to 90% of the task
 memory. MEGAHIT takes the minimum a step needs even above that budget, so a
 deep co-assembly can still need a larger request: its log
-(`<work dir>/coassembly_assembly/log`) gives each step's "Minimum memory
+(`<work dir>/coassembly_assembly/log`, or `<group>_assembly/log` with
+`--coassembly_group_by`) gives each step's "Minimum memory
 required" in bytes.
 
 The heaviest functional-annotation steps are `EGGNOG_MAPPER_SEARCH` (~80 GB peak
@@ -268,8 +274,6 @@ With the local executor, a task killed at its time limit can instead fail with
 the error strategy stops the run instead of retrying it with more time. Compare the task's
 start and end times with its `time` setting; if they match, raise `time` for that process as
 above and `-resume`.
-
----
 
 ### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored
 
@@ -397,6 +401,10 @@ eggNOG-mapper). Use the pinned image, or — when updating eggNOG-mapper —
 check whether issue #620 is fixed in the new version and update or remove
 `bin/emapper_ogs_fix.py` accordingly.
 
+---
+
+## ARG Prediction Issues
+
 ### RGI_BWT fails: "KMA failed", "bowtie2 failed" or "not the 6.0.8 method"
 
 `RGI_BWT` runs `rgi bwt` through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads the aligner placed on
@@ -480,6 +488,10 @@ because K-MARVEL 1.0.0 exits 0 even when its blastp step fails.
   `--kmarvel_min_read_length` (100 bp), so heavily trimmed short reads can leave
   little to assemble. Lowering `--kmarvel_min_coverage` / `--kmarvel_min_identity`
   (90 % each) admits partial or more divergent genes.
+
+---
+
+## Functional Annotation Issues
 
 ### AGGREGATE_FUNCTIONS fails with "annotations column header does not match the verified ... layout" or "not among the layouts this parser was verified against"
 
@@ -851,15 +863,14 @@ MemoryError in GTDB-TK
 ```
 
 **Solution:**
-1. GTDB-TK requires ~256GB RAM for full database
-2. Increase memory allocation:
-   ```groovy
-   process {
-       withName: 'GTDB_TK.*' {
-           memory = '256.GB'
-       }
-   }
-   ```
+1. `GTDB_TK_BATCH` already requests 256 GB, but the request is capped at
+   `--max_memory` (default 128 GB). Measured use was 60-142 GB depending on
+   the number of genomes and `--gtdbtk_pplacer_cpus` (see
+   [`parameters.md`](parameters.md#binning-parameters)).
+2. Raise `--max_memory` on a node that has the memory (with the local
+   executor, also raise the pool: see "Process requirement exceeds available
+   CPUs" above), then `-resume`. Lowering `--gtdbtk_pplacer_cpus` to 1 saves
+   only about 7 % of the memory, at 1.5-2x the placement time.
 
 ### GTDB-TK rejects the reference data (wrong release)
 
@@ -878,6 +889,8 @@ already have with `--custom_gtdbtk_db /path/to/release232` (the directory that
 directly contains `markers/`, `skani/`, `taxonomy/`, ...).
 
 ---
+
+## Taxonomy and Contig Classification Issues
 
 ### Sylph: Classified is 1.0, or TAXONOMY_PHYLOSEQ fails with "No sylph genomes in any sample"
 
@@ -1159,7 +1172,7 @@ contaminated MAGs.
 
 **Symptom (older pipeline versions):** a resumed run that changed nothing still re-runs a step
 that combines many samples. The steps affected were the co-assembly (`MEGAHIT` / its read
-alignment), `METAWRAP`, `CHECKM2_BATCH`, `GTDB_TK_BATCH`, or one of the report steps (reads,
+alignment), `METAWRAP` (since replaced by Binette), `CHECKM2_BATCH`, `GTDB_TK_BATCH`, or one of the report steps (reads,
 taxonomy, ARG, RGI and bin reports).
 
 **Cause:** these steps received their inputs in the order the upstream tasks happened to

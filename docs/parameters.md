@@ -9,19 +9,22 @@ Complete reference for all BugBuster pipeline parameters.
 1. [Input/Output Parameters](#inputoutput-parameters)
 2. [Pipeline Execution Parameters](#pipeline-execution-parameters)
 3. [Database Selection Parameters](#database-selection-parameters)
-4. [Custom Database Paths](#custom-database-paths)
-5. [Quality Control Parameters](#quality-control-parameters)
-6. [Taxonomy Profiling Parameters](#taxonomy-profiling-parameters)
-7. [Taxonomy Visualization Parameters](#taxonomy-visualization-parameters)
-8. [Results Summary Parameters](#results-summary-parameters)
-9. [Assembly Parameters](#assembly-parameters)
-10. [Binning Parameters](#binning-parameters)
-11. [Contig Taxonomy Parameters](#contig-taxonomy-parameters)
-12. [ARG Prediction Parameters](#arg-prediction-parameters)
-13. [Functional Annotation Parameters](#functional-annotation-parameters)
-14. [Alignment Parameters](#alignment-parameters)
-15. [Resource Limit Parameters](#resource-limit-parameters)
-16. [Advanced Parameters](#advanced-parameters)
+4. [Output & Cleanup Options](#output--cleanup-options)
+5. [Custom Database Paths](#custom-database-paths)
+6. [Quality Control Parameters](#quality-control-parameters)
+7. [Taxonomy Profiling Parameters](#taxonomy-profiling-parameters)
+8. [Taxonomy Visualization Parameters](#taxonomy-visualization-parameters)
+9. [Results Summary Parameters](#results-summary-parameters)
+10. [Assembly Parameters](#assembly-parameters)
+11. [Binning Parameters](#binning-parameters)
+12. [Contig Taxonomy Parameters](#contig-taxonomy-parameters)
+13. [ARG Prediction Parameters](#arg-prediction-parameters)
+14. [Functional Annotation Parameters](#functional-annotation-parameters)
+15. [Alignment Parameters](#alignment-parameters)
+16. [Resource Limit Parameters](#resource-limit-parameters)
+17. [Advanced Parameters](#advanced-parameters)
+18. [Cloud & HPC Profile Parameters](#cloud--hpc-profile-parameters)
+19. [Parameter Usage Examples](#parameter-usage-examples)
 
 ---
 
@@ -175,7 +178,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--genomad_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 (nf-core `genomad/endtoend`, end-to-end with `--cleanup`), against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/`. With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `mobile_class`, `plasmid_score`, `virus_score`, `provirus` (provirus regions overlapping the ARG gene), `virus_taxonomy` and `plasmid_conjugation_genes`, and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo. Cost in the Phase 9c benchmark: 1.1-5.5 CPU-h and ~18 GB per assembly (`process_medium`)
+- **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 (nf-core `genomad/endtoend`, end-to-end with `--cleanup`), against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/` (`genomad/coassembly/<group>/` with `--coassembly_group_by`). With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `mobile_class`, `plasmid_score`, `virus_score`, `provirus` (provirus regions overlapping the ARG gene), `virus_taxonomy` and `plasmid_conjugation_genes`, and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo. Cost in the Phase 9c benchmark: 1.1-5.5 CPU-h and ~18 GB per assembly (`process_medium`)
 - **Example**: `--genomad_prediction true --custom_genomad_db /shared/databases/genomad_db`
 
 ### `--checkv_prediction`
@@ -746,7 +749,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Type**: String
 - **Default**: `none`
 - **Options**: `none`, `normalize`
-- **Description**: Reduce the reads MEGAHIT assembles. `normalize` runs BBNorm (`bbnorm.sh target=100 min=2 prefilter=t`, heap from the task memory) on the assembler input only: BBMap, the read alignments, coverage, binning and gene counting use the full clean reads. Under co-assembly the pooled reads of every sample are normalized together; singletons pass through unchanged. Pairs in and kept are written to `03_assembly/per_sample/<sample>/` or `03_assembly/coassembly/` (`*_read_reduction.tsv`), with BBNorm's log next to it. Requires `--assembly_mode assembly` or `coassembly`.
+- **Description**: Reduce the reads MEGAHIT assembles. `normalize` runs BBNorm (`bbnorm.sh target=100 min=2 prefilter=t`, heap from the task memory) on the assembler input only: BBMap, the read alignments, coverage, binning and gene counting use the full clean reads. Under co-assembly the pooled reads of every sample are normalized together; singletons pass through unchanged. Pairs in and kept are written to `03_assembly/per_sample/<sample>/` or `03_assembly/coassembly/` (`coassembly/<group>/` with `--coassembly_group_by`) (`*_read_reduction.tsv`), with BBNorm's log next to it. Requires `--assembly_mode assembly` or `coassembly`.
 - **When to use it**: deep co-assemblies, where most reads come from a few highly covered genomes. In the [assembly benchmark](benchmarks/assembly_2026.md) (a 5-sample co-assembly of 19.4 M pairs) it kept 84 % of the pairs and cost 11.7 CPU-hours to save 2.1 in MEGAHIT, with the same bins; the saving grows with depth.
 - **Example**: `--assembly_read_reduction normalize`
 
@@ -1303,7 +1306,9 @@ nextflow run main.nf \
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
+    --taxonomic_profiler kraken2 \
     --custom_kraken_db /shared/db/kraken2 \
+    --include_binning \
     --custom_checkm2_db /shared/db/checkm2.dmnd \
     --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
     --databases_dir /shared/databases \

@@ -75,6 +75,7 @@ def printHelp() {
       --rgi_prediction              Enable RGI AMR prediction with pathogen-of-origin (default: ${params.rgi_prediction})
       --kmarvel_prediction          Enable K-MARVEL read-level ARG assembly against CARD (default: ${params.kmarvel_prediction})
       --contig_tax_and_arg          Enable contig-level taxonomy (Metabuli) and ARG (DeepARG) (default: ${params.contig_tax_and_arg})
+      --arg_bin_clustering          Bin-level ARGs (DeepARG contig hits split by refined bin) clustered with MMseqs2; needs --include_binning (default: ${params.arg_bin_clustering})
       --genomad_prediction          Classify contigs as chromosome / plasmid / virus with geNomad (default: ${params.genomad_prediction})
       --checkv_prediction           CheckV quality of geNomad's viruses and proviruses; needs --genomad_prediction (default: ${params.checkv_prediction})
       --contig_level_functional     Enable contig-level functional annotation (eggNOG-mapper v3 + run_dbcan) (default: ${params.contig_level_functional})
@@ -85,9 +86,10 @@ def printHelp() {
       --read_level_functional       Read-level functional profiling backend: 'woltka', 'superfocus', 'humann', 'none' (default: ${params.read_level_functional})
       --woltka_uniq                 Woltka: leave multi-hit reads unassigned instead of dividing them 1/k (default: ${params.woltka_uniq})
       --superfocus_aligner          SUPER-FOCUS search backend: 'diamond', 'mmseqs2' (default: ${params.superfocus_aligner})
+      --databases_dir               Where databases are downloaded and reused across runs (default: <output>/../databases)
 
     \u001B[1;33mResults summary (00_summary/):\u001B[0m
-      --results_summary             Tables, Excel workbook, figures, HTML report, README and LLM guide of QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus results (default: ${params.results_summary})
+      --results_summary             Tables, Excel workbook, figures, HTML and PDF reports, README and LLM guide of every stage that ran (default: ${params.results_summary})
       --sample_metadata             TSV/CSV with a 'sample' column and any metadata columns (default: none)
       --summary_group_by            Metadata column that groups samples, e.g. subject (default: none)
       --summary_order_by            Metadata column that orders samples within a group, e.g. visit (default: none)

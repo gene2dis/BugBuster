@@ -119,7 +119,7 @@ max_memory: "150.GB"
 assembly_mode: "assembly"  # Options: "assembly", "coassembly", "none"
 
 # Taxonomic profiling
-taxonomic_profiler: "sourmash"  # Options: "kraken2", "sourmash", "sylph", "none"
+taxonomic_profiler: "sylph"  # Options: "kraken2", "sourmash", "sylph", "none"
 
 # Feature toggles
 args_oap_prediction: false

@@ -285,7 +285,11 @@ For better performance, pre-download databases to shared storage:
 # Kraken2 Standard-8 (~7.5 GB)
 # Sourmash GTDB r220 (~17 GB)
 # Sylph GTDB r232 .syl2db (~19 GB) + sylph-tax metadata (~5.5 MB; recipe in manual.md)
+# Metabuli refseq_standard (~80 GB download / ~110 GB unpacked, contig taxonomy)
+# geNomad 1.9 (~0.84 GB download / 2.2 GB unpacked) and CheckV 1.5 (~1.68 GB / 6.4 GB)
+# DeepARG (~4.8 GB, contig and bin ARGs)
 # CheckM2 (~2.9 GB)
+# GUNC proGenomes 2.1 (~7.2 GB download / 13.5 GB unpacked)
 # GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.8.0)
 # eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
 # dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
@@ -302,6 +306,11 @@ nextflow run main.nf \
     --custom_sylph_db /shared/db/sylph/gtdb-r232-c200-dbv2.syl2db \
     --custom_sylph_taxonomy /shared/db/sylph/gtdb_r232_metadata.tsv.gz \
     --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
+    --custom_gunc_db /shared/db/gunc/gunc_db_progenomes2.1.dmnd \
+    --custom_metabuli_db /shared/db/metabuli/refseq_standard \
+    --custom_genomad_db /shared/db/genomad/genomad_db \
+    --custom_checkv_db /shared/db/checkv/checkv-db-v1.5 \
+    --custom_deeparg_db /shared/db/deeparg \
     --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
     --custom_eggnog_db /shared/db/eggnog/eggnog_db \
     --custom_dbcan_db /shared/db/dbcan/dbcan_db \
