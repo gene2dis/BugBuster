@@ -131,7 +131,8 @@ STAGES = [
     {
         "key": "contig_functional", "title": "Contig-level functional (Pyrodigal, eggNOG-mapper, dbCAN, featureCounts)",
         "params": "--contig_level_functional (needs an assembly), --functional_cazy",
-        "processes": ["PYRODIGAL", "EGGNOG_MAPPER_SEARCH", "EGGNOG_MAPPER_ANNOTATE", "RUN_DBCAN",
+        # not PYRODIGAL: the shared gene calling also runs for the contig and bin ARGs alone
+        "processes": ["EGGNOG_MAPPER_SEARCH", "EGGNOG_MAPPER_ANNOTATE", "RUN_DBCAN",
                       "FEATURECOUNTS_GENES", "AGGREGATE_FUNCTIONS"],
         "summary": "function_contig_long, function_contig_<ontology> (CPGE or TPM); samples_qc func_contig_*, "
                    "pct_reads_on_genes",

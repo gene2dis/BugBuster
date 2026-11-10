@@ -819,6 +819,9 @@ assert v == {"KARGVA": {"kargva": "1.0"}, "FASTP": {"fastp": "1.0.1"},
 from summary_catalog import stage_status
 kv = parse_versions('"TAXONOMY:KRAKEN2":\n    kraken2: 2.1.6\n"TAXONOMY:BRACKEN":\n    bracken: 3.0.1\n')
 assert dict((st["key"], s) for st, s in stage_status(kv, set()))["taxonomy"] == "ran, no table found"
+# Pyrodigal for the contig ARGs alone does not make the contig functional stage look run
+cv = parse_versions('"PYRODIGAL":\n    pyrodigal: 3.6.3\n"DEEPARG_CONTIGS":\n    deeparg: 1.0.4\n')
+assert dict((st["key"], s) for st, s in stage_status(cv, {"contig_arg"}))["contig_functional"] == "not run"
 # one tier per gene across methods: the first method's tier wins
 k = pd.DataFrame({"gene": ["g1"], "tier": [2], "category": ["a"], "tier_note": [""],
                   "resistance_snp_status": [""], "resistance_snps_found": [""]})
