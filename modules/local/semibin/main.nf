@@ -66,13 +66,14 @@ process SEMIBIN {
         set -euo pipefail
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
-        # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets Binette and the rest of the sample go on; any
-        # other failure keeps its exit status
+        # reclustering step gets an empty ORF file. SemiBin2 2.6.0 also stops
+        # when no contig reaches 4,000 bp, because it cannot build must-link
+        # pairs. An empty bin directory with a note lets Binette and the rest
+        # of the sample go on; any other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then
                 mv "\$1" ${prefix}_semibin_output_bins
-            elif grep -q 'Number of bins prior to reclustering: 0' semibin.log; then
+            elif grep -q -e 'Number of bins prior to reclustering: 0' -e 'no must-link pairs can be generated' semibin.log; then
                 echo "WARNING: SemiBin found no bins for ${prefix}." >&2
                 mkdir -p ${prefix}_semibin_output_bins
                 echo "SemiBin found no bins" > ${prefix}_semibin_output_bins/SKIPPED.txt
@@ -135,13 +136,14 @@ process SEMIBIN {
         set -euo pipefail
         
         # SemiBin2 fails when it finds no bins: the marker-gene search of its
-        # reclustering step gets an empty ORF file. An empty bin directory
-        # with a note lets Binette and the rest of the sample go on; any
-        # other failure keeps its exit status
+        # reclustering step gets an empty ORF file. SemiBin2 2.6.0 also stops
+        # when no contig reaches 4,000 bp, because it cannot build must-link
+        # pairs. An empty bin directory with a note lets Binette and the rest
+        # of the sample go on; any other failure keeps its exit status
         no_bins_or_move() {
             if [ "\$status" -eq 0 ]; then
                 mv "\$1" ${prefix}_semibin_output_bins
-            elif grep -q 'Number of bins prior to reclustering: 0' semibin.log; then
+            elif grep -q -e 'Number of bins prior to reclustering: 0' -e 'no must-link pairs can be generated' semibin.log; then
                 echo "WARNING: SemiBin found no bins for ${prefix}." >&2
                 mkdir -p ${prefix}_semibin_output_bins
                 echo "SemiBin found no bins" > ${prefix}_semibin_output_bins/SKIPPED.txt
