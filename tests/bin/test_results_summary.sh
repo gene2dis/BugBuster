@@ -1371,10 +1371,17 @@ cp -r st_asm st_asm_bbn
 add_versions st_asm_bbn/results BBNORM bbmap 40.05
 cp -r st_asm st_asm_ms
 add_versions st_asm_ms/results MULTISAMPLE_SPLIT_DEPTH busybox 1.36.1
+# without software_versions.yml blocks, the files the stages publish say they ran
+cp -r st_asm st_asm_files
+mkdir -p st_asm_files/results/03_assembly/per_sample/sampleA
+printf 'sample\treads_in\treads_out\n' > st_asm_files/results/03_assembly/per_sample/sampleA/sampleA_read_reduction.tsv
+printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\n' > st_asm_files/results/pipeline_info/multisample_groups.tsv
 check "BBNorm (versions only): every column documented" \
     documented st_asm_bbn_out --results st_asm_bbn/results --batch-labels st_asm --min-clean-pairs 10000
 check "multi-sample binning (versions only): every column documented" \
     documented st_asm_ms_out --results st_asm_ms/results --batch-labels st_asm --min-clean-pairs 10000
+check "BBNorm and multi-sample binning from their published files" \
+    documented st_asm_files_out --results st_asm_files/results --batch-labels st_asm --min-clean-pairs 10000
 check "GUNC: a batch with GUNC merged with one without" \
     documented gunc_merge_out --results st_asm_gunc/results st_co --batch-labels asm co --min-clean-pairs 10000
 # GUNC with no fail: no circles, no "circled in"
@@ -1484,8 +1491,8 @@ for d, with_checkv in (("run1_cv_out", True), ("docs_plain_out", False)):
     p = page(d, "contig_args.html")
     assert genomad in p and in_pdf(genomad, d), d
     assert (checkv in p) == with_checkv and in_pdf(checkv, d) == with_checkv, d
-assert ", in the batches where CheckV ran)" in page("cv_merge_out", "contig_args.html")
-assert ", in the batches where CheckV ran)" not in page("run1_cv_out", "contig_args.html")
+assert ", in the results directories where CheckV ran)" in page("cv_merge_out", "contig_args.html")
+assert ", in the results directories where CheckV ran)" not in page("run1_cv_out", "contig_args.html")
 ng = "ARG genes in the results directories where geNomad ran, geNomad places"
 assert ng in page("ng_merge_out", "contig_args.html") and in_pdf(ng, "ng_merge_out")
 assert ng not in page("cv_merge_out", "contig_args.html")
@@ -1511,14 +1518,15 @@ import html, os
 lines = {
     "Sequencing coverage: Nonpareil in k-mer mode": {"run1_np_out"},
     "Co-assembly: one per --coassembly_group_by group (2 groups": {"st_grp_out"},
-    "BBNorm normalised the assembler input only": {"st_asm_bbn_out"},
+    "BBNorm normalised the assembler input only": {"st_asm_bbn_out", "st_asm_files_out"},
     "GUNC checks each MAG for chimerism": {"st_asm_gunc_out"},
-    "Multi-sample binning: MetaBAT2 had one depth column": {"st_asm_ms_out"},
+    "Multi-sample binning: MetaBAT2 binned each assembly of a group of two or more samples": {"st_asm_ms_out",
+                                                                                              "st_asm_files_out"},
     "MAG clusters: galah at 95 % ANI": {"st_asm_derep_out"},
     "CheckV rates geNomad's viruses and proviruses": {"run1_cv_out"},
 }
 dirs = ["run1_np_out", "docs_plain_out", "st_grp_out", "st_co_out", "st_asm_out", "st_asm_bbn_out", "st_asm_gunc_out",
-        "st_asm_ms_out", "st_asm_derep_out", "st_asm_derep0_out", "run1_cv_out"]
+        "st_asm_ms_out", "st_asm_files_out", "st_asm_derep_out", "st_asm_derep0_out", "run1_cv_out"]
 for d in dirs:
     docs = {doc: open(f"{d}/{doc}").read() for doc in ("README.md", "LLM_GUIDE.md")}
     docs["methods"] = html.unescape(open(f"{d}/report/methods.html").read())
@@ -1528,6 +1536,13 @@ for d in dirs:
     # the MAG ARG line follows the arg_mag_long table
     has = os.path.exists(f"{d}/tables/arg_mag_long.tsv")
     assert ("MAG ARGs: the contig DeepARG hits" in docs["README.md"]) == has, d
+# merged results directories: the Methods line says the stage ran in only some
+for d, line in (("bbn_merge_out", "BBNorm (in the results directories where it ran) normalised"),
+                ("ms_merge_out", "Multi-sample binning (in the results directories where it ran): MetaBAT2"),
+                ("grp_merge_out", "Co-assembly (in the results directories where it ran): one per"),
+                ("gunc_merge_out", "GUNC (in the results directories where it ran) checks each MAG")):
+    for doc in ("README.md", "LLM_GUIDE.md"):
+        assert line in open(f"{d}/{doc}").read(), (d, doc, line)
 PYEOF
 
 echo

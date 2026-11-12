@@ -4,10 +4,10 @@
 <h1>MAGs</h1>
 <p>{{ f.n_mags }} refined MAGs: {{ f.high }} high, {{ f.medium }} medium and {{ f.low }} low quality by MIMAG ({{ m.figref(s, "mag_quality") }}, {{ m.tabref(s, "mags") }}). The High / Mid / Low classes of the run's binning plots are another, older scheme. {{ m.figref(s, "mag_abundance_heatmap") }} shows the share of each sample's sequenced bases on each MAG.</p>
 {% if f.gunc_fail is defined %}
-<p>GUNC flags {{ f.gunc_fail }} of {{ f.n_mags }} MAGs as likely chimeras of distant lineages (<code>gunc_pass</code> false{% if f.gunc_fail %}, circled in {{ m.figref(s, "mag_quality") }}{% endif %}); {{ f.gunc_pass }} pass{% if f.gunc_unscored %}, and {{ f.gunc_unscored }} have no GUNC result (not scored, or from a batch without GUNC){% endif %}. A fail does not change the MIMAG tier: check such a MAG before using it.</p>
+<p>GUNC flags {{ f.gunc_fail }} of {{ f.n_mags }} MAGs as likely chimeras of distant lineages (<code>gunc_pass</code> false{% if f.gunc_fail and s.figures.get("mag_quality") %}, circled in {{ m.figref(s, "mag_quality") }}{% endif %}); {{ f.gunc_pass }} pass{% if f.gunc_unscored %}, and {{ f.gunc_unscored }} have no GUNC result (not scored, or from a results directory without GUNC){% endif %}. A fail does not change the MIMAG tier: check such a MAG before using it.</p>
 {% endif %}
 {% if f.multisample is defined %}
-<p>Multi-sample binning{% if f.multisample_partial %} (in the results directories where it ran){% endif %}: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth ({{ m.tabref(s, "abundance") }}) is still each sample's own alignment.</p>
+<p>Multi-sample binning{% if f.multisample_partial %} (in the results directories where it ran){% endif %}: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth{% if s.tables.get("abundance") %} ({{ m.tabref(s, "abundance") }}){% endif %} is still each sample's own alignment.</p>
 {% endif %}
 {{ m.figure(s, "mag_quality", specs) }}
 {{ m.figure(s, "mag_abundance_heatmap", specs) }}

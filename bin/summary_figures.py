@@ -622,11 +622,13 @@ def fig_mag_quality(fw, mags):
     if gunc:
         # GUNC (--gunc_prediction) flags likely chimeras without changing the tier: an open circle around them
         fail = m[m["gunc_pass"].eq(False).fillna(False)]
-        if len(fail):
-            ax.scatter(fail["contamination_pct"], fail["completeness_pct"], s=26, facecolors="none",
-                       edgecolors="black", lw=0.6, label=f"GUNC fail ({len(fail)})")
+        # a MAG without CheckM2 values is not drawn, so neither is its circle
+        drawn = fail.dropna(subset=["completeness_pct", "contamination_pct"])
+        if len(drawn):
+            ax.scatter(drawn["contamination_pct"], drawn["completeness_pct"], s=26, facecolors="none",
+                       edgecolors="black", lw=0.6, label=f"GUNC fail ({len(drawn)})")
             note = " Open circles: MAGs that fail GUNC (likely chimeras across lineages; the tier is unchanged)."
-        else:
+        elif m["gunc_pass"].notna().any():
             note = " No MAG failed GUNC."
     for x, y in ((5, 90), (10, 50)):
         ax.axhline(y, color="#BBBBBB", lw=0.4, ls=":", zorder=0)

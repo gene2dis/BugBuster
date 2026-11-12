@@ -16,7 +16,7 @@ import pandas as pd
 
 from summary_args import METHOD_LABELS
 from summary_common import NA_LOW_DEPTH, die, generated_date, warn
-from summary_contigs import CHECKV_COUNTS
+from summary_contigs import CHECKV_COUNTS, CHECKV_TIER_ORDER
 from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
 from summary_figures import short_count
 
@@ -536,16 +536,16 @@ def build(ctx, assets):
                      "assembly.")
         if "arg_contig_mobile" in t:
             mob = t["arg_contig_mobile"][0]
-            # arg_contig_mobile has the geNomad batches only: fewer genes than n_genes when some batch lacks it
+            # arg_contig_mobile holds the geNomad batches only
             ca.facts.update({"mobile_genes": int(mob["arg_genes"].sum()),
-                             "mobile_partial": int(mob["arg_genes"].sum()) != ca.facts["n_genes"],
+                             "mobile_partial": ctx.get("partial", {}).get("genomad", False),
                              "on_plasmid": int(mob["arg_genes_on_plasmid"].sum()),
                              "on_virus": int(mob["arg_genes_on_virus"].sum()),
                              "in_provirus": int(mob["arg_genes_in_provirus"].sum())})
             if CHECKV_COUNTS[0] in mob.columns:
                 # blank in the rows of a batch without CheckV
-                cv = {c.rsplit("_checkv_", 1)[1]: int(pd.to_numeric(mob[c], errors="coerce").sum())
-                      for c in CHECKV_COUNTS}
+                cv = {tier: int(pd.to_numeric(mob[c], errors="coerce").sum())
+                      for tier, c in zip(CHECKV_TIER_ORDER, CHECKV_COUNTS)}
                 ca.facts.update({f"checkv_{k}": v for k, v in cv.items()})
                 ca.facts["checkv_viral"] = sum(cv.values())
                 ca.facts["checkv_partial"] = bool(pd.to_numeric(mob[CHECKV_COUNTS[0]], errors="coerce").isna().any())
