@@ -198,6 +198,13 @@ feat(modules): add DIAMOND module for protein alignment
 
 The tuples of one process become one block with its tools sorted, identical blocks
 from per-sample tasks collapse to one, and the file keeps its format.
+
+Every tool name a module writes there needs a row in `assets/report/tool_references.tsv`
+(display name, kind `tool` / `database` / `helper`, and the citekeys of
+`assets/report/references.yml`, each checked in PubMed or Crossref): the report's Methods
+name and cite tools from it. `tests/bin/test_tool_references.sh` (run in CI) fails on a key
+without a row; a key built at run time (`${aligner}:`) is listed in that script with the
+names it can take.
 `tests/subworkflows/software_versions*.nf.test` cover both sources.
 
 ### Databases
