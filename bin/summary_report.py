@@ -16,6 +16,7 @@ import pandas as pd
 
 from summary_args import METHOD_LABELS
 from summary_common import NA_LOW_DEPTH, die, generated_date, warn
+from summary_contigs import CHECKV_COUNTS
 from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
 from summary_figures import short_count
 
@@ -471,6 +472,10 @@ def build(ctx, assets):
     if "assembly_stats" in t:
         asm = Section("assembly", nums, records)
         asm.facts = {"n_assemblies": len(t["assembly_stats"][0])}
+        if ctx.get("n_coassembly_groups"):
+            asm.facts["n_groups"] = ctx["n_coassembly_groups"]
+        if ctx.get("bbnorm"):
+            asm.facts["bbnorm"] = True
         asm.table("stats", t["assembly_stats"][0], "assembly_stats", "MEGAHIT assemblies: statistics of all "
                   "contigs, and of those kept by the length filter that binning, contig taxonomy, ARGs and functions "
                   "use.")
@@ -528,6 +533,18 @@ def build(ctx, assets):
             ca.table("hosts", t["arg_contig_hosts"][0], "arg_contig_hosts", "ARG genes per host taxon, ARG class and "
                      "assembly.")
         if "arg_contig_mobile" in t:
+            mob = t["arg_contig_mobile"][0]
+            ca.facts.update({"mobile_genes": int(mob["arg_genes"].sum()),
+                             "on_plasmid": int(mob["arg_genes_on_plasmid"].sum()),
+                             "on_virus": int(mob["arg_genes_on_virus"].sum()),
+                             "in_provirus": int(mob["arg_genes_in_provirus"].sum())})
+            if CHECKV_COUNTS[0] in mob.columns:
+                # blank in the rows of a batch without CheckV
+                cv = {c.rsplit("_checkv_", 1)[1]: int(pd.to_numeric(mob[c], errors="coerce").sum())
+                      for c in CHECKV_COUNTS}
+                ca.facts.update({f"checkv_{k}": v for k, v in cv.items()})
+                ca.facts["checkv_viral"] = sum(cv.values())
+                ca.facts["checkv_partial"] = bool(pd.to_numeric(mob[CHECKV_COUNTS[0]], errors="coerce").isna().any())
             ca.table("mobile", t["arg_contig_mobile"][0], "arg_contig_mobile", "ARG genes on plasmids, viruses and "
                      "proviruses (geNomad) per assembly and ARG class.")
         if cl is not None:
