@@ -330,6 +330,11 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
 def method_notes(ctx):
     """One line per read-level method that ran, for the README (the HTML has its own reading guide)."""
     s, notes = ctx["summary"], []
+    ran = ctx.get("stages_found", set())
+    if s.get("nonpareil"):
+        notes.append("Sequencing coverage: Nonpareil in k-mer mode on R1 of each sample's clean reads, with the "
+                     "Nonpareil R package's curve fit (samples_qc nonpareil_coverage, nonpareil_diversity and "
+                     "nonpareil_depth_95pct, in read pairs).")
     if "K-MARVEL" in s.get("arg_methods", []):
         notes.append("K-MARVEL assembles resistance genes from the reads and reports calls against CARD, with their "
                      "supporting read pairs (RPKM in the summary).")
@@ -360,15 +365,35 @@ def method_notes(ctx):
         if prof:
             notes.append(f"Taxonomy: {what[prof]}. Classified fractions are not comparable between profilers.")
     if "assembly_stats" in t:
+        groups = ctx.get("n_coassembly_groups", 0)
         notes.append("Assembly: MEGAHIT, BBMap statistics of all contigs; only contigs of at least "
                      "min_contig_length_bp go on to binning, contig taxonomy, ARGs and functions. Reads not on contigs "
-                     "are outside every contig-based table (assembly_read_use).")
+                     "are outside every contig-based table (assembly_read_use)."
+                     + (f" Co-assembly: one per --coassembly_group_by group ({groups} group{'s' if groups != 1 else ''};"
+                        " assembly_read_use gives each sample's)." if groups else "")
+                     + (" BBNorm normalised the assembler input only (--assembly_read_reduction normalize); "
+                        "alignments, depths and counts use the full clean reads." if ctx.get("bbnorm") else ""))
     if "mags" in t:
         notes.append("MAGs: refined bins (Binette with >= 2 binners) scored by CheckM2, classified by GTDB-Tk and, "
-                     "with Bakta, checked for rRNA and tRNA genes: quality_tier follows MIMAG.")
+                     "with Bakta, checked for rRNA and tRNA genes: quality_tier follows MIMAG."
+                     + (" GUNC checks each MAG for chimerism across lineages (gunc_pass); a fail does not change the "
+                        "tier." if "gunc" in ran else "")
+                     + (" Multi-sample binning: MetaBAT2 had one depth column per sample of the assembly's group "
+                        "(each sample aligned to the concatenation of the group's assemblies); the MAG depth "
+                        "(mag_abundance) is still each sample's own alignment." if "multisample" in ran else ""))
+    if "mag_clusters" in t and len(t["mag_clusters"][0]):
+        ani = ", ".join(f"{v:g}" for v in sorted(t["mag_clusters"][0]["ani_pct"].dropna().unique()))
+        notes.append(f"MAG clusters: galah at {ani} % ANI over the run's refined MAGs (the representative has the "
+                     "highest completeness − 5 × contamination), and CoverM on the representatives with every "
+                     "sample's reads (mag_cluster_abundance); this run's samples only.")
     if "arg_contig_long" in t:
         notes.append("Contig ARGs: DeepARG on the predicted proteins of the contigs, with the contig's Metabuli taxon, "
-                     "bin and geNomad class: physical linkage of an ARG and its host, counted in genes on contigs.")
+                     "bin and geNomad class: physical linkage of an ARG and its host, counted in genes on contigs."
+                     + (" CheckV rates geNomad's viruses and proviruses (arg_contig_mobile "
+                        "arg_genes_viral_checkv_*)." if "checkv" in ran else ""))
+    if "arg_mag_long" in t:
+        notes.append("MAG ARGs: the contig DeepARG hits on each refined MAG's contigs, clustered with MMseqs2 at "
+                     "90-100 % identity (arg_mag_long; arg_cluster_sharing at 90 %).")
     if ctx.get("contig_functional"):
         c = ctx["contig_functional"]
         notes.append(f"Contig functional profile: eggNOG-mapper and dbCAN on the predicted genes, featureCounts per "
