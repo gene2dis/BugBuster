@@ -15,6 +15,7 @@ args_oap	ARGs-OAP	tool	yin2023	crossref; ARGs-OAP v3.0 paper (v4.0 adds no datab
 rgi	RGI	tool	alcock2023	PMID 36263822 (README citation)
 card	CARD (database)	database	alcock2023	PMID 36263822
 kma	KMA	tool	clausen2025;clausen2018	PMID 40918069 (README please-cite); PMID 30157759
+bwa	BWA	tool	li2009	PMID 19451168 (RGI bwt with --rgi_aligner bwa)
 kmarvel	K-MARVEL	tool	mahar2026	PMID 42834095 (published version of bioRxiv 10.1101/2025.10.08.681127)
 megahit	MEGAHIT	tool	li2015;li2016	PMID 25609793; PMID 27012178 (README Publications)
 bbmap	BBMap	tool		no paper (sourceforge)
@@ -23,6 +24,9 @@ semibin	SemiBin2	tool	pan2023;pan2022	PMID 37387171 (SemiBin2 method); PMID 3548
 comebin	COMEBin	tool	wang2024	PMID 38233391
 binette	Binette	tool	mainguy2024	crossref; JOSS
 checkm2	CheckM2	tool	chklovski2023	PMID 37500759
+gunc	GUNC	tool	orakov2021	PMID 34120611 (Genome Biol 2021)
+gunc_db	GUNC reference (database)	database	orakov2021	PMID 34120611; cite the tool (proGenomes 2.1 or GTDB r214 build)
+prodigal	Prodigal	tool	hyatt2010	PMID 20211023 (used by GUNC)
 galah	galah	tool		no paper (GitHub wwood/galah)
 skani	skani	tool	shaw2023	PMID 37735570 (used by galah)
 coverm	CoverM	tool	aroney2025	PMID 40193404
@@ -36,6 +40,9 @@ metabuli	Metabuli	tool	kim2024	PMID 38769467
 deeparg	DeepARG	tool	arangoargoty2018	PMID 29391044
 diamond	DIAMOND	tool	buchfink2021	PMID 33828273 (README: v2 paper; 2015 paper only up to v0.9.25)
 genomad	geNomad	tool	camargo2024	PMID 37735266
+checkv	CheckV	tool	nayfach2021	PMID 33349699 (Nat Biotechnol 2021)
+checkv_db	CheckV (database)	database	nayfach2021	PMID 33349699; cite the tool
+hmmer	HMMER	tool	eddy2011	PMID 22039361 (HMMER3; used by CheckV)
 pyrodigal	Pyrodigal	tool	larralde2022;hyatt2010	crossref (Pyrodigal JOSS); PMID 20211023 (Prodigal); README asks for both
 eggnog-mapper	eggNOG-mapper	tool	cantalapiedra2021	PMID 34597405; no v3 paper found
 eggnog_db	eggNOG (database)	database	hernandezplaza2023	PMID 36399505 (eggNOG 6.0)
@@ -56,6 +63,7 @@ humann	HUMAnN	tool	beghini2021	PMID 33944776; README asks for HUMAnN 3 paper, no
 metaphlan	MetaPhlAn 4	tool	blancomiguez2023	PMID 36823356
 superfocus	SUPER-FOCUS	tool	silva2016	PMID 26454280
 superfocus_db	SUPER-FOCUS (database)	database	silva2016	PMID 26454280; cite the tool
+superfocus_aligner	SUPER-FOCUS aligner	helper		setting (diamond or mmseqs2), not a tool version
 metabuli_db	Metabuli RefSeq (database)	database	kim2024	PMID 38769467; no separate database paper
 checkm2_db	CheckM2 (database)	database	chklovski2023	PMID 37500759; cite the tool
 deeparg_db	DeepARG (database)	database	arangoargoty2018	PMID 29391044; cite the tool

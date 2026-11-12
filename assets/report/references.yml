@@ -540,3 +540,43 @@ sahlin2022:
   number: "1"
   pages: "260"
   doi: "10.1186/s13059-022-02831-7"
+orakov2021:
+  type: "article"
+  author: "Orakov, Askarbek and Fullam, Anthony and Coelho, Luis Pedro and Khedkar, Supriya and Szklarczyk, Damian and Mende, Daniel R and Schmidt, Thomas S B and Bork, Peer"
+  title: "GUNC: detection of chimerism and contamination in prokaryotic genomes"
+  journal: "Genome Biology"
+  year: 2021
+  volume: "22"
+  number: "1"
+  pages: "178"
+  doi: "10.1186/s13059-021-02393-0"
+nayfach2021:
+  type: "article"
+  author: "Nayfach, Stephen and Camargo, Antonio Pedro and Schulz, Frederik and Eloe-Fadrosh, Emiley and Roux, Simon and Kyrpides, Nikos C"
+  title: "CheckV assesses the quality and completeness of metagenome-assembled viral genomes"
+  journal: "Nature Biotechnology"
+  year: 2021
+  volume: "39"
+  number: "5"
+  pages: "578--585"
+  doi: "10.1038/s41587-020-00774-7"
+eddy2011:
+  type: "article"
+  author: "Eddy, Sean R"
+  title: "Accelerated Profile HMM Searches"
+  journal: "PLoS Computational Biology"
+  year: 2011
+  volume: "7"
+  number: "10"
+  pages: "e1002195"
+  doi: "10.1371/journal.pcbi.1002195"
+li2009:
+  type: "article"
+  author: "Li, Heng and Durbin, Richard"
+  title: "Fast and accurate short read alignment with Burrows-Wheeler transform"
+  journal: "Bioinformatics"
+  year: 2009
+  volume: "25"
+  number: "14"
+  pages: "1754--1760"
+  doi: "10.1093/bioinformatics/btp324"
