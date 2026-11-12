@@ -8,7 +8,8 @@ Items that come from reading the code, not from real output, are marked **unveri
 them. In November 2026 (roadmap Phases 11a and 11b) the taxonomy, contig, binning, bin ARG and functional sections
 were checked against reference runs of every branch (a per-sample assembly and a co-assembly of the same subsampled
 real reads, and Kraken2 and sourmash runs on a 3-sample, 2 M-pair fixture); each item now says verified, fixed,
-deferred or dropped, with the evidence. When a module gets example data:
+deferred or dropped, with the evidence. The tools added by roadmap Phases 15-18 (co-assembly groups, GUNC, CheckV, Nonpareil,
+multi-sample binning, dereplication) have their own sections below (Phase 19, November 2026). When a module gets example data:
 
 1. Confirm or drop each item.
 2. Fix what is confirmed.
@@ -209,6 +210,70 @@ The tables in `07_functional_annotation/summary/` follow the design doc. There a
   MicrobeCensus ran, else TPM), the annotated fraction in `samples_qc`, never merged with the read branch; and
   read-level ARGs per genome equivalent (`arg_*_rpkg`). **Fixed (Phase 11d):** `function_contig_cog_heatmap`, with
   `mag_quality`, `mag_abundance_heatmap` and `arg_contig_hosts`.
+
+## Co-assembly per metadata group (roadmap Phase 15, verified 2026-11-06)
+
+With `--coassembly_group_by`, every co-assembly-side stage has one assembly per group, published under
+`<stage>/coassembly/<group>/`; `pipeline_info/coassembly_groups.tsv` maps each sample to its group.
+
+- **Taken:** the group label is the `assembly` key of every assembly-side table (`assembly_stats` one row per group,
+  `assembly_read_use` each sample's group, `mags`, `mag_abundance` over the group's samples, the contig and MAG ARG
+  tables, the contig functional tables). A merge of batches keeps same-named groups apart by `batch`.
+- **Verified** on a 5-sample co-assembly split into a 3-sample and a 2-sample group: one `assembly_stats` row per group,
+  `mag_abundance` 34 × 2 + 6 × 3 rows, the HTML report and PDF written. The low-depth samples kept fewer of their
+  reads on contigs than in the pooled co-assembly (27-66 % vs 39-79 %): they lose the contigs only the deep samples
+  assemble.
+- **Report (roadmap Phase 19):** the Assembly page and the Methods line say when the assemblies are one per group and
+  how many groups there are.
+
+## MAG and virus quality: GUNC and CheckV (roadmap Phase 16, verified 2026-11-07)
+
+`GUNC_RUN` checks each assembly's refined MAGs for chimerism (`quality/gunc/<assembly>_gunc_maxCSS_level.tsv`);
+`CHECKV_ENDTOEND` rates geNomad's viruses and proviruses (`06_contig_taxonomy/checkv/<assembly>/`), joined into the
+contig table as `checkv_*` columns.
+
+- **Taken:** `mags` gains `gunc_pass`, `clade_separation_score`, `contamination_portion` and
+  `reference_representation_score`; `arg_contig_mobile` gains `arg_genes_viral_checkv_*` (ARG genes on virus contigs
+  or in proviruses by CheckV tier). Both only when the tool ran; every other table is unchanged.
+- **Left out on purpose:** a GUNC fail is a flag and does not change the MIMAG `quality_tier` (owner, 2026-11-06). The
+  stage-level binning reports (`bin_quality_report.py`, `bin_summary.py`) do not show GUNC, and the summary has no
+  CheckV figure (owner, 2026-11-12).
+- **Verified** on a 4-sample per-sample assembly run: 11 of 45 MAGs fail GUNC (4 of the 26 that CheckM2 rates at
+  least 90 % complete and at most 5 % contaminated); 3 ARG genes on viruses or in proviruses, all CheckV medium
+  quality. GUNC's reference (proGenomes 2.1, or GTDB r214) is older than GTDB r232, which the caveat states.
+- **Report (roadmap Phase 19):** Methods names and cites GUNC, CheckV, HMMER and Prodigal (before, it listed their
+  raw version keys without a reference); the MAGs page counts the MAGs that pass, fail and were not scored, the PDF
+  `mags` table shows `gunc_pass`, and the `mag_quality` figure circles the GUNC fails (only when GUNC ran); the
+  contig ARG page counts the ARG genes on plasmids, viruses and proviruses, and with CheckV their virus quality.
+
+## Sequencing coverage: Nonpareil (roadmap Phase 17, verified 2026-11-08)
+
+`NONPAREIL` runs in k-mer mode on R1 of each sample's clean reads; `bin/nonpareil_fit.R` fits the curve.
+
+- **Taken:** `samples_qc` `nonpareil_coverage`, `nonpareil_diversity` and `nonpareil_depth_95pct` (read pairs), the
+  `nonpareil_curves` figure (static and interactive) and an overview note for samples below
+  `--summary_min_nonpareil_coverage` (0.6).
+- **Verified** on a 3-sample, 2 M-pair fixture: coverage 0.09-0.18, every sample noted. A second run moved coverage by
+  at most 0.003 and the 95 % depth by 9-20 % (k-mer mode has no seed), and 10 M pairs of one sample projected about
+  4 times the 95 % depth of its 2 M-pair subsample: the depth is an order of magnitude, which the caveat says.
+- **Report (roadmap Phase 19):** a Methods line.
+
+## Multi-sample binning and run-level dereplication (roadmap Phase 18b, verified 2026-11-09)
+
+`--multisample_binning` gives MetaBAT2 one depth column per sample of the assembly's group (each sample aligned to the
+concatenation of the group's assemblies); `--dereplicate_mags` clusters the run's refined MAGs with galah and
+measures each representative in every sample with CoverM (`04_binning/dereplicated/`).
+
+- **Taken:** `mag_clusters` (each MAG's cluster and representative) and `mag_cluster_abundance` (each
+  representative's share of every sample's reads), covering this run's samples only (caveat). Multi-sample binning
+  has no table of its own: it changes MetaBAT2's bins, so the `mags` table; `mag_abundance` still uses each sample's
+  own alignment.
+- **Left out on purpose:** a heatmap of the cluster abundance (owner, 2026-11-12); study-wide dereplication stays
+  outside the pipeline (owner, 2026-11-05).
+- **Verified** on a 4-sample per-sample assembly run with both options: 45 refined MAGs in 31 clusters at 95 % ANI
+  (as the benchmark), `mag_cluster_abundance` 31 × 4 rows, the MAGs page's "Run-level clusters" section written.
+- **Report (roadmap Phase 19):** the MAGs page says when MetaBAT2 used the group's depth columns, and Methods lines
+  describe multi-sample binning and the dereplication.
 
 ## Out of scope
 
