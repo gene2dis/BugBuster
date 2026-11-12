@@ -6,8 +6,10 @@
 # reference, as happened to GUNC and CheckV. Checks:
 #   - the version keys of every module: the indented `tool: version` lines of the versions.yml
 #     heredocs (cat <<-END_VERSIONS ... END_VERSIONS) in modules/local and modules/nf-core
-#     main.nf files (script and stub blocks), the tool names of nf-core topic tuples
-#     (val('<tool>'), eval(...)), and the pipeline / nextflow lines SOFTWARE_VERSIONS adds;
+#     main.nf files (script and stub blocks), the `    tool: %s` lines of printf and the
+#     `    tool: {...}` lines of Python f.write calls that write versions.yml, the tool names of
+#     nf-core topic tuples (val('<tool>'), eval(...)), and the pipeline / nextflow lines
+#     SOFTWARE_VERSIONS adds; a module with a versions.yml output and no key found fails;
 #   - a key built at run time (it contains '$') must be listed in DYNAMIC below, with the
 #     names it can take;
 #   - every key has a row; every row's kind is tool, database or helper; every citekey a row
@@ -39,6 +41,8 @@ DYNAMIC = {
 HEREDOC_START = re.compile(r"cat\s+<<-?\s*END_VERSIONS")
 KEY_LINE = re.compile(r"^\s+([^\s:\"][^:\"]*?):(\s|$)")
 TOPIC = re.compile(r"""val\(\s*['"]([^'"]+)['"]\s*\)\s*,\s*eval\(""")
+# printf '"%s":\\n    tool: %s\\n' / printf '    tool: %s\\n' and Python f.write(f'    tool: {...}\\n')
+INLINE = re.compile(r"""(?:\\n|['"])\s{4}([A-Za-z][A-Za-z0-9_.-]*): (?:%s|\{)""")
 
 keys = {}  # key -> first file that writes it
 
@@ -51,7 +55,12 @@ files = sorted((repo / "modules" / "local").glob("*/main.nf")) + sorted((repo / 
 for f in files:
     rel = str(f.relative_to(repo))
     inside = False
+    found_here = set()
     for line in f.read_text().splitlines():
+        if not inside and ("printf" in line or "f.write" in line):
+            for m in INLINE.finditer(line):
+                add(m.group(1), rel)
+                found_here.add(m.group(1))
         if not inside:
             if HEREDOC_START.search(line):
                 inside = True
@@ -73,8 +82,13 @@ for f in files:
                 continue
             for n in sorted(names):
                 add(n, rel)
+                found_here.add(n)
         else:
             add(key, rel)
+            found_here.add(key)
+    text = f.read_text()
+    if re.search(r'path\s*\(?\s*"versions\.yml"', text) and not found_here and not TOPIC.search(text):
+        problems.append(f"{rel}: writes versions.yml, but no version key was found in it (heredoc, printf, f.write)")
 
 sv = repo / "subworkflows" / "local" / "software_versions.nf"
 for m in re.finditer(r'"\s{4}([A-Za-z0-9_.-]+):\s', sv.read_text()):
