@@ -186,6 +186,10 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq python3-yaml > /dev/null
           tests/bin/test_module_meta.sh
 
+      - name: Check every tool version key has a Methods reference (roadmap R12)
+        run: |
+          tests/bin/test_tool_references.sh
+
       - name: Run bin-directory recognition regression tests (audit #6)
         run: |
           tests/bin/test_identify_bin_dir.sh
