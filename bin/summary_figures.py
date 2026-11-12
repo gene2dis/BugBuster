@@ -635,7 +635,8 @@ def fig_mag_quality(fw, mags):
     ax.set_ylabel("completeness (%, CheckM2)")
     ax.set_xlim(left=0)
     ax.set_ylim(top=101)
-    fig.legend(title="MIMAG tier", loc="outside right upper")
+    # with GUNC the circles are in the legend too: the title names both
+    fig.legend(title="MIMAG tier; circles: GUNC fail" if gunc else "MIMAG tier", loc="outside right upper")
     src = m[["assembly", "batch", "bin", "completeness_pct", "contamination_pct", "quality_tier", "tier_basis"]
             + (["gunc_pass"] if gunc else [])]
     n_ass = m["assembly"].nunique()
