@@ -580,6 +580,23 @@ next release is tagged.
 
 ### Changed
 
+- **The run summary's report covers the tools added in roadmap Phases 15-18**
+  (Phase 19). The summary tables (`tables/*.tsv`, the Excel workbook) are
+  unchanged; the HTML site, the PDF and the README / LLM guide methods lines
+  change:
+  - MAGs page: how many MAGs pass and fail GUNC (and how many have no GUNC
+    result), `gunc_pass` in the PDF's `mags` table, and the GUNC fails circled
+    on the `mag_quality` figure, with a legend entry, a caption line and
+    `gunc_pass` in its CSV. The figure changes only when GUNC ran. A sentence
+    when `--multisample_binning` gave MetaBAT2 the group's depth columns.
+  - ARGs on contigs: the ARG genes geNomad places on plasmid and virus contigs
+    and in proviruses, and with CheckV the quality of those viruses.
+  - Assembly: when the co-assemblies are one per `--coassembly_group_by` group,
+    and when BBNorm reduced the assembler input.
+  - Methods lines for Nonpareil, GUNC, CheckV, multi-sample binning,
+    co-assembly groups, BBNorm, the run-level MAG clusters (galah, CoverM) and
+    the MAG ARG clusters (MMseqs2).
+
 - **MAG depth has one definition in both assembly modes.** A MAG's depth in a
   sample (`04_binning/.../coverage/<sample>_bin_depth.tsv`, `Bin_summary.csv`'s
   `<sample>_avgcov` and the summary's `mag_abundance`) is now the mean of its
@@ -1286,6 +1303,14 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Methods cite GUNC, CheckV, HMMER, Prodigal and BWA**: the report's
+  software table listed GUNC's and CheckV's version keys (`gunc`, `checkv`,
+  `gunc_db`, `checkv_db`, `hmmer`, `prodigal`) and RGI's `bwa` aligner as raw
+  names, as tools (the two databases too), with no reference. They now have
+  their names, kinds and references (`assets/report/tool_references.tsv`,
+  `references.yml`), and a CI check (`tests/bin/test_tool_references.sh`) fails
+  when a module writes a version key with no row there.
 
 - **Run summary metadata read trimmed (`bin/results_summary.py`)**: the
   `--sample_metadata` table's column names and values are read without
