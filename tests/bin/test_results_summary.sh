@@ -1377,8 +1377,35 @@ check "multi-sample binning (versions only): every column documented" \
     documented st_asm_ms_out --results st_asm_ms/results --batch-labels st_asm --min-clean-pairs 10000
 check "GUNC: a batch with GUNC merged with one without" \
     documented gunc_merge_out --results st_asm_gunc/results st_co --batch-labels asm co --min-clean-pairs 10000
-for d in st_asm_out st_asm_gunc_out st_asm_bbn_out st_asm_ms_out run1_cv_out docs_plain_out cv_merge_out st_grp_out \
-         st_co_out; do
+# GUNC with no fail: no circles, no "circled in"
+cp -r st_asm_gunc st_asm_gunc0
+sed -i 's/\tFalse$/\tTrue/' st_asm_gunc0/results/04_binning/per_sample/sampleA/quality/gunc/sampleA_gunc_maxCSS_level.tsv
+check "GUNC with no fail" \
+    documented st_asm_gunc0_out --results st_asm_gunc0/results --batch-labels st_asm --min-clean-pairs 10000
+# merged results directories where a stage ran in only one: the sentences say so
+check "BBNorm in one of two merged results directories" \
+    documented bbn_merge_out --results st_asm_bbn/results st_co --batch-labels asm co --min-clean-pairs 10000
+check "multi-sample binning in one of two merged results directories" \
+    documented ms_merge_out --results st_asm_ms/results st_co --batch-labels asm co --min-clean-pairs 10000
+check "co-assembly groups in one of two merged results directories" \
+    documented grp_merge_out --results st_grp st_asm/results --batch-labels grp asm --min-clean-pairs 10000
+# a co-assembly batch without geNomad's columns merged with one with them
+cp -r co2 co2_ng
+py - co2_ng/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv <<'PYEOF'
+import sys
+import pandas as pd
+p = sys.argv[1]
+t = pd.read_csv(p, sep="\t", dtype=str, keep_default_na=False)
+t.drop(columns=["mobile_class", "plasmid_score", "virus_score", "provirus", "virus_taxonomy",
+                "plasmid_conjugation_genes"]).to_csv(p, sep="\t", index=False)
+PYEOF
+check "geNomad in one of two merged results directories" \
+    documented ng_merge_out --results co1/results co2_ng/results --batch-labels gn plain --min-clean-pairs 10000
+PDF_DIRS="st_asm_out st_asm_gunc_out st_asm_gunc0_out gunc_merge_out st_asm_bbn_out st_asm_ms_out run1_cv_out docs_plain_out
+          cv_merge_out ng_merge_out st_grp_out st_co_out bbn_merge_out ms_merge_out grp_merge_out"
+check "a report PDF for every Phase 19 fixture (typst only warns when it fails)" \
+    bash -c 'for d in '"$(echo ${PDF_DIRS})"'; do [ -s "$d/results_summary.pdf" ] || { echo "    no PDF: $d"; exit 1; }; done'
+for d in ${PDF_DIRS}; do
     poppler pdftotext -layout "$d/results_summary.pdf" "$d/report.txt"
 done
 check "report text of the Phase 15-18 tools only when they ran, in the HTML and the PDF; tables unchanged" py - <<'PYEOF'
@@ -1395,7 +1422,7 @@ def page(d, name):
 
 def bare(text):
     # the PDF text without spaces and hyphens: line breaks and hyphenation do not matter
-    return re.sub(r"[\s\-\u2010\u00ad]", "", text)
+    return re.sub(r"[\s\-\u2010\u00ad\u200b]", "", text)
 
 
 def pdf(d):
@@ -1417,7 +1444,8 @@ def same_tables(a, b):
 for d in ("st_asm_bbn_out", "st_asm_ms_out"):
     same_tables("st_asm_out", d)
 bbn = "BBNorm normalised the reads given to MEGAHIT"
-ms = "MetaBAT2 binned each assembly with one depth column per sample of its group"
+ms = ("MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the "
+      "group")
 assert bbn in page("st_asm_bbn_out", "assembly.html") and in_pdf(bbn, "st_asm_bbn_out")
 assert bbn not in page("st_asm_out", "assembly.html") and not in_pdf(bbn, "st_asm_out")
 assert ms in page("st_asm_ms_out", "mags.html") and in_pdf(ms, "st_asm_ms_out")
@@ -1430,18 +1458,26 @@ assert re.search(r"GUNC flags 1 of 2 MAGs as likely chimeras .*?; 1 pass\. A fai
 gm = page("gunc_merge_out", "mags.html")
 n = len(open("gunc_merge_out/tables/mags.tsv").read().splitlines()) - 1
 assert f"GUNC flags 1 of {n} MAGs" in gm and f"1 pass, and {n - 2} have no GUNC result" in gm, gm[:600]
+assert in_pdf(f"1 pass, and {n - 2} have no GUNC result", "gunc_merge_out")
+# no fail: no circles and no "circled in"
+g0 = page("st_asm_gunc0_out", "mags.html")
+assert "GUNC flags 0 of 2 MAGs" in g0 and "circled in" not in g0 and "No MAG failed GUNC." in g0, g0[:600]
+assert in_pdf("GUNC flags 0 of 2 MAGs", "st_asm_gunc0_out") and in_pdf("No MAG failed GUNC.", "st_asm_gunc0_out")
+assert not in_pdf("circled in", "st_asm_gunc0_out")
 assert "circled in Figure" in g and "Open circles: MAGs that fail GUNC" in g
-assert in_pdf("GUNC flags 1 of", "st_asm_gunc_out") and in_pdf("gunc_pass", "st_asm_gunc_out")
+assert in_pdf("GUNC flags 1 of", "st_asm_gunc_out")
+# the PDF's mags table gains the column after quality_tier
+assert in_pdf("quality_tier gunc_pass genome_size_mb", "st_asm_gunc_out")
 for d in ("st_asm_out", "st_asm_bbn_out"):
     assert "GUNC flags" not in page(d, "mags.html") and not in_pdf("GUNC flags", d)
-    assert "Open circles" not in page(d, "mags.html") and not in_pdf("gunc_pass", d)
+    assert "Open circles" not in page(d, "mags.html") and not in_pdf("quality_tier gunc_pass", d)
     assert "gunc_pass" not in open(f"{d}/figures/mag_quality.csv").readline()
 src = open("st_asm_gunc_out/figures/mag_quality.csv").read().splitlines()
 assert src[0].endswith(",gunc_pass") and sum(1 for line in src[1:] if line.endswith(",False")) == 1, src[:3]
 
 # geNomad and CheckV on the contig ARG page: tetracycline 2 genes (1 on a plasmid), bacitracin 1 (virus, CheckV
 # high quality), multidrug 1 (provirus, medium)
-genomad = "geNomad places 1 of 4 ARG genes on plasmid contigs, 1 on virus contigs and 1 in proviruses"
+genomad = "Of the 4 ARG genes, geNomad places 1 on plasmid contigs, 1 on virus contigs and 1 in proviruses"
 checkv = ("Of the ARG genes on virus contigs or in proviruses (2), CheckV rates the virus complete or high quality "
           "for 1, medium for 1, low for 0 and not determined for 0")
 for d, with_checkv in (("run1_cv_out", True), ("docs_plain_out", False)):
@@ -1450,6 +1486,19 @@ for d, with_checkv in (("run1_cv_out", True), ("docs_plain_out", False)):
     assert (checkv in p) == with_checkv and in_pdf(checkv, d) == with_checkv, d
 assert ", in the batches where CheckV ran)" in page("cv_merge_out", "contig_args.html")
 assert ", in the batches where CheckV ran)" not in page("run1_cv_out", "contig_args.html")
+ng = "ARG genes in the results directories where geNomad ran, geNomad places"
+assert ng in page("ng_merge_out", "contig_args.html") and in_pdf(ng, "ng_merge_out")
+assert ng not in page("cv_merge_out", "contig_args.html")
+
+# a stage that ran in one of two merged results directories
+for d, name, phrase in (("bbn_merge_out", "assembly.html", "normalize , in the results directories where it ran"),
+                        ("ms_merge_out", "mags.html", "Multi-sample binning (in the results directories where it ran)"),
+                        ("grp_merge_out", "assembly.html", "The co-assemblies of the results directories with groups")):
+    assert phrase in page(d, name) and in_pdf(phrase, d), (d, phrase)
+for d, name, phrase in (("st_asm_bbn_out", "assembly.html", "in the results directories where it ran"),
+                        ("st_asm_ms_out", "mags.html", "in the results directories where it ran"),
+                        ("st_grp_out", "assembly.html", "of the results directories with groups")):
+    assert phrase not in page(d, name), (d, phrase)
 
 # co-assembly groups on the Assembly page
 grp = "The co-assemblies are one per --coassembly_group_by group (2 groups)"

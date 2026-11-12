@@ -10,7 +10,7 @@
 ]
 
 #if "multisample" in f [
-  MetaBAT2 binned each assembly with one depth column per sample of its group (multi-sample binning: every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth (#tabref(s, "abundance")) is still each sample's own alignment.
+  Multi-sample binning#if f.multisample_partial [ (in the results directories where it ran)]: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth (#tabref(s, "abundance")) is still each sample's own alignment.
 ]
 
 #fig(s, "mag_quality")

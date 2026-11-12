@@ -962,6 +962,12 @@ def main(argv=None):
         "n_coassembly_groups": len({(b["label"], g) for b in batches if b["assembly"] is not None
                                     for g in b["assembly"]["groups"].values()}),
         "bbnorm": any("BBNORM" in b["processes"] for b in batches),
+        # merged results directories: a stage that ran in only some of those that have the stage it belongs to
+        "partial": {
+            "bbnorm": any(b["assembly"] is not None and "BBNORM" not in b["processes"] for b in batches),
+            "groups": any(b["assembly"] is not None and not b["assembly"]["groups"] for b in batches),
+            "multisample": any(b["mags"] is not None and "multisample" not in b["found"] for b in batches),
+        },
     }
     ctx["method_notes"] = method_notes(ctx)
     model = summary_report.build(ctx, args.report_assets)

@@ -472,10 +472,11 @@ def build(ctx, assets):
     if "assembly_stats" in t:
         asm = Section("assembly", nums, records)
         asm.facts = {"n_assemblies": len(t["assembly_stats"][0])}
+        partial = ctx.get("partial", {})
         if ctx.get("n_coassembly_groups"):
-            asm.facts["n_groups"] = ctx["n_coassembly_groups"]
+            asm.facts.update({"n_groups": ctx["n_coassembly_groups"], "groups_partial": partial.get("groups", False)})
         if ctx.get("bbnorm"):
-            asm.facts["bbnorm"] = True
+            asm.facts.update({"bbnorm": True, "bbnorm_partial": partial.get("bbnorm", False)})
         asm.table("stats", t["assembly_stats"][0], "assembly_stats", "MEGAHIT assemblies: statistics of all "
                   "contigs, and of those kept by the length filter that binning, contig taxonomy, ARGs and functions "
                   "use.")
@@ -497,7 +498,8 @@ def build(ctx, assets):
             mg.facts.update({"gunc_pass": int(g.eq(True).fillna(False).sum()),
                              "gunc_fail": int(g.eq(False).fillna(False).sum()), "gunc_unscored": int(g.isna().sum())})
         if "multisample" in ctx.get("stages_found", ()):
-            mg.facts["multisample"] = True
+            mg.facts.update({"multisample": True,
+                             "multisample_partial": ctx.get("partial", {}).get("multisample", False)})
         mg.fig("mag_quality")
         mg.fig("mag_abundance_heatmap")
         mg.table("mags", m, "mags", "Refined MAGs: CheckM2 quality, MIMAG tier (tier_basis: whether Bakta's rRNA and "
@@ -534,7 +536,9 @@ def build(ctx, assets):
                      "assembly.")
         if "arg_contig_mobile" in t:
             mob = t["arg_contig_mobile"][0]
+            # arg_contig_mobile has the geNomad batches only: fewer genes than n_genes when some batch lacks it
             ca.facts.update({"mobile_genes": int(mob["arg_genes"].sum()),
+                             "mobile_partial": int(mob["arg_genes"].sum()) != ca.facts["n_genes"],
                              "on_plasmid": int(mob["arg_genes_on_plasmid"].sum()),
                              "on_virus": int(mob["arg_genes_on_virus"].sum()),
                              "in_provirus": int(mob["arg_genes_in_provirus"].sum())})
