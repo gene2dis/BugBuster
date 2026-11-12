@@ -7,6 +7,7 @@
 #if "n_groups" in s.facts [
   The co-assemblies are one per `--coassembly_group_by` group (#s.facts.n_groups group#if s.facts.n_groups != 1 [s]): each pools its group's samples#if has(s, "tables", "read_use") [, and #tabref(s, "read_use") gives each sample's group].
 ]
+
 #if "bbnorm" in s.facts [
   BBNorm normalised the reads given to MEGAHIT (`--assembly_read_reduction normalize`): only the assembler input was reduced, and every alignment, depth and count uses the full clean reads.
 ]

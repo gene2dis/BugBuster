@@ -1442,14 +1442,14 @@ assert src[0].endswith(",gunc_pass") and sum(1 for line in src[1:] if line.endsw
 # geNomad and CheckV on the contig ARG page: tetracycline 2 genes (1 on a plasmid), bacitracin 1 (virus, CheckV
 # high quality), multidrug 1 (provirus, medium)
 genomad = "geNomad places 1 of 4 ARG genes on plasmid contigs, 1 on virus contigs and 1 in proviruses"
-checkv = ("CheckV rates the viruses of the 2 ARG genes on virus contigs or in proviruses: 1 complete or high "
-          "quality, 1 medium, 0 low and 0 not determined")
+checkv = ("Of the ARG genes on virus contigs or in proviruses (2), CheckV rates the virus complete or high quality "
+          "for 1, medium for 1, low for 0 and not determined for 0")
 for d, with_checkv in (("run1_cv_out", True), ("docs_plain_out", False)):
     p = page(d, "contig_args.html")
     assert genomad in p and in_pdf(genomad, d), d
     assert (checkv in p) == with_checkv and in_pdf(checkv, d) == with_checkv, d
-assert "(in the batches where it ran)" in page("cv_merge_out", "contig_args.html")
-assert "(in the batches where it ran)" not in page("run1_cv_out", "contig_args.html")
+assert ", in the batches where CheckV ran)" in page("cv_merge_out", "contig_args.html")
+assert ", in the batches where CheckV ran)" not in page("run1_cv_out", "contig_args.html")
 
 # co-assembly groups on the Assembly page
 grp = "The co-assemblies are one per --coassembly_group_by group (2 groups)"
