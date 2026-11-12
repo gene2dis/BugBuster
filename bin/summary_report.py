@@ -486,12 +486,20 @@ def build(ctx, assets):
         tiers = m["quality_tier"].value_counts()
         mg.facts = {"n_mags": len(m), "high": int(tiers.get("high", 0)), "medium": int(tiers.get("medium", 0)),
                     "low": int(tiers.get("low", 0))}
+        if "gunc_pass" in m.columns:
+            # boolean with NA: not scored, or a MAG of a batch without GUNC
+            g = m["gunc_pass"]
+            mg.facts.update({"gunc_pass": int(g.eq(True).fillna(False).sum()),
+                             "gunc_fail": int(g.eq(False).fillna(False).sum()), "gunc_unscored": int(g.isna().sum())})
+        if "multisample" in ctx.get("stages_found", ()):
+            mg.facts["multisample"] = True
         mg.fig("mag_quality")
         mg.fig("mag_abundance_heatmap")
         mg.table("mags", m, "mags", "Refined MAGs: CheckM2 quality, MIMAG tier (tier_basis: whether Bakta's rRNA and "
                  "tRNA genes were checked), GTDB-Tk lineage and Bakta counts.",
                  pdf_columns=[c for c in ("assembly", "bin", "completeness_pct", "contamination_pct", "quality_tier",
-                                          "genome_size_mb", "contigs", "phylum", "genus", "species") if c in m.columns])
+                                          "gunc_pass", "genome_size_mb", "contigs", "phylum", "genus", "species")
+                              if c in m.columns])
         if "mag_abundance" in t:
             mg.table("abundance", t["mag_abundance"][0], "mag_abundance", "MAG depth per sample; pct_sample_bases "
                      "compares samples of one assembly mode, raw depth does not.", html_rows=1000)

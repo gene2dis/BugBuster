@@ -932,6 +932,11 @@ def main(argv=None):
         "sarg": sarg_ctx, "functional": func_ctx, "contig_functional": cfunc_ctx, "table_units": table_units,
         "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
+        # the stages found in some batch, co-assembly groups (a batch's groups are its own) and BBNorm
+        "stages_found": set().union(*(b["found"] for b in batches)),
+        "n_coassembly_groups": len({(b["label"], g) for b in batches if b["assembly"] is not None
+                                    for g in b["assembly"]["groups"].values()}),
+        "bbnorm": any("BBNORM" in b["processes"] for b in batches),
     }
     ctx["method_notes"] = method_notes(ctx)
     model = summary_report.build(ctx, args.report_assets)
