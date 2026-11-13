@@ -617,6 +617,19 @@ def fig_mag_quality(fw, mags):
         if len(sub):
             ax.scatter(sub["contamination_pct"], sub["completeness_pct"], s=7, color=MIMAG_COLORS[tier], lw=0,
                        alpha=0.9, label=f"{tier} ({len(sub)})")
+    gunc = "gunc_pass" in m.columns
+    note = ""
+    if gunc:
+        # GUNC (--gunc_prediction) flags likely chimeras without changing the tier: an open circle around them
+        fail = m[m["gunc_pass"].eq(False).fillna(False)]
+        # a MAG without CheckM2 values is not drawn, so neither is its circle
+        drawn = fail.dropna(subset=["completeness_pct", "contamination_pct"])
+        if len(drawn):
+            ax.scatter(drawn["contamination_pct"], drawn["completeness_pct"], s=26, facecolors="none",
+                       edgecolors="black", lw=0.6, label=f"GUNC fail ({len(drawn)})")
+            note = " Open circles: MAGs that fail GUNC (likely chimeras across lineages; the tier is unchanged)."
+        elif m["gunc_pass"].notna().any():
+            note = " No MAG failed GUNC."
     for x, y in ((5, 90), (10, 50)):
         ax.axhline(y, color="#BBBBBB", lw=0.4, ls=":", zorder=0)
         ax.axvline(x, color="#BBBBBB", lw=0.4, ls=":", zorder=0)
@@ -624,14 +637,16 @@ def fig_mag_quality(fw, mags):
     ax.set_ylabel("completeness (%, CheckM2)")
     ax.set_xlim(left=0)
     ax.set_ylim(top=101)
-    fig.legend(title="MIMAG tier", loc="outside right upper")
-    src = m[["assembly", "batch", "bin", "completeness_pct", "contamination_pct", "quality_tier", "tier_basis"]]
+    # with GUNC the circles are in the legend too: the title names both
+    fig.legend(title="MIMAG tier; circles: GUNC fail" if gunc else "MIMAG tier", loc="outside right upper")
+    src = m[["assembly", "batch", "bin", "completeness_pct", "contamination_pct", "quality_tier", "tier_basis"]
+            + (["gunc_pass"] if gunc else [])]
     n_ass = m["assembly"].nunique()
     fw.save(fig, "mag_quality", "MAG quality",
             f"CheckM2 completeness against contamination of the {len(m)} refined MAGs of {n_ass} assembl"
             f"{'y' if n_ass == 1 else 'ies'}, coloured by MIMAG tier (high: > 90 % complete, < 5 % contaminated, with "
             "the 23S, 16S and 5S rRNA genes and at least 18 tRNA types from Bakta; medium: >= 50 %, < 10 %). Dotted "
-            "lines: the MIMAG cutoffs. Without Bakta no MAG is high (tier_basis checkm2_only).", src, "mags")
+            "lines: the MIMAG cutoffs. Without Bakta no MAG is high (tier_basis checkm2_only)." + note, src, "mags")
 
 
 def fig_mag_abundance(fw, ab, mags, cols, groups, low, max_rows=80):

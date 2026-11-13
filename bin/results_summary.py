@@ -330,6 +330,17 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
 def method_notes(ctx):
     """One line per read-level method that ran, for the README (the HTML has its own reading guide)."""
     s, notes = ctx["summary"], []
+    ran = ctx.get("stages_found", set())
+    partial = ctx.get("partial", {})
+
+    def where(key):
+        # merged results directories: a stage that ran in only some of those it applies to
+        return " (in the results directories where it ran)" if partial.get(key) else ""
+
+    if s.get("nonpareil"):
+        notes.append("Sequencing coverage: Nonpareil in k-mer mode on R1 of each sample's clean reads, with the "
+                     "Nonpareil R package's curve fit (samples_qc nonpareil_coverage, nonpareil_diversity and "
+                     "nonpareil_depth_95pct, in read pairs).")
     if "K-MARVEL" in s.get("arg_methods", []):
         notes.append("K-MARVEL assembles resistance genes from the reads and reports calls against CARD, with their "
                      "supporting read pairs (RPKM in the summary).")
@@ -360,15 +371,36 @@ def method_notes(ctx):
         if prof:
             notes.append(f"Taxonomy: {what[prof]}. Classified fractions are not comparable between profilers.")
     if "assembly_stats" in t:
+        groups = ctx.get("n_coassembly_groups", 0)
         notes.append("Assembly: MEGAHIT, BBMap statistics of all contigs; only contigs of at least "
                      "min_contig_length_bp go on to binning, contig taxonomy, ARGs and functions. Reads not on contigs "
-                     "are outside every contig-based table (assembly_read_use).")
+                     "are outside every contig-based table (assembly_read_use)."
+                     + (f" Co-assembly{where('groups')}: one per --coassembly_group_by group ({groups} "
+                        f"group{'s' if groups != 1 else ''}; assembly_read_use gives each sample's)." if groups else "")
+                     + (f" BBNorm{where('bbnorm')} normalised the assembler input only (--assembly_read_reduction "
+                        "normalize); alignments, depths and counts use the full clean reads."
+                        if ctx.get("bbnorm") else ""))
     if "mags" in t:
         notes.append("MAGs: refined bins (Binette with >= 2 binners) scored by CheckM2, classified by GTDB-Tk and, "
-                     "with Bakta, checked for rRNA and tRNA genes: quality_tier follows MIMAG.")
+                     "with Bakta, checked for rRNA and tRNA genes: quality_tier follows MIMAG."
+                     + (f" GUNC{where('gunc')} checks each MAG for chimerism across lineages (gunc_pass)."
+                        if "gunc" in ran else "")
+                     + (f" Multi-sample binning{where('multisample')}: MetaBAT2 binned each assembly of a group of two "
+                        "or more samples with one depth column per sample of the group, from each sample aligned to "
+                        "the concatenation of the group's assemblies." if "multisample" in ran else ""))
+    if "mag_clusters" in t and len(t["mag_clusters"][0]):
+        ani = ", ".join(f"{v:g}" for v in sorted(t["mag_clusters"][0]["ani_pct"].dropna().unique()))
+        notes.append(f"MAG clusters: galah at {ani} % ANI over the run's refined MAGs (the representative has the "
+                     "highest completeness − 5 × contamination), and CoverM on the representatives with every "
+                     "sample's reads (mag_cluster_abundance).")
     if "arg_contig_long" in t:
         notes.append("Contig ARGs: DeepARG on the predicted proteins of the contigs, with the contig's Metabuli taxon, "
-                     "bin and geNomad class: physical linkage of an ARG and its host, counted in genes on contigs.")
+                     "bin and geNomad class: physical linkage of an ARG and its host, counted in genes on contigs."
+                     + (f" CheckV{where('checkv')} rates geNomad's viruses and proviruses (arg_contig_mobile "
+                        "arg_genes_viral_checkv_*)." if "checkv" in ran else ""))
+    if "arg_mag_long" in t:
+        notes.append("MAG ARGs: the contig DeepARG hits on each refined MAG's contigs, clustered with MMseqs2 at "
+                     "90-100 % identity (arg_mag_long; arg_cluster_sharing at 90 %).")
     if ctx.get("contig_functional"):
         c = ctx["contig_functional"]
         notes.append(f"Contig functional profile: eggNOG-mapper and dbCAN on the predicted genes, featureCounts per "
@@ -494,7 +526,11 @@ def main(argv=None):
                                 ("checkv", has_checkv(contig_args)), ("nonpareil", nonpareil is not None),
                                 ("dereplication", derep is not None),
                                 # no table of its own: MetaBAT2's depth columns (the binning tables)
-                                ("multisample", "MULTISAMPLE_SPLIT_DEPTH" in processes)) if v}
+                                ("multisample", "MULTISAMPLE_SPLIT_DEPTH" in processes
+                                 or (root / "pipeline_info" / "multisample_groups.tsv").exists()),
+                                # report text only: the assembler input's read reduction
+                                ("bbnorm", "BBNORM" in processes
+                                 or any((root / "03_assembly").glob("**/*_read_reduction.tsv")))) if v}
         batches.append({"label": label, "root": root, "reads": reads, "fastp": fastp, "nonpareil": nonpareil,
                         "taxonomy": taxonomy,
                         "kmarvel": kmarvel, "kmarvel_ran": kran, "rgi": rgi, "rgi_kmer": rgi_kmer, "rgi_ran": rgi_ran,
@@ -932,6 +968,20 @@ def main(argv=None):
         "sarg": sarg_ctx, "functional": func_ctx, "contig_functional": cfunc_ctx, "table_units": table_units,
         "title": args.title,
         "stage_status": stage_by_batch, "versions_table": versions_table, "batches": batches, "order": order,
+        # the stages found in some batch, co-assembly groups (a batch's groups are its own) and BBNorm
+        "stages_found": set().union(*(b["found"] for b in batches)),
+        "n_coassembly_groups": len({(b["label"], g) for b in batches if b["assembly"] is not None
+                                    for g in b["assembly"]["groups"].values()}),
+        "bbnorm": any("bbnorm" in b["found"] for b in batches),
+        # merged results directories: a stage that ran in only some of those that have the stage it belongs to
+        "partial": {
+            "bbnorm": any(b["assembly"] is not None and "bbnorm" not in b["found"] for b in batches),
+            "groups": any(b["assembly"] is not None and not b["assembly"]["groups"] for b in batches),
+            "multisample": any(b["mags"] is not None and "multisample" not in b["found"] for b in batches),
+            "gunc": any(b["mags"] is not None and "gunc" not in b["found"] for b in batches),
+            "genomad": any("contig_arg" in b["found"] and "genomad" not in b["found"] for b in batches),
+            "checkv": any("genomad" in b["found"] and "checkv" not in b["found"] for b in batches),
+        },
     }
     ctx["method_notes"] = method_notes(ctx)
     model = summary_report.build(ctx, args.report_assets)

@@ -2,6 +2,12 @@
 {% block body %}
 <h1>Assembly</h1>
 <p>{{ s.facts.n_assemblies }} MEGAHIT assembl{{ "y" if s.facts.n_assemblies == 1 else "ies" }} ({{ m.tabref(s, "stats") }}). Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table ({{ m.tabref(s, "read_use") }}).</p>
+{% if s.facts.n_groups is defined %}
+<p>The co-assemblies{% if s.facts.groups_partial %} of the results directories with groups{% endif %} are one per <code>--coassembly_group_by</code> group ({{ s.facts.n_groups }} group{{ "" if s.facts.n_groups == 1 else "s" }}): each pools its group's samples{% if s.tables.get("read_use") %}, and {{ m.tabref(s, "read_use") }} gives each sample's group{% endif %}.</p>
+{% endif %}
+{% if s.facts.bbnorm is defined %}
+<p>BBNorm normalised the reads given to MEGAHIT (<code>--assembly_read_reduction normalize</code>{% if s.facts.bbnorm_partial %}, in the results directories where it ran{% endif %}): only the assembler input was reduced, and every alignment, depth and count uses the full clean reads.</p>
+{% endif %}
 {{ m.table(s, "stats") }}
 {{ m.table(s, "read_use") }}
 {% endblock %}
