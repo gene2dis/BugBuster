@@ -76,7 +76,10 @@ process GTDB_TK_BATCH {
             # Copy bins with prefixed names to track origin
             find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
                 bin_name=\$(basename "\$bin_file")
-                cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name}"
+                # named .fa whatever the extension: GTDB-Tk runs with
+                # --extension .fa, so a .fasta / .fna bin was counted but not
+                # classified (R4-12)
+                cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name%.*}.fa"
             done
             total_bins=\$((total_bins + bin_count))
         fi
@@ -104,79 +107,13 @@ process GTDB_TK_BATCH {
             --extension .fa \\
             --pplacer_cpus ${pplacer_cpus}
         
-        # Split the combined reports by sample prefix
+        # Split the combined reports by sample prefix (<sample>__<bin>):
+        # bin/gtdbtk_split.py stops on a bin whose prefix is not a sample of
+        # the batch instead of dropping its row (roadmap Phase 20, RV3), and
+        # writes a header-only ar53 table when GTDB-Tk wrote no ar53 summary
         if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ]; then
-            # The script body is indented with tabs: bash <<- strips them, and at four
-            # tabs they are not below the script's 4-space base indentation, which
-            # Nextflow strips from every line (fewer left spaces before END_VERSIONS)
-            python3 <<-PYEOF
-				import sys
-				import os
-				
-				meta_ids = "${meta_ids}".split()
-				
-				# Process bacteria summary
-				if os.path.exists("gtdbtk_output/classify/gtdbtk.bac120.summary.tsv"):
-				    with open("gtdbtk_output/classify/gtdbtk.bac120.summary.tsv", 'r') as f:
-				        header = f.readline()
-				        lines = f.readlines()
-				    
-				    # Create per-sample reports
-				    sample_reports = {meta_id: [] for meta_id in meta_ids}
-				    
-				    for line in lines:
-				        if line.strip():
-				            # Extract sample ID from bin name (format: sampleID__binname.fa)
-				            bin_name = line.split('\t')[0]
-				            if '__' in bin_name:
-				                sample_id = bin_name.split('__')[0]
-				                if sample_id in sample_reports:
-				                    # Remove the sample prefix from bin name in output
-				                    original_bin_name = '__'.join(bin_name.split('__')[1:])
-				                    modified_line = line.replace(bin_name, original_bin_name, 1)
-				                    sample_reports[sample_id].append(modified_line)
-				    
-				    # Write per-sample reports
-				    for meta_id in meta_ids:
-				        with open(f"{meta_id}_gtdbtk_bac120.tsv", 'w') as f:
-				            f.write(header)
-				            if sample_reports[meta_id]:
-				                f.writelines(sample_reports[meta_id])
-				
-				# Process archaea summary
-				if os.path.exists("gtdbtk_output/classify/gtdbtk.ar53.summary.tsv"):
-				    with open("gtdbtk_output/classify/gtdbtk.ar53.summary.tsv", 'r') as f:
-				        header = f.readline()
-				        lines = f.readlines()
-				    
-				    # Create per-sample reports
-				    sample_reports = {meta_id: [] for meta_id in meta_ids}
-				    
-				    for line in lines:
-				        if line.strip():
-				            # Extract sample ID from bin name (format: sampleID__binname.fa)
-				            bin_name = line.split('\t')[0]
-				            if '__' in bin_name:
-				                sample_id = bin_name.split('__')[0]
-				                if sample_id in sample_reports:
-				                    # Remove the sample prefix from bin name in output
-				                    original_bin_name = '__'.join(bin_name.split('__')[1:])
-				                    modified_line = line.replace(bin_name, original_bin_name, 1)
-				                    sample_reports[sample_id].append(modified_line)
-				    
-				    # Write per-sample reports
-				    for meta_id in meta_ids:
-				        with open(f"{meta_id}_gtdbtk_ar53.tsv", 'w') as f:
-				            f.write(header)
-				            if sample_reports[meta_id]:
-				                f.writelines(sample_reports[meta_id])
-				else:
-				    # Create empty ar53 files if no archaea found
-				    for meta_id in meta_ids:
-				        if not os.path.exists(f"{meta_id}_gtdbtk_ar53.tsv"):
-				            with open(f"{meta_id}_gtdbtk_ar53.tsv", 'w') as f:
-				                f.write("user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings\\n")
-				PYEOF
+            gtdbtk_split.py --samples ${meta_ids} --domain bac120 --summary gtdbtk_output/classify/gtdbtk.bac120.summary.tsv
+            gtdbtk_split.py --samples ${meta_ids} --domain ar53 --summary gtdbtk_output/classify/gtdbtk.ar53.summary.tsv
         fi
     fi
     

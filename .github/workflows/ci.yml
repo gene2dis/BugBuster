@@ -194,6 +194,10 @@ jobs:
         run: |
           tests/bin/test_identify_bin_dir.sh
 
+      - name: Run GTDB-Tk per-sample split regression tests (roadmap Phase 20, RV3)
+        run: |
+          tests/bin/test_gtdbtk_split.sh
+
       - name: Run RGI_BWT low-coverage fallback regression tests (audit #8)
         run: |
           tests/bin/test_rgi_bwt_fallback.sh
