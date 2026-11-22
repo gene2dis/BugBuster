@@ -1331,6 +1331,15 @@ next release is tagged.
 
 ### Fixed
 
+- **`--bbmap_length 0` keeps every contig** (roadmap Phase 21). BBMAP read the
+  value with Groovy's `?:`, which takes an Integer 0 for false, so a `0` from
+  a params file, a `-c` config or the command line on Nextflow 25.10 filtered
+  at 1000 bp without a message. On Nextflow >= 26.04, where a command-line
+  value arrives as a String, any `--bbmap_length` other than 0 stopped every
+  BBMAP task ("Cannot compare java.lang.String with java.lang.Integer"). The
+  value is now read with `!= null` and converted. The same holds for
+  `--rgi_min_kmer_coverage 0` (RGI_KMER used 10) and `--azure_vm_count 0`
+  (the Azure pool started with 1 VM).
 - **Sample ids, bin names and database labels are read back as text**
   (roadmap Phase 20). pandas inferred their type when the report scripts read
   a table back: READS_REPORT reads one file per sample, so a sample `001` was

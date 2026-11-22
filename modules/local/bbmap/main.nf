@@ -43,7 +43,10 @@ process BBMAP {
     script:
     prefix = meta.id
     def args = task.ext.args ?: ''
-    def min_length = task.ext.min_length ?: params.bbmap_length ?: 1000
+    // != null, not ?: (Groovy reads 0 as false, and 0 means no length filter);
+    // as Integer: numeric CLI params arrive as Strings on Nextflow >= 26.04
+    def min_length = (task.ext.min_length != null ? task.ext.min_length
+                      : params.bbmap_length != null ? params.bbmap_length : 1000) as Integer
     
     // Input validation
     if (!meta || !meta.id) {

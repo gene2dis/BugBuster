@@ -25,7 +25,8 @@ process RGI_KMER {
         def args = task.ext.args ?: ''
         def prefix = "${meta.id}"
         def kmer_size = params.rgi_kmer_size ?: 61
-        def minimum = params.rgi_min_kmer_coverage ?: 10
+        // != null, not ?: (Groovy reads 0 as false, and 0 is a valid minimum)
+        def minimum = (params.rgi_min_kmer_coverage != null ? params.rgi_min_kmer_coverage : 10) as Integer
         // Wall-clock cap enforced by the wrapper (modules.config ext.time_limit)
         def time_limit = ((task.ext.time_limit ?: 2.h) as Duration).toSeconds()
         

@@ -41,4 +41,30 @@ nextflow_process {
             assert process.out.versions.size() == 1
         }
     }
+
+    // --rgi_min_kmer_coverage 0 is a minimum of 0, not the default 10 (roadmap
+    // Phase 21, RV11; review R1-01): read with != null, not ?:. The script is
+    // built before the k-mer database check, so .command.sh shows the value
+    test("--rgi_min_kmer_coverage 0 reaches kmer_query as 0") {
+        when {
+            params {
+                rgi_min_kmer_coverage = 0
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 's1' ],
+                    file("${projectDir}/tests/data/rgi/s1_rgi_bwt.gene_mapping_data.txt", checkIfExists: true)
+                ]
+                input[1] = file("${projectDir}/tests/data/rgi/card_db_no_kmers", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def script = path(process.out.kmer_json.get(0)[1]).resolveSibling(".command.sh").text
+            assert script =~ /(?m)^\s*-m 0 \\$/
+        }
+    }
 }
