@@ -1167,6 +1167,21 @@ host removal:
   Binette ran, but no refined bin passed `--bin_min_completeness` /
   `--bin_max_contamination` (default 50 / 10).
 - `No bins available for refinement`: no binner produced a bin for Binette.
+- `No contig reaches MetaBAT2's minimum contig length (--metabat_minContig) - MetaBAT2 skipped`:
+  the assembly has contigs, but none of `--metabat_minContig` bp (2500 by
+  default), and MetaBAT2 cannot run without one.
+
+An assembly with no contig at all after the length filter (every contig below
+`--bbmap_length`) goes no further: the log warns `Assembly <id> (...) has no
+contig of at least <N> bp after the length filter`, the assembly is listed in
+`pipeline_info/empty_assemblies.tsv` (assembly, its samples, contigs before the
+filter, the minimum length) and has no binning, contig taxonomy, contig ARG or
+contig functional results. Its samples keep their QC, taxonomy and read-level
+results, and the summary names it under Attention. Under co-assembly that
+covers every sample of the co-assembly. The file is written only when a run
+has such an assembly, so one left by an earlier run into the same `--output`
+stays until you remove it; `contig_filtering_summary.txt` is rewritten by every
+run.
 
 The run finishes on purpose instead of failing. A report step still fails when
 an input file is missing, which points to a real pipeline problem.

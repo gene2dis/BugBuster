@@ -176,6 +176,9 @@ workflow BINNING {
         // (which changed the task hash and defeated -resume; design doc Q19)
         ch_all_sample_bins = ch_binner_bins
             .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
+            // no task without bins: toSortedList gives [] when ASSEMBLY dropped
+            // every assembly for want of contigs (roadmap Phase 21, RV10)
+            .filter { items -> items }
             .map { items ->
                 // one meta per path (CHECKM2_BATCH maps each staged
                 // directory to its sample from this list); the module
@@ -232,6 +235,7 @@ workflow BINNING {
     ch_all_refined_bins = ch_refined_bins
         .filter { _meta, bins -> bins != null }
         .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
+        .filter { items -> items }  // as for CHECKM2 above
         .map { items ->
             def meta_list = items.collect { item -> item[0] }
             def all_paths = items.collect { item -> item[1] }

@@ -266,7 +266,31 @@ def tier1_table(calls, comparison, primary):
     return t1
 
 
-def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_samples=(), min_coverage=None):
+def empty_assemblies(astats, asm_parts, batches):
+    """Assemblies BBMAP's length filter left without a contig (contigs_kept 0), which the pipeline drops before
+    the contig stages (pipeline_info/empty_assemblies.tsv): [(assembly, its samples, min contig length)]. The
+    assembly is prefixed with its results directory when several are merged."""
+    out = []
+    parts = dict(asm_parts)
+    samples_of = {b["label"]: sorted(b["samples"]) for b in batches}
+    for row in astats.itertuples():
+        if pd.isna(row.contigs_kept) or row.contigs_kept != 0:
+            continue
+        a = parts.get(row.batch)
+        groups = a["groups"] if a is not None else {}
+        if groups and row.assembly in set(groups.values()):
+            members = sorted(s for s, g in groups.items() if g == row.assembly)
+        elif row.assembly == "coassembly":
+            members = samples_of.get(row.batch, [])
+        else:
+            members = [row.assembly]
+        name = row.assembly if len(batches) == 1 else f"{row.batch}: {row.assembly}"
+        out.append((name, members, None if pd.isna(row.min_contig_length_bp) else int(row.min_contig_length_bp)))
+    return out
+
+
+def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_samples=(), min_coverage=None,
+                    empty_asm=()):
     """Short findings for the report header: [(kind, text, anchor)].
 
     Tier 1 genes come from the method comparison when several ARG methods ran (so a gene only one method found
@@ -328,6 +352,12 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
                                       f"{min_coverage:g}: {', '.join(low_coverage_samples)} (a large part of the "
                                       "community is unsampled: a taxon or gene missing there is weak evidence, and "
                                       "an assembly recovers mainly the dominant populations)", "qc"))
+    for name, members, minlen in empty_asm:
+        flags.append(("empty_assembly",
+                      f"assembly {name} ({', '.join(members)}) kept no contig"
+                      + (f" of at least {minlen} bp" if minlen is not None else "")
+                      + ": it has no binning, contig taxonomy, contig ARG or contig functional results; its samples "
+                        "keep their read-level results", "assembly"))
     return flags
 
 
@@ -830,6 +860,7 @@ def main(argv=None):
     astats = assembly_stats_table(asm_parts)
     if astats is not None:
         tables["assembly_stats"] = (astats, False)
+        summary["empty_assemblies"] = empty_assemblies(astats, asm_parts, batches)
         use = read_use_frame(asm_parts, {b["label"]: sorted(b["samples"]) for b in batches})
         if use is not None:
             tables["assembly_read_use"] = (with_meta(use, samples, meta_cols, order, []), False)
@@ -920,7 +951,8 @@ def main(argv=None):
     if prim_arg is not None and not prim_arg.empty:
         tier1_view = tier1_table(calls_by[primary], comparison, primary)
     summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"], calls_by,
-                                           summary.get("low_coverage_samples", ()), args.min_nonpareil_coverage)
+                                           summary.get("low_coverage_samples", ()), args.min_nonpareil_coverage,
+                                           summary.get("empty_assemblies", ()))
 
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]

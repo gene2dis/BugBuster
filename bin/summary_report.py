@@ -235,8 +235,8 @@ def caveats(ctx):
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",
                "homolog": "Tier 1 calls that may be commensal relatives", "low_depth": "Depth",
-               "low_coverage": "Sequencing coverage (Nonpareil)"}
-FLAG_SECTION = {"args": "args", "compare": "compare", "qc": "overview"}
+               "low_coverage": "Sequencing coverage (Nonpareil)", "empty_assembly": "Assemblies without contigs"}
+FLAG_SECTION = {"args": "args", "compare": "compare", "qc": "overview", "assembly": "assembly"}
 
 
 # ---- references
@@ -352,7 +352,7 @@ def build(ctx, assets):
         cards.append((s["n_species"], "species detected (any sample)", False))
     ov.lists["cards"] = [{"value": fmt(v), "label": lab, "warn": bool(w)} for v, lab, w in cards]
     att = []
-    for kind in ("tier1", "single", "homolog", "low_depth", "low_coverage"):
+    for kind in ("tier1", "single", "homolog", "low_depth", "low_coverage", "empty_assembly"):
         sub = [f for f in s.get("attention", []) if f[0] == kind]
         if sub:
             att.append({"kind": kind, "title": FLAG_TITLES[kind],
@@ -477,6 +477,10 @@ def build(ctx, assets):
             asm.facts.update({"n_groups": ctx["n_coassembly_groups"], "groups_partial": partial.get("groups", False)})
         if ctx.get("bbnorm"):
             asm.facts.update({"bbnorm": True, "bbnorm_partial": partial.get("bbnorm", False)})
+        empty = ctx["summary"].get("empty_assemblies") or []
+        if empty:
+            asm.facts["empty"] = ", ".join(name for name, _, _ in empty)
+            asm.facts["n_empty"] = len(empty)
         asm.table("stats", t["assembly_stats"][0], "assembly_stats", "MEGAHIT assemblies: statistics of all "
                   "contigs, and of those kept by the length filter that binning, contig taxonomy, ARGs and functions "
                   "use.")

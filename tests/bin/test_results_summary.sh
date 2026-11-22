@@ -1266,6 +1266,36 @@ r1 = pd.read_csv("out/tables/arg_gene_rpkg.tsv", sep="\t", index_col=0, keep_def
 assert set(r1["sampleB"]) <= {"NA_no_ags", "NA_low_depth"}, set(r1["sampleB"])
 PYEOF
 
+# An assembly the length filter left without contigs (roadmap Phase 21, RV10): the pipeline drops it before the
+# contig stages, so the results directory holds its contig statistics and contigs_kept 0, and none of its contig-
+# stage outputs. The summary says so in Attention, README.md and on the assembly page; the tables are built as for
+# any assembly without those stages
+mkdir -p st_empty
+cp -r st_asm/results st_empty/results
+rm -rf st_empty/results/04_binning/per_sample/sampleB st_empty/results/05_arg_prediction/contig_level/deeparg/sampleB \
+    st_empty/results/07_functional_annotation/gene_abundance/sampleB
+sed -i 's/^sampleB\t24425\t2078\t1000\tFALSE$/sampleB\t24425\t0\t1000\tTRUE/' \
+    st_empty/results/pipeline_info/contig_filtering_summary.txt
+for f in st_empty/results/07_functional_annotation/summary/*.tsv \
+         st_empty/results/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv; do
+    awk -F '\t' '$1 != "sampleB"' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+done
+check "an assembly without contigs: contigs_kept 0, flagged in Attention, README and the assembly page" \
+    documented st_empty_out --results st_empty/results --min-clean-pairs 10000
+check "an assembly without contigs: the flag names it and its samples" py - <<'PYEOF'
+import pandas as pd
+a = pd.read_csv("st_empty_out/tables/assembly_stats.tsv", sep="\t").set_index("assembly")
+assert a.at["sampleB", "contigs_kept"] == 0 and a.at["sampleA", "contigs_kept"] == 16094
+flag = "assembly sampleB (sampleB) kept no contig of at least 1000 bp"
+assert flag in open("st_empty_out/README.md").read()
+assert "Assemblies without contigs" in open("st_empty_out/report/index.html").read()
+asm = open("st_empty_out/report/assembly.html").read()
+assert "1 assembly kept no contig after the length filter (sampleB;" in asm
+# the per-sample tree without the empty assembly has none of it
+assert "kept no contig" not in open("st_asm_out/README.md").read()
+assert "kept no contig" not in open("st_asm_out/report/assembly.html").read()
+PYEOF
+
 # ---- the report documents (roadmap Phase 11d): a PDF and an HTML site with a page per section that ran
 pages() { (cd "$1/report" && ls -- *.html | sort | tr '\n' ' '); }
 check "QC only: the report has the overview, methods and dictionary pages only" \

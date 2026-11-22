@@ -1,0 +1,43 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    METABAT2 Module Test
+
+    Roadmap Phase 21, RV10 (review R4-08): an assembly with contigs but none
+    of --metabat_minContig bp (2500 by default) made MetaBAT2 2.18 exit 1
+    ("There were no large target contigs. Cannot proceed."), which stopped the
+    run for a sample that simply has no bins. METABAT2 now writes its bin
+    directory with a SKIPPED.txt, as SEMIBIN and COMEBIN do. The real tool
+    runs here on tests/data/contigs/mixed_length_contigs.fa (1200, 1500 and
+    300 bp) with a hand-written jgi depth table for those contigs
+    (tests/data/bins/metabat_short/mixed_length_depth.txt).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test METABAT2 Process"
+    script "../../modules/local/metabat2/main.nf"
+    process "METABAT2"
+
+    test("no contig of the minimum length: an empty bin set with SKIPPED.txt") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    file("${projectDir}/tests/data/contigs/mixed_length_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/bins/metabat_short/mixed_length_depth.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.resolve("SKIPPED.txt").text.contains("MetaBAT2 skipped")
+            assert !bins.toFile().listFiles().any { f -> f.name.endsWith('.fa') }
+            assert path(process.out.versions.get(0)).text.contains("metabat2: 2.18")
+        }
+    }
+}

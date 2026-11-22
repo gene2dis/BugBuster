@@ -1331,6 +1331,22 @@ next release is tagged.
 
 ### Fixed
 
+- **An assembly with no contig after the length filter no longer stops the
+  run** (roadmap Phase 21). When every contig of a sample (or a co-assembly)
+  was below `--bbmap_length`, its empty FASTA went on to every contig stage,
+  and MetaBAT2, BlobTools, DeepARG and eggNOG-mapper stop on an empty input
+  (checked in their pinned images), so one such sample ended the run after
+  every other assembly. ASSEMBLY now drops it after BBMAP with a warning. It
+  gets no alignment, binning, contig taxonomy, contig ARG or contig functional
+  annotation, and is listed in the new `pipeline_info/empty_assemblies.tsv`
+  (written only when there is one). Its samples keep their QC, taxonomy and
+  read-level results, and the summary names it under Attention and on the
+  assembly page (its `assembly_stats` row already had `contigs_kept` 0).
+  Also: METABAT2 on an assembly whose contigs are all below
+  `--metabat_minContig` (2500 by default) writes its bin folder with a
+  `SKIPPED.txt`, as SemiBin2 and COMEBin do. MetaBAT2 exits 1 there ("There
+  were no large target contigs"), which stopped the run for a sample that only
+  had no bins.
 - **GTDB_TK_BATCH writes its tables for archaea-only bins** (roadmap Phase 21).
   GTDB-Tk writes no `gtdbtk.bac120.summary.tsv` when no bin is bacterial, and
   the per-sample split ran only when that file existed, so a run whose refined

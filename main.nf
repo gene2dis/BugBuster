@@ -188,7 +188,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -685,6 +685,13 @@ workflow {
         ch_counting_bam = ASSEMBLY.out.counting_bam
         ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
         ch_summary_reports = ch_summary_reports.mix(ASSEMBLY.out.stats, ASSEMBLY.out.filter_summary)
+        // pipeline_info/empty_assemblies.tsv: the assemblies dropped before the
+        // contig stages for want of contigs (roadmap Phase 21, RV10), written
+        // only when there is one. The summary reads the same fact from
+        // contig_filtering_summary.txt (contigs_kept 0)
+        ASSEMBLY.out.empty_assemblies
+            .collectFile(name: 'empty_assemblies.tsv', storeDir: "${params.output}/pipeline_info", sort: true,
+                         seed: "assembly\tsamples\tcontigs_before_filter\tmin_length_bp\n")
 
         //
         // SUBWORKFLOW: Binning
@@ -952,10 +959,11 @@ workflow {
     ch_genomad_tables = channel.empty()
     if ( flagOn(params.genomad_prediction) && params.assembly_mode != "none" ) {
         // geNomad stops on a FASTA without sequences, which BBMAP writes when
-        // every contig of a sample is below --bbmap_length: skip those
+        // every contig of a sample is below --bbmap_length. ASSEMBLY no longer
+        // emits those (roadmap Phase 21, RV10); the check stays as a guard
         NFCORE_GENOMAD_ENDTOEND(
             ch_contigs_meta.filter { meta, contigs ->
-                def has_contigs = contigs.withReader { reader -> reader.readLine()?.startsWith('>') ?: false }
+                def has_contigs = hasFastaRecord(contigs)
                 if ( !has_contigs ) {
                     log.warn "No contigs for ${meta.id}: skipping geNomad"
                 }

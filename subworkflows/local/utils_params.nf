@@ -56,3 +56,16 @@ def parseBinners() {
     def names = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',')
     return names.collect { b -> b.toString().trim().toLowerCase() }.findAll { b -> b }.unique()
 }
+
+// true when a (plain, uncompressed) FASTA holds at least one record. BBMAP
+// writes a FASTA without sequences when every contig of an assembly is below
+// --bbmap_length; ASSEMBLY drops such an assembly before the contig stages
+// (roadmap Phase 21, RV10), and the geNomad filter in main.nf uses it too
+def hasFastaRecord(fasta) {
+    return fasta.withReader { reader -> reader.readLine()?.startsWith('>') ?: false }
+}
+
+// --bbmap_length as BBMAP reads it: an Integer, 0 included (roadmap Phase 21, RV11)
+def bbmapMinLength() {
+    return (params.bbmap_length != null ? params.bbmap_length : 1000) as Integer
+}
