@@ -110,7 +110,8 @@ process BBMAP {
     prefix = meta.id
     // stub-only test hook: ext.stub_empty_ids lists assemblies whose stub
     // contigs are written empty, as BBMAP writes them when every contig is
-    // below the length filter (tests/main.nf.test, roadmap Phase 21, RV10)
+    // below the length filter (tests/empty_assembly.nf.test with
+    // tests/empty_assembly.config; roadmap Phase 21, RV10)
     if ((task.ext.stub_empty_ids ?: []).contains(meta.id)) {
         """
         : > ${prefix}_filtered_contigs.fa

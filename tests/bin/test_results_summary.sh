@@ -1360,6 +1360,9 @@ assert flag in open("st_empty_out/README.md").read()
 assert "Assemblies without contigs" in open("st_empty_out/report/index.html").read()
 asm = open("st_empty_out/report/assembly.html").read()
 assert "1 assembly kept no contig after the length filter (sampleB;" in asm
+# its sample's reads are on no contig: 0 %, not NA_not_run (featureCounts never ran on it)
+u = pd.read_csv("st_empty_out/tables/assembly_read_use.tsv", sep="\t", keep_default_na=False).set_index("sample")
+assert u.at["sampleB", "pct_reads_on_contigs"] == 0 and u.at["sampleB", "pct_reads_on_genes"] == 0, u
 # the per-sample tree without the empty assembly has none of it
 assert "kept no contig" not in open("st_asm_out/README.md").read()
 assert "kept no contig" not in open("st_asm_out/report/assembly.html").read()

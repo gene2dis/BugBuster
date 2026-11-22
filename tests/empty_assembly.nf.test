@@ -153,4 +153,34 @@ nextflow_pipeline {
                 "coassembly\ttest_sample1,test_sample2\t3\t1000"
         }
     }
+
+    test("A run without empty assemblies removes the empty_assemblies.tsv an earlier run left") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['sampleX'])
+                output = {
+                    def stale = new File("${outputDir}/results/pipeline_info/empty_assemblies.tsv")
+                    stale.parentFile.mkdirs()
+                    stale.text = "assembly\tsamples\tcontigs_before_filter\tmin_length_bp\nold\told\t3\t1000\n"
+                    "${outputDir}/results"
+                }()
+                quality_control    = true
+                custom_phiX_fasta  = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta  = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode      = "assembly"
+                taxonomic_profiler = "none"
+                results_summary    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !path("${outputDir}/results/pipeline_info/empty_assemblies.tsv").exists()
+            assert path("${outputDir}/results/pipeline_info/contig_filtering_summary.txt").exists()
+        }
+    }
 }

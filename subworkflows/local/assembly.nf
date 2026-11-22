@@ -293,9 +293,13 @@ workflow ASSEMBLY {
         .join(ch_filter_reports.map { report -> [report.name - '_filter_report.txt', report] })
         .map { id, meta, report ->
             def samples = meta.coassembly ? meta.samples : [meta.id]
-            def before = (report.text =~ /(?m)^contigs_before_filter\t(\d+)/).with { m -> m.find() ? m.group(1) : 'NA' }
-            log.warn "Assembly ${id} (sample${samples.size() == 1 ? '' : 's'} ${samples.join(', ')}) has no contig of at least ${bbmapMinLength()} bp after the length filter (${before} contigs before it): it is dropped from alignment, binning, contig taxonomy and ARGs, and contig functional annotation; its samples keep their QC, taxonomy and read-level results (pipeline_info/empty_assemblies.tsv)"
-            "${id}\t${samples.join(',')}\t${before}\t${bbmapMinLength()}\n"
+            // both from BBMAP's own filter report: the minimum it applied may
+            // come from ext.min_length rather than --bbmap_length
+            def lines = report.readLines()
+            def before = lines.find { line -> line.startsWith('contigs_before_filter\t') }?.tokenize('\t')?.getAt(1) ?: 'NA'
+            def min_length = lines.find { line -> line.startsWith('min_length_threshold\t') }?.tokenize('\t')?.getAt(1) ?: bbmapMinLength()
+            log.warn "Assembly ${id} (sample${samples.size() == 1 ? '' : 's'} ${samples.join(', ')}) has no contig of at least ${min_length} bp after the length filter (${before} contigs before it): it is dropped from alignment, binning, contig taxonomy and ARGs, and contig functional annotation; its samples keep their QC, taxonomy and read-level results (pipeline_info/empty_assemblies.tsv)"
+            "${id}\t${samples.join(',')}\t${before}\t${min_length}\n"
         }
 
     // Generate contig filtering summary report

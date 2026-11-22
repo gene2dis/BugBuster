@@ -145,7 +145,8 @@ def assembly_stats_table(parts):
 def read_use_frame(parts, batch_samples):
     """Per sample: the assembly its reads were counted against and the % of reads featureCounts placed on the
     contigs and on predicted genes; NA_not_run for every sample of an assembly batch without featureCounts
-    summaries (no --contig_level_functional). parts: [(batch label, load_assembly result)];
+    summaries (no --contig_level_functional), and 0 for a sample whose assembly kept no contig in a batch with
+    them. parts: [(batch label, load_assembly result)];
     batch_samples: {batch label: [samples]}. -> DataFrame(sample, assembly, pct_reads_on_contigs,
     pct_reads_on_genes) or None."""
     rows = []
@@ -153,11 +154,18 @@ def read_use_frame(parts, batch_samples):
         if a is None:
             continue
         coassembly = "coassembly" in a["stats"]
+        # assemblies the length filter left without contigs: the pipeline drops them before featureCounts
+        # (roadmap Phase 21, RV10), so their samples have no summary although no read can be on a contig
+        filt = a["filter"]
+        empty = set(filt.loc[filt["contigs_kept"] == 0, "assembly"]) if filt is not None else set()
         for s in batch_samples.get(label, []):
             asm = a["groups"].get(s, s) if a["groups"] else "coassembly" if coassembly else s
             if asm not in a["stats"]:
                 continue
             c = a["counts"].get(s)
+            if c is None and asm in empty and a["counts"]:
+                rows.append({"sample": s, "assembly": asm, "pct_reads_on_contigs": 0.0, "pct_reads_on_genes": 0.0})
+                continue
             if c is None:
                 rows.append({"sample": s, "assembly": asm, "pct_reads_on_contigs": NA_NOT_RUN,
                              "pct_reads_on_genes": NA_NOT_RUN})

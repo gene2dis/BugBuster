@@ -1179,9 +1179,8 @@ filter, the minimum length) and has no binning, contig taxonomy, contig ARG or
 contig functional results. Its samples keep their QC, taxonomy and read-level
 results, and the summary names it under Attention. Under co-assembly that
 covers every sample of the co-assembly. The file is written only when a run
-has such an assembly, so one left by an earlier run into the same `--output`
-stays until you remove it; `contig_filtering_summary.txt` is rewritten by every
-run.
+has such an assembly (a run removes the one an earlier run left in the same
+`--output`).
 
 The run finishes on purpose instead of failing. A report step still fails when
 an input file is missing, which points to a real pipeline problem.

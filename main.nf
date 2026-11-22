@@ -691,6 +691,12 @@ workflow {
         // contig stages for want of contigs (roadmap Phase 21, RV10), written
         // only when there is one. The summary reads the same fact from
         // contig_filtering_summary.txt (contigs_kept 0)
+        // a file left by an earlier run into the same --output would list
+        // assemblies this run kept: remove it before this run writes its own
+        def stale_empty = file("${params.output}/pipeline_info/empty_assemblies.tsv")
+        if ( stale_empty.exists() ) {
+            stale_empty.delete()
+        }
         ASSEMBLY.out.empty_assemblies
             .collectFile(name: 'empty_assemblies.tsv', storeDir: "${params.output}/pipeline_info", sort: true,
                          seed: "assembly\tsamples\tcontigs_before_filter\tmin_length_bp\n")
