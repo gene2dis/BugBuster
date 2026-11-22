@@ -1331,6 +1331,13 @@ next release is tagged.
 
 ### Fixed
 
+- **GTDB_TK_BATCH writes its tables for archaea-only bins** (roadmap Phase 21).
+  GTDB-Tk writes no `gtdbtk.bac120.summary.tsv` when no bin is bacterial, and
+  the per-sample split ran only when that file existed, so a run whose refined
+  bins were all archaeal stopped with "Missing output file(s)" after the whole
+  GTDB-Tk job. The split now runs when either summary exists, with a
+  header-only table for the missing domain; with neither, the task stops with
+  that message and the end of GTDB-Tk's log.
 - **`--custom_rgi_card_db` + `--custom_rgi_wildcard` builds the database**
   (roadmap Phase 21). RGI_LOAD_WILDCARD looked for an existing WildCARD FASTA
   with `ls ... | head -1`, which under the task shell's `pipefail` ended the
