@@ -16,7 +16,7 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { get_sample_ids } from './input_check'
+include { get_sample_ids ; unsafeIdReason } from './input_check'
 include { flagOn         } from './utils_params'
 
 /**
@@ -55,6 +55,11 @@ def metadataGroups(param_name, reserved, reserved_what) {
     // The samplesheet's sample ids, as INPUT_CHECK reads them (ids and the
     // metadata's header and ids are compared trimmed)
     def samples = get_sample_ids(file(params.input, checkIfExists: true))
+    // no id means the samplesheet has no 'sample' column as read here: an
+    // empty list would pass every check below and look like "no grouping"
+    if (!samples) {
+        error("${opt} ${column}: no sample id read from --input ${params.input} (it needs a 'sample' column with at least one value)")
+    }
 
     def table = file(params.sample_metadata, checkIfExists: true)
     def sep = table.name.toLowerCase().endsWith('.csv') ? ',' : '\t'
@@ -89,8 +94,9 @@ def metadataGroups(param_name, reserved, reserved_what) {
         error("${opt} ${column}: no value in column ${column} for sample(s) ${blank.join(', ')}")
     }
 
-    // Labels name folders and files: path-safe, distinct, and never a sample
-    // id or the ungrouped co-assembly's id
+    // Labels name folders and files and are the ids of their co-assembly or
+    // group: path-safe, distinct, never a sample id, and safe as an id
+    // (unsafeIdReason: not number- or NA-like, no '__', neither reserved id)
     def label_of = (value_of.values() as List).unique().collectEntries { value -> [(value): value.replaceAll(/[^A-Za-z0-9._-]/, '_')] }
     def by_label = label_of.groupBy { _value, label -> label }
     def clashes = by_label.findAll { _label, values -> values.size() > 1 }
@@ -108,6 +114,10 @@ def metadataGroups(param_name, reserved, reserved_what) {
         }
         if (label == reserved) {
             error("${opt} ${column}: the value '${value}' gives the label '${reserved}', the name of ${reserved_what}: rename it")
+        }
+        def reason = unsafeIdReason(label)
+        if (reason) {
+            error("${opt} ${column}: the value '${value}' gives the label '${label}', which cannot be the id of a ${param_name == 'coassembly_group_by' ? 'co-assembly' : 'multi-sample group'}: ${reason}. Rename it in --sample_metadata (e.g. site1 for 1, site_a for site__a)")
         }
         if (label in samples) {
             error("${opt} ${column}: the value '${value}' gives the label '${label}', which is also a sample id: rename it")

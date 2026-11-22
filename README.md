@@ -199,7 +199,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 
 | Column | Required | Description |
 |--------|----------|-------------|
-| `sample` | Yes | Unique sample identifier |
+| `sample` | Yes | Unique sample identifier: letters, digits, `_`, `.` or `-`, starting with a letter or digit. Rejected at launch: ids that read as a number (`001`, `1.5`, `1e5`, `inf`), missing-value or true/false words (`NA`, `NaN`, `null`, `None`, `true`, `false`, any case), ids containing `__`, and the reserved ids `coassembly` and `multisample` (use `S001`, not `001`) |
 | `r1` | Yes | Path to forward reads (R1) |
 | `r2` | Yes | Path to reverse reads (R2) |
 | `s` | No | Path to singleton reads (optional) |

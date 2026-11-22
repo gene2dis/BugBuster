@@ -580,6 +580,32 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (samplesheet)**: sample names that the pipeline's tables cannot
+  carry are rejected at launch, with every offending name and its reason in one
+  error (roadmap Phase 20). Rejected: names that read as a number (digits only
+  such as `001` or `12`, decimals, exponent forms such as `1e5`, `inf`,
+  `infinity`), missing-value and true/false words in any case (`NA`, `N/A`,
+  `NaN`, `null`, `None`, `true`, `false`), names containing `__`, and the
+  reserved names `coassembly` and `multisample`. Before, pandas read `001`
+  back as `1` (the sample lost its profiler columns in `Reads_report.csv`, with
+  no error) and an all-numeric samplesheet stopped READS_REPORT or
+  TAXONOMY_REPORT; a name with `__` lost its GTDB-Tk rows or had them written
+  into another sample's report; a sample called `coassembly` had its tables
+  filed under the co-assembly folders in the summary. **To upgrade**: rename
+  such samples in the samplesheet and in `--sample_metadata` (`S001` for `001`,
+  `site_rep1` for `site__rep1`). The HUMAnN-only rule on `s__` / `t__` is now
+  part of the `__` rule for every run.
+- **Breaking (group labels)**: a `--coassembly_group_by` or
+  `--multisample_group_by` label is the id of its co-assembly or group, so it
+  follows the same rules: a group value such as `1`, `NA` or `a__b` (also a
+  value that becomes `__` once spaces are replaced, `a_ b`), and the label of
+  the other mode's pooled group (`multisample` under `--coassembly_group_by`,
+  `coassembly` under `--multisample_group_by`), stop the run at launch.
+  **To upgrade**: give such values a letter (`site1` for `1`). The samplesheet
+  is also read with the same rules everywhere: a `sample` header with spaces
+  around it, or a byte order mark, no longer leaves the group helpers with no
+  sample (which grouped nothing, silently); a samplesheet without a `sample`
+  column stops a grouped run with a message.
 - **The run summary's report covers the tools added in roadmap Phases 15-18**
   (Phase 19). The summary tables (`tables/*.tsv`, the Excel workbook) are
   unchanged; the HTML site, the PDF and the README / LLM guide methods lines

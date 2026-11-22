@@ -346,4 +346,88 @@ nextflow_pipeline {
             assert (workflow.stdout + workflow.stderr).join('\n').contains("gives the label '.hidden', which does not start with a letter or digit")
         }
     }
+
+    // Roadmap Phase 20, RV1: a label is the id of its co-assembly, so it
+    // passes every sample-id rule (unsafeIdReason in input_check.nf)
+    test("Rejects the group label multisample") {
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\tmultisample\ntest_sample2\tb\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("the value 'multisample' gives the label 'multisample', which cannot be the id of a co-assembly: 'multisample' is the id the pipeline gives to its own pooled multi-sample group")
+        }
+    }
+
+    test("Rejects number-like and missing-value group labels") {
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\t1\ntest_sample2\tNA\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            assert log.contains("the value '1' gives the label '1', which cannot be the id of a co-assembly: table readers take it for a number")
+            assert log.contains("e.g. site1 for 1")
+        }
+    }
+
+    test("Rejects a group value whose label holds a double underscore") {
+        // 'a_ b' becomes 'a__b' once the space is replaced
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\ta_ b\ntest_sample2\tb\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("the value 'a_ b' gives the label 'a__b', which cannot be the id of a co-assembly: it contains '__'")
+        }
+    }
+
+    test("Reads the samplesheet's sample column with spaces around its name") {
+        // ' sample ' is the sample column for the reads channel, so the group
+        // helpers find both ids too and reach the label check (R3-05: they
+        // read no id and pooled every sample into one co-assembly)
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['test_sample1', 'test_sample2'], " sample ,r1,r2,s")
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\ttest_sample2\ntest_sample2\tb\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("gives the label 'test_sample2', which is also a sample id")
+        }
+    }
 }

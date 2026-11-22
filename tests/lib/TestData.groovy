@@ -43,6 +43,19 @@ class TestData {
         return sheet.absolutePath
     }
 
+    // A samplesheet whose samples carry the given ids, all on test_sample1's
+    // reads, for the sample-id launch checks; header is the samplesheet's
+    // header line (a header with spaces around 'sample' tests the trimming)
+    static String samplesheetWithIds(outputDir, projectDir, List ids, String header = "sample,r1,r2,s") {
+        def sheet = new File("${outputDir}", "ids_samplesheet.csv")
+        sheet.parentFile.mkdirs()
+        def reads = "${projectDir}/tests/data/reads"
+        sheet.text = "${header}\n" + ids.collect { id ->
+            "${id},${reads}/test_sample1_R1.fastq.gz,${reads}/test_sample1_R2.fastq.gz,\n"
+        }.join('')
+        return sheet.absolutePath
+    }
+
     // A --sample_metadata table with the given text (TSV, or CSV by a .csv name)
     static String metadataTable(outputDir, String name, String text) {
         def table = new File("${outputDir}", name)
