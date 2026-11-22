@@ -74,10 +74,14 @@ class PhyloseqTableGenerator:
         
         self.tax_ranks = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
     
-    # Rank codes in kraken-style reports mapped to phyloseq ranks. Kraken2
-    # emits 'D' (domain) at the top level for NCBI taxonomies while other DB
-    # builds use 'K'; both fill the Kingdom slot. Sub-ranks (S1, G1, ...) and
-    # unranked rows stay on the indent-walk stack but fill no rank column.
+    # Rank codes in kraken-style reports mapped to phyloseq ranks. 'D'
+    # (domain: Bacteria, Archaea, Eukaryota, Viruses) and 'K' (kingdom) both
+    # map to Kingdom, but an NCBI lineage can hold both (Eukaryota > Metazoa;
+    # since NCBI's 2025 taxonomy also Bacteria > Pseudomonadati): the first,
+    # the domain, is kept, as on the sylph and sourmash paths, and K fills the
+    # slot only in a database without D rows (roadmap Phase 20, RV6; review
+    # finding R6-03). Sub-ranks (S1, G1, ...) and unranked rows stay on the
+    # indent-walk stack but fill no rank column.
     KRAKEN_RANK_MAP = {
         'D': 'Kingdom', 'K': 'Kingdom', 'P': 'Phylum', 'C': 'Class',
         'O': 'Order', 'F': 'Family', 'G': 'Genus', 'S': 'Species',
@@ -140,7 +144,9 @@ class PhyloseqTableGenerator:
                         lineage = {r: '' for r in self.tax_ranks}
                         for _depth, rank_code, taxon_name in stack:
                             rank_name = self.KRAKEN_RANK_MAP.get(rank_code)
-                            if rank_name:
+                            # root to leaf: a rank already filled (Kingdom
+                            # from D) is not overwritten by a deeper row (K)
+                            if rank_name and not lineage[rank_name]:
                                 lineage[rank_name] = taxon_name
                         counts[taxid] = counts.get(taxid, 0) + clade_count
                         tax_rows.setdefault(taxid, {'taxon_id': taxid, **lineage})
