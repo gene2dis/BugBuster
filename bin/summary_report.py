@@ -346,6 +346,9 @@ def build(ctx, assets):
     if s.get("n_tier1") is not None:
         cards += [(s["n_tier1"], f"samples with a tier 1 ARG ({s.get('arg_primary', '')})", s["n_tier1"] > 0),
                   (s["n_tier1_genes"], f"distinct tier 1 genes ({s.get('arg_primary', '')})", False)]
+    if s.get("n_tier1_other"):
+        cards.append((s["n_tier1_other"], f"samples with a tier 1 ARG ({s['tier1_other_methods']}, where "
+                                          f"{s.get('arg_primary', '')} did not run)", True))
     if s.get("n_tier1_genes_all_methods") is not None:
         cards.append((s["n_tier1_genes_all_methods"], "tier 1 genes found by every ARG method", False))
     if s.get("n_species") is not None:
@@ -403,7 +406,9 @@ def build(ctx, assets):
         ar.title = f"Antimicrobial resistance genes ({primary})"
         ar.facts = {"primary": primary, "others": ", ".join(others), "rgi_cov": f"{ctx['rgi_min_coverage']:g}",
                     "n_tier1_samples": s.get("n_tier1"), "n_tier1_genes": s.get("n_tier1_genes"),
-                    "comparison": ctx.get("comparison") is not None}
+                    "comparison": ctx.get("comparison") is not None,
+                    # tier 1 calls of other methods where the primary one did not run (merged results directories)
+                    "n_tier1_other": s.get("n_tier1_other"), "tier1_other_methods": s.get("tier1_other_methods", "")}
         for k in ("arg_priority_heatmap", "arg_drug_class_heatmap", "arg_vs_depth"):
             ar.fig(k)
         al = t["arg_long"][0]

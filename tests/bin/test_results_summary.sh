@@ -1168,6 +1168,75 @@ check "no MAG passes galah's filter: the report has no cluster sentence" py - <<
 html = open("st_asm_derep0_out/report/mags.html").read()
 assert "No refined MAG passed galah's quality filter" in html and "clusters at" not in html, html
 PYEOF
+# Roadmap Phase 21, RV13 (R5-01): mag_cluster_abundance's columns were not in RESERVED_COLUMNS, so a --metadata
+# column named cluster (or relative_abundance_pct, trimmed_mean_x, covered_fraction) stopped the summary with a
+# pandas KeyError when dereplication ran. They are renamed meta_<name> now, like every other summary column
+printf 'sample\tcluster\tcovered_fraction\tsite\nsampleA\tc1\thalf\tx\nsampleB\tc2\tall\ty\n' > derep_meta.tsv
+check "metadata columns named cluster / covered_fraction with dereplication: renamed meta_*" \
+    documented st_derep_meta --results st_asm_derep/results --metadata derep_meta.tsv --min-clean-pairs 10000
+check "the renamed metadata columns reach mag_cluster_abundance" py - <<'PYEOF'
+import pandas as pd
+ab = pd.read_csv("st_derep_meta/tables/mag_cluster_abundance.tsv", sep="\t")
+assert ["meta_cluster", "meta_covered_fraction", "site"] == [c for c in ab.columns if c in
+                                                             ("meta_cluster", "meta_covered_fraction", "site")]
+assert {"cluster", "covered_fraction"} <= set(ab.columns)
+assert set(ab.loc[ab["sample"] == "sampleA", "meta_cluster"]) == {"c1"}
+PYEOF
+# Roadmap Phase 21, RV13 (R5-02): merged results directories whose ARG methods ran on disjoint samples (K-MARVEL on
+# sampleB in one, RGI on sampleA in the other) have no sample in the method comparison, and RGI's tier 1 genes
+# (KPC, cfrE, poxtA in sampleA) were in no Attention item, card or ARG page table. A partial overlap (RGI on both,
+# K-MARVEL on sampleB) listed them in Attention but on no card or table
+make_results dj_km/results sampleB
+rm -rf dj_km/results/05_arg_prediction/read_level/rgi dj_km/results/05_arg_prediction/read_level/rgi_kmer
+make_results dj_rgi/results sampleA
+rm -rf dj_rgi/results/05_arg_prediction/read_level/kmarvel
+make_results pt/results sampleA sampleB
+rm -rf pt/results/05_arg_prediction/read_level/kmarvel/sampleA
+check "disjoint ARG methods: summary documented" \
+    documented dj_out --results dj_km/results dj_rgi/results --batch-labels km rg --min-clean-pairs 10000
+check "partial overlap of ARG methods: summary documented" \
+    documented pt_out --results pt/results --min-clean-pairs 10000
+check "the other method's tier 1 genes reach Attention, the cards and the ARG page" py - <<'PYEOF'
+import re
+for out, label in (("dj_out", "disjoint"), ("pt_out", "partial")):
+    readme = open(f"{out}/README.md").read()
+    att = readme[readme.index("## Attention"):].split("\n## ")[0]
+    assert re.search(r"KPC: 1 sample \(sampleA\)[^\n]* - found by RGI", att), (label, att)
+    index = open(f"{out}/report/index.html").read()
+    assert "samples with a tier 1 ARG (RGI, where K-MARVEL did not run)" in index, label
+    args = open(f"{out}/report/args.html").read()
+    assert "1 more sample, where K-MARVEL did not run, carries a tier 1 gene found by RGI" in args, label
+    assert "KPC" in args and "RGI (not every method ran)" in args, label
+# the run where every method ran on every sample keeps its cards and has no such sentence
+assert "where K-MARVEL did not run" not in open("out/report/index.html").read()
+assert "more sample" not in open("out/report/args.html").read()
+PYEOF
+# ... and the next table cannot repeat it: in every table of these runs that carries the metadata columns, every other
+# column is a summary column named in RESERVED_COLUMNS (or sample)
+check "every column of every metadata-joined table is in RESERVED_COLUMNS" py - "${REPO_DIR}/bin" "${FIX}/metadata.tsv" <<'PYEOF'
+import os, sys
+import pandas as pd
+sys.dont_write_bytecode = True
+sys.path.insert(0, sys.argv[1])
+from results_summary import RESERVED_COLUMNS
+runs = {"docs1": sys.argv[2], "st_derep_meta": "derep_meta.tsv", "np9_out": "np9_meta.tsv"}
+checked = set()
+for out, meta in runs.items():
+    cols = list(pd.read_csv(meta, sep="\t", nrows=0).columns)[1:]
+    meta_cols = {f"meta_{c}" if c in RESERVED_COLUMNS else c for c in cols}
+    for f in sorted(os.listdir(f"{out}/tables")):
+        if not f.endswith(".tsv"):
+            continue
+        header = list(pd.read_csv(f"{out}/tables/{f}", sep="\t", nrows=0).columns)
+        if not meta_cols <= set(header):
+            continue
+        bad = [c for c in header if c not in meta_cols and c != "sample" and c not in RESERVED_COLUMNS]
+        assert not bad, (out, f, bad)
+        checked.add(f[:-4])
+for t in ("samples_qc", "arg_long", "taxonomy_long", "mag_cluster_abundance", "mag_abundance", "arg_contig_abundance",
+          "function_contig_long", "assembly_read_use", "arg_method_comparison", "arg_sarg_long", "function_read_long"):
+    assert t in checked, (t, sorted(checked))
+PYEOF
 # GUNC (--gunc_prediction, roadmap Phase 16 G1): its maxCSS-level table adds four mags columns after tier_basis and
 # changes nothing else; bin10 passes, bin2 fails, a third genome GUNC could not score is not a MAG of the run
 cp -r st_asm st_asm_gunc

@@ -1331,6 +1331,20 @@ next release is tagged.
 
 ### Fixed
 
+- **Results summary** (roadmap Phase 21):
+  - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,
+    `trimmed_mean_x` or `covered_fraction` stopped RESULTS_SUMMARY with a
+    pandas `KeyError` when `--dereplicate_mags` ran: those
+    `mag_cluster_abundance` columns are now renamed `meta_<name>` like every
+    other summary column, and a test checks that every column of every
+    metadata-joined table is reserved.
+  - Merged results directories where the ARG methods ran on different
+    samples: the tier 1 genes another method found where the primary method
+    did not run were missing from Attention (when no sample ran every method),
+    the overview cards and the ARG page's tier 1 table. They are now listed in
+    all three ("found by RGI (not every method ran)"), with a card of their own.
+    A single pipeline run, where every sample gets every enabled method, is
+    unchanged.
 - **Small failures** (roadmap Phase 21):
   - The launch warning about databases "in the layout of an earlier release"
     matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after

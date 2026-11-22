@@ -2,7 +2,7 @@
 {% set f = s.facts %}
 {% block body %}
 <h1>{{ s.title }}</h1>
-<p>The ARG figures and matrices use {{ f.primary }}{% if f.others %}; the calls of {{ f.others }} are in arg_long.tsv{% if f.comparison %} and in the <a href="compare.html">comparison of methods</a>{% endif %}{% endif %}. RGI genes count when reads cover at least {{ f.rgi_cov }} % of their best reference sequence. {% if f.n_tier1_samples is not none %}{{ f.n_tier1_samples }} samples carry a tier 1 (clinical priority) gene; {{ f.n_tier1_genes }} distinct tier 1 genes.{% endif %} Tiers are explained in <a href="methods.html">Methods</a>.</p>
+<p>The ARG figures and matrices use {{ f.primary }}{% if f.others %}; the calls of {{ f.others }} are in arg_long.tsv{% if f.comparison %} and in the <a href="compare.html">comparison of methods</a>{% endif %}{% endif %}. RGI genes count when reads cover at least {{ f.rgi_cov }} % of their best reference sequence. {% if f.n_tier1_samples is not none %}{{ f.n_tier1_samples }} samples carry a tier 1 (clinical priority) gene; {{ f.n_tier1_genes }} distinct tier 1 genes.{% endif %}{% if f.n_tier1_other %} {{ f.n_tier1_other }} more sample{{ "" if f.n_tier1_other == 1 else "s" }}, where {{ f.primary }} did not run, carr{{ "ies" if f.n_tier1_other == 1 else "y" }} a tier 1 gene found by {{ f.tier1_other_methods }}; those calls are in the tier 1 table below.{% endif %} Tiers are explained in <a href="methods.html">Methods</a>.</p>
 {{ m.figure(s, "arg_priority_heatmap", specs) }}
 {{ m.figure(s, "arg_drug_class_heatmap", specs) }}
 {{ m.figure(s, "arg_vs_depth", specs) }}
