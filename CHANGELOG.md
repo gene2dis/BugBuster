@@ -1330,6 +1330,48 @@ next release is tagged.
 
 ### Fixed
 
+- **Sample ids, bin names and database labels are read back as text**
+  (roadmap Phase 20). pandas inferred their type when the report scripts read
+  a table back: READS_REPORT reads one file per sample, so a sample `001` was
+  published as `1` in `Reads_report.csv` and lost its profiler columns in
+  TAXONOMY_REPORT, `NA` became `0`, and an all-numeric samplesheet stopped
+  READS_REPORT, TAXONOMY_REPORT or BIN_SUMMARY. The run summary took a
+  digit-only database label (a custom database named `2024`) for the clean
+  read count. `bin/report_unify.py`, `taxonomy_report.py`, `bin_summary.py`,
+  `results_summary.py` and the summary's taxonomy, SARG, contig and functional
+  readers now keep these columns as written (`bin/id_columns.py`); the rest of
+  each table is parsed as before. This also covers results directories merged
+  outside the pipeline, which no launch check sees. Also: READS_REPORT takes
+  decontamination reports by their exact suffix (a sample named
+  `contaminants_ctrl` had its fastp report read twice and its row duplicated),
+  and a sourmash genome without a lineage stops TAXONOMY_PHYLOSEQ with the
+  file and genome named (before: `'float' object has no attribute 'split'`).
+- **GTDB_TK_BATCH** splits the pooled GTDB-Tk summaries with
+  `bin/gtdbtk_split.py`, which stops on a bin whose `<sample>__` prefix is not
+  a sample of the batch instead of dropping its row silently, and classifies
+  `.fasta` / `.fna` bins (copied as `.fa`; they were counted but GTDB-Tk,
+  run with `--extension .fa`, skipped them).
+- **`--binners` names are counted once** (one parser, `parseBinners()`, for
+  the launch checks and BINNING): `metabat2,metabat2` turned Binette on with
+  one bin set, so no bin was refined or quality-checked, and passed the
+  ">= 2 binners" checks of `--dereplicate_mags` and `--mag_level_functional`.
+- **COMEBin bins on executors that copy inputs**: BINETTE, CHECKM2_BATCH and
+  GTDB_TK_BATCH pass each bin directory's sample id to
+  `bin/identify_bin_dir.sh`, which no longer recovers COMEBin's from the
+  resolved work path. Where inputs are copied (cloud batch executors) the
+  three processes failed with "cannot derive sample id" whenever `comebin` was
+  among `--binners`, and a work path holding `_comebin` gave the wrong sample.
+- **Taxon names in the phyloseq object** (`--create_phyloseq_rds`):
+  `bin/tables_to_phyloseq_simple.R` reads the tables without quote, comment
+  or missing-value characters; a Kraken2 species name with one apostrophe
+  merged the rows after it and a `#` cut the name, with no error. The script
+  now stops if the taxonomy and OTU tables differ in rows.
+- **Kraken2 `Kingdom` column**: an NCBI lineage holds a domain (`D`) and,
+  below it, a kingdom (`K`: Metazoa, Fungi, and since NCBI's 2025 taxonomy
+  Pseudomonadati, Bacillati); the kingdom overwrote the domain. `Kingdom` now
+  holds the domain (Bacteria, Archaea, Eukaryota, Viruses), as on the sylph
+  and sourmash paths; `K` fills it only in a database without `D` rows.
+
 - **Methods cite GUNC, CheckV, HMMER, Prodigal and BWA**: the report's
   software table listed GUNC's and CheckV's version keys (`gunc`, `checkv`,
   `gunc_db`, `checkv_db`, `hmmer`, `prodigal`) and RGI's `bwa` aligner as raw
