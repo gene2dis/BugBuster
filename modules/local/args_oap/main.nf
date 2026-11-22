@@ -27,23 +27,37 @@ process ARGS_OAP {
     def prefix  = "${meta.id}"
     def singles = reads instanceof List && reads.size() > 2 ? reads[2] : null
     def link_singles = !singles ? '' : """\
-    if [ -n "\$(gzip -cd ${singles} 2>/dev/null | head -c1)" ]; then
-            ln -s ../${singles} tmp_reads/${prefix}_tmp_reads_S.fastq.gz
+    if is_gz ${singles}; then
+            has_reads=\$(gzip -cd ${singles} 2>/dev/null | head -c1 || true)
         else
-            gzip -t ${singles}
+            has_reads=\$(head -c1 ${singles})
+        fi
+        if [ -n "\$has_reads" ]; then
+            link_reads ${singles} ${prefix}_tmp_reads_S
+        else
+            if is_gz ${singles}; then gzip -t ${singles}; fi
             echo "ARGs-OAP: the singleton file of ${prefix} has no reads, skipped" >&2
         fi"""
     """
     # args_oap globs its input folder, so the reads get a folder of their own;
     # links instead of copies (it reads through them, performance review E6).
     # The singleton file is a sample of its own for ARGs-OAP (<id>_tmp_reads_S);
-    # ARGS_OAP_REPORT adds it to the pairs
+    # ARGS_OAP_REPORT adds it to the pairs.
+    # With -f fastq, stage one takes both *.fastq and *.fastq.gz, so each link
+    # is named by its file's content (gzip magic bytes, no decompression):
+    # with --quality_control false the samplesheet's reads arrive as they are,
+    # and an uncompressed one was linked as .fastq.gz (roadmap Phase 21, RV12;
+    # review R4-14). Gzipped reads give the same file list and names as before
+    is_gz() { [ "\$(head -c 2 "\$1" | od -An -tx1 | tr -d ' \\n')" = "1f8b" ]; }
+    link_reads() {
+        if is_gz "\$1"; then ln -s "../\$1" "tmp_reads/\$2.fastq.gz"; else ln -s "../\$1" "tmp_reads/\$2.fastq"; fi
+    }
     mkdir tmp_reads
-    ln -s ../${reads[0]} tmp_reads/${prefix}_tmp_reads_R1.fastq.gz
-    ln -s ../${reads[1]} tmp_reads/${prefix}_tmp_reads_R2.fastq.gz
+    link_reads ${reads[0]} ${prefix}_tmp_reads_R1
+    link_reads ${reads[1]} ${prefix}_tmp_reads_R2
     # An empty singleton file (all singletons removed in QC) makes stage one's
     # DIAMOND fail and the file be dropped: skip it (gzip -t still fails a
-    # corrupt one)
+    # corrupt gzipped one)
     ${link_singles}
 
     # The image ships SARG, KO30 and GG85 as FASTA and stage one indexes them
@@ -67,7 +81,7 @@ process ARGS_OAP {
     args_oap stage_one \\
         -i tmp_reads \\
         -o ${prefix}_args_oap \\
-        -f fastq.gz \\
+        -f fastq \\
         -t ${task.cpus} \\
         ${args} > stage_one.log 2>&1 || status=\$?
     cat stage_one.log >&2

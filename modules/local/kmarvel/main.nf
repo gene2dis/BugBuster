@@ -145,13 +145,19 @@ process KMARVEL {
 
         # kmarvel has exited, so zcat should be done. If kmarvel never read
         # the pipe, zcat is still blocked on it: stop it after a grace period
-        # so the task fails instead of hanging
-        ( sleep 30; kill \$zcat_pid 2>/dev/null ) &
-        watchdog_pid=\$!
+        # so the task fails instead of hanging. The wait polls in the
+        # foreground: a background '( sleep 30; kill ) &' watchdog, killed
+        # when zcat ended, left its sleep running with the task's stdout and
+        # stderr open, and Nextflow's wrapper waited the full 30 s for it
+        # (roadmap Phase 21, RV12; review R4-15)
+        for _ in \$(seq 30); do
+            kill -0 \$zcat_pid 2>/dev/null || break
+            sleep 1
+        done
+        kill \$zcat_pid 2>/dev/null || true
         zcat_status=0
         wait \$zcat_pid || zcat_status=\$?
         zcat_running=0
-        kill \$watchdog_pid 2>/dev/null || true
         if [ "\$zcat_status" -ne 0 ]; then
             echo "ERROR: streaming the reads to K-MARVEL failed (zcat exit \$zcat_status): corrupt input, or K-MARVEL did not read them" >&2
             exit 1

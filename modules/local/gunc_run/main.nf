@@ -56,7 +56,7 @@ process GUNC_RUN {
     for bin in ${bins}/*.fa; do
         n=\$((n + 1))
         ln -s "\$(readlink -f "\$bin")" gunc_in/bin_\$n.fa
-        printf 'bin_%s\t%s\n' "\$n" "\$(basename "\$bin" .fa)" >> bin_names.tsv
+        printf 'bin_%s\\t%s\\n' "\$n" "\$(basename "\$bin" .fa)" >> bin_names.tsv
     done
     gunc run \\
         --input_dir gunc_in \\

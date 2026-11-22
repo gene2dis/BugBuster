@@ -25,7 +25,14 @@ NC='\033[0m' # No Color
 get_dir_size() {
     local dir="$1"
     if [ -d "$dir" ]; then
-        du -sb "$dir" 2>/dev/null | cut -f1 || echo "0"
+        # du exits non-zero when a file vanishes during the scan (a live work
+        # directory) or a folder is unreadable, yet prints its total: keep that
+        # one number. '| cut -f1 || echo 0' printed it and then "0", which broke
+        # the arithmetic below and ended the monitor (roadmap Phase 21, RV12;
+        # review R6-06)
+        local size
+        size=$(du -sb "$dir" 2>/dev/null | cut -f1) || true
+        echo "${size:-0}"
     else
         echo "0"
     fi

@@ -209,6 +209,25 @@ printf 'Id\tRaw reads\n001\t1000\n' > "${RU_NUMNONE}/001_fastp_report.tsv"
 NEXT_WORKDIR="${RU_NUMNONE}"
 expect_pass "report_unify: none mode with id 001" report_unify.py none
 check_grep "report_unify: none-mode 001 kept" "Reads_report.csv" "^001,1000$"
+# Roadmap Phase 21, RV12 (R6-08): the reports were read in directory-listing
+# order, so the rows of Reads_report.csv (and of the other run-level stage
+# tables built from per-sample files) could change between runs and file
+# systems. They follow the sorted file names now
+RU_ORDER="${WORK}/report_unify_order"
+mkdir -p "${RU_ORDER}"
+for id in s07 s12 s01 s09 s03 s11 s05 s02 s10 s04 s08 s06; do ru_sample "${RU_ORDER}" "${id}"; done
+NEXT_WORKDIR="${RU_ORDER}"
+expect_pass "report_unify: twelve samples" report_unify.py contaminants
+check_order() {
+    local got
+    got=$(tail -n +2 "${RU_ORDER}/Reads_report.csv" | cut -d, -f1 | tr '\n' ' ')
+    [ "${got}" = "s01 s02 s03 s04 s05 s06 s07 s08 s09 s10 s11 s12 " ] || { echo "    rows: ${got}"; return 1; }
+}
+if check_order; then
+    echo "✓ report_unify: rows in sample-file order"; PASS=$((PASS + 1))
+else
+    echo "✗ report_unify: rows in sample-file order"; FAIL=$((FAIL + 1))
+fi
 # R6-09: a sample named after the alias (contaminants_ctrl) had its fastp report
 # read as a decontamination report too, which duplicated its row
 RU_ALIAS="${WORK}/report_unify_alias_name"

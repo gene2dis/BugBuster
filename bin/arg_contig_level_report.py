@@ -87,7 +87,7 @@ def read_tsv(path):
 def genomad_tables():
     """{sample: (contig-level frame, {contig: [(start, end, taxonomy)] of its proviruses})}."""
     out = {}
-    for path in glob.glob(f'*{GENOMAD_SUFFIX}plasmid_summary.tsv'):
+    for path in sorted(glob.glob(f'*{GENOMAD_SUFFIX}plasmid_summary.tsv')):
         sample = path[:-len(f'{GENOMAD_SUFFIX}plasmid_summary.tsv')]
         plasmids = read_tsv(path)
         viruses = read_tsv(f'{sample}{GENOMAD_SUFFIX}virus_summary.tsv')
@@ -119,7 +119,7 @@ def checkv_tables():
     """{sample: {sequence id: [CHECKV_COLS values]}} from CheckV's quality summaries (<sample>_checkv_quality_summary.tsv);
     a provirus region is <contig>|provirus_<start>_<end>, as geNomad names it."""
     out = {}
-    for path in glob.glob(f'*{CHECKV_SUFFIX}'):
+    for path in sorted(glob.glob(f'*{CHECKV_SUFFIX}')):
         df = read_tsv(path)
         rows = {}
         if not df.empty:
@@ -154,7 +154,7 @@ def main():
     """Main function to generate contig-level ARG and taxonomy report."""
 
     # Read blob table files
-    blob_files = glob.glob('*Blob_table*')
+    blob_files = sorted(glob.glob('*Blob_table*'))
     if not blob_files:
         print("ERROR: No blob table files found (*Blob_table*)", file=sys.stderr)
         sys.exit(1)
@@ -180,7 +180,7 @@ def main():
         'bam0': 'coverage'
     })
 
-    metabuli_files = glob.glob('*_classifications.tsv')
+    metabuli_files = sorted(glob.glob('*_classifications.tsv'))
     if not metabuli_files:
         print("ERROR: No Metabuli files found (*_classifications.tsv)", file=sys.stderr)
         sys.exit(1)
@@ -191,11 +191,11 @@ def main():
 
     # Bin membership (BIN_CONTIG_LABELS) and the bin's GTDB-Tk classification
     # from the sample's <sample>_gtdbtk_{bac120,ar53}.tsv (binning on)
-    bin_files = glob.glob('*_contig_bins.tsv')
+    bin_files = sorted(glob.glob('*_contig_bins.tsv'))
     bin_cols = []
     if bin_files:
         gtdb = {}
-        for f in glob.glob('*_gtdbtk_bac120.tsv') + glob.glob('*_gtdbtk_ar53.tsv'):
+        for f in sorted(glob.glob('*_gtdbtk_bac120.tsv')) + sorted(glob.glob('*_gtdbtk_ar53.tsv')):
             t = read_tsv(f)
             if not t.empty:
                 gtdb.setdefault(f.rsplit('_gtdbtk_', 1)[0], {}).update(zip(t['user_genome'], t['classification']))
@@ -231,7 +231,7 @@ def main():
         genomad_cols = GENOMAD_COLS
 
     # Read DeepARG files
-    deeparg_files = glob.glob('*_contigs_deep_arg.out.mapping.ARG')
+    deeparg_files = sorted(glob.glob('*_contigs_deep_arg.out.mapping.ARG'))
     if not deeparg_files:
         print("ERROR: No DeepARG files found (*_contigs_deep_arg.out.mapping.ARG)", file=sys.stderr)
         sys.exit(1)

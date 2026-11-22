@@ -1,0 +1,48 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    Launch check for databases left in the layout of releases before storeDir
+    (roadmap M9) in --databases_dir
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Earlier databases_dir layout warning"
+    script "../main.nf"
+
+    // Roadmap Phase 21, RV12 (review R3-01): the "earlier release layout"
+    // launch warning globbed gtdbtk/release*, which matched the current
+    // GTDB-Tk store gtdbtk/release_232/, so every run after the first GTDB-Tk
+    // download was told to delete a database it reuses
+    test("No earlier-layout warning for the current GTDB-Tk store; one for the old folder") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                databases_dir = {
+                    def store = new File("${outputDir}", "store")
+                    new File(store, "gtdbtk/release_232/gtdbtk_db").mkdirs()
+                    new File(store, "gtdbtk/release232").mkdirs()
+                    store.absolutePath
+                }()
+                quality_control    = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                nonpareil          = false
+                results_summary    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def warning = path("${outputDir}/../meta/nextflow.log").readLines().find { line -> line.contains("in the layout of an earlier release") }
+            assert warning != null
+            assert warning.contains("(release232)")
+            assert !warning.contains("release_232")
+        }
+    }
+}

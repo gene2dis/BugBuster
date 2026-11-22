@@ -414,7 +414,9 @@ workflow {
     // no stored check looks (<databases_dir>/<db>/<key>/ now): say so before
     // they are downloaded a second time
     if (params.databases_dir) {
-        def old_layout = ['kraken/k2_ref_db', 'metabuli_db', 'genomad_db', 'deeparg_db', 'gtdbtk/release*',
+        // gtdbtk/release[0-9]*: the old unpacked folder (release232), not the
+        // current store gtdbtk/release_232/ (roadmap Phase 21, RV12; review R3-01)
+        def old_layout = ['kraken/k2_ref_db', 'metabuli_db', 'genomad_db', 'deeparg_db', 'gtdbtk/release[0-9]*',
                           'eggnog/eggnog_db', 'dbcan/dbcan_db', 'bakta/bakta_db', 'woltka/woltka_db',
                           'superfocus/superfocus_db', 'humann/humann_db', 'kmarvel/kmarvel_db', 'rgi/card_db',
                           'sylph/*.syl*db', 'checkm2/*.dmnd', 'cog/*.def.tab']

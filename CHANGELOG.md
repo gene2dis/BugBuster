@@ -1331,6 +1331,41 @@ next release is tagged.
 
 ### Fixed
 
+- **Small failures** (roadmap Phase 21):
+  - The launch warning about databases "in the layout of an earlier release"
+    matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after
+    the first GTDB-Tk download suggested deleting a database it reuses. It now
+    matches the old folder name (`gtdbtk/release232`) only.
+  - GUNC_RUN's and CHECKM2_BATCH's `versions.yml` were not valid YAML: a
+    script line at column 0 (GUNC's unescaped `\n`) or a tab-only Python
+    heredoc (CheckM2) left the heredoc terminator indented, so an
+    `END_VERSIONS` line was written into the file and into
+    `pipeline_info/software_versions.yml`.
+  - `bin/monitor_disk_usage.sh` stopped at its first iteration whenever `du`
+    reported an error (a file removed during the scan, as in a live work
+    directory, or an unreadable folder).
+  - ARGS_OAP with uncompressed FASTQ (`--quality_control false`): every read
+    file was linked as `.fastq.gz`, and a plain singleton file stopped the task.
+    Links are now named by content and stage one runs with `-f fastq`, which
+    takes `.fastq` and `.fastq.gz` together; gzipped reads give the same input
+    list as before.
+  - The combined decontamination FASTA (`--custom_host_fasta` /
+    `--custom_phiX_fasta`) gets a newline between files: a file whose last line
+    had none glued the next file's first header onto its last sequence line,
+    and the Bowtie2 index lost that sequence (bwa-mem3's reader happened to
+    split it).
+  - K-MARVEL waits for its read stream in the foreground. The background
+    watchdog left a `sleep 30` running after the task, which could hold the task
+    open for 30 s where no container ends it (conda, or a local run without a
+    container); under docker the container's end killed it.
+  - `Reads_report.csv`, `Contig_tax_and_arg_prediction.tsv`,
+    `All_Mag_quality_table.csv` and `MAGs_tax_summary.csv` read their
+    per-sample files in file-name order instead of directory-listing order, so
+    their rows no longer change between runs or file systems. Row order
+    changes once; contents do not.
+  - TAXONOMY_REPORT stops on a per-sample sourmash or sylph report it cannot
+    parse, naming the file, instead of skipping it with exit 0 and leaving that
+    sample's classification blank.
 - **An assembly with no contig after the length filter no longer stops the
   run** (roadmap Phase 21). When every contig of a sample (or a co-assembly)
   was below `--bbmap_length`, its empty FASTA went on to every contig stage,

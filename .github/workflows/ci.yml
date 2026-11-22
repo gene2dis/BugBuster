@@ -198,6 +198,10 @@ jobs:
         run: |
           tests/bin/test_gtdbtk_split.sh
 
+      - name: Run disk usage monitor test (roadmap Phase 21, RV12)
+        run: |
+          tests/bin/test_monitor_disk_usage.sh
+
       - name: Run RGI_BWT low-coverage fallback regression tests (audit #8)
         run: |
           tests/bin/test_rgi_bwt_fallback.sh

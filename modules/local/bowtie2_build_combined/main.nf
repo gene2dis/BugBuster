@@ -32,10 +32,16 @@ process BOWTIE2_BUILD_COMBINED {
     # Concatenate all FASTA files into a single file
     # Handle both compressed and uncompressed files
     for fasta in ${fasta_files}; do
-        if [[ \$fasta == *.gz ]]; then
-            zcat \$fasta >> combined_contaminants.fasta
+        if [[ "\$fasta" == *.gz ]]; then
+            zcat "\$fasta" >> combined_contaminants.fasta
         else
-            cat \$fasta >> combined_contaminants.fasta
+            cat "\$fasta" >> combined_contaminants.fasta
+        fi
+        # a file whose last line has no newline would glue the next file's
+        # first header onto its last sequence line (roadmap Phase 21, RV12;
+        # review R4-16); a well-formed file gives the same bytes as before
+        if [ -s combined_contaminants.fasta ] && [ -n "\$(tail -c 1 combined_contaminants.fasta)" ]; then
+            echo >> combined_contaminants.fasta
         fi
     done
 
