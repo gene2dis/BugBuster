@@ -75,6 +75,7 @@ process CHECKM2_BATCH {
         [ -z "\$bin_dir" ] && continue
 
         staged_id=\$(awk -F '\\t' -v d="\$bin_dir" '\$1 == d {print \$2}' staged_ids.tsv)
+        [ -n "\$staged_id" ] || { echo "ERROR: \$bin_dir is not in staged_ids.tsv (staged inputs and the meta list disagree)" >&2; exit 1; }
         id_line=\$(identify_bin_dir.sh "\$bin_dir" "\$staged_id")
         sample_id=\${id_line%%\$'\\t'*}
         binner=\${id_line##*\$'\\t'}

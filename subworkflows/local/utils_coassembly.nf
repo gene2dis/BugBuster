@@ -96,7 +96,7 @@ def metadataGroups(param_name, reserved, reserved_what) {
 
     // Labels name folders and files and are the ids of their co-assembly or
     // group: path-safe, distinct, never a sample id, and safe as an id
-    // (unsafeIdReason: not number- or NA-like, no '__', neither reserved id)
+    // (unsafeIdReason: not number- or NA-like, no '__', no trailing '_', neither reserved id)
     def label_of = (value_of.values() as List).unique().collectEntries { value -> [(value): value.replaceAll(/[^A-Za-z0-9._-]/, '_')] }
     def by_label = label_of.groupBy { _value, label -> label }
     def clashes = by_label.findAll { _label, values -> values.size() > 1 }
@@ -117,7 +117,7 @@ def metadataGroups(param_name, reserved, reserved_what) {
         }
         def reason = unsafeIdReason(label)
         if (reason) {
-            error("${opt} ${column}: the value '${value}' gives the label '${label}', which cannot be the id of a ${param_name == 'coassembly_group_by' ? 'co-assembly' : 'multi-sample group'}: ${reason}. Rename it in --sample_metadata (e.g. site1 for 1, site_a for site__a)")
+            error("${opt} ${column}: the value '${value}' gives the label '${label}', which cannot be the id of a ${param_name == 'coassembly_group_by' ? 'co-assembly' : 'multi-sample group'}: ${reason}. Rename it in --sample_metadata (e.g. site1 for 1, site_a for site__a, site for site_)")
         }
         if (label in samples) {
             error("${opt} ${column}: the value '${value}' gives the label '${label}', which is also a sample id: rename it")

@@ -142,7 +142,8 @@ def reservedIds() {
  * back from TSV/CSV tables, where pandas and R turn a number-like value
  * (001 -> 1, 1e5 -> 100000.0, inf), a missing-value word (NA, NaN, null,
  * None) or a boolean word (true, false) into something else; GTDB_TK_BATCH
- * names pooled bins <id>__<bin> and splits them back at the first '__'; and
+ * names pooled bins <id>__<bin> and splits them back at the first '__' (so
+ * an id may not hold '__' nor end in '_'); and
  * the reserved ids name the pipeline's own pooled assemblies and groups.
  */
 def unsafeIdReason(id) {
@@ -158,6 +159,9 @@ def unsafeIdReason(id) {
     }
     if (id.toString().contains('__')) {
         return "it contains '__', which separates the sample id from the bin name in GTDB-Tk's pooled bins"
+    }
+    if (id.toString().endsWith('_')) {
+        return "it ends in '_', so <id>__<bin> holds '___' and the id is read back without its last '_' (GTDB-Tk's pooled bins, the CheckM2 and GTDB-Tk report names)"
     }
     if (id.toString() in reservedIds()) {
         return "'${id}' is the id the pipeline gives to its own pooled ${id == 'coassembly' ? 'co-assembly' : 'multi-sample group'}"
@@ -178,6 +182,6 @@ def check_sample_ids(samplesheet) {
     }
     def unsafe = ids.collect { id -> [id, unsafeIdReason(id)] }.findAll { pair -> pair[1] != null }
     if (unsafe) {
-        error "Invalid sample name(s) in ${samplesheet}: ${unsafe.collect { id, reason -> "'${id}' (${reason})" }.join('; ')}. Rename them in the samplesheet's sample column (and in --sample_metadata) so that none reads as a number (001, 1.5, 1e5, inf), is a missing-value or true/false word (NA, NaN, null, None, true, false, in any case) or a reserved id (coassembly, multisample), or contains '__': e.g. S001 for 001, site_rep1 for site__rep1"
+        error "Invalid sample name(s) in ${samplesheet}: ${unsafe.collect { id, reason -> "'${id}' (${reason})" }.join('; ')}. Rename them in the samplesheet's sample column (and in --sample_metadata) so that none reads as a number (001, 1.5, 1e5, inf), is a missing-value or true/false word (NA, NaN, null, None, true, false, in any case) or a reserved id (coassembly, multisample), or contains '__' or ends in '_': e.g. S001 for 001, site_rep1 for site__rep1, S1 for S1_"
     }
 }

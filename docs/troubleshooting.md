@@ -104,7 +104,7 @@ back from the pipeline's tables. Table readers (pandas, R) turn a name that
 looks like a number or a missing value into something else (`001` becomes `1`,
 `NA` an empty cell), so that sample would lose its rows in the merged tables;
 `__` separates the sample from the bin name when GTDB-Tk classifies all bins
-together; `coassembly` and `multisample` name the pipeline's own pooled
+together (so a name may not hold `__` or end in `_`); `coassembly` and `multisample` name the pipeline's own pooled
 co-assembly and multi-sample group. The second message lists every such name
 with its reason; the third is the same rule for a `--coassembly_group_by` or
 `--multisample_group_by` value, whose label is the id of its co-assembly or
@@ -115,7 +115,8 @@ group.
 - Replace spaces with underscores
 - Give a number-like name a letter (`S001` for `001`, `site1` for `1`); rename
   `NA`, `NaN`, `null`, `None`, `N/A`, `inf`, `infinity`, `true`, `false` (any
-  case), `coassembly` and `multisample`; replace `__` with `_`
+  case), `coassembly` and `multisample`; replace `__` with `_` and drop a
+  trailing `_`
 - Rename the sample in `--sample_metadata` too, and the group value in the
   column you group by
 

@@ -1208,7 +1208,7 @@ nextflow_pipeline {
 
     // Roadmap Phase 20, RV1: ids that table readers rewrite (pandas reads 001
     // as 1, NA as a missing value, true as a boolean), ids containing '__'
-    // (GTDB_TK_BATCH's <id>__<bin> split) and the reserved ids are rejected
+    // or ending in '_' (GTDB_TK_BATCH's <id>__<bin> split) and the reserved ids are rejected
     // at launch, each named with its reason. One test per class
     test("Rejects number-like sample ids") {
         tag "samplesheet_validation"
@@ -1258,12 +1258,12 @@ nextflow_pipeline {
         }
     }
 
-    test("Rejects a sample id containing a double underscore") {
+    test("Rejects a sample id containing a double underscore or ending in one") {
         tag "samplesheet_validation"
         options "-stub"
         when {
             params {
-                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['site__rep1', 'site'])
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['site__rep1', 'site', 'S1_'])
                 output = "${outputDir}"
                 quality_control     = false
                 assembly_mode      = "none"
@@ -1276,6 +1276,8 @@ nextflow_pipeline {
             def log = (workflow.stdout + workflow.stderr).join('\n')
             assert log.contains("'site__rep1' (it contains '__'")
             assert log.contains("site_rep1 for site__rep1")
+            assert log.contains("'S1_' (it ends in '_'")
+            assert !log.contains("'site' (")
         }
     }
 

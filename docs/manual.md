@@ -436,13 +436,13 @@ assembly use singletons as well.
     exponent form (`1e5`, `2E-3`) or `inf` / `infinity`;
   - is a missing-value or true/false word, in any case: `NA`, `N/A`, `NaN`,
     `null`, `None`, `true`, `false`;
-  - contains `__`;
+  - contains `__` or ends in `_`;
   - is `coassembly` or `multisample`.
 
   Sample names are read back from the pipeline's tables, where table readers
   (pandas, R) would turn `001` into `1` and `NA` into an empty cell; `__`
   separates the sample from the bin name when GTDB-Tk classifies every
-  sample's bins together; and `coassembly` / `multisample` are the names of the
+  sample's bins together (a trailing `_` would make `___`); and `coassembly` / `multisample` are the names of the
   pipeline's own pooled co-assembly and multi-sample group. Add a letter
   (`S001`, `site1`) or use a single `_`. The same rules apply to the group
   labels of `--coassembly_group_by` and `--multisample_group_by` (6.7, 6.8).
@@ -823,8 +823,8 @@ nextflow run main.nf --input samplesheet.csv --output ./results \
 This makes two co-assemblies, `river_north` (S01, S02) and `lake` (S03): the
 label is the value with characters other than letters, digits, `.`, `_` and
 `-` replaced by `_`. A label is the id of its co-assembly, so it follows the
-sample-name rules (*Input Requirements* in section 5: not `1` or `NA`, no `__`, not
-`coassembly` or `multisample`) and may not be a sample name; a value that
+sample-name rules (*Input Requirements* in section 5: not `1` or `NA`, no `__`, no
+trailing `_`, not `coassembly` or `multisample`) and may not be a sample name; a value that
 breaks them stops the run at launch. Every sample of the samplesheet needs a row with a value;
 rows for other samples are ignored, so one table can serve several batches.
 Each sample is aligned once, to its own group's co-assembly, and every later

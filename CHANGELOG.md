@@ -585,20 +585,21 @@ next release is tagged.
   error (roadmap Phase 20). Rejected: names that read as a number (digits only
   such as `001` or `12`, decimals, exponent forms such as `1e5`, `inf`,
   `infinity`), missing-value and true/false words in any case (`NA`, `N/A`,
-  `NaN`, `null`, `None`, `true`, `false`), names containing `__`, and the
-  reserved names `coassembly` and `multisample`. Before, pandas read `001`
+  `NaN`, `null`, `None`, `true`, `false`), names containing `__` or ending
+  in `_` (`S1_` is read back as `S1` from `S1___bin.1`), and the reserved names `coassembly` and `multisample`. Before, pandas read `001`
   back as `1` (the sample lost its profiler columns in `Reads_report.csv`, with
   no error) and an all-numeric samplesheet stopped READS_REPORT or
   TAXONOMY_REPORT; a name with `__` lost its GTDB-Tk rows or had them written
   into another sample's report; a sample called `coassembly` had its tables
   filed under the co-assembly folders in the summary. **To upgrade**: rename
   such samples in the samplesheet and in `--sample_metadata` (`S001` for `001`,
-  `site_rep1` for `site__rep1`). The HUMAnN-only rule on `s__` / `t__` is now
+  `site_rep1` for `site__rep1`, `S1` for `S1_`). The HUMAnN-only rule on `s__` / `t__` is now
   part of the `__` rule for every run.
 - **Breaking (group labels)**: a `--coassembly_group_by` or
   `--multisample_group_by` label is the id of its co-assembly or group, so it
   follows the same rules: a group value such as `1`, `NA` or `a__b` (also a
-  value that becomes `__` once spaces are replaced, `a_ b`), and the label of
+  value that becomes `__` or ends in `_` once spaces are replaced, `a_ b`,
+  `site#`), and the label of
   the other mode's pooled group (`multisample` under `--coassembly_group_by`,
   `coassembly` under `--multisample_group_by`), stop the run at launch.
   **To upgrade**: give such values a letter (`site1` for `1`). The samplesheet
@@ -1362,8 +1363,9 @@ next release is tagged.
   three processes failed with "cannot derive sample id" whenever `comebin` was
   among `--binners`, and a work path holding `_comebin` gave the wrong sample.
 - **Taxon names in the phyloseq object** (`--create_phyloseq_rds`):
-  `bin/tables_to_phyloseq_simple.R` reads the tables without quote, comment
-  or missing-value characters; a Kraken2 species name with one apostrophe
+  `bin/tables_to_phyloseq_simple.R` reads double quotes as pandas writes
+  them and no comment or missing-value characters, so apostrophes, `#` and
+  `NA` stay text; a Kraken2 species name with one apostrophe
   merged the rows after it and a `#` cut the name, with no error. The script
   now stops if the taxonomy and OTU tables differ in rows.
 - **Kraken2 `Kingdom` column**: an NCBI lineage holds a domain (`D`) and,

@@ -409,6 +409,28 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects a group value whose label ends in an underscore") {
+        // 'site#' becomes 'site_', and 'site___<bin>' splits back as 'site'
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\tsite#\ntest_sample2\tb\n")
+                coassembly_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            assert log.contains("the value 'site#' gives the label 'site_', which cannot be the id of a co-assembly: it ends in '_'")
+            assert log.contains("site for site_")
+        }
+    }
+
     test("Reads the samplesheet's sample column with spaces around its name") {
         // ' sample ' is the sample column for the reads channel, so the group
         // helpers find both ids too and reach the label check (R3-05: they
