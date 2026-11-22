@@ -188,7 +188,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel     } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -248,7 +248,7 @@ workflow {
     }
 
     // Parse and validate binners parameter
-    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { b -> b.trim().toLowerCase() }
+    def binners_list = parseBinners()
     def valid_binners = ['comebin', 'semibin', 'metabat2']
     def invalid_binners = binners_list.findAll { b -> !(b in valid_binners) }
     if (binners_list.isEmpty()) {

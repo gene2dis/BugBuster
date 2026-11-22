@@ -421,6 +421,38 @@ nextflow_pipeline {
         }
     }
 
+    test("A binner named twice runs once, without Binette") {
+        // roadmap Phase 20, RV4: BINNING counted metabat2,metabat2 as two
+        // binners, turned Binette on and waited for a second bin set that never
+        // came (no refined bins, no CheckM2); parseBinners removes the repeat
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = false
+                nonpareil          = false
+                assembly_mode      = "assembly"
+                include_binning    = true
+                binners            = "metabat2,metabat2"
+                taxonomic_profiler = "none"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.contains(name) } }
+            assert count("BINNING:METABAT2 (") == 2
+            assert count("BINETTE") == 0
+            assert count("CHECKM2_BATCH") == 1
+            assert count("GTDB_TK_BATCH") == 1
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("Binners              : metabat2\n")
+        }
+    }
+
     test("Stub run publishes assembly and binning outputs") {
         // Pins the config-side publishing for BBMAP and BINETTE
         // (config/modules.config withName blocks): their outputs must land in

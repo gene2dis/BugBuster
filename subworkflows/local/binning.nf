@@ -50,7 +50,7 @@ include { BIN_DEPTH                  } from '../../modules/local/bin_depth/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
-include { flagOn                     } from './utils_params'
+include { flagOn; parseBinners       } from './utils_params'
 include { multisampleSharedGroups    } from './utils_coassembly'
 
 workflow BINNING {
@@ -65,7 +65,7 @@ workflow BINNING {
     ch_versions = channel.empty()
 
     // Parse selected binners
-    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { b -> b.trim().toLowerCase() }
+    def binners_list = parseBinners()
     def use_metabat2 = 'metabat2' in binners_list
     def use_semibin  = 'semibin' in binners_list
     def use_comebin  = 'comebin' in binners_list
