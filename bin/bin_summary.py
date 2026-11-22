@@ -10,6 +10,9 @@ import glob
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from id_columns import read_table  # noqa: E402
+
 
 RANKS = ['Domain', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
 QUALITY_COLUMNS = [
@@ -56,7 +59,7 @@ def main():
     quality_dfs = []
     for file in sorted(quality_files):
         try:
-            quality_dfs.append(pd.read_csv(file, sep='\t'))
+            quality_dfs.append(read_table(file, ['Name'], sep='\t'))
         except pd.errors.EmptyDataError:
             print(f"WARNING: skipping empty quality report {file}", file=sys.stderr)
 
@@ -72,7 +75,7 @@ def main():
     tax_dfs = []
     for file in sorted(tax_files):
         try:
-            tax_dfs.append(pd.read_csv(file, sep='\t'))
+            tax_dfs.append(read_table(file, ['user_genome'], sep='\t'))
         except pd.errors.EmptyDataError:
             print(f"WARNING: skipping empty taxonomy file {file}", file=sys.stderr)
 
@@ -108,7 +111,9 @@ def main():
 
     depth_dfs = []
     for file in depth_files:
-        df = pd.read_csv(file, sep='\t')
+        # sample and bin ids as text: an all-numeric sample id is an int to
+        # pandas, and '+ _avgcov' below fails on it (001 became 1_avgcov)
+        df = read_table(file, ['sample', 'bin_id'], sep='\t')
         depth_dfs.append(df)
 
     bin_depth = pd.concat(depth_dfs, ignore_index=True)

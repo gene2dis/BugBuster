@@ -19,6 +19,7 @@ import pandas as pd
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import figure_style as fs  # noqa: E402
+from id_columns import read_table  # noqa: E402
 
 fs.setup()
 import matplotlib.pyplot as plt  # noqa: E402
@@ -36,7 +37,8 @@ def read_tsv_files(pattern):
     dfs = []
     for file in files:
         try:
-            df = pd.read_csv(file, sep='\t')
+            # Id as text: one file per sample, so pandas would read 001 as 1
+            df = read_table(file, ['Id'], sep='\t')
             dfs.append(df)
         except Exception as e:
             print(f"Warning: Could not read {file}: {e}", file=sys.stderr)
@@ -51,7 +53,9 @@ def process_reports_with_filtering(filter_args):
     # Read bowtie reports for each filter type
     bowtie_dfs = {}
     for arg in filter_args:
-        pattern = f"*{arg}*"
+        # the decontamination report's own suffix: a substring match on the
+        # whole name also caught a sample named after the alias (R6-09)
+        pattern = f"*_{arg}_decontamination_report.tsv"
         df = read_tsv_files(pattern)
         if not df.empty:
             bowtie_dfs[f"bowtie_{arg}"] = df

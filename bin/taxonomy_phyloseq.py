@@ -31,6 +31,7 @@ import re
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from summary_common import natural_key  # noqa: E402
+from id_columns import read_table  # noqa: E402
 import figure_style as fs  # noqa: E402
 
 fs.setup()
@@ -185,7 +186,9 @@ class PhyloseqTableGenerator:
 
         for gather_file in gather_files:
             try:
-                df = pd.read_csv(gather_file)
+                # genome names and lineages as text: a digit-only name was a
+                # number and an empty lineage a float NaN (R6-10)
+                df = read_table(gather_file, ['name', 'lineage'])
             except Exception as e:
                 raise ValueError(f"Failed to parse sourmash gather file {gather_file}: {e}")
 
@@ -205,6 +208,14 @@ class PhyloseqTableGenerator:
             if missing:
                 raise ValueError(
                     f"{gather_file} is missing expected gather columns: {sorted(missing)}"
+                )
+
+            no_lineage = df.loc[df['lineage'].str.strip() == '', 'name']
+            if not no_lineage.empty:
+                raise ValueError(
+                    f"{gather_file}: no lineage for {len(no_lineage)} genome(s): "
+                    f"{', '.join(no_lineage.head(10))}{' ...' if len(no_lineage) > 10 else ''}. "
+                    "The lineages file of --custom_sourmash_db must cover every genome of the k-mer database"
                 )
 
             df['sample_id'] = sample_name

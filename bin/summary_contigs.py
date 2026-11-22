@@ -9,6 +9,7 @@ abundances."""
 
 import pandas as pd
 
+from id_columns import read_table
 from summary_common import die, load_coassembly_groups
 
 CONTIG_TABLE = ("05_arg_prediction", "contig_level", "summary", "Contig_tax_and_arg_prediction.tsv")
@@ -205,7 +206,7 @@ def load_arg_gene_abundance(root):
     if head != GENE_ABUNDANCE_COLUMNS:
         die(f"{gpath}: unexpected header {head} (expected {GENE_ABUNDANCE_COLUMNS})")
     chunks = [c[c["gene_id"].isin(wanted)]
-              for c in pd.read_csv(gpath, sep="\t", dtype={"sample_id": str, "gene_id": str}, chunksize=500_000)]
+              for c in read_table(gpath, ["sample_id", "gene_id"], sep="\t", chunksize=500_000)]
     ab = pd.concat(chunks, ignore_index=True)
     groups = load_coassembly_groups(root)
     coassembly = (ab["assembly_mode"] == "coassembly").any() if not ab.empty else "coassembly" in set(hits["assembly"])

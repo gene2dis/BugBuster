@@ -196,6 +196,41 @@ check_grep "sourmash report: classified fraction merged" "Reads_report.csv" "^sa
 check_file "sourmash report: classification plot created" "sourmash_tax_classified_reads.png"
 
 #
+# taxonomy_report.py — sample ids and database labels read as text (roadmap
+# Phase 20, RV2, R6-01): READS_REPORT writes 001 as text, and reading it back
+# with type inference gave 1 (blank profiler columns for that sample) or, with
+# every id numeric, an int64-vs-str merge error
+#
+echo "--- taxonomy_report.py (numeric ids) ---"
+tr_numeric() {
+    # tr_numeric <dir> <db label> <id>...: a reads report and one sourmash report per id
+    local dir="$1" db="$2"; shift 2
+    mkdir -p "${dir}"
+    printf 'Id,Raw reads,Fastp\n' > "${dir}/input_reads_report.csv"
+    local id
+    for id in "$@"; do
+        printf '%s,1000,900\n' "${id}" >> "${dir}/input_reads_report.csv"
+        printf 'Id\tSourmash DB\tUnclassified\tClassified\n%s\t%s\t0.25\t0.75\n' "${id}" "${db}" \
+            > "${dir}/${id}_species_gtdb_report.tsv"
+    done
+}
+TRN_MIX="${WORK}/taxonomy_report_numeric_mixed"
+tr_numeric "${TRN_MIX}" gtdb 001 S2
+NEXT_WORKDIR="${TRN_MIX}"
+expect_pass "taxonomy report: ids 001 and S2" taxonomy_report.py --profiler sourmash \
+    --reports 001_species_gtdb_report.tsv S2_species_gtdb_report.tsv \
+    --reads-report input_reads_report.csv --db-name gtdb --output-dir .
+check_grep "taxonomy report: 001 keeps its id and classified fraction" "Reads_report.csv" "^001,1000,900,gtdb,0.25,0.75$"
+TRN_ALL="${WORK}/taxonomy_report_numeric_all"
+tr_numeric "${TRN_ALL}" 2024 001 12
+NEXT_WORKDIR="${TRN_ALL}"
+expect_pass "taxonomy report: all-numeric ids and a digit-only DB label" taxonomy_report.py --profiler sourmash \
+    --reports 001_species_gtdb_report.tsv 12_species_gtdb_report.tsv \
+    --reads-report input_reads_report.csv --db-name 2024 --output-dir .
+check_grep "taxonomy report: all-numeric 001 row" "Reads_report.csv" "^001,1000,900,2024,0.25,0.75$"
+check_grep "taxonomy report: all-numeric 12 row" "Reads_report.csv" "^12,1000,900,2024,0.25,0.75$"
+
+#
 # taxonomy_phyloseq.py — kraken2 branch (audit #4; merge bugs were #12)
 #
 echo "--- taxonomy_phyloseq.py (kraken2) ---"
@@ -310,6 +345,21 @@ check_no_grep "sourmash phyloseq: no NaN in the genus plot data" "sourmash_gtdb_
     ",$"
 check_grep "sourmash phyloseq: sample without genus ranks warned" "../taxonomy_phyloseq_sourmash_nogenus.log" \
     "no classified taxa at Genus level in sampleC"
+
+# Roadmap Phase 20, RV2 (R6-10): a genome with an empty lineage (a custom
+# lineages file that misses it) raised "'float' object has no attribute
+# 'split'"; now the error names the file and the genome
+SMPH_NOLIN="${WORK}/taxonomy_phyloseq_sourmash_nolineage"
+mkdir -p "${SMPH_NOLIN}"
+sed -e '3s/,d__Bacteria;[^,]*$/,/' "${FIXTURES}/sampleA_smgather_gtdb.with-lineages.csv" \
+    > "${SMPH_NOLIN}/sampleA_smgather_gtdb.with-lineages.csv"
+NEXT_WORKDIR="${SMPH_NOLIN}"
+expect_fail "sourmash phyloseq: genome without a lineage fails" taxonomy_phyloseq.py --profiler sourmash \
+    --input-files sampleA_smgather_gtdb.with-lineages.csv \
+    --db-name gtdb --output-dir . --format tables \
+    --plot-levels Species --top-n 10
+check_grep "sourmash phyloseq: missing-lineage failure names the genome" "../taxonomy_phyloseq_sourmash_nolineage.log" \
+    "no lineage for 1 genome(s): GCA_000000002.1 Bacillus subtilis"
 
 # All samples empty (the audit-requested no-matches unit test): loud failure
 SMPH_EMPTY="${WORK}/taxonomy_phyloseq_sourmash_empty"

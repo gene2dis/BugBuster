@@ -12,6 +12,7 @@ section, not matched gene by gene with the CARD methods, and has no tiers.
 import numpy as np
 import pandas as pd
 
+from id_columns import read_table
 from summary_common import NA_LOW_DEPTH, NA_NOT_RUN, die, fill_columns
 
 LONG_NEEDED = {"sample", "level", "sarg_type", "sarg_subtype", "sarg_gene", "read_count", "copies",
@@ -21,7 +22,7 @@ NOT_NORMALISED = "not_normalised"
 
 
 def _read(path, needed):
-    df = pd.read_csv(path, sep="\t", dtype={"sample": str})
+    df = read_table(path, ["sample"], sep="\t")
     missing = needed - set(df.columns)
     if missing:
         die(f"{path} lacks columns: {', '.join(sorted(missing))}")

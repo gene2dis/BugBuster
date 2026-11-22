@@ -22,6 +22,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from summary_common import natural_key  # noqa: E402
 import figure_style as fs  # noqa: E402
+from id_columns import read_table  # noqa: E402
 
 fs.setup()
 import matplotlib.pyplot as plt  # noqa: E402
@@ -133,16 +134,10 @@ class TaxonomyReportGenerator:
         
         for report_file in report_files:
             try:
-                df = pd.read_csv(
-                    report_file,
-                    sep='\t',
-                    dtype={
-                        'Id': str,
-                        db_col: str,
-                        'Unclassified': float,
-                        'Classified': float
-                    }
-                )
+                # Id and the database label as text (NA, None or a digit-only
+                # label would otherwise become a missing value or a number)
+                df = read_table(report_file, ['Id', db_col], sep='\t')
+                df = df.astype({c: float for c in ('Unclassified', 'Classified') if c in df.columns})
             except Exception as e:
                 print(f"Warning: Failed to parse {report_file}: {e}", file=sys.stderr)
                 continue
@@ -173,7 +168,10 @@ class TaxonomyReportGenerator:
             Merged DataFrame
         """
         try:
-            reads_report = pd.read_csv(reads_report_path)
+            # Id (and any earlier '... DB' label) as text: READS_REPORT wrote
+            # them as text, and pandas would read 001 back as 1
+            header = pd.read_csv(reads_report_path, nrows=0).columns
+            reads_report = read_table(reads_report_path, ['Id'] + [c for c in header if c.endswith(' DB')])
         except Exception as e:
             raise ValueError(
                 f"Required reads report {reads_report_path} is missing or "

@@ -3,6 +3,7 @@
 import numpy as np
 import pandas as pd
 
+from id_columns import read_table
 from summary_common import ACCESSION, NA_LOW_DEPTH, die, norm_taxon
 
 
@@ -14,17 +15,16 @@ def load_taxonomy(root):
     if len(otus) > 1:
         die(f"{tables} holds more than one *_otu_table.tsv: {[p.name for p in otus]}")
     label = otus[0].name[: -len("_otu_table.tsv")]
-    otu = pd.read_csv(otus[0], sep="\t", index_col=0)
-    otu.index = otu.index.astype(str)
+    # taxon ids as text from the start: astype(str) afterwards cannot undo a
+    # genome name read as a number (001 -> 1) or a missing value
+    otu = read_table(otus[0], index=True, sep="\t")
     tax_path = tables / f"{label}_tax_table.tsv"
     if not tax_path.exists():
         die(f"{tax_path} is missing")
     tax = pd.read_csv(tax_path, sep="\t", index_col=0, dtype=str, keep_default_na=False)
     tax.index = tax.index.astype(str)
     counts_path = tables / f"{label}_read_counts.tsv"
-    counts = pd.read_csv(counts_path, sep="\t", index_col=0) if counts_path.exists() else None
-    if counts is not None:
-        counts.index = counts.index.astype(str)
+    counts = read_table(counts_path, index=True, sep="\t") if counts_path.exists() else None
     sylph = load_sylph_details(root, label)
     return {"label": label, "otu": otu, "tax": tax, "counts": counts, "sylph": sylph}
 

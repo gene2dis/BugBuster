@@ -15,6 +15,7 @@ annotated reads: the tables are not compositional.
 import numpy as np
 import pandas as pd
 
+from id_columns import read_table
 from summary_common import NA_NO_AGS, die, fill_columns, warn
 
 
@@ -56,9 +57,9 @@ def load_read_functional(root):
     fraction = summary = None
     fpath, spath = sdir / "read_annotated_fraction.tsv", sdir / "read_sample_summary.tsv"
     if fpath.exists():
-        fraction = pd.read_csv(fpath, sep="\t", dtype={"sample_id": str})
+        fraction = read_table(fpath, ["sample_id"], sep="\t")
     if spath.exists():
-        summary = pd.read_csv(spath, sep="\t", dtype={"sample_id": str, "db_version": str, "tool_version": str})
+        summary = read_table(spath, ["sample_id", "db_version", "tool_version"], sep="\t")
     ran = set(ab["sample_id"])
     if summary is not None:
         ran |= set(summary["sample_id"])
@@ -70,7 +71,7 @@ def load_microbecensus(root):
     mdir = root / "07_functional_annotation" / "microbecensus"
     rows = []
     for path in sorted(mdir.glob("*/*.ags.tsv")) if mdir.is_dir() else []:
-        df = pd.read_csv(path, sep="\t", dtype={"sample_id": str})
+        df = read_table(path, ["sample_id"], sep="\t")
         if not {"sample_id", "average_genome_size_bp", "genome_equivalents"} <= set(df.columns):
             warn(f"{path}: not a MicrobeCensus AGS table, skipped")
             continue
@@ -196,7 +197,7 @@ def load_contig_functional(root):
         ab[col] = pd.to_numeric(ab[col], errors="coerce")
     ab["description"] = ab["description"].fillna("")
     fpath = sdir / "annotated_fraction.tsv"
-    fraction = pd.read_csv(fpath, sep="\t", dtype={"sample_id": str}) if fpath.exists() else None
+    fraction = read_table(fpath, ["sample_id"], sep="\t") if fpath.exists() else None
     ran = set(ab["sample_id"]) | (set(fraction["sample_id"]) if fraction is not None else set())
     return {"abundance": ab, "fraction": fraction, "ran": ran}
 
