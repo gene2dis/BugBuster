@@ -554,28 +554,29 @@ expect_fail "sylph phyloseq: malformed profile fails" taxonomy_phyloseq.py --pro
 #
 # tables_to_phyloseq_simple.R (PHYLOSEQ_CONVERTER, --create_phyloseq_rds) in the
 # module's pinned phyloseq image. Roadmap Phase 20, RV6 (R6-02): the tables are
-# written unquoted by taxonomy_phyloseq.py, and read.table's default quote and
-# comment characters merged the rows after a name with one apostrophe and cut
-# a name at '#', with no error
+# written by pandas (double quotes only around a field that holds one), and
+# read.table's default quote and comment characters merged the rows after a
+# name with one apostrophe and cut a name at '#', with no error
 #
 echo "--- tables_to_phyloseq_simple.R ---"
 PHYLOSEQ_IMG=$(grep -o "'quay.io/biocontainers/bioconductor-phyloseq:[^']*'" \
     "${REPO_DIR}/modules/local/phyloseq_converter/main.nf" | tr -d "'" | head -1)
 RDS_WORK="${WORK}/phyloseq_rds_quotes"
 mkdir -p "${RDS_WORK}"
-printf 'taxon_id\tsampleA\tsampleB\n11\t10.0\t0.0\n12\t5.0\t1.0\n13\t1.0\t2.0\n14\t3.0\t3.0\n' \
+printf 'taxon_id\tsampleA\tsampleB\n11\t10.0\t0.0\n12\t5.0\t1.0\n13\t1.0\t2.0\n14\t3.0\t3.0\n15\t1.0\t1.0\n' \
     > "${RDS_WORK}/otu.tsv"
 printf '%s\n' $'taxon_id\tKingdom\tGenus\tSpecies' \
     $'11\tViruses\tAlphavirus\tO\'nyong-nyong virus' \
     $'12\tBacteria\tEscherichia\tEscherichia coli' \
     $'13\tBacteria\tBacillus\tBacillus sp. #12' \
-    $'14\tBacteria\t\t' > "${RDS_WORK}/tax.tsv"
+    $'14\tBacteria\t\t' \
+    $'15\tViruses\tKayvirus\t"phage ""N4"""' > "${RDS_WORK}/tax.tsv"
 printf 'sample\tsite\nsampleA\ta\nsampleB\tb\n' > "${RDS_WORK}/samples.tsv"
 if docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "${REPO_DIR}/bin:/pipeline_bin:ro" \
         -v "${RDS_WORK}:/repwork" -w /repwork "${PHYLOSEQ_IMG}" bash -c \
         'Rscript /pipeline_bin/tables_to_phyloseq_simple.R otu.tsv tax.tsv samples.tsv out.RDS &&
          Rscript -e "suppressMessages(library(phyloseq)); p <- readRDS(\"out.RDS\"); t <- as.data.frame(tax_table(p));
-                     cat(ntaxa(p), t[\"11\", \"Species\"], t[\"13\", \"Species\"], paste0(\"[\", t[\"14\", \"Genus\"], \"]\"), sep = \"|\")" > check.txt' \
+                     cat(ntaxa(p), t[\"11\", \"Species\"], t[\"13\", \"Species\"], paste0(\"[\", t[\"14\", \"Genus\"], \"]\"), t[\"15\", \"Species\"], sep = \"|\")" > check.txt' \
         > "${RDS_WORK}.log" 2>&1; then
     echo "✓ phyloseq RDS: built from tables with an apostrophe and a '#'"
     PASS=$((PASS + 1))
@@ -584,11 +585,11 @@ else
     tail -5 "${RDS_WORK}.log" | sed 's/^/    /'
     FAIL=$((FAIL + 1))
 fi
-if [ "$(cat "${RDS_WORK}/check.txt" 2>/dev/null)" = "4|O'nyong-nyong virus|Bacillus sp. #12|[]" ]; then
+if [ "$(cat "${RDS_WORK}/check.txt" 2>/dev/null)" = "5|O'nyong-nyong virus|Bacillus sp. #12|[]|phage \"N4\"" ]; then
     echo "✓ phyloseq RDS: every taxon kept, names whole, blank ranks blank"
     PASS=$((PASS + 1))
 else
-    echo "✗ phyloseq RDS: got '$(cat "${RDS_WORK}/check.txt" 2>/dev/null)', expected 4 taxa with whole names"
+    echo "✗ phyloseq RDS: got '$(cat "${RDS_WORK}/check.txt" 2>/dev/null)', expected 5 taxa with whole names"
     FAIL=$((FAIL + 1))
 fi
 

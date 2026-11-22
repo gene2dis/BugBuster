@@ -114,7 +114,7 @@ def get_sample_ids(samplesheet) {
         return []
     }
     def header = lines[0].collect { c -> c.toString().trim() }
-    header[0] = header[0].replaceFirst(/^﻿/, '').trim()
+    header[0] = header[0].replaceFirst(/^\uFEFF/, '').trim()
     def col = header.indexOf('sample')
     if (col < 0) {
         return []

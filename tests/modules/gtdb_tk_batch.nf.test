@@ -41,6 +41,11 @@ nextflow_process {
             assert reports == ['S1_gtdbtk_ar53.tsv', 'S1_gtdbtk_bac120.tsv', 'S2_gtdbtk_ar53.tsv', 'S2_gtdbtk_bac120.tsv']
             def log = path(process.out.versions.get(0)).parent.resolve('.command.log').text
             assert log.contains("Processing comebin_res_bins -> sample_id=S2")
+            // the script's lines keep their common indentation: a line at column 0
+            // (an unescaped \\n in the script string) left END_VERSIONS unclosed
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.startsWith('"GTDB_TK_BATCH":') && versions.contains('\n    gtdbtk: ')
+            assert !versions.contains('END_VERSIONS')
         }
     }
 }

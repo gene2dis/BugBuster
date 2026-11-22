@@ -787,7 +787,8 @@ assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
 `https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/`:
 `mpa_vOct22_CHOCOPhlAnSGB_202403.tar` and
 `bowtie2_indexes/mpa_vOct22_CHOCOPhlAnSGB_202403_bt2.tar`, unpacked flat into
-`metaphlan/`). 
+`metaphlan/`).
+
 ### AGGREGATE_READ_FUNCTIONS / HUMANN fail with a layout or version message
 
 **Errors:**

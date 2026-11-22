@@ -42,11 +42,13 @@ if (!file.exists(sample_file)) {
 cat("Reading input files...\n")
 
 # The tables are written by taxonomy_phyloseq.py with pandas' to_csv, which
-# quotes nothing: read.table's default quote ("'") and comment ("#") characters
-# merged or cut rows of taxon names holding an apostrophe or a '#', with no
-# error, and its default na.strings made a taxon or sample called NA missing
-# (roadmap Phase 20, RV6; review finding R6-02). Every read.table below takes
-# the fields as they are.
+# wraps a field in double quotes only when it holds one (doubled inside), a tab
+# or a line break, and never quotes an apostrophe or a '#'. read.table's
+# default quote ("'" as well) and comment ("#") characters merged or cut rows
+# of taxon names holding an apostrophe or a '#', with no error, and its default
+# na.strings made a taxon or sample called NA missing (roadmap Phase 20, RV6;
+# review finding R6-02). The reads below take double quotes as pandas writes
+# them and every other character as it is.
 
 # Read OTU table
 otu_data <- read.table(
@@ -56,7 +58,7 @@ otu_data <- read.table(
   row.names = 1,
   check.names = FALSE,
   stringsAsFactors = FALSE,
-  quote = "",
+  quote = "\"",
   comment.char = "",
   na.strings = character(0)
 )
@@ -69,7 +71,7 @@ tax_data <- read.table(
   row.names = 1,
   check.names = FALSE,
   stringsAsFactors = FALSE,
-  quote = "",
+  quote = "\"",
   comment.char = "",
   na.strings = character(0)
 )
@@ -82,7 +84,7 @@ sample_data <- read.table(
   row.names = 1,
   check.names = FALSE,
   stringsAsFactors = FALSE,
-  quote = "",
+  quote = "\"",
   comment.char = "",
   na.strings = character(0)
 )

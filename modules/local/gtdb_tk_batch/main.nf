@@ -58,7 +58,7 @@ process GTDB_TK_BATCH {
     set -euo pipefail
 
     # staged bin directory -> sample id
-    printf '%s\t%s\n' ${staged_ids} > staged_ids.tsv
+    printf '%s\\t%s\\n' ${staged_ids} > staged_ids.tsv
 
     # Create combined directory with prefixed bin names
     mkdir -p combined_bins

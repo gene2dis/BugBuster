@@ -54,7 +54,7 @@ process CHECKM2_BATCH {
     set -euo pipefail
 
     # staged bin directory -> sample id
-    printf '%s\t%s\n' ${staged_ids} > staged_ids.tsv
+    printf '%s\\t%s\\n' ${staged_ids} > staged_ids.tsv
 
     # Every bin of every sample and binner goes into one directory as
     # <sample>__<binner>__<bin>.fa, so one checkm2 run (one DIAMOND search,
