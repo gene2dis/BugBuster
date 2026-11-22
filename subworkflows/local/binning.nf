@@ -193,7 +193,7 @@ workflow BINNING {
                 def sample_reports = [:]
                 def report_files = reports instanceof List ? reports : [reports]
                 report_files.each { report ->
-                    // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                    // Extract sample_id from filename: sampleA_metabat_quality_report.tsv -> sampleA
                     // Use findLastIndexOf to correctly handle sample names that contain binner keywords
                     def filename = report.name
                     def parts = filename.tokenize('_')
@@ -246,7 +246,7 @@ workflow BINNING {
             def sample_reports = [:]
             def report_files = reports instanceof List ? reports : [reports]
             report_files.each { report ->
-                // Extract sample_id from filename: S10_Ago2021_gtdbtk_bac120.tsv -> S10_Ago2021
+                // Extract sample_id from filename: sampleA_gtdbtk_bac120.tsv -> sampleA
                 // Use findLastIndexOf to correctly handle sample names that contain 'gtdbtk'
                 def filename = report.name
                 def parts = filename.tokenize('_')

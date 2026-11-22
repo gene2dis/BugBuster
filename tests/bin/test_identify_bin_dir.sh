@@ -64,14 +64,14 @@ expect_id "comebin dir" "S1${TAB}comebin" "bin_1/S1_comebin_bins"
 
 # Sample ids containing underscores and binner-like words
 expect_id "underscore-heavy sample id" \
-    "S10_Ago2021${TAB}semibin" "S10_Ago2021_semibin_output_bins"
+    "site_A_rep1${TAB}semibin" "site_A_rep1_semibin_output_bins"
 expect_id "sample id containing a binner keyword" \
     "metabat_test${TAB}metabat" "metabat_test_metabat_bins"
 
 # Binette's refined bins
 expect_id "binette dir" "S1${TAB}binette" "S1_binette_bins"
 expect_id "binette dir, underscore-heavy sample id" \
-    "S10_Ago2021${TAB}binette" "S10_Ago2021_binette_bins"
+    "site_A_rep1${TAB}binette" "site_A_rep1_binette_bins"
 
 # COMEBin nested dir staged by its basename: sample id comes from the resolved path
 mkdir -p "${TMP_DIR}/work/S2_comebin_bins/comebin_res/comebin_res_bins"
