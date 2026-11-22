@@ -1,0 +1,51 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    GTDB_TK_BATCH: the sample of every staged bin directory
+
+    Roadmap Phase 20, RV5 (review findings R4-05, R6-04). COMEBin's bins sit in
+    <id>_comebin_bins/comebin_res/comebin_res_bins, whose staged name holds no
+    sample id; identify_bin_dir.sh used to recover it from the resolved symlink
+    target, so a task whose inputs are copied (cloud batch executors) failed
+    with "cannot derive sample id". The processes now pass each directory's
+    meta.id. The real scripts run here, with inputs copied
+    (stage_copy.config) and no bins (SKIPPED.txt only), so neither CheckM2 nor
+    GTDB-Tk needs its database: the stand-in database is never read.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test GTDB_TK_BATCH Process"
+    script "../../modules/local/gtdb_tk_batch/main.nf"
+    process "GTDB_TK_BATCH"
+    config "./stage_copy.config"
+
+    test("GTDB_TK_BATCH: copied COMEBin directory gets its sample from the meta") {
+        when {
+            process {
+                """
+                def d = "${projectDir}/tests/data/bins/batch_no_bins"
+                input[0] = [
+                    [ [ id: 'S1' ], [ id: 'S2' ] ],
+                    [ file("\${d}/S1_metabat_bins", checkIfExists: true),
+                      file("\${d}/S2_comebin_bins/comebin_res/comebin_res_bins", checkIfExists: true) ],
+                    file("\${d}/S1_metabat_bins/SKIPPED.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reports = process.out.gtdb_tk.get(0)[1].collect { f -> new File(f.toString()).name }.sort()
+            assert reports == ['S1_gtdbtk_ar53.tsv', 'S1_gtdbtk_bac120.tsv', 'S2_gtdbtk_ar53.tsv', 'S2_gtdbtk_bac120.tsv']
+            def log = path(process.out.versions.get(0)).parent.resolve('.command.log').text
+            assert log.contains("Processing comebin_res_bins -> sample_id=S2")
+            // the script's lines keep their common indentation: a line at column 0
+            // (an unescaped \\n in the script string) left END_VERSIONS unclosed
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.startsWith('"GTDB_TK_BATCH":') && versions.contains('\n    gtdbtk: ')
+            assert !versions.contains('END_VERSIONS')
+        }
+    }
+}

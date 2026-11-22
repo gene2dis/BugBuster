@@ -50,7 +50,7 @@ include { BIN_DEPTH                  } from '../../modules/local/bin_depth/main'
 include { BIN_QUALITY_REPORT         } from '../../modules/local/bin_quality_report/main'
 include { BIN_TAX_REPORT             } from '../../modules/local/bin_tax_report/main'
 include { BIN_SUMMARY                } from '../../modules/local/bin_summary/main'
-include { flagOn                     } from './utils_params'
+include { flagOn; parseBinners       } from './utils_params'
 include { multisampleSharedGroups    } from './utils_coassembly'
 
 workflow BINNING {
@@ -65,7 +65,7 @@ workflow BINNING {
     ch_versions = channel.empty()
 
     // Parse selected binners
-    def binners_list = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',').collect { b -> b.trim().toLowerCase() }
+    def binners_list = parseBinners()
     def use_metabat2 = 'metabat2' in binners_list
     def use_semibin  = 'semibin' in binners_list
     def use_comebin  = 'comebin' in binners_list
@@ -177,7 +177,10 @@ workflow BINNING {
         ch_all_sample_bins = ch_binner_bins
             .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
             .map { items ->
-                def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
+                // one meta per path (CHECKM2_BATCH maps each staged
+                // directory to its sample from this list); the module
+                // de-duplicates the ids
+                def meta_list = items.collect { item -> item[0] }
                 def all_paths = items.collect { item -> item[1] }
                 [meta_list, all_paths]
             }
@@ -193,7 +196,7 @@ workflow BINNING {
                 def sample_reports = [:]
                 def report_files = reports instanceof List ? reports : [reports]
                 report_files.each { report ->
-                    // Extract sample_id from filename: S10_Ago2021_metabat_quality_report.tsv -> S10_Ago2021
+                    // Extract sample_id from filename: sampleA_metabat_quality_report.tsv -> sampleA
                     // Use findLastIndexOf to correctly handle sample names that contain binner keywords
                     def filename = report.name
                     def parts = filename.tokenize('_')
@@ -246,7 +249,7 @@ workflow BINNING {
             def sample_reports = [:]
             def report_files = reports instanceof List ? reports : [reports]
             report_files.each { report ->
-                // Extract sample_id from filename: S10_Ago2021_gtdbtk_bac120.tsv -> S10_Ago2021
+                // Extract sample_id from filename: sampleA_gtdbtk_bac120.tsv -> sampleA
                 // Use findLastIndexOf to correctly handle sample names that contain 'gtdbtk'
                 def filename = report.name
                 def parts = filename.tokenize('_')

@@ -40,8 +40,21 @@ process CHECKM2_BATCH {
 
     script:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
+    // The sample of each staged bin directory, from the meta list (one meta
+    // per path, in the order Nextflow stages them as bin_1, bin_2, ...), so no
+    // id is recovered from a directory name or the resolved work path
+    // (roadmap Phase 20, RV5). One line of quoted pairs: a multi-line value
+    // would break the script's indentation stripping (R4-04)
+    def bin_paths = all_bins instanceof List ? all_bins : [all_bins]
+    if (bin_paths.size() != meta_list.size()) {
+        error "CHECKM2_BATCH: ${bin_paths.size()} bin directories for ${meta_list.size()} metas"
+    }
+    def staged_ids = [bin_paths, meta_list].transpose().collect { p, m -> "'${p}' '${m instanceof Map ? m.id : m}'" }.join(' ')
     """
     set -euo pipefail
+
+    # staged bin directory -> sample id
+    printf '%s\\t%s\\n' ${staged_ids} > staged_ids.tsv
 
     # Every bin of every sample and binner goes into one directory as
     # <sample>__<binner>__<bin>.fa, so one checkm2 run (one DIAMOND search,
@@ -61,7 +74,9 @@ process CHECKM2_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        staged_id=\$(awk -F '\\t' -v d="\$bin_dir" '\$1 == d {print \$2}' staged_ids.tsv)
+        [ -n "\$staged_id" ] || { echo "ERROR: \$bin_dir is not in staged_ids.tsv (staged inputs and the meta list disagree)" >&2; exit 1; }
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "\$staged_id")
         sample_id=\${id_line%%\$'\\t'*}
         binner=\${id_line##*\$'\\t'}
 
@@ -152,7 +167,7 @@ process CHECKM2_BATCH {
     """
     
     stub:
-    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.join(' ')
+    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     """
     # Create stub quality report files for each sample and binner
     for meta_id in ${meta_ids}; do

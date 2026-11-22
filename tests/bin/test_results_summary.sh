@@ -743,6 +743,19 @@ qc = pd.read_csv("kr/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert abs(qc.at["k1", "classified_fraction"] - 0.855) < 1e-9 and abs(qc.at["k2", "classified_fraction"] - 0.005) < 1e-9
 PYEOF
 
+# roadmap Phase 20, RV2: a digit-only database label (a custom database named 2024) was read as a number and
+# taken for the last read-count step, so clean_pairs was 1012; and the ids 001 / NA came back as 1 / missing
+mkdir -p numlabel/results/01_quality_control/summary
+printf 'Id,Raw reads,Fastp,Clean reads (contaminants removed),Kraken DB,Unclassified,Classified\n001,2000,1900,1800,2024,14.5,85.5\nNA,2000,1900,1600,2024,99.5,0.5\n' \
+    > numlabel/results/01_quality_control/summary/Reads_report.csv
+check "Reads_report.csv with a digit-only DB label and ids 001 / NA" py "${SUMMARY}" --results numlabel/results --outdir numlab --no-excel
+check "digit-only DB label is not a read count; ids 001 and NA kept" py - <<'PYEOF'
+import pandas as pd
+qc = pd.read_csv("numlab/tables/samples_qc.tsv", sep="\t", dtype={"sample": str}, keep_default_na=False).set_index("sample")
+assert list(qc.index) == ["001", "NA"], list(qc.index)
+assert int(qc.at["001", "clean_pairs"]) == 900 and int(qc.at["NA", "clean_pairs"]) == 800, qc[["clean_pairs"]]
+PYEOF
+
 check "CARD snps.txt check, gene names, tier rules, heatmap row order and k-mer parsing" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys, tempfile, os
 import pandas as pd

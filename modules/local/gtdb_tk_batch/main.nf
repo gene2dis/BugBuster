@@ -43,15 +43,29 @@ process GTDB_TK_BATCH {
     // pplacer threads (performance review M10): 4 placed genomes 1.5-2x
     // faster than 1 for ~7 % more memory; never more than the task's CPUs
     def pplacer_cpus = Math.min(params.gtdbtk_pplacer_cpus as Integer, task.cpus as Integer)
+    // The sample of each staged bin directory, from the meta list (one meta
+    // per path, in the order Nextflow stages them as bin_1, bin_2, ...), so no
+    // id is recovered from a directory name or the resolved work path
+    // (roadmap Phase 20, RV5)
+    def bin_paths = all_bins instanceof List ? all_bins : [all_bins]
+    if (bin_paths.size() != meta_list.size()) {
+        error "GTDB_TK_BATCH: ${bin_paths.size()} bin directories for ${meta_list.size()} metas"
+    }
+    // one line of quoted pairs: a multi-line value would break the script's
+    // indentation stripping (R4-04)
+    def staged_ids = [bin_paths, meta_list].transpose().collect { p, m -> "'${p}' '${m instanceof Map ? m.id : m}'" }.join(' ')
     """
     set -euo pipefail
+
+    # staged bin directory -> sample id
+    printf '%s\\t%s\\n' ${staged_ids} > staged_ids.tsv
 
     # Create combined directory with prefixed bin names
     mkdir -p combined_bins
 
     total_bins=0
 
-    # Process ALL staged bin directories - parse sample_id from directory names
+    # Process ALL staged bin directories; the sample id comes from staged_ids.tsv
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. The input channel
     # already carries exactly the dirs to classify (single-binner outputs, or
     # Binette-refined dirs), so every dir must be recognized; identify_bin_dir.sh
@@ -63,7 +77,9 @@ process GTDB_TK_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        staged_id=\$(awk -F '\\t' -v d="\$bin_dir" '\$1 == d {print \$2}' staged_ids.tsv)
+        [ -n "\$staged_id" ] || { echo "ERROR: \$bin_dir is not in staged_ids.tsv (staged inputs and the meta list disagree)" >&2; exit 1; }
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "\$staged_id")
         sample_id=\${id_line%%\$'\\t'*}
 
         echo "Processing \$(basename "\$bin_dir") -> sample_id=\$sample_id"
@@ -76,7 +92,10 @@ process GTDB_TK_BATCH {
             # Copy bins with prefixed names to track origin
             find -L "\$bin_dir" -type f \\( -name "*.fa" -o -name "*.fasta" -o -name "*.fna" \\) | while read bin_file; do
                 bin_name=\$(basename "\$bin_file")
-                cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name}"
+                # named .fa whatever the extension: GTDB-Tk runs with
+                # --extension .fa, so a .fasta / .fna bin was counted but not
+                # classified (R4-12)
+                cp "\$bin_file" "combined_bins/\${sample_id}__\${bin_name%.*}.fa"
             done
             total_bins=\$((total_bins + bin_count))
         fi
@@ -104,79 +123,13 @@ process GTDB_TK_BATCH {
             --extension .fa \\
             --pplacer_cpus ${pplacer_cpus}
         
-        # Split the combined reports by sample prefix
+        # Split the combined reports by sample prefix (<sample>__<bin>):
+        # bin/gtdbtk_split.py stops on a bin whose prefix is not a sample of
+        # the batch instead of dropping its row (roadmap Phase 20, RV3), and
+        # writes a header-only ar53 table when GTDB-Tk wrote no ar53 summary
         if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ]; then
-            # The script body is indented with tabs: bash <<- strips them, and at four
-            # tabs they are not below the script's 4-space base indentation, which
-            # Nextflow strips from every line (fewer left spaces before END_VERSIONS)
-            python3 <<-PYEOF
-				import sys
-				import os
-				
-				meta_ids = "${meta_ids}".split()
-				
-				# Process bacteria summary
-				if os.path.exists("gtdbtk_output/classify/gtdbtk.bac120.summary.tsv"):
-				    with open("gtdbtk_output/classify/gtdbtk.bac120.summary.tsv", 'r') as f:
-				        header = f.readline()
-				        lines = f.readlines()
-				    
-				    # Create per-sample reports
-				    sample_reports = {meta_id: [] for meta_id in meta_ids}
-				    
-				    for line in lines:
-				        if line.strip():
-				            # Extract sample ID from bin name (format: sampleID__binname.fa)
-				            bin_name = line.split('\t')[0]
-				            if '__' in bin_name:
-				                sample_id = bin_name.split('__')[0]
-				                if sample_id in sample_reports:
-				                    # Remove the sample prefix from bin name in output
-				                    original_bin_name = '__'.join(bin_name.split('__')[1:])
-				                    modified_line = line.replace(bin_name, original_bin_name, 1)
-				                    sample_reports[sample_id].append(modified_line)
-				    
-				    # Write per-sample reports
-				    for meta_id in meta_ids:
-				        with open(f"{meta_id}_gtdbtk_bac120.tsv", 'w') as f:
-				            f.write(header)
-				            if sample_reports[meta_id]:
-				                f.writelines(sample_reports[meta_id])
-				
-				# Process archaea summary
-				if os.path.exists("gtdbtk_output/classify/gtdbtk.ar53.summary.tsv"):
-				    with open("gtdbtk_output/classify/gtdbtk.ar53.summary.tsv", 'r') as f:
-				        header = f.readline()
-				        lines = f.readlines()
-				    
-				    # Create per-sample reports
-				    sample_reports = {meta_id: [] for meta_id in meta_ids}
-				    
-				    for line in lines:
-				        if line.strip():
-				            # Extract sample ID from bin name (format: sampleID__binname.fa)
-				            bin_name = line.split('\t')[0]
-				            if '__' in bin_name:
-				                sample_id = bin_name.split('__')[0]
-				                if sample_id in sample_reports:
-				                    # Remove the sample prefix from bin name in output
-				                    original_bin_name = '__'.join(bin_name.split('__')[1:])
-				                    modified_line = line.replace(bin_name, original_bin_name, 1)
-				                    sample_reports[sample_id].append(modified_line)
-				    
-				    # Write per-sample reports
-				    for meta_id in meta_ids:
-				        with open(f"{meta_id}_gtdbtk_ar53.tsv", 'w') as f:
-				            f.write(header)
-				            if sample_reports[meta_id]:
-				                f.writelines(sample_reports[meta_id])
-				else:
-				    # Create empty ar53 files if no archaea found
-				    for meta_id in meta_ids:
-				        if not os.path.exists(f"{meta_id}_gtdbtk_ar53.tsv"):
-				            with open(f"{meta_id}_gtdbtk_ar53.tsv", 'w') as f:
-				                f.write("user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings\\n")
-				PYEOF
+            gtdbtk_split.py --samples ${meta_ids} --domain bac120 --summary gtdbtk_output/classify/gtdbtk.bac120.summary.tsv
+            gtdbtk_split.py --samples ${meta_ids} --domain ar53 --summary gtdbtk_output/classify/gtdbtk.ar53.summary.tsv
         fi
     fi
     
@@ -187,7 +140,7 @@ process GTDB_TK_BATCH {
     """
     
     stub:
-    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.join(' ')
+    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     """
     # Create stub taxonomy files for each sample
     for meta_id in ${meta_ids}; do

@@ -21,6 +21,10 @@ import glob
 import gzip
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from id_columns import read_table  # noqa: E402
 
 RANKS = ['superkingdom', 'phylum', 'class', 'order', 'family', 'genus', 'species']
 # Metabuli lineage prefixes (--lineage 1); 'd' is NCBI's 'domain' (the
@@ -159,7 +163,8 @@ def main():
     for file in blob_files:
         sample_name = file.split('_Blob_table')[0]
         # Skip first 10 lines (blobtools header)
-        df = pd.read_csv(file, sep='\t', skiprows=10)
+        # contig names as text, like the other tables merged on them
+        df = read_table(file, ['# name'], sep='\t', skiprows=10)
         df['Sample'] = sample_name
         blob_dfs.append(df)
 

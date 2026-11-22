@@ -125,6 +125,28 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects --dereplicate_mags with one binner named twice") {
+        // roadmap Phase 20, RV4: metabat2,metabat2 is one binner (parseBinners
+        // removes the repeat); it passed the ">= 2 binners" check before
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control  = false
+                assembly_mode    = "assembly"
+                include_binning  = true
+                binners          = "metabat2, MetaBAT2,metabat2"
+                dereplicate_mags = true
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("--dereplicate_mags requires at least two --binners: galah picks each cluster's representative from Binette's CheckM2 reports, and Binette only runs with >= 2 binners. Got: metabat2")
+        }
+    }
+
     test("Rejects --dereplicate_mags with one binner") {
         when {
             params {

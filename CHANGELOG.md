@@ -580,6 +580,33 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (samplesheet)**: sample names that the pipeline's tables cannot
+  carry are rejected at launch, with every offending name and its reason in one
+  error (roadmap Phase 20). Rejected: names that read as a number (digits only
+  such as `001` or `12`, decimals, exponent forms such as `1e5`, `inf`,
+  `infinity`), missing-value and true/false words in any case (`NA`, `N/A`,
+  `NaN`, `null`, `None`, `true`, `false`), names containing `__` or ending
+  in `_` (`S1_` is read back as `S1` from `S1___bin.1`), and the reserved names `coassembly` and `multisample`. Before, pandas read `001`
+  back as `1` (the sample lost its profiler columns in `Reads_report.csv`, with
+  no error) and an all-numeric samplesheet stopped READS_REPORT or
+  TAXONOMY_REPORT; a name with `__` lost its GTDB-Tk rows or had them written
+  into another sample's report; a sample called `coassembly` had its tables
+  filed under the co-assembly folders in the summary. **To upgrade**: rename
+  such samples in the samplesheet and in `--sample_metadata` (`S001` for `001`,
+  `site_rep1` for `site__rep1`, `S1` for `S1_`). The HUMAnN-only rule on `s__` / `t__` is now
+  part of the `__` rule for every run.
+- **Breaking (group labels)**: a `--coassembly_group_by` or
+  `--multisample_group_by` label is the id of its co-assembly or group, so it
+  follows the same rules: a group value such as `1`, `NA` or `a__b` (also a
+  value that becomes `__` or ends in `_` once spaces are replaced, `a_ b`,
+  `site#`), and the label of
+  the other mode's pooled group (`multisample` under `--coassembly_group_by`,
+  `coassembly` under `--multisample_group_by`), stop the run at launch.
+  **To upgrade**: give such values a letter (`site1` for `1`). The samplesheet
+  is also read with the same rules everywhere: a `sample` header with spaces
+  around it, or a byte order mark, no longer leaves the group helpers with no
+  sample (which grouped nothing, silently); a samplesheet without a `sample`
+  column stops a grouped run with a message.
 - **The run summary's report covers the tools added in roadmap Phases 15-18**
   (Phase 19). The summary tables (`tables/*.tsv`, the Excel workbook) are
   unchanged; the HTML site, the PDF and the README / LLM guide methods lines
@@ -1303,6 +1330,49 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Sample ids, bin names and database labels are read back as text**
+  (roadmap Phase 20). pandas inferred their type when the report scripts read
+  a table back: READS_REPORT reads one file per sample, so a sample `001` was
+  published as `1` in `Reads_report.csv` and lost its profiler columns in
+  TAXONOMY_REPORT, `NA` became `0`, and an all-numeric samplesheet stopped
+  READS_REPORT, TAXONOMY_REPORT or BIN_SUMMARY. The run summary took a
+  digit-only database label (a custom database named `2024`) for the clean
+  read count. `bin/report_unify.py`, `taxonomy_report.py`, `bin_summary.py`,
+  `results_summary.py` and the summary's taxonomy, SARG, contig and functional
+  readers now keep these columns as written (`bin/id_columns.py`); the rest of
+  each table is parsed as before. This also covers results directories merged
+  outside the pipeline, which no launch check sees. Also: READS_REPORT takes
+  decontamination reports by their exact suffix (a sample named
+  `contaminants_ctrl` had its fastp report read twice and its row duplicated),
+  and a sourmash genome without a lineage stops TAXONOMY_PHYLOSEQ with the
+  file and genome named (before: `'float' object has no attribute 'split'`).
+- **GTDB_TK_BATCH** splits the pooled GTDB-Tk summaries with
+  `bin/gtdbtk_split.py`, which stops on a bin whose `<sample>__` prefix is not
+  a sample of the batch instead of dropping its row silently, and classifies
+  `.fasta` / `.fna` bins (copied as `.fa`; they were counted but GTDB-Tk,
+  run with `--extension .fa`, skipped them).
+- **`--binners` names are counted once** (one parser, `parseBinners()`, for
+  the launch checks and BINNING): `metabat2,metabat2` turned Binette on with
+  one bin set, so no bin was refined or quality-checked, and passed the
+  ">= 2 binners" checks of `--dereplicate_mags` and `--mag_level_functional`.
+- **COMEBin bins on executors that copy inputs**: BINETTE, CHECKM2_BATCH and
+  GTDB_TK_BATCH pass each bin directory's sample id to
+  `bin/identify_bin_dir.sh`, which no longer recovers COMEBin's from the
+  resolved work path. Where inputs are copied (cloud batch executors) the
+  three processes failed with "cannot derive sample id" whenever `comebin` was
+  among `--binners`, and a work path holding `_comebin` gave the wrong sample.
+- **Taxon names in the phyloseq object** (`--create_phyloseq_rds`):
+  `bin/tables_to_phyloseq_simple.R` reads double quotes as pandas writes
+  them and no comment or missing-value characters, so apostrophes, `#` and
+  `NA` stay text; a Kraken2 species name with one apostrophe
+  merged the rows after it and a `#` cut the name, with no error. The script
+  now stops if the taxonomy and OTU tables differ in rows.
+- **Kraken2 `Kingdom` column**: an NCBI lineage holds a domain (`D`) and,
+  below it, a kingdom (`K`: Metazoa, Fungi, and since NCBI's 2025 taxonomy
+  Pseudomonadati, Bacillati); the kingdom overwrote the domain. `Kingdom` now
+  holds the domain (Bacteria, Archaea, Eukaryota, Viruses), as on the sylph
+  and sourmash paths; `K` fills it only in a database without `D` rows.
 
 - **Methods cite GUNC, CheckV, HMMER, Prodigal and BWA**: the report's
   software table listed GUNC's and CheckV's version keys (`gunc`, `checkv`,

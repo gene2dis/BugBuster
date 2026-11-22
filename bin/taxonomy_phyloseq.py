@@ -31,6 +31,7 @@ import re
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 sys.dont_write_bytecode = True
 from summary_common import natural_key  # noqa: E402
+from id_columns import read_table  # noqa: E402
 import figure_style as fs  # noqa: E402
 
 fs.setup()
@@ -73,10 +74,14 @@ class PhyloseqTableGenerator:
         
         self.tax_ranks = ['Kingdom', 'Phylum', 'Class', 'Order', 'Family', 'Genus', 'Species']
     
-    # Rank codes in kraken-style reports mapped to phyloseq ranks. Kraken2
-    # emits 'D' (domain) at the top level for NCBI taxonomies while other DB
-    # builds use 'K'; both fill the Kingdom slot. Sub-ranks (S1, G1, ...) and
-    # unranked rows stay on the indent-walk stack but fill no rank column.
+    # Rank codes in kraken-style reports mapped to phyloseq ranks. 'D'
+    # (domain: Bacteria, Archaea, Eukaryota, Viruses) and 'K' (kingdom) both
+    # map to Kingdom, but an NCBI lineage can hold both (Eukaryota > Metazoa;
+    # since NCBI's 2025 taxonomy also Bacteria > Pseudomonadati): the first,
+    # the domain, is kept, as on the sylph and sourmash paths, and K fills the
+    # slot only in a database without D rows (roadmap Phase 20, RV6; review
+    # finding R6-03). Sub-ranks (S1, G1, ...) and unranked rows stay on the
+    # indent-walk stack but fill no rank column.
     KRAKEN_RANK_MAP = {
         'D': 'Kingdom', 'K': 'Kingdom', 'P': 'Phylum', 'C': 'Class',
         'O': 'Order', 'F': 'Family', 'G': 'Genus', 'S': 'Species',
@@ -139,7 +144,9 @@ class PhyloseqTableGenerator:
                         lineage = {r: '' for r in self.tax_ranks}
                         for _depth, rank_code, taxon_name in stack:
                             rank_name = self.KRAKEN_RANK_MAP.get(rank_code)
-                            if rank_name:
+                            # root to leaf: a rank already filled (Kingdom
+                            # from D) is not overwritten by a deeper row (K)
+                            if rank_name and not lineage[rank_name]:
                                 lineage[rank_name] = taxon_name
                         counts[taxid] = counts.get(taxid, 0) + clade_count
                         tax_rows.setdefault(taxid, {'taxon_id': taxid, **lineage})
@@ -185,7 +192,9 @@ class PhyloseqTableGenerator:
 
         for gather_file in gather_files:
             try:
-                df = pd.read_csv(gather_file)
+                # genome names and lineages as text: a digit-only name was a
+                # number and an empty lineage a float NaN (R6-10)
+                df = read_table(gather_file, ['name', 'lineage'])
             except Exception as e:
                 raise ValueError(f"Failed to parse sourmash gather file {gather_file}: {e}")
 
@@ -205,6 +214,14 @@ class PhyloseqTableGenerator:
             if missing:
                 raise ValueError(
                     f"{gather_file} is missing expected gather columns: {sorted(missing)}"
+                )
+
+            no_lineage = df.loc[df['lineage'].str.strip() == '', 'name']
+            if not no_lineage.empty:
+                raise ValueError(
+                    f"{gather_file}: no lineage for {len(no_lineage)} genome(s): "
+                    f"{', '.join(no_lineage.head(10))}{' ...' if len(no_lineage) > 10 else ''}. "
+                    "The lineages file of --custom_sourmash_db must cover every genome of the k-mer database"
                 )
 
             df['sample_id'] = sample_name

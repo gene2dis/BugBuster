@@ -175,6 +175,57 @@ NEXT_WORKDIR="${RU_NONE}"
 expect_pass "report_unify: none mode with count report" report_unify.py none
 check_grep "report_unify: none-mode report row" "Reads_report.csv" "^s1,1000$"
 
+# Roadmap Phase 20, RV2 (R6-01): one report per sample, so pandas inferred each
+# file's Id on its own: 001 was written as 1, NA as 0, and an all-numeric run
+# stopped in melt. Ids are read as text now
+ru_sample() {
+    # ru_sample <dir> <id>: the fastp and decontamination reports of one sample
+    printf 'Id\tRaw reads\tFastp\n%s\t1000\t900\n' "$2" > "$1/$2_fastp_report.tsv"
+    printf 'Id\tClean reads (contaminants removed)\n%s\t850\n' "$2" > "$1/$2_contaminants_decontamination_report.tsv"
+}
+RU_NUM="${WORK}/report_unify_numeric_mixed"
+mkdir -p "${RU_NUM}"
+ru_sample "${RU_NUM}" 001; ru_sample "${RU_NUM}" S2
+NEXT_WORKDIR="${RU_NUM}"
+expect_pass "report_unify: ids 001 and S2" report_unify.py contaminants
+check_grep "report_unify: 001 kept as text" "Reads_report.csv" "^001,1000,900,850$"
+check_grep "report_unify: S2 row" "Reads_report.csv" "^S2,1000,900,850$"
+RU_ALLNUM="${WORK}/report_unify_numeric_all"
+mkdir -p "${RU_ALLNUM}"
+ru_sample "${RU_ALLNUM}" 001; ru_sample "${RU_ALLNUM}" 12
+NEXT_WORKDIR="${RU_ALLNUM}"
+expect_pass "report_unify: all-numeric ids 001 and 12" report_unify.py contaminants
+check_grep "report_unify: all-numeric 001 kept" "Reads_report.csv" "^001,1000,900,850$"
+check_grep "report_unify: all-numeric 12 kept" "Reads_report.csv" "^12,1000,900,850$"
+RU_NA="${WORK}/report_unify_na"
+mkdir -p "${RU_NA}"
+ru_sample "${RU_NA}" NA; ru_sample "${RU_NA}" S2
+NEXT_WORKDIR="${RU_NA}"
+expect_pass "report_unify: id NA" report_unify.py contaminants
+check_grep "report_unify: NA kept as text" "Reads_report.csv" "^NA,1000,900,850$"
+RU_NUMNONE="${WORK}/report_unify_numeric_none"
+mkdir -p "${RU_NUMNONE}"
+printf 'Id\tRaw reads\n001\t1000\n' > "${RU_NUMNONE}/001_fastp_report.tsv"
+NEXT_WORKDIR="${RU_NUMNONE}"
+expect_pass "report_unify: none mode with id 001" report_unify.py none
+check_grep "report_unify: none-mode 001 kept" "Reads_report.csv" "^001,1000$"
+# R6-09: a sample named after the alias (contaminants_ctrl) had its fastp report
+# read as a decontamination report too, which duplicated its row
+RU_ALIAS="${WORK}/report_unify_alias_name"
+mkdir -p "${RU_ALIAS}"
+ru_sample "${RU_ALIAS}" contaminants_ctrl; ru_sample "${RU_ALIAS}" S2
+NEXT_WORKDIR="${RU_ALIAS}"
+expect_pass "report_unify: sample named contaminants_ctrl" report_unify.py contaminants
+RU_ALIAS_ROWS=$(grep -c '^contaminants_ctrl,' "${RU_ALIAS}/Reads_report.csv" 2>/dev/null || true)
+if [ "${RU_ALIAS_ROWS}" = "1" ]; then
+    echo "✓ report_unify: contaminants_ctrl has one row"
+    PASS=$((PASS + 1))
+else
+    echo "✗ report_unify: contaminants_ctrl has ${RU_ALIAS_ROWS} rows (expected 1)"
+    FAIL=$((FAIL + 1))
+fi
+check_grep "report_unify: contaminants_ctrl row" "Reads_report.csv" "^contaminants_ctrl,1000,900,850$"
+
 # No fastp reports staged: both modes must exit non-zero (the masking bug)
 RU_EMPTY="${WORK}/report_unify_empty_filtered"
 mkdir -p "${RU_EMPTY}"
@@ -319,6 +370,19 @@ else
     echo "✗ bin_summary: expected 3 rows, got ${BS_ROWS}"
     FAIL=$((FAIL + 1))
 fi
+
+# Roadmap Phase 20, RV2 (R6-01): BIN_DEPTH writes one depth file per sample, so
+# an all-numeric sample id was an int to pandas and '+ _avgcov' failed
+BS_NUM="${WORK}/bin_summary_numeric_ids"
+mkdir -p "${BS_NUM}"
+cp "${BS_WORK}"/*quality_report.tsv "${BS_WORK}"/*gtdbtk*.tsv "${BS_NUM}/"
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\n001\tbin.1\t10\t12.5\n001\tbin.2\t8\t3.0\n001\tbin.3\t5\t7.5\n' \
+    > "${BS_NUM}/001_bin_depth.tsv"
+printf 'sample\tbin_id\tTotal_contigs\taverage_cov\n12\tbin.1\t10\t2.5\n12\tbin.2\t8\t9.0\n12\tbin.3\t5\t1.5\n' \
+    > "${BS_NUM}/12_bin_depth.tsv"
+NEXT_WORKDIR="${BS_NUM}"
+expect_pass "bin_summary: all-numeric sample ids 001 and 12" bin_summary.py
+check_grep "bin_summary: numeric ids keep their text in the coverage columns" "Bin_summary.csv" "001_avgcov,12_avgcov"
 
 # Quality reports header-only but classified bins present: CheckM2 lost
 # bins, so it must exit non-zero, not write an empty summary

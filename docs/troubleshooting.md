@@ -92,15 +92,33 @@ ERROR: Cannot find file: /path/to/reads.fastq.gz
 
 ### Invalid sample name
 
-**Error:**
+**Errors:**
 ```
-Invalid sample name '...': use only letters, digits, underscore, dot or hyphen
+Invalid sample name '...': use only letters, digits, underscore, dot or hyphen, starting with a letter or digit
+Invalid sample name(s) in <samplesheet>: '001' (table readers take it for a number); 'NA' (table readers take it for a missing value); ...
+--coassembly_group_by site: the value '1' gives the label '1', which cannot be the id of a co-assembly: table readers take it for a number. ...
 ```
 
+**Cause:** sample names become file and directory names, and they are read
+back from the pipeline's tables. Table readers (pandas, R) turn a name that
+looks like a number or a missing value into something else (`001` becomes `1`,
+`NA` an empty cell), so that sample would lose its rows in the merged tables;
+`__` separates the sample from the bin name when GTDB-Tk classifies all bins
+together (so a name may not hold `__` or end in `_`); `coassembly` and `multisample` name the pipeline's own pooled
+co-assembly and multi-sample group. The second message lists every such name
+with its reason; the third is the same rule for a `--coassembly_group_by` or
+`--multisample_group_by` value, whose label is the id of its co-assembly or
+group.
+
 **Solution:**
-- Sample names become file and directory names throughout the pipeline
 - Use only `A-Za-z0-9`, `_`, `.` or `-`, starting with a letter or digit
 - Replace spaces with underscores
+- Give a number-like name a letter (`S001` for `001`, `site1` for `1`); rename
+  `NA`, `NaN`, `null`, `None`, `N/A`, `inf`, `infinity`, `true`, `false` (any
+  case), `coassembly` and `multisample`; replace `__` with `_` and drop a
+  trailing `_`
+- Rename the sample in `--sample_metadata` too, and the group value in the
+  column you group by
 
 ### Unrecognised parameter
 
@@ -750,7 +768,6 @@ fast-mode thresholds belong there).
 ERROR: <dir>/metaphlan/ not found - not a HUMAnN database root (chocophlan/, uniref/, utility_mapping/, metaphlan/; see --custom_humann_db)
 ERROR: <dir>/metaphlan/mpa_vOct22_CHOCOPhlAnSGB_202403.pkl not found - HUMAnN 4.0.0a2 accepts only the MetaPhlAn database mpa_vOct22_CHOCOPhlAnSGB_202403
 ERROR: MetaPhlAn DB version check failed. Expected one of: ['vOct22_CHOCOPhlAnSGB_202403'] Detected tag-like strings: [...]
-Invalid sample name '<name>' for --read_level_functional humann: sample names must not contain 's__' or 't__' ...
 ```
 
 **Cause:** `--custom_humann_db` must be a database **root** with `chocophlan/`,
@@ -762,7 +779,8 @@ and checks its tag at run time — a MetaPhlAn 4 database you already have (e.g.
 directly in that folder. The sample-name rule works around a 4.0.0a2 defect: a
 MetaPhlAn profile line holding both `s__` and `t__` — including the header line
 that carries the sample name — is misread as a taxon row and crashes HUMAnN with
-`IndexError: list index out of range`.
+`IndexError: list index out of range`. Such names contain `__`, which the
+pipeline rejects at launch for every run (see [Invalid sample name](#invalid-sample-name)).
 
 **Solution:** let the pipeline download the database set (`--humann_db`), or
 assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
@@ -770,7 +788,7 @@ assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
 `https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/`:
 `mpa_vOct22_CHOCOPhlAnSGB_202403.tar` and
 `bowtie2_indexes/mpa_vOct22_CHOCOPhlAnSGB_202403_bt2.tar`, unpacked flat into
-`metaphlan/`). Rename samples whose names contain `s__` or `t__`.
+`metaphlan/`).
 
 ### AGGREGATE_READ_FUNCTIONS / HUMANN fail with a layout or version message
 

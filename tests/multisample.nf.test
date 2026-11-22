@@ -249,4 +249,28 @@ nextflow_pipeline {
             assert (workflow.stdout + workflow.stderr).join('\n').contains("--multisample_group_by site: the value 'multisample' gives the label 'multisample', the name of the ungrouped run's multi-sample group")
         }
     }
+
+    test("Rejects the group label coassembly under --multisample_group_by") {
+        // roadmap Phase 20, RV1: the label is the id of the group, so neither
+        // reserved id is allowed (before, only 'multisample' was checked)
+        options "-stub"
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control      = false
+                assembly_mode        = "assembly"
+                include_binning      = true
+                binners              = "semibin,metabat2"
+                multisample_binning  = true
+                sample_metadata      = TestData.metadataTable(outputDir, "m.tsv", "sample\tsite\ntest_sample1\tcoassembly\ntest_sample2\tcoassembly\n")
+                multisample_group_by = "site"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert (workflow.stdout + workflow.stderr).join('\n').contains("the value 'coassembly' gives the label 'coassembly', which cannot be the id of a multi-sample group: 'coassembly' is the id the pipeline gives to its own pooled co-assembly")
+        }
+    }
 }

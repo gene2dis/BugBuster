@@ -13,7 +13,7 @@ workflow INPUT_CHECK {
     samplesheet // file: /path/to/samplesheet.csv
 
     main:
-    check_duplicates(samplesheet)
+    check_sample_ids(samplesheet)
 
     emit:
     // channel: [ val(meta), [ reads ] ]
@@ -55,13 +55,10 @@ def validate_input(row) {
         error "Invalid sample name '${meta.id}': use only letters, digits, underscore, dot or hyphen, starting with a letter or digit"
     }
 
-    // HUMAnN 4.0.0a2 parses every MetaPhlAn profile line containing both
-    // 's__' and 't__' as a species row - including the header lines that carry
-    // the sample name - and crashes with an IndexError (design doc Q2 bug 2,
-    // fixed only in unreleased upstream code)
-    if (params.read_level_functional == 'humann' && (meta.id.contains('s__') || meta.id.contains('t__'))) {
-        error "Invalid sample name '${meta.id}' for --read_level_functional humann: sample names must not contain 's__' or 't__' (HUMAnN 4.0.0a2 misreads them as MetaPhlAn taxon labels and crashes); rename the sample"
-    }
+    // HUMAnN 4.0.0a2 crashes on a sample name holding 's__' and 't__' (it
+    // misreads the MetaPhlAn profile's header line as a taxon row, design doc
+    // Q2 bug 2): such names contain '__', which check_sample_ids rejects for
+    // every run (unsafeIdReason)
 
     // Check file existence
     def r1_file = file(row.r1.toString().trim(), checkIfExists: true)
@@ -105,28 +102,86 @@ def validate_input(row) {
 }
 
 /**
- * Get list of sample IDs from samplesheet
+ * Get list of sample IDs from samplesheet, read as INPUT_CHECK's channel reads
+ * it (fields trimmed) and with a byte order mark removed from the header, so
+ * the launch checks and the group tables see the same ids as the run
  * @param samplesheet Path to samplesheet CSV
  * @return List of sample IDs
  */
 def get_sample_ids(samplesheet) {
+    def lines = file(samplesheet).splitCsv(sep: ',', strip: true)
+    if (!lines) {
+        return []
+    }
+    def header = lines[0].collect { c -> c.toString().trim() }
+    header[0] = header[0].replaceFirst(/^\uFEFF/, '').trim()
+    def col = header.indexOf('sample')
+    if (col < 0) {
+        return []
+    }
     def ids = []
-    file(samplesheet).splitCsv(header: true).each { row ->
-        if (row.sample) {
-            ids << row.sample.toString().trim()
+    lines.drop(1).each { fields ->
+        def id = col < fields.size() ? fields[col]?.toString()?.trim() : null
+        if (id) {
+            ids << id
         }
     }
     return ids
 }
 
+// Ids the pipeline gives to its own pooled assemblies and groups: without
+// --coassembly_group_by the co-assembly is 'coassembly', without
+// --multisample_group_by the multi-sample group is 'multisample'
+def reservedIds() {
+    return ['coassembly', 'multisample']
+}
+
 /**
- * Check for duplicate sample IDs
+ * Why an id (a sample id, or a co-assembly / multi-sample group label, which
+ * is the id of its assembly) is unsafe, or null when it is safe. Ids are read
+ * back from TSV/CSV tables, where pandas and R turn a number-like value
+ * (001 -> 1, 1e5 -> 100000.0, inf), a missing-value word (NA, NaN, null,
+ * None) or a boolean word (true, false) into something else; GTDB_TK_BATCH
+ * names pooled bins <id>__<bin> and splits them back at the first '__' (so
+ * an id may not hold '__' nor end in '_'); and
+ * the reserved ids name the pipeline's own pooled assemblies and groups.
+ */
+def unsafeIdReason(id) {
+    def lower = id.toString().toLowerCase()
+    if (lower ==~ /[0-9]+(\.[0-9]*)?(e[+-]?[0-9]+)?/ || lower in ['inf', 'infinity']) {
+        return "table readers take it for a number"
+    }
+    if (lower in ['na', 'n/a', 'nan', 'null', 'none']) {
+        return "table readers take it for a missing value"
+    }
+    if (lower in ['true', 'false']) {
+        return "table readers take it for a true/false value"
+    }
+    if (id.toString().contains('__')) {
+        return "it contains '__', which separates the sample id from the bin name in GTDB-Tk's pooled bins"
+    }
+    if (id.toString().endsWith('_')) {
+        return "it ends in '_', so <id>__<bin> holds '___' and the id is read back without its last '_' (GTDB-Tk's pooled bins, the CheckM2 and GTDB-Tk report names)"
+    }
+    if (id.toString() in reservedIds()) {
+        return "'${id}' is the id the pipeline gives to its own pooled ${id == 'coassembly' ? 'co-assembly' : 'multi-sample group'}"
+    }
+    return null
+}
+
+/**
+ * Check the samplesheet's sample IDs at launch: no duplicates, and no id
+ * that unsafeIdReason() rejects. One error lists every offending id
  * @param samplesheet Path to samplesheet CSV
  */
-def check_duplicates(samplesheet) {
+def check_sample_ids(samplesheet) {
     def ids = get_sample_ids(samplesheet)
     def duplicates = ids.groupBy { id -> id }.findAll { entry -> entry.value.size() > 1 }.keySet()
     if (duplicates) {
         error "Duplicate sample IDs found in samplesheet: ${duplicates.join(', ')}"
+    }
+    def unsafe = ids.collect { id -> [id, unsafeIdReason(id)] }.findAll { pair -> pair[1] != null }
+    if (unsafe) {
+        error "Invalid sample name(s) in ${samplesheet}: ${unsafe.collect { id, reason -> "'${id}' (${reason})" }.join('; ')}. Rename them in the samplesheet's sample column (and in --sample_metadata) so that none reads as a number (001, 1.5, 1e5, inf), is a missing-value or true/false word (NA, NaN, null, None, true, false, in any case) or a reserved id (coassembly, multisample), or contains '__' or ends in '_': e.g. S001 for 001, site_rep1 for site__rep1, S1 for S1_"
     }
 }

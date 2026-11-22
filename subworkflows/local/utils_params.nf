@@ -46,3 +46,13 @@ def sourmashDbLabel() {
     def kmer_db = params.custom_sourmash_db instanceof List ? params.custom_sourmash_db[0] : params.custom_sourmash_db
     return file(kmer_db).baseName
 }
+
+// --binners as a list of binner names, trimmed and lower-cased, each once:
+// main.nf validates it and BINNING runs from it, so both read it the same way
+// (roadmap Phase 20, RV4). A repeated name (metabat2,metabat2) counted as two
+// binners, which turned on Binette with one bin set and passed the ">= 2
+// binners" checks of --dereplicate_mags and --mag_level_functional
+def parseBinners() {
+    def names = params.binners instanceof List ? params.binners : params.binners.toString().tokenize(',')
+    return names.collect { b -> b.toString().trim().toLowerCase() }.findAll { b -> b }.unique()
+}

@@ -22,10 +22,11 @@ PASS=0
 FAIL=0
 
 expect_id() {
-    # expect_id <desc> <expected "sample<TAB>binner"> <dir>
+    # expect_id <desc> <expected "sample<TAB>binner"> <dir> [sample_id]
     local desc="$1" expected="$2" dir="$3"
+    shift 3
     local got
-    if got=$("${IDENTIFY}" "${dir}" 2>"${TMP_DIR}/stderr.log"); then
+    if got=$("${IDENTIFY}" "${dir}" "$@" 2>"${TMP_DIR}/stderr.log"); then
         if [ "${got}" = "${expected}" ]; then
             echo "✓ ${desc}"
             PASS=$((PASS + 1))
@@ -41,9 +42,10 @@ expect_id() {
 }
 
 expect_reject() {
-    # expect_reject <desc> <dir>
+    # expect_reject <desc> <dir> [sample_id]
     local desc="$1" dir="$2"
-    if "${IDENTIFY}" "${dir}" >/dev/null 2>&1; then
+    shift 2
+    if "${IDENTIFY}" "${dir}" "$@" >/dev/null 2>&1; then
         echo "✗ ${desc} — expected nonzero exit, script succeeded"
         FAIL=$((FAIL + 1))
     else
@@ -64,29 +66,33 @@ expect_id "comebin dir" "S1${TAB}comebin" "bin_1/S1_comebin_bins"
 
 # Sample ids containing underscores and binner-like words
 expect_id "underscore-heavy sample id" \
-    "S10_Ago2021${TAB}semibin" "S10_Ago2021_semibin_output_bins"
+    "site_A_rep1${TAB}semibin" "site_A_rep1_semibin_output_bins"
 expect_id "sample id containing a binner keyword" \
     "metabat_test${TAB}metabat" "metabat_test_metabat_bins"
 
 # Binette's refined bins
 expect_id "binette dir" "S1${TAB}binette" "S1_binette_bins"
 expect_id "binette dir, underscore-heavy sample id" \
-    "S10_Ago2021${TAB}binette" "S10_Ago2021_binette_bins"
+    "site_A_rep1${TAB}binette" "site_A_rep1_binette_bins"
 
-# COMEBin nested dir staged by its basename: sample id comes from the resolved path
-mkdir -p "${TMP_DIR}/work/S2_comebin_bins/comebin_res/comebin_res_bins"
-mkdir -p "${TMP_DIR}/staged"
-ln -sf "${TMP_DIR}/work/S2_comebin_bins/comebin_res/comebin_res_bins" "${TMP_DIR}/staged/comebin_res_bins"
-expect_id "comebin_res_bins symlink resolves sample from target path" \
-    "S2${TAB}comebin" "${TMP_DIR}/staged/comebin_res_bins"
+# The sample id passed by the process (roadmap Phase 20, RV5): COMEBin's nested
+# comebin_res_bins dir takes it from the argument, however it was staged (a
+# copy has no symlink to resolve; a work path holding '_comebin' gave its own
+# prefix before); a named dir must carry the given id
+mkdir -p "${TMP_DIR}/copied/comebin_res_bins"
+expect_id "comebin_res_bins (copied, not a symlink) takes the given id" \
+    "S2${TAB}comebin" "${TMP_DIR}/copied/comebin_res_bins" S2
+mkdir -p "${TMP_DIR}/proj_comebin_test/work/S3_comebin_bins/comebin_res/comebin_res_bins"
+expect_id "comebin_res_bins under a path holding _comebin takes the given id" \
+    "S3${TAB}comebin" "${TMP_DIR}/proj_comebin_test/work/S3_comebin_bins/comebin_res/comebin_res_bins" S3
+expect_id "named dir with its own id given" "S1${TAB}metabat" "bin_1/S1_metabat_bins" S1
+expect_id "binette dir with its own id given" "site_A_rep1${TAB}binette" "site_A_rep1_binette_bins" site_A_rep1
 
 # Failure modes: naming drift must be loud, not a silent skip
 expect_reject "unrecognized directory fails" "S1_random_bins"
 expect_reject "former MetaWRAP dir fails" "S1_metawrap_50_10_bins"
-mkdir -p "${TMP_DIR}/staged_bad"
-ln -sf "${TMP_DIR}/work" "${TMP_DIR}/staged_bad/comebin_res_bins"
-expect_reject "comebin_res_bins without a _comebin path component fails" \
-    "${TMP_DIR}/staged_bad/comebin_res_bins"
+expect_reject "comebin_res_bins without a given id fails" "${TMP_DIR}/copied/comebin_res_bins"
+expect_reject "named dir staged for another sample fails" "bin_1/S1_metabat_bins" S2
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="

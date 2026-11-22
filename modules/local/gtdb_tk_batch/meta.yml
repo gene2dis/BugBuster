@@ -17,7 +17,7 @@ tools:
 input:
   - meta_list:
       type: list of maps
-      description: Metadata of every sample in the batch (the meta.id values name the per-sample summaries)
+      description: One meta per bin directory, in the order of all_bins (its meta.id is the sample of that directory, passed to bin/identify_bin_dir.sh; the ids name the per-sample summaries)
   - all_bins:
       type: directory
       description: |

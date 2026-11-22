@@ -421,6 +421,38 @@ nextflow_pipeline {
         }
     }
 
+    test("A binner named twice runs once, without Binette") {
+        // roadmap Phase 20, RV4: BINNING counted metabat2,metabat2 as two
+        // binners, turned Binette on and waited for a second bin set that never
+        // came (no refined bins, no CheckM2); parseBinners removes the repeat
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = false
+                nonpareil          = false
+                assembly_mode      = "assembly"
+                include_binning    = true
+                binners            = "metabat2,metabat2"
+                taxonomic_profiler = "none"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def count = { name -> workflow.trace.tasks().count { task -> task.name.contains(name) } }
+            assert count("BINNING:METABAT2 (") == 2
+            assert count("BINETTE") == 0
+            assert count("CHECKM2_BATCH") == 1
+            assert count("GTDB_TK_BATCH") == 1
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("Binners              : metabat2\n")
+        }
+    }
+
     test("Stub run publishes assembly and binning outputs") {
         // Pins the config-side publishing for BBMAP and BINETTE
         // (config/modules.config withName blocks): their outputs must land in
@@ -1174,6 +1206,123 @@ nextflow_pipeline {
         }
     }
 
+    // Roadmap Phase 20, RV1: ids that table readers rewrite (pandas reads 001
+    // as 1, NA as a missing value, true as a boolean), ids containing '__'
+    // or ending in '_' (GTDB_TK_BATCH's <id>__<bin> split) and the reserved ids are rejected
+    // at launch, each named with its reason. One test per class
+    test("Rejects number-like sample ids") {
+        tag "samplesheet_validation"
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['001', 'S2', '1e5', '1.5', 'Inf'])
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            assert log.contains("'001' (table readers take it for a number)")
+            assert log.contains("'1e5' (table readers take it for a number)")
+            assert log.contains("'1.5' (table readers take it for a number)")
+            assert log.contains("'Inf' (table readers take it for a number)")
+            assert !log.contains("'S2' (")
+            assert log.contains("e.g. S001 for 001")
+        }
+    }
+
+    test("Rejects missing-value and true/false sample ids") {
+        tag "samplesheet_validation"
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['NA', 'nan', 'Null', 'None', 'True', 'S2'])
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            ['NA', 'nan', 'Null', 'None'].each { id ->
+                assert log.contains("'${id}' (table readers take it for a missing value)")
+            }
+            assert log.contains("'True' (table readers take it for a true/false value)")
+        }
+    }
+
+    test("Rejects a sample id containing a double underscore or ending in one") {
+        tag "samplesheet_validation"
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['site__rep1', 'site', 'S1_'])
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            assert log.contains("'site__rep1' (it contains '__'")
+            assert log.contains("site_rep1 for site__rep1")
+            assert log.contains("'S1_' (it ends in '_'")
+            assert !log.contains("'site' (")
+        }
+    }
+
+    test("Rejects the reserved sample ids coassembly and multisample") {
+        tag "samplesheet_validation"
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['coassembly', 'multisample', 'S3'])
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def log = (workflow.stdout + workflow.stderr).join('\n')
+            assert log.contains("'coassembly' ('coassembly' is the id the pipeline gives to its own pooled co-assembly)")
+            assert log.contains("'multisample' ('multisample' is the id the pipeline gives to its own pooled multi-sample group)")
+        }
+    }
+
+    test("Accepts sample ids that only contain digits next to letters") {
+        tag "samplesheet_validation"
+        // S001, 1A, e5, nana and A_1.2 stay text in pandas: the check passes
+        // and the run goes on (-stub, no stage)
+        options "-stub"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['S001', '1A', 'e5', 'nana', 'A_1.2'])
+                output = "${outputDir}"
+                quality_control    = false
+                nonpareil          = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.success
+        }
+    }
+
     test("Rejects a header-only samplesheet") {
         tag "samplesheet_validation"
         // Previously a samplesheet with no sample rows yielded a "successful"
@@ -1207,10 +1356,12 @@ nextflow_pipeline {
         // to yield a "successful" QC-only run instead of an error. Now rejected
         // by nf-schema's enum validation (message-agnostic assertion: nf-schema
         // wording changes between plugin versions).
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode = "asembly"
             }
         }
@@ -1226,10 +1377,12 @@ nextflow_pipeline {
         // Regression test for audit item #25: nextflow_schema.json used to be
         // decorative (nothing validated against it). A type violation must now
         // fail the run and name the offending parameter.
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 metabat_maxP = "notanumber"
             }
         }
@@ -1253,6 +1406,7 @@ nextflow_pipeline {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode = "assembly"
                 contig_level_metacerberus = true
             }
@@ -1567,6 +1721,7 @@ nextflow_pipeline {
         // HUMAnN 4.0.0a2 misreads a MetaPhlAn profile line holding both 's__'
         // and 't__' (incl. the header lines carrying the sample name) and
         // crashes (design doc Q2 bug 2): such names are rejected at input check
+        options "-stub"
         when {
             params {
                 input = {
@@ -1588,16 +1743,19 @@ nextflow_pipeline {
 
         then {
             assert workflow.failed
-            assert (workflow.stdout + workflow.stderr).any { line -> line.contains("must not contain 's__' or 't__'") }
+            // the general '__' rule (roadmap Phase 20) rejects it for every run
+            assert (workflow.stdout + workflow.stderr).any { line -> line.contains("'plots__site1' (it contains '__'") }
         }
     }
 
     test("Rejects an unknown superfocus_aligner") {
         // Rejected at launch (schema enum + main.nf validation), not at runtime
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 read_level_functional = "superfocus"
                 superfocus_aligner    = "rapsearch"
             }
@@ -1613,10 +1771,12 @@ nextflow_pipeline {
     test("Rejects an unknown read_level_functional backend") {
         // Design doc Section 7: unknown backends are rejected at launch, not
         // at runtime (message-agnostic: the schema enum fires first)
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 read_level_functional = "humann_typo"
             }
         }
@@ -1688,10 +1848,12 @@ nextflow_pipeline {
     test("Rejects mag_level_functional without include_binning") {
         // T7: Bakta only annotates refined bins, so the toggle is
         // contradictory without binning (same fail-fast policy as audit #15)
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode        = "assembly"
                 mag_level_functional = true
             }
@@ -1714,6 +1876,7 @@ nextflow_pipeline {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode          = "assembly"
                 include_binning        = true
                 binners                = "semibin,metabat2"
@@ -1744,6 +1907,7 @@ nextflow_pipeline {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode      = "assembly"
                 include_binning    = true
                 binners            = "semibin,metabat2"
@@ -1769,6 +1933,7 @@ nextflow_pipeline {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode      = "assembly"
                 include_binning    = true
                 binners            = "semibin,metabat2"
@@ -1788,10 +1953,12 @@ nextflow_pipeline {
     }
 
     test("Rejects a deprecated cutoff alias that contradicts its new param") {
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode         = "assembly"
                 include_binning       = true
                 binners               = "semibin,metabat2"
@@ -1811,10 +1978,12 @@ nextflow_pipeline {
         // T7 owner decision (2026-08-30): the only bin quality filter is
         // refinement (MetaWRAP then, Binette since Phase 7b), which runs only with >= 2 binners;
         // Bakta must never see unfiltered single-binner output
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode        = "assembly"
                 include_binning      = true
                 binners              = "semibin"
@@ -1832,10 +2001,12 @@ nextflow_pipeline {
     test("Rejects include_binning with assembly_mode none") {
         // Regression test for audit item #15: contradictory feature combos must
         // fail fast instead of silently skipping stages.
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode   = "none"
                 include_binning = true
             }
@@ -1850,10 +2021,12 @@ nextflow_pipeline {
 
     test("Rejects an invalid assembly_read_reduction value") {
         // Roadmap A1: only 'none' and 'normalize' exist (nf-schema enum)
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_read_reduction = "normalize_ecc"
             }
         }
@@ -1867,10 +2040,12 @@ nextflow_pipeline {
 
     test("Rejects a malformed megahit_k_list") {
         // Roadmap A2: a comma-separated list of numbers (nf-schema pattern)
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 megahit_k_list = "21 41 61"
             }
         }
@@ -1885,10 +2060,12 @@ nextflow_pipeline {
     test("Rejects a megahit_k_list MEGAHIT would refuse") {
         // Roadmap A2: odd values pass the schema; the launch check applies
         // MEGAHIT's range (15-255) and step (at most 28) rules
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode  = "assembly"
                 megahit_k_list = "21,51"
             }
@@ -1903,10 +2080,12 @@ nextflow_pipeline {
 
     test("Rejects assembly_read_reduction with assembly_mode none") {
         // Roadmap A1: the reduction only applies to the assembler input
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 assembly_mode           = "none"
                 assembly_read_reduction = "normalize"
             }
@@ -2091,10 +2270,12 @@ nextflow_pipeline {
     test("Rejects --custom_sylph_db without --custom_sylph_taxonomy") {
         // A custom database with the registry's metadata would get wrong or
         // default lineages from sylph-tax without failing: rejected at launch
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 taxonomic_profiler = "sylph"
                 custom_sylph_db    = "${projectDir}/tests/data/sylph/sylph_test_db.syldb"
             }
@@ -2134,10 +2315,12 @@ nextflow_pipeline {
     }
 
     test("Rejects --custom_sylph_taxonomy without --custom_sylph_db") {
+        options "-stub"
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
+                quality_control     = false
                 taxonomic_profiler    = "sylph"
                 custom_sylph_taxonomy = "${projectDir}/tests/data/sylph/sylph_tax_fixture.tsv.gz"
             }

@@ -63,6 +63,7 @@ import pandas as pd
 # write no __pycache__ into the pipeline's bin/ (read-only in a container image)
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from id_columns import read_table  # noqa: E402
 from summary_common import (NA_NOT_RUN, die, natural_key, norm_taxon, parse_versions, sample_status,  # noqa: E402
                             strip_gtdb, warn)
 from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mark_low_depth,  # noqa: E402
@@ -124,7 +125,10 @@ def load_reads_report(root):
         path = root / "01_quality_control" / "summary" / "Reads_report.csv"
     if not path.exists():
         return None
-    df = pd.read_csv(path, dtype={"Id": str})
+    # Id and the profiler's "<Tool> DB" label as text: a digit-only label
+    # was read as a number and taken for the last read-count step (R5-07)
+    header = pd.read_csv(path, nrows=0).columns
+    df = read_table(path, ["Id"] + [c for c in header if c.endswith(" DB")])
     if "Id" not in df.columns:
         die(f"{path} has no Id column")
     steps = [
