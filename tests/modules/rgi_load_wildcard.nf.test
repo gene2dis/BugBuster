@@ -1,0 +1,66 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RGI_LOAD_WILDCARD Module Test
+
+    Roadmap Phase 21, RV8 (review R4-01, R4-10). With --custom_rgi_card_db +
+    --custom_rgi_wildcard the process checked for an existing WildCARD FASTA
+    with `X=$(ls wildcard_database_v*.fasta 2>/dev/null | head -1)`: under
+    the task shell's -e -o pipefail, the failed ls ended the task with exit 2
+    and an empty error log whenever the CARD directory had not been annotated
+    with WildCARD before (the documented use). The same `ls | head` made the
+    "annotation file not found" checks unreachable. The real process runs
+    here, in the RGI image, on a synthetic CARD + WildCARD pair
+    (tests/data/rgi/wildcard_mini/, from tests/bin/make_rgi_wildcard_fixture.sh;
+    no CARD data, no k-mer files, so the k-mer load warns and is skipped).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RGI_LOAD_WILDCARD Process"
+    script "../../modules/local/rgi_load_wildcard/main.nf"
+    process "RGI_LOAD_WILDCARD"
+
+    test("annotates and loads WildCARD into a CARD directory that has none yet") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/rgi/wildcard_mini/card", checkIfExists: true)
+                input[1] = file("${projectDir}/tests/data/rgi/wildcard_mini/wildcard", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def db = path(process.out.card_db.get(0))
+            assert db.resolve("wildcard_database_v1.0.0.fasta").exists()
+            // the WildCARD reference RGI bwt reads with --include_wildcard
+            assert db.resolve("localDB/card_wildcard_reference.fasta").text.contains(">")
+            assert db.resolve("localDB/loaded_databases.json").text.contains('"card_variants"')
+            def log = db.parent.resolve(".command.log").text
+            assert log.contains("Processing WildCARD annotations")
+            def err = db.parent.resolve(".command.err").text
+            assert err.contains("has no 61-mer database")
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.startsWith('"RGI_LOAD_WILDCARD":')
+            assert new groovy.yaml.YamlSlurper().parseText(versions)["RGI_LOAD_WILDCARD"]["card"] == "1.0.0"
+        }
+    }
+
+    test("a CARD directory without its annotation FASTA stops with the explicit message") {
+        when {
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/rgi/wildcard_mini/card_unannotated", checkIfExists: true)
+                input[1] = file("${projectDir}/tests/data/rgi/wildcard_mini/wildcard", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("CARD annotation file (card_database_v*.fasta) not found") }
+        }
+    }
+}

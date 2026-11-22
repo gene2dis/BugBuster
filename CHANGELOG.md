@@ -1331,6 +1331,17 @@ next release is tagged.
 
 ### Fixed
 
+- **`--custom_rgi_card_db` + `--custom_rgi_wildcard` builds the database**
+  (roadmap Phase 21). RGI_LOAD_WILDCARD looked for an existing WildCARD FASTA
+  with `ls ... | head -1`, which under the task shell's `pipefail` ended the
+  task with an empty error log whenever the CARD directory had not been
+  annotated with WildCARD before, the documented use. The same pattern made
+  the "annotation file not found" messages of RGI_LOAD and RGI_LOAD_WILDCARD
+  unreachable; they now appear, with the annotation log. A failing `rgi bwt`
+  (RGI_BWT) now shows the end of its log in the error report instead of an
+  empty "Command error". `tests/modules/rgi_load_wildcard.nf.test` runs the
+  process on a synthetic CARD + WildCARD fixture (`tests/data/rgi/wildcard_mini/`,
+  no CARD data).
 - **`--bbmap_length 0` keeps every contig** (roadmap Phase 21). BBMAP read the
   value with Groovy's `?:`, which takes an Integer 0 for false, so a `0` from
   a params file, a `-c` config or the command line on Nextflow 25.10 filtered

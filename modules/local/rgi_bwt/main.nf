@@ -78,7 +78,15 @@ process RGI_BWT {
             --clean \\
             ${wildcard} \\
             ${args} \\
-            2>${prefix}_rgi_bwt.log
+            2>${prefix}_rgi_bwt.log || {
+                # the log is neither an output nor published: show its end, so
+                # the error report is not an empty "Command error" (roadmap
+                # Phase 21, RV8; review R4-11)
+                rc=\$?
+                echo "ERROR: rgi bwt exited with status \$rc; the end of its log:" >&2
+                tail -n 50 ${prefix}_rgi_bwt.log >&2
+                exit \$rc
+            }
 
         # Low-coverage fallback (audit #8): if RGI produced no mapping results,
         # create every declared non-optional output (NA allele/gene tables plus
