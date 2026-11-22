@@ -1,0 +1,1 @@
+MetaBAT2 skipped: fixture with no bins

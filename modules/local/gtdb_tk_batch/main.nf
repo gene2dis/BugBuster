@@ -43,15 +43,29 @@ process GTDB_TK_BATCH {
     // pplacer threads (performance review M10): 4 placed genomes 1.5-2x
     // faster than 1 for ~7 % more memory; never more than the task's CPUs
     def pplacer_cpus = Math.min(params.gtdbtk_pplacer_cpus as Integer, task.cpus as Integer)
+    // The sample of each staged bin directory, from the meta list (one meta
+    // per path, in the order Nextflow stages them as bin_1, bin_2, ...), so no
+    // id is recovered from a directory name or the resolved work path
+    // (roadmap Phase 20, RV5)
+    def bin_paths = all_bins instanceof List ? all_bins : [all_bins]
+    if (bin_paths.size() != meta_list.size()) {
+        error "GTDB_TK_BATCH: ${bin_paths.size()} bin directories for ${meta_list.size()} metas"
+    }
+    // one line of quoted pairs: a multi-line value would break the script's
+    // indentation stripping (R4-04)
+    def staged_ids = [bin_paths, meta_list].transpose().collect { p, m -> "'${p}' '${m instanceof Map ? m.id : m}'" }.join(' ')
     """
     set -euo pipefail
+
+    # staged bin directory -> sample id
+    printf '%s\t%s\n' ${staged_ids} > staged_ids.tsv
 
     # Create combined directory with prefixed bin names
     mkdir -p combined_bins
 
     total_bins=0
 
-    # Process ALL staged bin directories - parse sample_id from directory names
+    # Process ALL staged bin directories; the sample id comes from staged_ids.tsv
     # Bins are staged as bin_1/*, bin_2/*, etc. by Nextflow. The input channel
     # already carries exactly the dirs to classify (single-binner outputs, or
     # Binette-refined dirs), so every dir must be recognized; identify_bin_dir.sh
@@ -63,7 +77,8 @@ process GTDB_TK_BATCH {
         bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
         [ -z "\$bin_dir" ] && continue
 
-        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        staged_id=\$(awk -F '\\t' -v d="\$bin_dir" '\$1 == d {print \$2}' staged_ids.tsv)
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "\$staged_id")
         sample_id=\${id_line%%\$'\\t'*}
 
         echo "Processing \$(basename "\$bin_dir") -> sample_id=\$sample_id"
@@ -124,7 +139,7 @@ process GTDB_TK_BATCH {
     """
     
     stub:
-    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.join(' ')
+    def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     """
     # Create stub taxonomy files for each sample
     for meta_id in ${meta_ids}; do

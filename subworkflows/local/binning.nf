@@ -177,7 +177,10 @@ workflow BINNING {
         ch_all_sample_bins = ch_binner_bins
             .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
             .map { items ->
-                def meta_list = items.collect { item -> item[0] }.unique { m -> m.id }
+                // one meta per path (CHECKM2_BATCH maps each staged
+                // directory to its sample from this list); the module
+                // de-duplicates the ids
+                def meta_list = items.collect { item -> item[0] }
                 def all_paths = items.collect { item -> item[1] }
                 [meta_list, all_paths]
             }

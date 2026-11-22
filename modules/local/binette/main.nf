@@ -80,7 +80,7 @@ process BINETTE {
     # left out
     mkdir -p sets
     for bin_dir in ${bin_dirs}; do
-        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${meta.id}")
         ln -s "../\$bin_dir" "sets/\${id_line##*\$'\\t'}"
     done
     with_bins=()
@@ -163,7 +163,7 @@ process BINETTE {
     # Header-only CheckM2 reports, one per binner
     mkdir -p sets
     for bin_dir in ${bin_dirs}; do
-        id_line=\$(identify_bin_dir.sh "\$bin_dir")
+        id_line=\$(identify_bin_dir.sh "\$bin_dir" "${meta.id}")
         ln -s "../\$bin_dir" "sets/\${id_line##*\$'\\t'}"
     done
     binette_quality_reports.py --sample ${prefix} --final-bins ${prefix}_binette_bins sets/*
