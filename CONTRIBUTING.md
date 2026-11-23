@@ -142,14 +142,24 @@ feat(modules): add DIAMOND module for protein alignment
   `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
   task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
   directory path, which is stable while the upstream tasks are cached, not by sample name.)
-- Every `errorStrategy` in `nextflow.config` and `config/modules.config` must start with
-  `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
+- Every `errorStrategy` in `nextflow.config`, `config/modules.config` and `conf/` must start
+  with `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
   (then your own rule, e.g. `'retry'`). A local task with no exit status asked for more CPUs
   or memory than the local executor's pool and can never be scheduled (a task killed while
   running reports its signal status, e.g. 137, instead); with `'finish'`, `'retry'` or
-  `'ignore'` instead, the run can hang forever waiting for it. Profiles that switch to a
-  non-local executor (`conf/aws.config`, `conf/slurm.config`, ...) have no such pool and
-  are exempt
+  `'ignore'` instead, the run can hang forever waiting for it. A rule that retries listed
+  exit codes also retries the cloud preemption codes,
+  `task.exitStatus == ['google-batch': 14, 'azurebatch': 50001][task.executor]` (as in
+  `nextflow.config`'s default rule): a `withLabel` or `withName` rule replaces the default
+  one under every profile, so a profile cannot add them. The slurm and cloud profiles set
+  only `maxRetries` and leave the rule to `nextflow.config`
+- Settings that a profile may override (the default `process` rules, `conf/base.config`)
+  go before the `profiles {}` block in `nextflow.config`: with the strict config parser a
+  later block wins, and placed after the profiles they replaced the slurm and cloud
+  settings. The resource labels stay after it (under the legacy parser a profile's
+  `withLabel` block placed later would replace the whole label block), and so do
+  `config/databases.config` and `config/modules.config`. `tests/bin/test_profile_config.sh`
+  checks the resolved config of every profile
 - CI and nf-test run under docker only, so nothing automated exercises the image a process
   gets under singularity/apptainer. A separately built singularity image (a Seqera
   `oras://` variant, a depot.galaxyproject.org sif) can lack tools its docker twin has:

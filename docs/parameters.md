@@ -375,7 +375,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--databases_dir`
 - **Type**: String (directory path)
 - **Default**: `<output>/../databases`
-- **Description**: Directory for storing downloaded databases (separate from results output). Each database is stored with Nextflow's `storeDir` in `<databases_dir>/<database>/<key>/`, the key being its registry key (`--kraken2_db`, `--sylph_db`, ...): a later run with the same directory skips the download, and another version goes into its own folder. Delete a folder to download that database again. `-stub` runs store their placeholder files under `<databases_dir>/stub/`. Builds from your own files (`--custom_host_fasta` / `--custom_phiX_fasta`, `--custom_rgi_wildcard`, a `--custom_sourmash_db` lineages file) are rebuilt every run and copied here for reuse through `--custom_*`. Layout: `docs/manual.md`, Database Storage Directory
+- **Description**: Directory for storing downloaded databases (separate from results output). Each database is stored with Nextflow's `storeDir` in `<databases_dir>/<database>/<key>/`, the key being its registry key (`--kraken2_db`, `--sylph_db`, ...): a later run with the same directory skips the download, and another version goes into its own folder. Delete a folder to download that database again. Databases are kept here only, never copied into the results directory. `-stub` runs store their placeholder files under `<databases_dir>/stub/`. Builds from your own files (`--custom_host_fasta` / `--custom_phiX_fasta`, `--custom_rgi_wildcard`, a `--custom_sourmash_db` lineages file) are rebuilt every run and copied here for reuse through `--custom_*` (also under `stub/` in a `-stub` run). The default follows `output` when it comes from the command line, a `-params-file` or a profile; when `output` is set in a `-c` config file, set `databases_dir` in the same file (a launch warning says so), otherwise no database is stored and each new work directory downloads them again. Layout: `docs/manual.md`, Database Storage Directory
 - **Example**: `--databases_dir /shared/databases/bugbuster`
 
 ---
@@ -1263,9 +1263,9 @@ These parameters are read by the execution profiles in `conf/` (`-profile aws`, 
 | Parameter | Default | Description |
 |-----------|---------|-------------|
 | `--slurm_queue` | `normal` | Default partition |
-| `--slurm_queue_short` / `--slurm_queue_long` | — | Partitions for short/long jobs |
+| `--slurm_queue_short` / `--slurm_queue_long` | — | Partitions for the short jobs (`process_single`, `process_low`) and the long ones (`process_high`); time limits come from the resource labels (4, 8, 24 and 72 h, times the attempt) |
 | `--slurm_account` | — | Account for job submission |
-| `--slurm_queue_size` | `100` | Executor queue size |
+| `--slurm_queue_size` | `100` | Executor queue size (jobs queued or running at once) |
 | `--singularity_cache` | — | Singularity/Apptainer image cache directory |
 | `--singularity_run_options` | — | Extra singularity/apptainer run options |
 

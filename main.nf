@@ -410,6 +410,14 @@ workflow {
         log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
     }
 
+    // databases_dir defaults to <output>/../databases in nextflow.config, after
+    // the profiles. An output set in a -c config file is merged later and never
+    // reaches that default (review R2-03): without a warning, every database
+    // would be downloaded again into each new work directory
+    if (params.output && !params.databases_dir) {
+        log.warn "--databases_dir is not set: output (${params.output}) comes from a -c config file, which is read after the default <output>/../databases is computed, so no database is stored for later runs and each new work directory downloads them again. Set databases_dir in the same file (or pass --databases_dir / --output on the command line)"
+    }
+
     // Databases published by releases before storeDir (roadmap M9) sit where
     // no stored check looks (<databases_dir>/<db>/<key>/ now): say so before
     // they are downloaded a second time

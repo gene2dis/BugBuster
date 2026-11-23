@@ -1350,6 +1350,29 @@ next release is tagged.
     folder can be taken for the database. File names are unchanged and
     existing stores are reused.
 
+- **Profiles** (roadmap Phase 22):
+  - On Nextflow >= 26.04 the slurm, AWS, GCP and Azure profiles' settings were
+    replaced by the defaults that `nextflow.config` set after them: under
+    `-profile slurm` the run used the local executor's queue size (16 jobs,
+    `--max_cpus`) instead of 100 (`--slurm_queue_size` had no effect), and the
+    cloud profiles retried twice instead of three times and did not retry a
+    preempted spot VM (exit 14 on Google Batch, 50001 on Azure Batch). The
+    defaults now come before the profiles. The preemption codes are retried by
+    every error rule, including the per-process ones (downloads, eggNOG-mapper,
+    RGI, ...), which no profile setting could reach.
+  - `-profile slurm_singularity` set only the executor; it now has the
+    settings of `-profile slurm,singularity` (queues, account, queue size, image
+    cache). `-profile local_docker` now switches the other container engines
+    off, as `-profile docker` does.
+  - The default `--databases_dir` (`<output>/../databases`) now follows an
+    `output` set by a profile: the `test` profile without `--output` stored no
+    database; it now stores them in `./databases`. An `output` set only in a
+    `-c` config file still cannot set the default (that file is read later): a
+    launch warning says to set `databases_dir` there too.
+  - GTDB_TK_BATCH and WOLTKA_ALIGN (256 GB per attempt, clamped to
+    `--max_memory`) no longer retry an out-of-memory exit once their request is
+    at the cap, where a retry got the same memory and repeated the whole job.
+
 - **Results summary** (roadmap Phase 21):
   - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,
     `trimmed_mean_x` or `covered_fraction` stopped RESULTS_SUMMARY with a

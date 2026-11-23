@@ -1356,8 +1356,8 @@ nextflow run main.nf \
 | `apptainer` | Run with Apptainer containers |
 | `conda` | Run with Conda environments |
 | `slurm` | Submit jobs to SLURM scheduler |
-| `slurm_singularity` | SLURM with Singularity |
-| `local_docker` | Docker with the container user mapped to yours (`-u $(id -u):$(id -g)`) |
+| `slurm_singularity` | Legacy name for `-profile slurm,singularity` (same settings) |
+| `local_docker` | Legacy name for `-profile docker` (same settings) |
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
