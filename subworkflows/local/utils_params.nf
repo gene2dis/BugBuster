@@ -43,8 +43,21 @@ def sourmashDbLabel() {
     if (!params.custom_sourmash_db) {
         return params.sourmash_db
     }
-    def kmer_db = params.custom_sourmash_db instanceof List ? params.custom_sourmash_db[0] : params.custom_sourmash_db
-    return file(kmer_db).baseName
+    return file(sourmashCustomFiles()[0]).baseName
+}
+
+// --custom_sourmash_db as its [k-mer file, lineages file] list. A params file
+// or a config gives a list; on the command line the value is a String, taken
+// as a JSON-style list ('["kmers.zip","lineages.csv"]') or a comma-separated
+// pair ('kmers.zip,lineages.csv'). main.nf stops unless it holds two entries
+// (review R1-02: the documented command-line form failed validation)
+def sourmashCustomFiles() {
+    def value = params.custom_sourmash_db
+    if (!value) {
+        return []
+    }
+    def entries = value instanceof List ? value : value.toString().trim().replaceAll(/^\[|\]$/, '').tokenize(',')
+    return entries.collect { e -> e.toString().trim().replaceAll(/^["']|["']$/, '').trim() }.findAll { e -> e }
 }
 
 // --binners as a list of binner names, trimmed and lower-cased, each once:

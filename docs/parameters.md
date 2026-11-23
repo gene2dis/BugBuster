@@ -400,6 +400,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to a pre-built combined decontamination index directory (host + phiX) matching `--read_aligner`: a bwa-mem3/bwa-mem2 index (`*.bwt.2bit.64`) under the default `bwamem3`, or a Bowtie2 index under `--read_aligner bowtie2`. A Bowtie2 index under `bwamem3` is rejected at launch: add `--read_aligner bowtie2` to keep using an index built by an earlier release. Skips both the genome downloads and the index build. An index the pipeline builds from the registry genomes is stored in `<databases_dir>/bwamem3_index/phiX174_human/` (`bowtie_index/` under `bowtie2`) and reused automatically; one built from `--custom_host_fasta` / `--custom_phiX_fasta` is rebuilt every run and copied to `<databases_dir>/bwamem3_index/contaminants_index` (`bowtie_index/contaminants_index`), which you can pass here to skip the rebuild.
 - **Example**: `--custom_decontamination_index /path/to/bwamem3_index/contaminants_index`
+- **Note**: `--custom_host_fasta` and `--custom_phiX_fasta` are ignored when this is given (a launch warning says so): the index is used as it is
 - **Note**: See [`docs/DECONTAMINATION_QUICK_REFERENCE.md`](DECONTAMINATION_QUICK_REFERENCE.md) for details
 
 ### `--custom_phiX_fasta`
@@ -420,9 +421,9 @@ Override automatic downloads by providing custom database paths:
 - **Example**: `--custom_kraken_db /path/to/kraken2_db`
 
 ### `--custom_sourmash_db`
-- **Type**: Array of strings
-- **Description**: Paths to custom Sourmash database files [kmer_file, lineages_file]. Outputs are then labelled with the k-mer file's name without its extension (e.g. `gtdb-reps-rs226-k31.dna` for `gtdb-reps-rs226-k31.dna.zip`, in file names and the `Sourmash DB` column) instead of the `--sourmash_db` key
-- **Example**: `--custom_sourmash_db '["/path/to/kmers.zip", "/path/to/lineages.csv"]'`
+- **Type**: Array of strings (a list in a params file or config; on the command line, a comma-separated pair or a quoted list)
+- **Description**: Paths to custom Sourmash database files [kmer_file, lineages_file]: exactly two, checked at launch. Outputs are then labelled with the k-mer file's name without its extension (e.g. `gtdb-reps-rs226-k31.dna` for `gtdb-reps-rs226-k31.dna.zip`, in file names and the `Sourmash DB` column) instead of the `--sourmash_db` key
+- **Example**: `--custom_sourmash_db '/path/to/kmers.zip,/path/to/lineages.csv'` or `--custom_sourmash_db '["/path/to/kmers.zip", "/path/to/lineages.csv"]'`; in a params file, `custom_sourmash_db: [/path/to/kmers.zip, /path/to/lineages.csv]`
 
 ### `--custom_sylph_db`
 - **Type**: String (file path)
@@ -480,6 +481,7 @@ Override automatic downloads by providing custom database paths:
 - **Type**: String (directory path)
 - **Description**: Path to WildCARD directory containing variant files. Use together with `--custom_rgi_card_db` to combine separate databases
 - **Example**: `--custom_rgi_wildcard /path/to/wildcard_directory`
+- **Note**: ignored (with a launch warning) without `--custom_rgi_card_db`
 - **Requirements**: Directory must contain `index-for-model-sequences.txt`, the variant FASTA files and the k-mer database for `--rgi_kmer_size` (`61_kmer_db.json`, `all_amr_61mers.txt`; without them the pathogen-of-origin step is skipped with a warning), all decompressed. Both directories are copied into the preparation task and the combined database is published as a full copy, so loading the database once by hand and passing `--custom_rgi_card_db` alone saves that space
 - **Note**: See [`docs/RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md) for detailed usage examples
 
@@ -972,7 +974,7 @@ The switches are under [Pipeline Execution Parameters](#pipeline-execution-param
 ### `--rgi_card_version`
 - **Type**: String
 - **Default**: `latest`
-- **Description**: CARD database version for RGI. Use 'latest' or specify a version number
+- **Description**: CARD database version for RGI. Use 'latest' or specify a version number. This pins `card.json` only: WildCARD (`--rgi_include_wildcard true`, the default) is always downloaded from CARD's latest release, whatever version is pinned here, so a pinned CARD is paired with the WildCARD of the download date. For a fixed pair, prepare both once and pass them with `--custom_rgi_card_db` (and `--custom_rgi_wildcard`)
 - **Example**: `--rgi_card_version latest` or `--rgi_card_version 3.2.9`
 
 ### `--rgi_include_wildcard`

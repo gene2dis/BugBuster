@@ -30,7 +30,7 @@ include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
 include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
-include { flagOn                  } from './utils_params'
+include { flagOn; sourmashCustomFiles } from './utils_params'
 
 workflow PREPARE_DATABASES {
     
@@ -77,7 +77,7 @@ workflow PREPARE_DATABASES {
     if ( params.taxonomic_profiler == "sourmash" ) {
         if ( params.custom_sourmash_db ) {
             // Custom database: expect list with [kmer_db, lineages_file]
-            ch_sourmash_files = channel.fromList(params.custom_sourmash_db)
+            ch_sourmash_files = channel.fromList(sourmashCustomFiles())
                 .map { filepath -> file(filepath, checkIfExists: true) }
                 .collect()
             

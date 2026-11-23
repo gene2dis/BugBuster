@@ -1373,6 +1373,26 @@ next release is tagged.
     `--max_memory`) no longer retry an out-of-memory exit once their request is
     at the cap, where a retry got the same memory and repeated the whole job.
 
+- **Parameter checks** (roadmap Phase 22):
+  - `--custom_sourmash_db` given on the command line as the documentation
+    showed (`'["kmers.zip","lineages.csv"]'`) failed validation ("Value is
+    [string] but should be [array]"). The command line now takes that quoted
+    list or a comma-separated pair (`'kmers.zip,lineages.csv'`); a params file
+    still takes a list. A value without exactly two files stops at launch.
+  - Eleven database-key parameters (`--bakta_db`, `--checkm2_db`,
+    `--gtdbtk_db`, `--eggnog_db`, `--dbcan_db`, `--cog_db`, `--woltka_db`,
+    `--superfocus_db`, `--sourmash_db`, `--host_db`, `--phiX_index`) accepted
+    any value, and a typo stopped the run with "Cannot get property 'url' on
+    null object". Each now has the registry's keys as its allowed values, so
+    `--bakta_db v6.0-lite` is rejected at launch with "Expected any of
+    [v6.0-full, v6.0-light]".
+  - Launch warnings for two options that are ignored: `--custom_rgi_wildcard`
+    without `--custom_rgi_card_db` (the pipeline downloads CARD and WildCARD
+    itself), and `--custom_host_fasta` / `--custom_phiX_fasta` together with
+    `--custom_decontamination_index` (the pre-built index is used as it is).
+  - `docs/parameters.md` now says that `--rgi_card_version` pins CARD only:
+    WildCARD is always the latest release.
+
 - **Results summary** (roadmap Phase 21):
   - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,
     `trimmed_mean_x` or `covered_fraction` stopped RESULTS_SUMMARY with a

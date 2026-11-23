@@ -693,7 +693,7 @@ breaks `-resume`.
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory; outputs are labelled with the directory's name |
-| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]`; outputs are labelled with the k-mer file's name without extension |
+| `--custom_sourmash_db` | The k-mer database and its lineages CSV: `'kmer.zip,lineages.csv'` or `'["kmer.zip", "lineages.csv"]'` on the command line, a list of the two in a params file; outputs are labelled with the k-mer file's name without extension |
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |

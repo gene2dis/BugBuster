@@ -2195,6 +2195,137 @@ nextflow_pipeline {
         }
     }
 
+    test("Stub run takes --custom_sourmash_db as a quoted list on the command line") {
+        // The documented command-line form arrives as a String, which the
+        // schema (type array) rejected (review R1-02, roadmap Phase 22 RV16).
+        // Both String forms are read as the [k-mer file, lineages] pair
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "sourmash"
+                custom_sourmash_db = "[\"${projectDir}/tests/data/sourmash/stub_db.zip\", \"${projectDir}/tests/data/sourmash/stub_lineages.csv\"]"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH_TAX_PREPARE") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH (") } == 2
+            assert path("${outputDir}/02_taxonomy/tables/sourmash_stub_db_otu_table.tsv").exists()
+        }
+    }
+
+    test("Stub run takes --custom_sourmash_db as a comma-separated pair") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "sourmash"
+                custom_sourmash_db = "${projectDir}/tests/data/sourmash/stub_db.zip,${projectDir}/tests/data/sourmash/stub_lineages.csv"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.contains("SOURMASH_TAX_PREPARE") } == 1
+            assert path("${outputDir}/02_taxonomy/tables/sourmash_stub_db_otu_table.tsv").exists()
+        }
+    }
+
+    test("Rejects --custom_sourmash_db with one file") {
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                taxonomic_profiler = "sourmash"
+                custom_sourmash_db = "${projectDir}/tests/data/sourmash/stub_db.zip"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--custom_sourmash_db needs exactly two files")
+        }
+    }
+
+    test("Warns that --custom_rgi_wildcard is ignored without --custom_rgi_card_db") {
+        // Review R1-04: the WildCARD directory is added only to a custom CARD
+        // database; without one, RGI_LOAD downloads CARD and WildCARD itself
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                rgi_prediction     = true
+                custom_rgi_wildcard = "${projectDir}/tests/data/rgi/wildcard_mini/wildcard"
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().any { task -> task.name.contains("RGI_LOAD (") || task.name.endsWith("RGI_LOAD") }
+            assert !workflow.trace.tasks().any { task -> task.name.contains("RGI_LOAD_WILDCARD") }
+            // log.warn reaches only the Nextflow log, not the captured console
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("--custom_rgi_wildcard is ignored without --custom_rgi_card_db")
+        }
+    }
+
+    test("Warns that a host FASTA is ignored with --custom_decontamination_index") {
+        // Review R1-04: a pre-built index is used as it is; the FASTA is not added
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control    = true
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                custom_decontamination_index = {
+                    def dir = new File("${outputDir}", "prebuilt/contaminants_index")
+                    dir.mkdirs()
+                    ['amb', 'ann', 'bwt.2bit.64', 'pac'].each { ext -> new File(dir, "contaminants.${ext}").text = '' }
+                    dir.absolutePath
+                }()
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !workflow.trace.tasks().any { task -> task.name.contains("BUILD_COMBINED") }
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("--custom_host_fasta is ignored: --custom_decontamination_index is a pre-built index")
+        }
+    }
+
     test("Stub run wires kraken2 with a custom database (no download)") {
         // tests/data/kraken2/stub_db holds empty placeholders of a Kraken2
         // database directory (the KRAKEN2 memory rule reads hash.k2d's size;
