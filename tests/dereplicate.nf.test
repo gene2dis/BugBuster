@@ -56,6 +56,7 @@ nextflow_pipeline {
                          "04_binning/dereplicated/abundance/test_sample1_coverm_genome.tsv",
                          "04_binning/dereplicated/abundance/test_sample2_coverm_genome.tsv"]
             def dev = new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines()
+            assert TestData.databaseFolders(outputDir) == []
             assert TestData.publishedPaths(outputDir).sort() == (dev + added).sort()
             assert path("${outputDir}/04_binning/dereplicated/mag_clusters.tsv").readLines() == [
                 "assembly\tbin\tgenome\trepresentative\tani_pct",

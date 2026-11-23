@@ -37,7 +37,9 @@ process FORMAT_SYLPH_DB {
         val(db)
 
     output:
-        path("sylph_db/*.syl*db"), emit: db
+        // Fixed name (the URL's file name, as the script saves it): storeDir
+        // checks only that declared outputs exist (CONTRIBUTING, Databases)
+        path("sylph_db/${db.tokenize('/')[-1]}"), emit: db
 
     script:
         """
@@ -61,7 +63,7 @@ process FORMAT_SYLPH_TAXONOMY {
         val(taxonomy)
 
     output:
-        path("sylph_db/*.tsv.gz"), emit: taxonomy
+        path("sylph_db/${taxonomy.tokenize('/')[-1]}"), emit: taxonomy
 
     script:
         """
@@ -218,7 +220,7 @@ process FORMAT_CHECKM2_DB {
         val(db)
 
     output:
-        path("*.dmnd")
+        path("${params.checkm2_ref_db[params.checkm2_db]["file"]}")
 
     script:
         """
@@ -227,7 +229,7 @@ process FORMAT_CHECKM2_DB {
 
     stub:
         """
-        touch uniref100.KO.1.dmnd
+        touch ${params.checkm2_ref_db[params.checkm2_db]["file"]}
         """
 }
 
@@ -381,7 +383,7 @@ process FORMAT_COG_DB {
         val(db)
 
     output:
-        path("*.def.tab")
+        path("${db.tokenize('/')[-1]}")
 
     script:
         """
@@ -390,7 +392,7 @@ process FORMAT_COG_DB {
 
     stub:
         """
-        touch cog-24.def.tab
+        touch ${db.tokenize('/')[-1]}
         """
 }
 
@@ -553,7 +555,7 @@ process SOURMASH_TAX_PREPARE {
         path(tax_file)
 
     output:
-        path("*.sqldb"), emit: tax_db
+        path("taxonomy.sqldb"), emit: tax_db
         path "versions.yml", emit: versions
 
     script:

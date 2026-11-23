@@ -1331,6 +1331,25 @@ next release is tagged.
 
 ### Fixed
 
+- **Databases** (roadmap Phase 22):
+  - A downloaded database was also copied into the results directory: the
+    first run that downloaded one wrote it to `--databases_dir` and a second
+    full copy to `<output>/format/`, `<output>/download/` or `<output>/rgi/`
+    (the default publish rule still applied to the 19 database processes after
+    they moved to `storeDir`). Those folders are no longer written; databases
+    live in `--databases_dir` only. Results folders from earlier runs may still
+    hold them and can be deleted.
+  - The copies of builds from your own files (the decontamination index from
+    `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with
+    `--custom_rgi_wildcard`, a `--custom_sourmash_db` lineages database) made
+    by a `-stub` run now go under `<databases_dir>/stub/`, as the stored
+    databases of a stub run already did, instead of where a real run's copy is
+    taken from.
+  - The sylph, CheckM2, COG and sourmash taxonomy databases are declared by
+    their file names instead of a pattern, so no other file left in a store
+    folder can be taken for the database. File names are unchanged and
+    existing stores are reused.
+
 - **Results summary** (roadmap Phase 21):
   - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,
     `trimmed_mean_x` or `covered_fraction` stopped RESULTS_SUMMARY with a

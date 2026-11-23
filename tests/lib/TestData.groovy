@@ -80,4 +80,11 @@ class TestData {
         }
         return published
     }
+
+    // The database folders a run must not publish under outputDir (roadmap
+    // RV14: databases live in databases_dir only; storeDir with publishDir off).
+    // Checked as folders, so an empty one (DeepARG's stub) counts too
+    static List<String> databaseFolders(outputDir) {
+        return ['format', 'download', 'rgi'].findAll { d -> new File("${outputDir}", d).exists() }
+    }
 }

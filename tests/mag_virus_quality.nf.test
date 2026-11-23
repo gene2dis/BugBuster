@@ -8,8 +8,8 @@
       a stub run of dev de57f34 with the settings below; Nonpareil, on by default
       since Phase 17, is switched off, tests/nonpareil.nf.test adds it).
     - With both on, the same run publishes dev's paths plus GUNC's and CheckV's
-      only (and their stub databases, which -stub publishes under format/ as it
-      does every database's).
+      only (their stub databases go to databases_dir, never under the output:
+      roadmap RV14).
     - Under co-assembly groups, both land in the group's folders.
     - Each needs its stage (launch errors), and a database already in
       databases_dir is not prepared again.
@@ -51,6 +51,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("GUNC") || task.name.contains("CHECKV") } == 0
+            assert TestData.databaseFolders(outputDir) == []
             assert TestData.publishedPaths(outputDir).sort() ==
                 new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines().sort()
         }
@@ -98,10 +99,8 @@ nextflow_pipeline {
                 added << "04_binning/per_sample/${s}/quality/gunc/${s}_gunc_maxCSS_level.tsv".toString()
                 added << "06_contig_taxonomy/checkv/${s}/${s}_checkv/quality_summary.tsv".toString()
             }
-            added += ["format/gunc_db_progenomes2.1.dmnd", "format/checkv_db/README.txt",
-                      "format/checkv_db/genome_db/checkv_error.tsv", "format/checkv_db/genome_db/checkv_reps.dmnd",
-                      "format/checkv_db/genome_db/checkv_reps.tsv", "format/checkv_db/hmm_db/checkv_hmms.tsv"]
             def dev = new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines()
+            assert TestData.databaseFolders(outputDir) == []
             assert TestData.publishedPaths(outputDir).sort() == (dev + added).sort()
 
             // the CheckV quality summaries reach the contig report (its task: the one

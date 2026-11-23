@@ -219,8 +219,13 @@ in the same form as the existing blocks:
 ```groovy
 withName: 'FORMAT_TOOL_DB' {
     storeDir = { params.databases_dir != null ? "${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}tool/${params.tool_db}" : null }
+    publishDir = [enabled: false]
 }
 ```
+
+- **Switch `publishDir` off.** Without it, the default rule in `conf/base.config`
+  also copies the stored database into `<output>/<first word of the process name>/`
+  (`format/`, `download/`, ...), a second full copy in the results directory.
 
 - **The closure returns `null` without `databases_dir`**, which turns storeDir off
   (module-level nf-tests run without `--output`). The `stub/` prefix keeps `-stub`
@@ -242,7 +247,7 @@ withName: 'FORMAT_TOOL_DB' {
 - **A build from the user's own files** (`--custom_host_fasta`, `--custom_rgi_wildcard`,
   a `--custom_sourmash_db` lineages file) has no version to key on. It runs every time
   and keeps a `publishDir` copy in `databases_dir`, for reuse through the matching
-  `--custom_*` option.
+  `--custom_*` option. Its publish path takes the same `stub/` prefix as storeDir.
 - **Every database has a `--custom_*` parameter** that bypasses the process and uses the
   path in place.
 

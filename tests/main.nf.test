@@ -295,6 +295,12 @@ nextflow_pipeline {
             // MAG depth per sample in per-sample mode too (roadmap Phase 15, B1)
             assert workflow.trace.tasks().count { task -> task.name.contains("BIN_DEPTH") } == 2
             assert path("${outputDir}/04_binning/per_sample/test_sample1/coverage/test_sample1_bin_depth.tsv").exists()
+            // The index built from the custom FASTAs is copied to databases_dir,
+            // under stub/ in a -stub run (roadmap RV14, R2-05), never where a real
+            // run's copy goes; no database is published under the output
+            assert path("${outputDir}/../databases/stub/bwamem3_index/contaminants_index").exists()
+            assert !path("${outputDir}/../databases/bwamem3_index").exists()
+            assert TestData.databaseFolders(outputDir) == []
         }
     }
 
