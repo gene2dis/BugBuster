@@ -45,6 +45,12 @@ process BWAMEM3_DECONTAMINATE {
 
     script:
     def args = task.ext.args ?: ''
+    // The aligner and samtools share the task's CPUs instead of each taking all
+    // of them (review R4-18): samtools gets a quarter, at most 4, the aligner
+    // the rest. Alignments do not depend on the aligner's thread count
+    // (bwa-mem3 runs with a fixed -K batch size; bowtie2 aligns each read alone)
+    def st_threads = Math.min(4, Math.max(1, (task.cpus as int).intdiv(4)))
+    def aln_threads = Math.max(1, (task.cpus as int) - st_threads)
     def prefix = meta.id
     def r1 = reads[0]
     def r2 = reads[1]
@@ -69,14 +75,14 @@ process BWAMEM3_DECONTAMINATE {
     bwa-mem3 mem \\
         ${args} \\
         -P \\
-        -t ${task.cpus} \\
+        -t ${aln_threads} \\
         -K 100000000 \\
         --bam \\
         \${index} \\
         ${r1} \\
         ${r2} \\
         | samtools fastq \\
-            -@ ${task.cpus} \\
+            -@ ${st_threads} \\
             -n \\
             -f 12 \\
             -F 0x900 \\
@@ -98,13 +104,13 @@ process BWAMEM3_DECONTAMINATE {
     ${singleton ? """
     bwa-mem3 mem \\
         ${args} \\
-        -t ${task.cpus} \\
+        -t ${aln_threads} \\
         -K 100000000 \\
         --bam \\
         \${index} \\
         ${singleton} \\
         | samtools fastq \\
-            -@ ${task.cpus} \\
+            -@ ${st_threads} \\
             -n \\
             -f 4 \\
             -F 0x900 \\
