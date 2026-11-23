@@ -772,7 +772,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Type**: Integer
 - **Default**: `1000`
 - **Minimum**: `0`
-- **Description**: Minimum contig length after BBMap filtering
+- **Description**: Minimum contig length after BBMap filtering; `0` keeps every contig. An assembly with no contig of this length goes no further than the filter: it gets no alignment, binning, contig taxonomy, contig ARG or contig functional annotation, a warning in the run log and a row in `pipeline_info/empty_assemblies.tsv`, while its samples keep their read-level results
 - **Example**: `--bbmap_length 1500`
 
 ---

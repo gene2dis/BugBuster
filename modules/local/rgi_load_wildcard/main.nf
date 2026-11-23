@@ -64,16 +64,19 @@ process RGI_LOAD_WILDCARD {
         # Get CARD version from JSON using Python (more reliable than grep/sed)
         CARD_VERSION=\$(python3 -c "import json; data=json.load(open('card.json')); print(data.get('_version', ''))" 2>/dev/null || echo "")
         
-        # Get CARD FASTA filename
-        CARD_FASTA=\$(ls card_database_v*.fasta | head -1)
+        # Get CARD FASTA filename. compgen -G lists the matches (in ls's order)
+        # and prints nothing when there is none: 'ls pattern | head -1' ended
+        # the task under -e -o pipefail with an empty log instead of reaching
+        # the checks below (roadmap Phase 21, RV8; review R4-01, R4-10)
+        CARD_FASTA=\$(compgen -G 'card_database_v*.fasta' | head -1 || true)
         
         if [ -z "\$CARD_FASTA" ]; then
-            echo "ERROR: CARD annotation file not found in provided database"
+            echo "ERROR: CARD annotation file (card_database_v*.fasta) not found in ${card_db}: --custom_rgi_card_db must be a CARD directory loaded and annotated with 'rgi card_annotation'" >&2
             exit 1
         fi
 
         # Check if wildcard database already exists
-        WILDCARD_FASTA=\$(ls wildcard_database_v*.fasta 2>/dev/null | head -1)
+        WILDCARD_FASTA=\$(compgen -G 'wildcard_database_v*.fasta' | head -1 || true)
         
         if [ -z "\$WILDCARD_FASTA" ]; then
             # Run wildcard annotation only if not already present
@@ -82,14 +85,15 @@ process RGI_LOAD_WILDCARD {
                 -i wildcard_data \\
                 --card_json card.json \\
                 -v \$CARD_VERSION \\
-                > wildcard_annotation.log 2>&1
+                > wildcard_annotation.log 2>&1 \\
+                || { status=\$?; cat wildcard_annotation.log >&2; exit \$status; }
             
             # Get wildcard FASTA filename after creation
-            WILDCARD_FASTA=\$(ls wildcard_database_v*.fasta | head -1)
+            WILDCARD_FASTA=\$(compgen -G 'wildcard_database_v*.fasta' | head -1 || true)
             
             if [ -z "\$WILDCARD_FASTA" ]; then
-                echo "ERROR: WildCARD annotation file not created"
-                cat wildcard_annotation.log
+                echo "ERROR: WildCARD annotation file not created; rgi wildcard_annotation's log:" >&2
+                cat wildcard_annotation.log >&2
                 exit 1
             fi
         else

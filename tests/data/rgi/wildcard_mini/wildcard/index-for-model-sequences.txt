@@ -1,0 +1,5 @@
+prevalence_sequence_id	model_id	aro_term	aro_accession	detection_model	species_name	ncbi_accession	data_type	rgi_criteria	percent_identity	bitscore	amr_gene_family	resistance_mechanism	drug_class	card_short_name
+1	9001	testGeneA	ARO:9900001	protein homolog model	Testus syntheticus	TESTC0001	ncbi_contig	Strict	99.0	300.0	test gene family A	test inactivation	testmycin	testGeneA
+2	9001	testGeneA	ARO:9900001	protein homolog model	Testus syntheticus	TESTC0002	ncbi_contig	Strict	99.0	300.0	test gene family A	test inactivation	testmycin	testGeneA
+3	9002	testGeneB	ARO:9900002	protein homolog model	Testus syntheticus	TESTC0003	ncbi_contig	Strict	99.0	300.0	test gene family B	test inactivation	testmycin	testGeneB
+4	9002	testGeneB	ARO:9900002	protein homolog model	Testus syntheticus	TESTC0004	ncbi_contig	Strict	99.0	300.0	test gene family B	test inactivation	testmycin	testGeneB

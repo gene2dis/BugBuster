@@ -1,0 +1,186 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    An assembly with no contig after BBMAP's length filter (roadmap Phase 21,
+    RV10; review R4-08; owner decision 2026-11-21: drop it early)
+
+    The assembly is removed before the contig stages, with a warning, and
+    listed in pipeline_info/empty_assemblies.tsv; its samples keep their QC
+    and read-level results. Before, it went on to every contig process, and
+    MetaBAT2, BlobTools, DeepARG and eggNOG-mapper stop on an empty FASTA
+    (container check, roadmap section 6), so one such sample ended the run.
+    BBMAP's stub writes the empty FASTA for the ids in empty_assembly.config.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_pipeline {
+
+    name "Empty assemblies are dropped before the contig stages"
+    script "../main.nf"
+    config "./empty_assembly.config"
+
+    test("Per-sample: an empty assembly runs no contig stage; the other sample is complete") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "assembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                multisample_binning     = true
+                dereplicate_mags        = true
+                contig_tax_and_arg      = true
+                genomad_prediction      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                mag_level_functional    = true
+                microbecensus           = true
+                args_oap_prediction     = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def tasks = workflow.trace.tasks()*.name
+            // test_sample2's assembly stops at BBMAP: no alignment, binning,
+            // gene calling, contig taxonomy / ARG or functional task
+            def contig_stages = ["BWAMEM3_INDEX", "BWAMEM3_SAMTOOLS", "CALCULATE_DEPTH", "METABAT2", "SEMIBIN",
+                                 "BINETTE", "PYRODIGAL", "DEEPARG_CONTIGS", "METABULI_CLASSIFY", "BLOBTOOLS",
+                                 "GENOMAD", "EGGNOG_MAPPER", "FEATURECOUNTS", "MULTISAMPLE_BWAMEM3_SAMTOOLS"]
+            contig_stages.each { stage ->
+                assert !tasks.any { t -> t.contains(stage) && t.contains("(test_sample2)") }, stage
+                assert tasks.any { t -> t.contains(stage) }, stage
+            }
+            assert tasks.any { t -> t.contains("BBMAP (test_sample2)") }
+            // ... and keeps its QC and read-level results
+            assert tasks.any { t -> t.contains("ARGS_OAP (test_sample2)") }
+            assert tasks.any { t -> t.contains("MICROBECENSUS (test_sample2)") }
+            assert path("${outputDir}/pipeline_info/empty_assemblies.tsv").readLines() == [
+                "assembly\tsamples\tcontigs_before_filter\tmin_length_bp",
+                "test_sample2\ttest_sample2\t3\t1000"
+            ]
+            def published = TestData.publishedPaths(outputDir)
+            assert !published.any { p -> p.startsWith("04_binning/per_sample/test_sample2/") }
+            assert published.any { p -> p.startsWith("04_binning/per_sample/test_sample1/") }
+            assert published.contains("03_assembly/per_sample/test_sample2/test_sample2_contig.stats")
+            assert path("${outputDir}/../meta/nextflow.log").text.contains(
+                "Assembly test_sample2 (sample test_sample2) has no contig of at least 1000 bp after the length filter")
+        }
+    }
+
+    test("Co-assembly groups: an empty group's samples get no alignment; the other group is complete") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet3(outputDir, projectDir)
+                output = "${outputDir}/results"
+                sample_metadata         = TestData.metadataTable(outputDir, "groups.tsv",
+                    "sample\tsite\ntest_sample1\tA\ntest_sample2\tA\ntest_sample3\tsolo\n")
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "coassembly"
+                coassembly_group_by     = "site"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                dereplicate_mags        = true
+                contig_tax_and_arg      = true
+                contig_level_functional = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def tasks = workflow.trace.tasks()*.name
+            assert !tasks.any { t -> t.contains("BWAMEM3_SAMTOOLS (test_sample3)") }
+            assert tasks.any { t -> t.contains("BWAMEM3_SAMTOOLS (test_sample1)") }
+            assert !tasks.any { t -> t.contains("(solo)") && !t.contains("BBMAP") && !t.contains("MEGAHIT") }
+            assert tasks.any { t -> t.contains("AGGREGATE_FUNCTIONS") }
+            assert path("${outputDir}/results/pipeline_info/empty_assemblies.tsv").readLines() == [
+                "assembly\tsamples\tcontigs_before_filter\tmin_length_bp",
+                "solo\ttest_sample3\t3\t1000"
+            ]
+            assert !path("${outputDir}/results/04_binning/coassembly/solo").exists()
+            assert path("${outputDir}/results/04_binning/coassembly/A").exists()
+        }
+    }
+
+    test("Co-assembly without contigs: no contig stage runs and the run completes") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control         = true
+                custom_phiX_fasta       = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta       = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode           = "coassembly"
+                taxonomic_profiler      = "none"
+                include_binning         = true
+                binners                 = "semibin,metabat2"
+                contig_tax_and_arg      = true
+                arg_bin_clustering      = true
+                contig_level_functional = true
+                results_summary         = true
+                max_cpus   = 4
+                max_memory = "8.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            def tasks = workflow.trace.tasks()*.name
+            ["BWAMEM3_INDEX", "CHECKM2_BATCH", "GTDB_TK_BATCH", "PYRODIGAL", "DEEPARG_CONTIGS",
+             "ARG_CONTIG_LEVEL_REPORT", "AGGREGATE_FUNCTIONS"].each { stage ->
+                assert !tasks.any { t -> t.contains(stage) }, stage
+            }
+            assert tasks.any { t -> t.contains("RESULTS_SUMMARY") }
+            assert path("${outputDir}/pipeline_info/empty_assemblies.tsv").readLines()[1] ==
+                "coassembly\ttest_sample1,test_sample2\t3\t1000"
+        }
+    }
+
+    test("A run without empty assemblies removes the empty_assemblies.tsv an earlier run left") {
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['sampleX'])
+                output = {
+                    def stale = new File("${outputDir}/results/pipeline_info/empty_assemblies.tsv")
+                    stale.parentFile.mkdirs()
+                    stale.text = "assembly\tsamples\tcontigs_before_filter\tmin_length_bp\nold\told\t3\t1000\n"
+                    "${outputDir}/results"
+                }()
+                quality_control    = true
+                custom_phiX_fasta  = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta  = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                assembly_mode      = "assembly"
+                taxonomic_profiler = "none"
+                results_summary    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !path("${outputDir}/results/pipeline_info/empty_assemblies.tsv").exists()
+            assert path("${outputDir}/results/pipeline_info/contig_filtering_summary.txt").exists()
+        }
+    }
+}

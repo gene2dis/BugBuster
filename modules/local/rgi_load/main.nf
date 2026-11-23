@@ -50,13 +50,17 @@ process RGI_LOAD {
         rgi load --card_json card.json --local
 
         # Create annotated reference sequences
-        rgi card_annotation -i card.json > card_annotation.log 2>&1
+        rgi card_annotation -i card.json > card_annotation.log 2>&1 \\
+            || { status=\$?; cat card_annotation.log >&2; exit \$status; }
 
-        # Get the actual filename created
-        CARD_FASTA=\$(ls card_database_v*.fasta | head -1)
+        # Get the actual filename created (compgen -G: no match prints nothing,
+        # where 'ls | head -1' ended the task under pipefail before this check;
+        # roadmap Phase 21, RV8)
+        CARD_FASTA=\$(compgen -G 'card_database_v*.fasta' | head -1 || true)
         
         if [ -z "\$CARD_FASTA" ]; then
-            echo "ERROR: CARD annotation file not created"
+            echo "ERROR: CARD annotation file not created; rgi card_annotation's log:" >&2
+            cat card_annotation.log >&2
             exit 1
         fi
 
@@ -87,13 +91,15 @@ process RGI_LOAD {
                 -i wildcard \\
                 --card_json card.json \\
                 -v \$CARD_VERSION \\
-                > wildcard_annotation.log 2>&1
+                > wildcard_annotation.log 2>&1 \\
+                || { status=\$?; cat wildcard_annotation.log >&2; exit \$status; }
             
             # Get wildcard FASTA filename
-            WILDCARD_FASTA=\$(ls wildcard_database_v*.fasta | head -1)
+            WILDCARD_FASTA=\$(compgen -G 'wildcard_database_v*.fasta' | head -1 || true)
             
             if [ -z "\$WILDCARD_FASTA" ]; then
-                echo "ERROR: WildCARD annotation file not created"
+                echo "ERROR: WildCARD annotation file not created; rgi wildcard_annotation's log:" >&2
+                cat wildcard_annotation.log >&2
                 exit 1
             fi
             

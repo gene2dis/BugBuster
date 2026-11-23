@@ -1435,6 +1435,7 @@ results/
 │   ├── software_versions.yml                   # Versions of every tool used in the run
 │   ├── coassembly_groups.tsv                   # Each sample's co-assembly group (if coassembly_group_by is set)
 │   ├── multisample_groups.tsv                  # Each sample's multi-sample binning group (if multisample_group_by is set)
+│   ├── empty_assemblies.tsv                    # Assemblies with no contig after the length filter, dropped before the contig stages (only when there is one)
 │   └── contig_filtering_summary.txt            # Contig filtering summary (if assembly_mode != 'none')
 ├── 00_summary/                                 # Run-level summary (if results_summary=true)
 │   ├── report/                                 # HTML report: index.html (overview), a page per section, methods,

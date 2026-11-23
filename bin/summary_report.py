@@ -235,8 +235,8 @@ def caveats(ctx):
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",
                "homolog": "Tier 1 calls that may be commensal relatives", "low_depth": "Depth",
-               "low_coverage": "Sequencing coverage (Nonpareil)"}
-FLAG_SECTION = {"args": "args", "compare": "compare", "qc": "overview"}
+               "low_coverage": "Sequencing coverage (Nonpareil)", "empty_assembly": "Assemblies without contigs"}
+FLAG_SECTION = {"args": "args", "compare": "compare", "qc": "overview", "assembly": "assembly"}
 
 
 # ---- references
@@ -346,13 +346,16 @@ def build(ctx, assets):
     if s.get("n_tier1") is not None:
         cards += [(s["n_tier1"], f"samples with a tier 1 ARG ({s.get('arg_primary', '')})", s["n_tier1"] > 0),
                   (s["n_tier1_genes"], f"distinct tier 1 genes ({s.get('arg_primary', '')})", False)]
+    if s.get("n_tier1_other"):
+        cards.append((s["n_tier1_other"], f"samples with a tier 1 ARG ({s['tier1_other_methods']}, where "
+                                          f"{s.get('arg_primary', '')} did not run)", True))
     if s.get("n_tier1_genes_all_methods") is not None:
         cards.append((s["n_tier1_genes_all_methods"], "tier 1 genes found by every ARG method", False))
     if s.get("n_species") is not None:
         cards.append((s["n_species"], "species detected (any sample)", False))
     ov.lists["cards"] = [{"value": fmt(v), "label": lab, "warn": bool(w)} for v, lab, w in cards]
     att = []
-    for kind in ("tier1", "single", "homolog", "low_depth", "low_coverage"):
+    for kind in ("tier1", "single", "homolog", "low_depth", "low_coverage", "empty_assembly"):
         sub = [f for f in s.get("attention", []) if f[0] == kind]
         if sub:
             att.append({"kind": kind, "title": FLAG_TITLES[kind],
@@ -403,7 +406,9 @@ def build(ctx, assets):
         ar.title = f"Antimicrobial resistance genes ({primary})"
         ar.facts = {"primary": primary, "others": ", ".join(others), "rgi_cov": f"{ctx['rgi_min_coverage']:g}",
                     "n_tier1_samples": s.get("n_tier1"), "n_tier1_genes": s.get("n_tier1_genes"),
-                    "comparison": ctx.get("comparison") is not None}
+                    "comparison": ctx.get("comparison") is not None,
+                    # tier 1 calls of other methods where the primary one did not run (merged results directories)
+                    "n_tier1_other": s.get("n_tier1_other"), "tier1_other_methods": s.get("tier1_other_methods", "")}
         for k in ("arg_priority_heatmap", "arg_drug_class_heatmap", "arg_vs_depth"):
             ar.fig(k)
         al = t["arg_long"][0]
@@ -477,6 +482,10 @@ def build(ctx, assets):
             asm.facts.update({"n_groups": ctx["n_coassembly_groups"], "groups_partial": partial.get("groups", False)})
         if ctx.get("bbnorm"):
             asm.facts.update({"bbnorm": True, "bbnorm_partial": partial.get("bbnorm", False)})
+        empty = ctx["summary"].get("empty_assemblies") or []
+        if empty:
+            asm.facts["empty"] = ", ".join(name for name, _, _ in empty)
+            asm.facts["n_empty"] = len(empty)
         asm.table("stats", t["assembly_stats"][0], "assembly_stats", "MEGAHIT assemblies: statistics of all "
                   "contigs, and of those kept by the length filter that binning, contig taxonomy, ARGs and functions "
                   "use.")

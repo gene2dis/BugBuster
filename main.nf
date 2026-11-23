@@ -188,7 +188,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -414,7 +414,9 @@ workflow {
     // no stored check looks (<databases_dir>/<db>/<key>/ now): say so before
     // they are downloaded a second time
     if (params.databases_dir) {
-        def old_layout = ['kraken/k2_ref_db', 'metabuli_db', 'genomad_db', 'deeparg_db', 'gtdbtk/release*',
+        // gtdbtk/release[0-9]*: the old unpacked folder (release232), not the
+        // current store gtdbtk/release_232/ (roadmap Phase 21, RV12; review R3-01)
+        def old_layout = ['kraken/k2_ref_db', 'metabuli_db', 'genomad_db', 'deeparg_db', 'gtdbtk/release[0-9]*',
                           'eggnog/eggnog_db', 'dbcan/dbcan_db', 'bakta/bakta_db', 'woltka/woltka_db',
                           'superfocus/superfocus_db', 'humann/humann_db', 'kmarvel/kmarvel_db', 'rgi/card_db',
                           'sylph/*.syl*db', 'checkm2/*.dmnd', 'cog/*.def.tab']
@@ -685,6 +687,19 @@ workflow {
         ch_counting_bam = ASSEMBLY.out.counting_bam
         ch_versions     = ch_versions.mix(ASSEMBLY.out.versions)
         ch_summary_reports = ch_summary_reports.mix(ASSEMBLY.out.stats, ASSEMBLY.out.filter_summary)
+        // pipeline_info/empty_assemblies.tsv: the assemblies dropped before the
+        // contig stages for want of contigs (roadmap Phase 21, RV10), written
+        // only when there is one. The summary reads the same fact from
+        // contig_filtering_summary.txt (contigs_kept 0)
+        // a file left by an earlier run into the same --output would list
+        // assemblies this run kept: remove it before this run writes its own
+        def stale_empty = file("${params.output}/pipeline_info/empty_assemblies.tsv")
+        if ( stale_empty.exists() ) {
+            stale_empty.delete()
+        }
+        ASSEMBLY.out.empty_assemblies
+            .collectFile(name: 'empty_assemblies.tsv', storeDir: "${params.output}/pipeline_info", sort: true,
+                         seed: "assembly\tsamples\tcontigs_before_filter\tmin_length_bp\n")
 
         //
         // SUBWORKFLOW: Binning
@@ -952,10 +967,11 @@ workflow {
     ch_genomad_tables = channel.empty()
     if ( flagOn(params.genomad_prediction) && params.assembly_mode != "none" ) {
         // geNomad stops on a FASTA without sequences, which BBMAP writes when
-        // every contig of a sample is below --bbmap_length: skip those
+        // every contig of a sample is below --bbmap_length. ASSEMBLY no longer
+        // emits those (roadmap Phase 21, RV10); the check stays as a guard
         NFCORE_GENOMAD_ENDTOEND(
             ch_contigs_meta.filter { meta, contigs ->
-                def has_contigs = contigs.withReader { reader -> reader.readLine()?.startsWith('>') ?: false }
+                def has_contigs = hasFastaRecord(contigs)
                 if ( !has_contigs ) {
                     log.warn "No contigs for ${meta.id}: skipping geNomad"
                 }

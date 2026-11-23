@@ -54,7 +54,7 @@ def main():
     """Main function to generate bin taxonomy report."""
     
     # Find GTDB-Tk taxonomy files
-    tax_files = glob.glob('*gtdbtk*.tsv')
+    tax_files = sorted(glob.glob('*gtdbtk*.tsv'))
     if not tax_files:
         print("ERROR: No GTDB-Tk taxonomy files found (*gtdbtk*.tsv)", file=sys.stderr)
         sys.exit(1)

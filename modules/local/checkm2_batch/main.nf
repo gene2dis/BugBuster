@@ -126,39 +126,43 @@ process CHECKM2_BATCH {
 
     # One report per sample and binner: the binner's rows of the combined
     # report, sorted by bin name, with the sample/binner prefix removed. A
-    # binner without bins in any sample gets header-only reports
+    # binner without bins in any sample gets header-only reports. The body is
+    # indented with the script's 4 spaces plus a tab: Nextflow strips the 4
+    # spaces, <<- the tab. Tab-only lines made the common indentation one
+    # character, so END_VERSIONS below kept 3 spaces and was written into
+    # versions.yml (roadmap Phase 21, RV12)
     python3 <<-PYEOF
-	import csv
+    	import csv
 
-	meta_ids = "${meta_ids}".split()
-	binners = sorted(set(open("binners.txt").read().split()))
-	empty_header = "Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes\\n"
+    	meta_ids = "${meta_ids}".split()
+    	binners = sorted(set(open("binners.txt").read().split()))
+    	empty_header = "Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes\\n"
 
-	with open("bin_map.tsv") as f:
-	    bin_map = {row["name"]: row for row in csv.DictReader(f, delimiter="\\t")}
-	binners_with_bins = {row["binner"] for row in bin_map.values()}
+    	with open("bin_map.tsv") as f:
+    	    bin_map = {row["name"]: row for row in csv.DictReader(f, delimiter="\\t")}
+    	binners_with_bins = {row["binner"] for row in bin_map.values()}
 
-	header, rows = None, {}
-	if bin_map:
-	    with open("checkm2_output/quality_report.tsv") as f:
-	        header = f.readline()
-	        for line in f:
-	            if not line.strip():
-	                continue
-	            name, rest = line.split("\\t", 1)
-	            entry = bin_map[name]
-	            key = (entry["sample_id"], entry["binner"])
-	            rows.setdefault(key, []).append((entry["bin"], entry["bin"] + "\\t" + rest))
+    	header, rows = None, {}
+    	if bin_map:
+    	    with open("checkm2_output/quality_report.tsv") as f:
+    	        header = f.readline()
+    	        for line in f:
+    	            if not line.strip():
+    	                continue
+    	            name, rest = line.split("\\t", 1)
+    	            entry = bin_map[name]
+    	            key = (entry["sample_id"], entry["binner"])
+    	            rows.setdefault(key, []).append((entry["bin"], entry["bin"] + "\\t" + rest))
 
-	for binner in binners:
-	    for meta_id in meta_ids:
-	        with open(f"{meta_id}_{binner}_quality_report.tsv", "w") as out:
-	            if binner not in binners_with_bins:
-	                out.write(empty_header)
-	                continue
-	            out.write(header)
-	            out.writelines(line for _, line in sorted(rows.get((meta_id, binner), [])))
-	PYEOF
+    	for binner in binners:
+    	    for meta_id in meta_ids:
+    	        with open(f"{meta_id}_{binner}_quality_report.tsv", "w") as out:
+    	            if binner not in binners_with_bins:
+    	                out.write(empty_header)
+    	                continue
+    	            out.write(header)
+    	            out.writelines(line for _, line in sorted(rows.get((meta_id, binner), [])))
+    	PYEOF
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

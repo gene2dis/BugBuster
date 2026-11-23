@@ -1,0 +1,41 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    RGI_BWT Module Test
+
+    Roadmap Phase 21, RV8 (review R4-11). rgi bwt's stderr goes to
+    <id>_rgi_bwt.log, which is neither an output nor published, so a failed
+    task showed an empty "Command error". The module now prints the end of
+    that log to stderr. Here rgi bwt fails for real: the database is
+    tests/data/rgi/card_db_no_kmers, a localDB/ without any loaded CARD files.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test RGI_BWT Process"
+    script "../../modules/local/rgi_bwt/main.nf"
+    process "RGI_BWT"
+
+    test("a failing rgi bwt puts the end of its log on stderr") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 's1' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/rgi/card_db_no_kmers", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            def out = process.stdout + process.stderr
+            assert out.any { line -> line.contains("ERROR: rgi bwt exited with status") }
+        }
+    }
+}

@@ -139,8 +139,10 @@ class TaxonomyReportGenerator:
                 df = read_table(report_file, ['Id', db_col], sep='\t')
                 df = df.astype({c: float for c in ('Unclassified', 'Classified') if c in df.columns})
             except Exception as e:
-                print(f"Warning: Failed to parse {report_file}: {e}", file=sys.stderr)
-                continue
+                # raise, as for a missing column below: skipping it left that
+                # sample's classification blank in Reads_report.csv with exit 0
+                # (roadmap Phase 21, RV12; review R6-11)
+                raise ValueError(f"{report_file} cannot be parsed as a {label} report: {e}") from e
             missing = [c for c in columns if c not in df.columns]
             if missing:
                 raise ValueError(f"{report_file} is missing report columns {missing} (expected {columns})")

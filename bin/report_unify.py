@@ -30,7 +30,7 @@ warnings.filterwarnings('ignore')
 
 def read_tsv_files(pattern):
     """Read and concatenate TSV files matching pattern."""
-    files = glob.glob(pattern)
+    files = sorted(glob.glob(pattern))
     if not files:
         return pd.DataFrame()
     

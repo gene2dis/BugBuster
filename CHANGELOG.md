@@ -1331,6 +1331,98 @@ next release is tagged.
 
 ### Fixed
 
+- **Results summary** (roadmap Phase 21):
+  - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,
+    `trimmed_mean_x` or `covered_fraction` stopped RESULTS_SUMMARY with a
+    pandas `KeyError` when `--dereplicate_mags` ran: those
+    `mag_cluster_abundance` columns are now renamed `meta_<name>` like every
+    other summary column, and a test checks that every column of every
+    metadata-joined table is reserved.
+  - Merged results directories where the ARG methods ran on different
+    samples: the tier 1 genes another method found where the primary method
+    did not run were missing from Attention (when no sample ran every method),
+    the overview cards and the ARG page's tier 1 table. They are now listed in
+    all three ("found by RGI (not every method ran)"), with a card of their own.
+    A single pipeline run, where every sample gets every enabled method, is
+    unchanged.
+- **Small failures** (roadmap Phase 21):
+  - The launch warning about databases "in the layout of an earlier release"
+    matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after
+    the first GTDB-Tk download suggested deleting a database it reuses. It now
+    matches the old folder name (`gtdbtk/release232`) only.
+  - GUNC_RUN's and CHECKM2_BATCH's `versions.yml` were not valid YAML: a
+    script line at column 0 (GUNC's unescaped `\n`) or a tab-only Python
+    heredoc (CheckM2) left the heredoc terminator indented, so an
+    `END_VERSIONS` line was written into the file and into
+    `pipeline_info/software_versions.yml`.
+  - `bin/monitor_disk_usage.sh` stopped at its first iteration whenever `du`
+    reported an error (a file removed during the scan, as in a live work
+    directory, or an unreadable folder).
+  - ARGS_OAP with uncompressed FASTQ (`--quality_control false`): every read
+    file was linked as `.fastq.gz`, and a plain singleton file stopped the task.
+    Links are now named by content and stage one runs with `-f fastq`, which
+    takes `.fastq` and `.fastq.gz` together; gzipped reads give the same input
+    list as before.
+  - The combined decontamination FASTA (`--custom_host_fasta` /
+    `--custom_phiX_fasta`) gets a newline between files: a file whose last line
+    had none glued the next file's first header onto its last sequence line,
+    and the Bowtie2 index lost that sequence (bwa-mem3's reader happened to
+    split it).
+  - K-MARVEL waits for its read stream in the foreground. The background
+    watchdog left a `sleep 30` running after the task, which could hold the task
+    open for 30 s where no container ends it (conda, or a local run without a
+    container); under docker the container's end killed it.
+  - `Reads_report.csv`, `Contig_tax_and_arg_prediction.tsv`,
+    `All_Mag_quality_table.csv` and `MAGs_tax_summary.csv` read their
+    per-sample files in file-name order instead of directory-listing order, so
+    their rows no longer change between runs or file systems. Row order
+    changes once; contents do not.
+  - TAXONOMY_REPORT stops on a per-sample sourmash or sylph report it cannot
+    parse, naming the file, instead of skipping it with exit 0 and leaving that
+    sample's classification blank.
+- **An assembly with no contig after the length filter no longer stops the
+  run** (roadmap Phase 21). When every contig of a sample (or a co-assembly)
+  was below `--bbmap_length`, its empty FASTA went on to every contig stage,
+  and MetaBAT2, BlobTools, DeepARG and eggNOG-mapper stop on an empty input
+  (checked in their pinned images), so one such sample ended the run after
+  every other assembly. ASSEMBLY now drops it after BBMAP with a warning. It
+  gets no alignment, binning, contig taxonomy, contig ARG or contig functional
+  annotation, and is listed in the new `pipeline_info/empty_assemblies.tsv`
+  (written only when there is one). Its samples keep their QC, taxonomy and
+  read-level results, and the summary names it under Attention and on the
+  assembly page (its `assembly_stats` row already had `contigs_kept` 0).
+  Also: METABAT2 on an assembly whose contigs are all below
+  `--metabat_minContig` (2500 by default) writes its bin folder with a
+  `SKIPPED.txt`, as SemiBin2 and COMEBin do. MetaBAT2 exits 1 there ("There
+  were no large target contigs"), which stopped the run for a sample that only
+  had no bins.
+- **GTDB_TK_BATCH writes its tables for archaea-only bins** (roadmap Phase 21).
+  GTDB-Tk writes no `gtdbtk.bac120.summary.tsv` when no bin is bacterial, and
+  the per-sample split ran only when that file existed, so a run whose refined
+  bins were all archaeal stopped with "Missing output file(s)" after the whole
+  GTDB-Tk job. The split now runs when either summary exists, with a
+  header-only table for the missing domain; with neither, the task stops with
+  that message and the end of GTDB-Tk's log.
+- **`--custom_rgi_card_db` + `--custom_rgi_wildcard` builds the database**
+  (roadmap Phase 21). RGI_LOAD_WILDCARD looked for an existing WildCARD FASTA
+  with `ls ... | head -1`, which under the task shell's `pipefail` ended the
+  task with an empty error log whenever the CARD directory had not been
+  annotated with WildCARD before, the documented use. The same pattern made
+  the "annotation file not found" messages of RGI_LOAD and RGI_LOAD_WILDCARD
+  unreachable; they now appear, with the annotation log. A failing `rgi bwt`
+  (RGI_BWT) now shows the end of its log in the error report instead of an
+  empty "Command error". `tests/modules/rgi_load_wildcard.nf.test` runs the
+  process on a synthetic CARD + WildCARD fixture (`tests/data/rgi/wildcard_mini/`,
+  no CARD data).
+- **`--bbmap_length 0` keeps every contig** (roadmap Phase 21). BBMAP read the
+  value with Groovy's `?:`, which takes an Integer 0 for false, so a `0` from
+  a params file, a `-c` config or the command line on Nextflow 25.10 filtered
+  at 1000 bp without a message. On Nextflow >= 26.04, where a command-line
+  value arrives as a String, any `--bbmap_length` other than 0 stopped every
+  BBMAP task ("Cannot compare java.lang.String with java.lang.Integer"). The
+  value is now read with `!= null` and converted. The same holds for
+  `--rgi_min_kmer_coverage 0` (RGI_KMER used 10) and `--azure_vm_count 0`
+  (the Azure pool started with 1 VM).
 - **Sample ids, bin names and database labels are read back as text**
   (roadmap Phase 20). pandas inferred their type when the report scripts read
   a table back: READS_REPORT reads one file per sample, so a sample `001` was

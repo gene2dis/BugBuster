@@ -28,6 +28,9 @@
                 bam_meta; coassembly: each sample against its co-assembly, whose
                 samtools merge is bam/bam_meta - issue #28; meta.group names
                 the co-assembly)
+        empty_assemblies: one TSV line per assembly with no contig left
+                after BBMAP's length filter; such an assembly is in none of
+                the outputs above (roadmap Phase 21, RV10)
 
     CO-ASSEMBLY META:
         [id: 'coassembly' (or the group's label), coassembly: true,
@@ -52,7 +55,7 @@ include { BWAMEM3_INDEX        } from '../../modules/local/bwamem3_samtools/main
 include { BWAMEM3_SAMTOOLS     } from '../../modules/local/bwamem3_samtools/main'
 include { SAMTOOLS_MERGE as NFCORE_SAMTOOLS_MERGE } from '../../modules/nf-core/samtools/merge/main'
 include { CONTIG_FILTER_SUMMARY } from '../../modules/local/contig_filter_summary/main'
-include { flagOn                } from './utils_params'
+include { flagOn; hasFastaRecord; bbmapMinLength } from './utils_params'
 include { coassemblyGroups; coassemblyLabel } from './utils_coassembly'
 
 workflow ASSEMBLY {
@@ -70,6 +73,7 @@ workflow ASSEMBLY {
     ch_contig_stats   = channel.empty()   // <id>_contig.stats (BBMap stats.sh)
     ch_filter_summary = channel.empty()   // contig_filtering_summary.txt
     ch_empty_reports = channel.empty()
+    ch_empty_assemblies = channel.empty()  // metas of assemblies with no contig after BBMAP
     def reduce_reads = params.assembly_read_reduction == 'normalize'
 
     //
@@ -101,19 +105,27 @@ workflow ASSEMBLY {
         // Collect filter reports for tracking
         ch_filter_reports = BBMAP.out.filter_report
         ch_contig_stats   = BBMAP.out.stats
-        
+
+        // An assembly with no contig left after the length filter goes no
+        // further (roadmap Phase 21, RV10): see emptyAssemblies() below
+        ch_kept = BBMAP.out.contigs_with_reads.branch { _meta, _reads, contigs ->
+            kept: hasFastaRecord(contigs)
+            empty: true
+        }
+        ch_empty_assemblies = ch_kept.empty.map { meta, _reads, _contigs -> meta }
+
         // Set output channels
-        ch_contigs_with_reads = BBMAP.out.contigs_with_reads
-        ch_contigs_only = BBMAP.out.contigs_only
+        ch_contigs_with_reads = ch_kept.kept
+        ch_contigs_only = ch_kept.kept.map { meta, _reads, contigs -> [meta, contigs] }
 
         // Generate BAM files for binning/contig analysis/gene counting if needed
         if ( flagOn(params.include_binning) || flagOn(params.contig_tax_and_arg) || flagOn(params.contig_level_functional) ) {
             if ( params.read_aligner == 'bwamem3' ) {
-                BWAMEM3_INDEX(BBMAP.out.contigs_only)
+                BWAMEM3_INDEX(ch_contigs_only)
                 ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
 
                 // [meta, reads, contigs] + [meta, index] -> [meta, reads, contigs, index]
-                BWAMEM3_SAMTOOLS(BBMAP.out.contigs_with_reads.join(BWAMEM3_INDEX.out.index))
+                BWAMEM3_SAMTOOLS(ch_contigs_with_reads.join(BWAMEM3_INDEX.out.index))
 
                 ch_bam_with_contigs = BWAMEM3_SAMTOOLS.out.contigs_and_bam
                 ch_bam_only = BWAMEM3_SAMTOOLS.out.bam_only
@@ -122,7 +134,7 @@ workflow ASSEMBLY {
                 ch_empty_reports = BWAMEM3_SAMTOOLS.out.empty_contig_report
                 ch_versions = ch_versions.mix(BWAMEM3_SAMTOOLS.out.versions.first())
             } else {
-                BOWTIE2_SAMTOOLS(BBMAP.out.contigs_with_reads)
+                BOWTIE2_SAMTOOLS(ch_contigs_with_reads)
 
                 ch_bam_with_contigs = BOWTIE2_SAMTOOLS.out.contigs_and_bam
                 ch_bam_only = BOWTIE2_SAMTOOLS.out.bam_only
@@ -190,9 +202,17 @@ workflow ASSEMBLY {
         // Collect filter reports for tracking
         ch_filter_reports = BBMAP.out.filter_report
         ch_contig_stats   = BBMAP.out.stats
+
+        // A co-assembly with no contig left after the length filter goes no
+        // further, and its samples get no alignment (roadmap Phase 21, RV10)
+        ch_kept = BBMAP.out.contigs_only.branch { _meta, contigs ->
+            kept: hasFastaRecord(contigs)
+            empty: true
+        }
+        ch_empty_assemblies = ch_kept.empty.map { meta, _contigs -> meta }
         
         // Set output channels
-        ch_contigs_only = BBMAP.out.contigs_only
+        ch_contigs_only = ch_kept.kept
 
         // One alignment per sample against the co-assembly (issue #28): the
         // per-sample BAMs count genes (design doc Q1/T3), give MetaBAT2 and
@@ -208,12 +228,12 @@ workflow ASSEMBLY {
                     def label = coassemblyLabel(groups, meta.id)
                     [label, meta + [group: label], files]
                 }
-                .combine(BBMAP.out.contigs_only.map { meta, contigs -> [meta.id, contigs] }, by: 0)
+                .combine(ch_contigs_only.map { meta, contigs -> [meta.id, contigs] }, by: 0)
 
             if ( params.read_aligner == 'bwamem3' ) {
                 // One index per co-assembly, shared by its samples (bowtie2
                 // builds it in each task)
-                BWAMEM3_INDEX(BBMAP.out.contigs_only)
+                BWAMEM3_INDEX(ch_contigs_only)
                 ch_versions = ch_versions.mix(BWAMEM3_INDEX.out.versions.first())
 
                 BWAMEM3_SAMTOOLS(
@@ -243,7 +263,7 @@ workflow ASSEMBLY {
             NFCORE_SAMTOOLS_MERGE(
                 ch_sample_bams
                     .map { meta, bam -> [meta.group, meta.id, bam] }
-                    .combine(BBMAP.out.contigs_only.map { meta, _contigs -> [meta.id, meta] }, by: 0)
+                    .combine(ch_contigs_only.map { meta, _contigs -> [meta.id, meta] }, by: 0)
                     .map { _label, id, bam, cmeta -> [groupKey(cmeta, cmeta.samples.size()), id, bam] }
                     .groupTuple()
                     .map { key, ids, bams ->
@@ -255,10 +275,32 @@ workflow ASSEMBLY {
 
             ch_bam_only = NFCORE_SAMTOOLS_MERGE.out.bam
             ch_bam_with_contigs = NFCORE_SAMTOOLS_MERGE.out.bam
-                .join(BBMAP.out.contigs_only)
+                .join(ch_contigs_only)
                 .map { meta, bam, contigs -> [meta, contigs, bam] }
         }
     }
+
+    // Assemblies dropped for want of contigs (roadmap Phase 21, RV10; owner
+    // decision 2026-11-21): like a sample below --min_read_sample, but only
+    // for the contig stages. Its samples keep their QC, taxonomy and
+    // read-level results; alignment, binning, contig taxonomy / ARGs and
+    // contig functional annotation never see it (several of those tools stop
+    // on an empty FASTA: MetaBAT2, BlobTools, DeepARG, eggNOG-mapper). One
+    // line per assembly for pipeline_info/empty_assemblies.tsv: assembly,
+    // its samples, contigs before the filter, the filter's minimum length
+    ch_empty_rows = ch_empty_assemblies
+        .map { meta -> [meta.id, meta] }
+        .join(ch_filter_reports.map { report -> [report.name - '_filter_report.txt', report] })
+        .map { id, meta, report ->
+            def samples = meta.coassembly ? meta.samples : [meta.id]
+            // both from BBMAP's own filter report: the minimum it applied may
+            // come from ext.min_length rather than --bbmap_length
+            def lines = report.readLines()
+            def before = lines.find { line -> line.startsWith('contigs_before_filter\t') }?.tokenize('\t')?.getAt(1) ?: 'NA'
+            def min_length = lines.find { line -> line.startsWith('min_length_threshold\t') }?.tokenize('\t')?.getAt(1) ?: bbmapMinLength()
+            log.warn "Assembly ${id} (sample${samples.size() == 1 ? '' : 's'} ${samples.join(', ')}) has no contig of at least ${min_length} bp after the length filter (${before} contigs before it): it is dropped from alignment, binning, contig taxonomy and ARGs, and contig functional annotation; its samples keep their QC, taxonomy and read-level results (pipeline_info/empty_assemblies.tsv)"
+            "${id}\t${samples.join(',')}\t${before}\t${min_length}\n"
+        }
 
     // Generate contig filtering summary report
     if ( params.assembly_mode != "none" ) {
@@ -278,5 +320,6 @@ workflow ASSEMBLY {
     counting_bam    = ch_sample_bams         // channel: [ val(meta), path(bam) ] - per sample, against its assembly or the co-assembly
     stats           = ch_contig_stats        // channel: path(<id>_contig.stats) - BBMap statistics of the MEGAHIT contigs
     filter_summary  = ch_filter_summary      // channel: path(contig_filtering_summary.txt)
+    empty_assemblies = ch_empty_rows         // channel: val("<assembly>\t<samples>\t<contigs before>\t<min length>\n"), assemblies dropped for want of contigs
     versions        = ch_versions            // channel: path(versions.yml)
 }

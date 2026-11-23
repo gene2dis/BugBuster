@@ -43,4 +43,28 @@ nextflow_process {
             assert path(process.out.versions.get(0)).text.contains("bwamem3: 0.15.0")
         }
     }
+
+    // Roadmap Phase 21, RV12 (review R4-16): files were joined with plain cat,
+    // so a FASTA whose last line has no newline glued the next file's header
+    // onto its last sequence line and that reference was lost
+    test("a FASTA without a final newline keeps the next file's first sequence") {
+        when {
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/decontamination/phiX174_no_final_newline.fasta", checkIfExists: true),
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                ]
+                input[1] = "contaminants"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def ann = path("${process.out.index.get(0)}/contaminants.ann").text
+            assert ann.contains("NC_001422.1")
+            assert ann.contains("NC_001416.1")
+        }
+    }
 }

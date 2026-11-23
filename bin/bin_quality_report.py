@@ -39,7 +39,7 @@ def main():
     """Main function to generate bin quality report."""
     
     # Find all quality report files
-    quality_files = glob.glob('*_quality_report.tsv')
+    quality_files = sorted(glob.glob('*_quality_report.tsv'))
     if not quality_files:
         print("ERROR: No quality report files found (*_quality_report.tsv)", file=sys.stderr)
         sys.exit(1)

@@ -210,6 +210,10 @@ RESERVED_COLUMNS = {
     "assembly", "pct_reads_on_contigs", "pct_reads_on_genes", "bin", "mean_depth_x", "pct_sample_bases", "gene_id",
     "contig", "arg_gene", "arg_class", "count", "tpm", "cpge", "abundance_tpm", "func_contig_genes_annotated_pct",
     "func_contig_annotated_by_abundance_pct",
+    # mag_cluster_abundance (--dereplicate_mags; roadmap Phase 21, RV13: missing here, a metadata column named
+    # cluster stopped the summary). tests/bin/test_results_summary.sh checks that every column of every
+    # metadata-joined table is in this set
+    "cluster", "relative_abundance_pct", "trimmed_mean_x", "covered_fraction",
 }
 
 
@@ -266,32 +270,93 @@ def tier1_table(calls, comparison, primary):
     return t1
 
 
-def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_samples=(), min_coverage=None):
+def other_tier1(calls_by, comparison, primary):
+    """Tier 1 calls of the methods other than the primary one in the samples the method comparison does not cover
+    (where the primary method did not run), in tier1_table's columns with a detected_by note; None when there is
+    none. The tier 1 table, a card and the ARG page take them (roadmap Phase 21, RV13; R5-02)."""
+    out = outside_comparison(calls_by, comparison)
+    if out is None or out.empty:
+        return None
+    t1 = out[(out["tier"] == 1) & (out["_m"] != primary)].copy()
+    if t1.empty:
+        return None
+    keep = ["sample", "method", "gene", "aro_full_name", "gene_family", "category", "assembly_coverage",
+            "supporting_reads", "rpkm"]
+    keep += [c for c in ("rgi_kmer_hosts", "rgi_host_check", "candidate_hosts") if c in t1.columns]
+    t1["detected_by"] = t1["_m"].map(lambda m: f"{METHOD_LABELS.get(m, m)} (not every method ran)")
+    return t1[keep + ["detected_by"]].reset_index(drop=True)
+
+
+def empty_assemblies(astats, asm_parts, batches):
+    """Assemblies BBMAP's length filter left without a contig (contigs_kept 0), which the pipeline drops before
+    the contig stages (pipeline_info/empty_assemblies.tsv): [(assembly, its samples, min contig length)]. The
+    assembly is prefixed with its results directory when several are merged."""
+    out = []
+    parts = dict(asm_parts)
+    samples_of = {b["label"]: sorted(b["samples"]) for b in batches}
+    for row in astats.itertuples():
+        if pd.isna(row.contigs_kept) or row.contigs_kept != 0:
+            continue
+        a = parts.get(row.batch)
+        groups = a["groups"] if a is not None else {}
+        if groups and row.assembly in set(groups.values()):
+            members = sorted(s for s, g in groups.items() if g == row.assembly)
+        elif row.assembly == "coassembly":
+            members = samples_of.get(row.batch, [])
+        else:
+            members = [row.assembly]
+        name = row.assembly if len(batches) == 1 else f"{row.batch}: {row.assembly}"
+        out.append((name, members, None if pd.isna(row.min_contig_length_bp) else int(row.min_contig_length_bp)))
+    return out
+
+
+def outside_comparison(calls_by, comparison):
+    """With several ARG methods: the calls (any tier) of every method in the samples the method comparison does not
+    cover, where not every method ran, with a _m method column. Every sample when no sample ran every method (a
+    merge of results directories whose methods ran on disjoint samples, so comparison is None). None with one
+    method. Roadmap Phase 21, RV13 (R5-02): the disjoint case lost the other methods' tier 1 genes."""
+    if not calls_by or len(calls_by) < 2:
+        return None
+    common = comparison["common"] if comparison is not None else set()
+    parts = [d[~d["sample"].isin(common)].assign(_m=m) for m, d in calls_by.items() if not d.empty]
+    return pd.concat(parts, ignore_index=True) if parts else pd.DataFrame(columns=["sample", "gene", "tier", "_m"])
+
+
+def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_samples=(), min_coverage=None,
+                    empty_asm=()):
     """Short findings for the report header: [(kind, text, anchor)].
 
     Tier 1 genes come from the method comparison when several ARG methods ran (so a gene only one method found
-    is listed too), plus the tier 1 calls (calls_by) in samples outside it, where not every method ran; else
-    from the primary method's tier 1 calls.
+    is listed too), plus the tier 1 calls (calls_by) in samples outside it, where not every method ran (every
+    sample when no sample ran every method); else from the primary method's tier 1 calls.
     """
     flags = []
     rows = None
-    if comparison is not None:
-        rows = comparison["comp"]
-        rows = rows[rows["tier"] == 1]
-        parts = [d[(d["tier"] == 1) & d["gene_representative"] & ~d["sample"].isin(comparison["common"])]
-                 .assign(_m=m) for m, d in (calls_by or {}).items() if not d.empty]
-        outside = pd.concat(parts, ignore_index=True) if parts else pd.DataFrame()
+    outside_all = outside_comparison(calls_by, comparison)
+    multi = outside_all is not None
+    if multi:
+        methods = (comparison["methods"] if comparison is not None
+                   else [m for m in ("kmarvel", "rgi") if m in calls_by])
+        if comparison is not None:
+            rows = comparison["comp"]
+            rows = rows[rows["tier"] == 1]
+        else:
+            rows = pd.DataFrame(columns=["sample", "gene", "tier", "detected_by"])
+        outside = outside_all[(outside_all["tier"] == 1) & outside_all["gene_representative"].astype(bool)] \
+            if not outside_all.empty else outside_all
         if not outside.empty:
             extra = []
             for (s, g), sub in outside.groupby(["sample", "gene"], sort=False):
-                found = " + ".join(METHOD_LABELS.get(m, m) for m in comparison["methods"] if m in set(sub["_m"]))
+                found = " + ".join(METHOD_LABELS.get(m, m) for m in methods if m in set(sub["_m"]))
                 rec = {"sample": s, "gene": g, "tier": 1, "detected_by": f"{found} (not every method ran)"}
                 for c in ("rgi_kmer_hosts", "rgi_host_check"):
                     if c in sub:
                         vals = sub[c].dropna()
                         rec[c] = vals.iloc[0] if not vals.empty else ""
                 extra.append(rec)
-            rows = pd.concat([rows, pd.DataFrame(extra)], ignore_index=True).sort_values("sample", kind="stable")
+            extra = pd.DataFrame(extra)
+            rows = (pd.concat([rows, extra], ignore_index=True) if not rows.empty else extra) \
+                .sort_values("sample", kind="stable")
     elif tier1 is not None:
         rows = tier1.drop_duplicates(["sample", "gene"])
     if rows is not None and not rows.empty:
@@ -303,16 +368,16 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
                 f"{h} ({c} sample{'s' if c > 1 else ''})" for c, h in tops[:3])) if tops else ""
             checks = set(sub.get("rgi_host_check", pd.Series(dtype=str)).fillna(""))
             text = f"{gene}: {n} sample{'s' if n > 1 else ''} ({', '.join(sub['sample'])}){host_txt}"
-            if comparison is not None:
+            if multi:
                 by = sub["detected_by"].fillna("")
                 n_all = int(by.str.contains(r"\+", regex=True).sum())
                 single = sorted({b for b in by if "+" not in b})
             if "non_watchlist_host" in checks and "watchlist_host" not in checks:
                 kind, note = "homolog", ("the RGI k-mer host is not a watchlist pathogen: possibly a related gene "
                                          "of a commensal")
-            elif comparison is not None and n_all == 0:
+            elif multi and n_all == 0:
                 kind, note = "single", f"found by {' / '.join(single)}"
-            elif comparison is not None:
+            elif multi:
                 kind, note = "tier1", f"found by every method in {n_all} of {n} samples"
             else:
                 kind, note = "tier1", ""
@@ -328,6 +393,12 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
                                       f"{min_coverage:g}: {', '.join(low_coverage_samples)} (a large part of the "
                                       "community is unsampled: a taxon or gene missing there is weak evidence, and "
                                       "an assembly recovers mainly the dominant populations)", "qc"))
+    for name, members, minlen in empty_asm:
+        flags.append(("empty_assembly",
+                      f"assembly {name} ({', '.join(members)}) kept no contig"
+                      + (f" of at least {minlen} bp" if minlen is not None else "")
+                      + ": it has no binning, contig taxonomy, contig ARG or contig functional results; its samples "
+                        "keep their read-level results", "assembly"))
     return flags
 
 
@@ -830,6 +901,7 @@ def main(argv=None):
     astats = assembly_stats_table(asm_parts)
     if astats is not None:
         tables["assembly_stats"] = (astats, False)
+        summary["empty_assemblies"] = empty_assemblies(astats, asm_parts, batches)
         use = read_use_frame(asm_parts, {b["label"]: sorted(b["samples"]) for b in batches})
         if use is not None:
             tables["assembly_read_use"] = (with_meta(use, samples, meta_cols, order, []), False)
@@ -919,8 +991,17 @@ def main(argv=None):
     tier1_view = None
     if prim_arg is not None and not prim_arg.empty:
         tier1_view = tier1_table(calls_by[primary], comparison, primary)
+    # the other methods' tier 1 calls where the primary method did not run (merged results directories): on the
+    # ARG page's tier 1 table and a card of their own
+    others_t1 = other_tier1(calls_by, comparison, primary) if methods_ran else None
+    if others_t1 is not None:
+        tier1_view = (others_t1 if tier1_view is None or tier1_view.empty
+                      else pd.concat([tier1_view, others_t1], ignore_index=True))
+        summary["n_tier1_other"] = int(others_t1["sample"].nunique())
+        summary["tier1_other_methods"] = " / ".join(METHOD_LABELS.get(m, m) for m in sorted(set(others_t1["method"])))
     summary["attention"] = attention_flags(tier1_view, comparison, summary["low_depth_samples"], calls_by,
-                                           summary.get("low_coverage_samples", ()), args.min_nonpareil_coverage)
+                                           summary.get("low_coverage_samples", ()), args.min_nonpareil_coverage,
+                                           summary.get("empty_assemblies", ()))
 
     qc_lead = ["batch"] + meta_cols
     qc = samples[qc_lead + [c for c in samples.columns if c not in qc_lead]]

@@ -40,6 +40,11 @@ nextflow_process {
             assert rows.drop(1).collect { r -> r.split('\t')[0] }.sort() == ['soil.fall21_metabat_bin.1', 'soil.fall21_metabat_bin.2']
             def versions = path(process.out.versions.get(0)).text
             assert versions.contains('gunc: 1.1.1') && versions.contains('diamond: 2.1.24') && versions.contains('gunc_db: progenomes_2.1')
+            // an unescaped \n in the printf put a script line at column 0, so
+            // Nextflow stripped no indentation and END_VERSIONS was written
+            // into versions.yml (roadmap Phase 21, RV12; review R4-04)
+            assert !versions.contains('END_VERSIONS')
+            assert new groovy.yaml.YamlSlurper().parseText(versions)['GUNC_RUN']['gunc'] == '1.1.1'
         }
     }
 

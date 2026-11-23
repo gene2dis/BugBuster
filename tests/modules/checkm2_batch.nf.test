@@ -42,6 +42,11 @@ nextflow_process {
                                'S2_comebin_quality_report.tsv', 'S2_metabat_quality_report.tsv']
             def log = path(process.out.versions.get(0)).parent.resolve('.command.log').text
             assert log.contains("Processing bin_2/comebin_res_bins -> sample_id=S2, binner=comebin")
+            // the Python heredoc's tab-only indentation left END_VERSIONS
+            // indented, so it was written into versions.yml (roadmap Phase 21, RV12)
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.startsWith('"CHECKM2_BATCH":') && !versions.contains('END_VERSIONS')
+            assert new groovy.yaml.YamlSlurper().parseText(versions)['CHECKM2_BATCH'].containsKey('checkm2')
         }
     }
 }

@@ -126,10 +126,16 @@ process GTDB_TK_BATCH {
         # Split the combined reports by sample prefix (<sample>__<bin>):
         # bin/gtdbtk_split.py stops on a bin whose prefix is not a sample of
         # the batch instead of dropping its row (roadmap Phase 20, RV3), and
-        # writes a header-only ar53 table when GTDB-Tk wrote no ar53 summary
-        if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ]; then
+        # writes header-only tables for a domain GTDB-Tk wrote no summary for
+        # (no genome placed in it): ar53 for bacteria-only bins, bac120 for
+        # archaea-only bins (roadmap Phase 21, RV9; review R4-03)
+        if [ -f gtdbtk_output/classify/gtdbtk.bac120.summary.tsv ] || [ -f gtdbtk_output/classify/gtdbtk.ar53.summary.tsv ]; then
             gtdbtk_split.py --samples ${meta_ids} --domain bac120 --summary gtdbtk_output/classify/gtdbtk.bac120.summary.tsv
             gtdbtk_split.py --samples ${meta_ids} --domain ar53 --summary gtdbtk_output/classify/gtdbtk.ar53.summary.tsv
+        else
+            echo "ERROR: GTDB-Tk wrote neither gtdbtk.bac120.summary.tsv nor gtdbtk.ar53.summary.tsv for \$total_bins bins; the end of its log:" >&2
+            tail -n 50 gtdbtk_output/gtdbtk.log >&2 || true
+            exit 1
         fi
     fi
     

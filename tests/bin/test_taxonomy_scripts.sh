@@ -435,6 +435,21 @@ expect_fail "sylph report: report missing a column fails" taxonomy_report.py --p
 check_grep "sylph report: missing-column failure names the column" "../taxonomy_report_sylph_badcols.log" \
     "missing report columns \['Unclassified'\]"
 
+# A per-sample report pandas cannot parse (a non-numeric Classified value) was
+# skipped with a warning and exit 0, leaving the sample's classification blank
+# (roadmap Phase 21, RV12; review R6-11): it fails now, naming the file
+SY_BADVAL="${WORK}/taxonomy_report_sylph_badvalue"
+mkdir -p "${SY_BADVAL}"
+cp "${FIXTURES}/sample1_sylph_gtdb_report.tsv" "${SY_BADVAL}/"
+printf 'Id\tSylph DB\tUnclassified\tClassified\nsample2\tgtdb\t0.25\thigh\n' > "${SY_BADVAL}/sample2_sylph_gtdb_report.tsv"
+cp "${FIXTURES}/Reads_report_fixture.csv" "${SY_BADVAL}/input_reads_report.csv"
+NEXT_WORKDIR="${SY_BADVAL}"
+expect_fail "sylph report: an unparsable report next to a good one fails" taxonomy_report.py --profiler sylph \
+    --reports sample1_sylph_gtdb_report.tsv sample2_sylph_gtdb_report.tsv \
+    --reads-report input_reads_report.csv --db-name gtdb --output-dir .
+check_grep "sylph report: unparsable-report failure names the file" "../taxonomy_report_sylph_badvalue.log" \
+    "sample2_sylph_gtdb_report.tsv cannot be parsed as a"
+
 #
 # taxonomy_phyloseq.py — sylph branch
 #

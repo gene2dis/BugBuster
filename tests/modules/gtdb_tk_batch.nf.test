@@ -48,4 +48,54 @@ nextflow_process {
             assert !versions.contains('END_VERSIONS')
         }
     }
+
+    // Roadmap Phase 21, RV9 (review R4-03): GTDB-Tk writes no bac120 summary
+    // when every bin is archaeal, and the split ran only inside an "is there a
+    // bac120 summary" test, so the task ended with a missing output after the
+    // whole GTDB-Tk run. tests/modules/gtdbtk_stand_in.sh stands in for gtdbtk
+    // (no database): it writes the ar53 summary only, or no summary
+    test("GTDB_TK_BATCH: archaea-only bins (ar53 summary, no bac120) give both tables") {
+        config "./gtdbtk_stand_in.config"
+        when {
+            process {
+                """
+                input[0] = [
+                    [ [ id: 'S1' ] ],
+                    [ file("${projectDir}/tests/data/bins/batch_one_bin/S1_metabat_bins", checkIfExists: true) ],
+                    file("${projectDir}/tests/data/bins/batch_no_bins/S1_metabat_bins/SKIPPED.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def reports = process.out.gtdb_tk.get(0)[1].collectEntries { f -> [new File(f.toString()).name, path(f.toString()).readLines()] }
+            assert reports.keySet() == ['S1_gtdbtk_ar53.tsv', 'S1_gtdbtk_bac120.tsv'] as Set
+            assert reports['S1_gtdbtk_ar53.tsv'].size() == 2
+            assert reports['S1_gtdbtk_ar53.tsv'][1].startsWith("S1_metabat_bin.1\td__Archaea;")
+            assert reports['S1_gtdbtk_bac120.tsv'].size() == 1
+            assert reports['S1_gtdbtk_bac120.tsv'][0].startsWith("user_genome\tclassification\t")
+        }
+    }
+
+    test("GTDB_TK_BATCH: no summary at all stops with a message") {
+        config "./gtdbtk_stand_in.config"
+        when {
+            process {
+                """
+                input[0] = [
+                    [ [ id: 'S1' ] ],
+                    [ file("${projectDir}/tests/data/bins/batch_noclass/S1_metabat_bins", checkIfExists: true) ],
+                    file("${projectDir}/tests/data/bins/batch_no_bins/S1_metabat_bins/SKIPPED.txt", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.failed
+            assert (process.stdout + process.stderr).any { line -> line.contains("GTDB-Tk wrote neither gtdbtk.bac120.summary.tsv nor gtdbtk.ar53.summary.tsv") }
+        }
+    }
 }

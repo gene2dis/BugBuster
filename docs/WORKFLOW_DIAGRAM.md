@@ -309,7 +309,9 @@ flowchart TD
 
 **Outputs:** `contigs_meta` (`[meta, contigs]`), `bam` (`[meta, contigs, bam]`; the pooled
 BAM under co-assembly), `bam_meta`, `counting_bam` (one BAM per sample in both modes), BBMap
-`*_contig.stats` and `contig_filtering_summary.txt` (both read by `RESULTS_SUMMARY`).
+`*_contig.stats` and `contig_filtering_summary.txt` (both read by `RESULTS_SUMMARY`). An assembly
+with no contig after BBMAP's filter is in none of the contig and BAM outputs; it is listed in
+`pipeline_info/empty_assemblies.tsv` (`empty_assemblies`).
 
 ### 7. BINNING
 
@@ -643,7 +645,7 @@ Top level of `--output`; the full tree, with every file, is in
 results/
 ├── pipeline_info/               # Execution report, timeline, trace, DAG, software_versions.yml,
 │                                # contig_filtering_summary.txt, coassembly_groups.tsv /
-│                                # multisample_groups.tsv (with groups)
+│                                # multisample_groups.tsv (with groups), empty_assemblies.tsv
 ├── 00_summary/                  # Run summary (results_summary=true, default): report/ (HTML),
 │                                # results_summary.html / .pdf / .xlsx, README.md, LLM_GUIDE.md,
 │                                # tables/, figures/

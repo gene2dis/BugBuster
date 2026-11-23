@@ -1,0 +1,73 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ARGS_OAP Module Test
+
+    Roadmap Phase 21, RV12 (review R4-14): with --quality_control false the
+    samplesheet's reads reach ARGS_OAP as they are, and the samplesheet
+    accepts uncompressed FASTQ. Every read file was linked as .fastq.gz and
+    stage one ran with -f fastq.gz, and the singleton file was checked with
+    gzip -t, so a plain singleton file stopped the task. The links are now
+    named by content and stage one runs with -f fastq, which takes *.fastq and
+    *.fastq.gz together. Real ARGs-OAP 4.0.0, its bundled SARG / 16S / marker
+    databases (indexed in the task, ~12 s), on the 2-read-pair committed
+    fixtures: plain pairs and a gzipped singleton file.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test ARGS_OAP Process"
+    script "../../modules/local/args_oap/main.nf"
+    process "ARGS_OAP"
+
+    test("uncompressed read pairs and a gzipped singleton file") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 's1' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def out = path(process.out.args_oap.get(0)[1])
+            // nRead per ARGs-OAP sample: both mates of the 10 plain pairs, and
+            // the 10 reads of the gzipped singleton file
+            def nread = out.resolve("metadata.txt").readLines().drop(1).collectEntries { line ->
+                def f = line.split('\t'); [f[0], f[1]] }
+            assert nread == ['s1_tmp_reads': '20', 's1_tmp_reads_S': '10']
+        }
+    }
+
+    test("gzipped reads: the same samples and counts as before") {
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 's1' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def nread = path(process.out.args_oap.get(0)[1]).resolve("metadata.txt").readLines().drop(1).collectEntries { line ->
+                def f = line.split('\t'); [f[0], f[1]] }
+            assert nread == ['s1_tmp_reads': '20', 's1_tmp_reads_S': '10']
+        }
+    }
+}

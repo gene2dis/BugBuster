@@ -62,12 +62,29 @@ process METABAT2 {
         exit 1
     fi
     
-    # Run MetaBAT2
+    # Run MetaBAT2. With contigs but none of --metabat_minContig bp it stops
+    # with exit 1 ("There were no large target contigs"), which ended the run
+    # for a sample that just has no bins: write the bin directory with a
+    # SKIPPED.txt instead, as SEMIBIN and COMEBIN do (Binette, CHECKM2_BATCH
+    # and GTDB_TK_BATCH skip a directory without .fa files; roadmap Phase 21,
+    # RV10). Every other failure still fails the task
+    status=0
     metabat2 -i ${contigs} \\
              -a ${depth} \\
              -o ${prefix}_metabat_bins/${prefix}_metabat_bin \\
              ${args} \\
-             -t ${task.cpus}
+             -t ${task.cpus} > metabat2.log 2>&1 || status=\$?
+    cat metabat2.log >&2
+    if [ "\$status" -ne 0 ]; then
+        if grep -q 'There were no large target contigs' metabat2.log; then
+            echo "WARNING: no contig of ${prefix} reaches MetaBAT2's minimum contig length; MetaBAT2 skipped" >&2
+            mkdir -p ${prefix}_metabat_bins
+            echo "No contig reaches MetaBAT2's minimum contig length (--metabat_minContig) - MetaBAT2 skipped" > ${prefix}_metabat_bins/SKIPPED.txt
+        else
+            exit "\$status"
+        fi
+    fi
+    rm -f metabat2.log
 
     # MetaBAT2 2.18 writes depth fields after the contig name in bin FASTA
     # headers; refiners and the bin depth step match contigs by the whole
