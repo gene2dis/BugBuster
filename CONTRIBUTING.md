@@ -177,7 +177,7 @@ feat(modules): add DIAMOND module for protein alignment
   to task) but shares the host `/tmp`. A tool that names its temp files by PID (tRNAscan-SE's
   `/tmp/tscan<PID>`, inside Bakta) can collide with a task running beside it, so give such a
   process a `TMPDIR` in its task directory: `ext.tmpdir_in_task = true` in its
-  `config/modules.config` block (see BAKTA_BAKTA), which `conf/base.config`'s `containerOptions`
+  `config/modules.config` block (see NFCORE_BAKTA_BAKTA), which `conf/base.config`'s `containerOptions`
   turns into `--env TMPDIR=$PWD`. Not a `beforeScript`, which would replace the `module load` an
   HPC config puts there, and not a `withName` `containerOptions`, which would replace base.config's
 - Upstream bugs are worked around in `bin/`, never by editing an image:

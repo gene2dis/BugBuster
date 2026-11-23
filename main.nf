@@ -156,10 +156,10 @@ include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samt
 include { BLOBPLOT         } from './modules/local/blobplot/main'
 
 	// ORF PREDICTION IN CONTIGS AND BINS
-	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
+	// NFCORE_PYRODIGAL (nf-core pyrodigal) is the shared contig gene-calling step (design doc Q9): one
 	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
 	// (contig_level_functional)
-include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
+include { PYRODIGAL as NFCORE_PYRODIGAL } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
 include { ARGS_OAP         } from './modules/local/args_oap/main'
@@ -842,19 +842,19 @@ workflow {
     def run_contig_deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
     if ( (run_contig_deeparg || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
-        // Run nf-core PYRODIGAL for contig ORF prediction
-        // nf-core PYRODIGAL signature:
+        // Run nf-core pyrodigal (NFCORE_PYRODIGAL) for contig ORF prediction
+        // nf-core pyrodigal signature:
         //   input:  tuple val(meta), path(fasta) + val(output_format)
         //   output: tuple val(meta), path("*.faa.gz"), emit: faa
         //           tuple val(meta), path("*.gff.gz"), emit: annotations
         //
-        PYRODIGAL(
+        NFCORE_PYRODIGAL(
             ch_contigs_meta,
             "gff"  // output_format
         )
-        ch_contig_proteins  = PYRODIGAL.out.faa
-        ch_contig_genes_gff = PYRODIGAL.out.annotations
-        ch_versions = ch_versions.mix(PYRODIGAL.out.versions.first())
+        ch_contig_proteins  = NFCORE_PYRODIGAL.out.faa
+        ch_contig_genes_gff = NFCORE_PYRODIGAL.out.annotations
+        ch_versions = ch_versions.mix(NFCORE_PYRODIGAL.out.versions.first())
     }
 
     //

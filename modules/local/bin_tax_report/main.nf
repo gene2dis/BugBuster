@@ -35,6 +35,11 @@ process BIN_TAX_REPORT {
     """
     touch MAGs_tax_plot.pdf MAGs_tax_plot.svg MAGs_tax_plot.png MAGs_tax_plot.csv
     touch MAGs_tax_summary.csv
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+        matplotlib: 3.11.2
+    END_VERSIONS
     """
 }

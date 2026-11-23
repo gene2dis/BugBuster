@@ -37,6 +37,9 @@ process CALCULATE_DEPTH {
 
     script:
     prefix = meta.id
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
     
     // Input validation
     if (!meta || !meta.id) {
@@ -49,7 +52,7 @@ process CALCULATE_DEPTH {
     """
     set -euo pipefail
     
-    jgi_summarize_bam_contig_depths --outputDepth depth.txt ${bam}
+    jgi_summarize_bam_contig_depths ${args} --outputDepth depth.txt ${bam}
     mv depth.txt ${prefix}_depth.txt
     
     cat <<-END_VERSIONS > versions.yml

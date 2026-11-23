@@ -104,7 +104,7 @@ time observed on the pipeline's own validation runs:
 | `WOLTKA_ALIGN` | read (woltka) | 64.8 GB | — | test data; the WoLr2 index alone needs ≥ 68 GB RAM |
 | `HUMANN` | read (humann) | 23.5 GB | ~9 min per sample | test data, full ChocoPhlAn |
 | `SUPERFOCUS` | read (superfocus) | ~16 GB | 66–93 min per sample | real samples, DIAMOND |
-| `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
+| `NFCORE_BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
 
 These are observations, not limits: needs grow with input size and community
 complexity. The eggNOG search requests 16 CPUs and 96 GB on the first attempt;
@@ -120,7 +120,7 @@ eggNOG-mapper's default `sensitive` DIAMOND mode; the pipeline now runs it with
 11 min instead of 56 and 3,241 instead of 37,762 CPU seconds, for 1.6 % fewer
 proteins with a seed ortholog. The annotate step (8 CPUs, 48 GB on the first
 attempt) peaked at 35.1 GB. `RUN_DBCAN` runs on 8 CPUs (16 GB), as fast as on
-16, and `BAKTA_BAKTA` on 4 CPUs (16 GB) per bin.
+16, and `NFCORE_BAKTA_BAKTA` on 4 CPUs (16 GB) per bin.
 
 #### Contig taxonomy (Metabuli) and geNomad
 

@@ -31,6 +31,10 @@ process BIN_SUMMARY {
     stub:
     """
     touch Bin_summary.csv
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+    END_VERSIONS
     """
 }

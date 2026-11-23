@@ -104,7 +104,7 @@ nextflow_pipeline {
             assert report_text.contains("singleton_test")
             assert report_text.toLowerCase().contains("singleton")
 
-            // Audit #14: the FASTP_SINGLETON selector must carry the knob too
+            // Audit #14: the NFCORE_FASTP_SINGLETON selector must carry the knob too
             def singleton_json = path("${outputDir}/01_quality_control/fastp/singleton_test/singleton_test_Singleton.fastp.json")
             assert singleton_json.exists()
             assert singleton_json.text.contains("--qualified_quality_phred 20")
@@ -299,6 +299,10 @@ nextflow_pipeline {
             // under stub/ in a -stub run (roadmap RV14, R2-05), never where a real
             // run's copy goes; no database is published under the output
             assert path("${outputDir}/../databases/stub/bwamem3_index/contaminants_index").exists()
+            // Registry database releases reach software_versions.yml (review R2-08)
+            def vtext = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert vtext.contains("gtdbtk_db: GTDB release 232 GTDB-TK version")
+            assert vtext.contains("checkm2_db: Checkm2 database version 3")
             assert !path("${outputDir}/../databases/bwamem3_index").exists()
             assert TestData.databaseFolders(outputDir) == []
         }
@@ -1526,7 +1530,7 @@ nextflow_pipeline {
         then {
             assert workflow.success
             // "true": QC ran; the min_read_sample comparison passed both samples
-            assert workflow.trace.tasks().count { task -> task.name.contains("QC:FASTP") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("QC:NFCORE_FASTP (") } == 2
             assert workflow.trace.tasks().count { task -> task.name.contains("WOLTKA_CLASSIFY") } == 2
             // "false": every disabled branch stays off
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
@@ -1822,7 +1826,7 @@ nextflow_pipeline {
             assert workflow.success
 
             // Per-bin fan-out: 2 samples x 2 Binette stub bins = 4 tasks
-            assert workflow.trace.tasks().count { task -> task.name.contains("BAKTA_BAKTA") } == 4
+            assert workflow.trace.tasks().count { task -> task.name.contains("NFCORE_BAKTA_BAKTA") } == 4
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_BAKTA_DB") } == 1
 
             // Contig branch fully off: none of its processes or databases run
@@ -2192,6 +2196,7 @@ nextflow_pipeline {
             assert !path("${tax}/tables/sourmash_gtdb_220_k31_otu_table.tsv").exists()
             assert path("${tax}/tables/Reads_report_taxonomy.csv").exists()
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("sourmash: 4.9.4")
+            assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("sourmash_db: custom (stub_db.zip)")
         }
     }
 
@@ -2360,6 +2365,8 @@ nextflow_pipeline {
             assert path("${tax}/tables/kraken2_stub_db_otu_table.tsv").exists()
             assert !path("${tax}/tables/kraken2_standard-8_otu_table.tsv").exists()
             assert path("${tax}/tables/Reads_report_taxonomy.csv").exists()
+            // The database reaches software_versions.yml (review R2-08)
+            assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("kraken2_db: custom (stub_db)")
         }
     }
 
@@ -2502,8 +2509,9 @@ nextflow_pipeline {
             assert vtext.contains('"gene2dis/BugBuster":')   // workflow block
             assert vtext.contains("fastp:")                  // nf-core module
             assert vtext.contains("bash:")                   // new QFILTER capture
-            // Content-dedup: ONE block per process despite two samples
-            assert vtext.count('"QC:FASTP":') == 1
+            // Content-dedup: ONE block per process despite two samples. nf-core
+            // modules are imported with an NFCORE_ alias (review R2-11)
+            assert vtext.count('"QC:NFCORE_FASTP":') == 1
         }
     }
 }

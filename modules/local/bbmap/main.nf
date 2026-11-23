@@ -114,8 +114,17 @@ process BBMAP {
     // tests/empty_assembly.config; roadmap Phase 21, RV10)
     if ((task.ext.stub_empty_ids ?: []).contains(meta.id)) {
         """
+        # BBMap stats.sh's layout (run on the unfiltered contigs), so a consumer
+        # sees the same shape as from a real run (review R4-13)
+        stats_txt() {
+            printf 'A\\tC\\tG\\tT\\tN\\tIUPAC\\tOther\\tGC\\tGC_stdev\\n0.2500\\t0.2500\\t0.2500\\t0.2500\\t0.0000\\t0.0000\\t0.0000\\t0.5000\\t0.0100\\n\\n'
+            for k in scaffold contig; do printf 'Main genome %s total:           \\t%s\\n' "\$k" "\$1"; done
+            printf 'Main genome scaffold sequence total:\\t%s Mb\\nMain genome contig sequence total:  \\t%s Mb  \\t0.000%% gap\\n' "\$2" "\$2"
+            printf 'Main genome scaffold N/L50:         \\t%s\\nMain genome contig N/L50:           \\t%s\\n' "\$3" "\$3"
+            printf 'Max scaffold length:                \\t%s Kbp\\nMax contig length:                  \\t%s Kbp\\n' "\$4" "\$4"
+        }
         : > ${prefix}_filtered_contigs.fa
-        printf '#name\\tlength\\tgc\\n' > ${prefix}_contig.stats
+        stats_txt 3 0.002 2/700 0.800 > ${prefix}_contig.stats
         printf 'sample_id\\t%s\\ncontigs_before_filter\\t3\\ncontigs_after_filter\\t0\\nmin_length_threshold\\t1000\\nall_contigs_filtered\\tTRUE\\n' ${prefix} > ${prefix}_filter_report.txt
         printf '"%s":\\n    bbmap: 40.05\\n' "${task.process}" > versions.yml
         """
@@ -129,12 +138,16 @@ process BBMAP {
     TGCATGCATGCATGCATGCATGCATGCATGCATGCATGCATGCA
     EOF
     
-    # Create a minimal stats file
-    cat > ${prefix}_contig.stats << 'EOF'
-    #name	length	gc
-    filtered_contig_1	2000	0.50
-    filtered_contig_2	3500	0.48
-    EOF
+    # BBMap stats.sh's layout (run on the unfiltered contigs), so a consumer
+    # sees the same shape as from a real run (review R4-13)
+    stats_txt() {
+        printf 'A\\tC\\tG\\tT\\tN\\tIUPAC\\tOther\\tGC\\tGC_stdev\\n0.2500\\t0.2500\\t0.2500\\t0.2500\\t0.0000\\t0.0000\\t0.0000\\t0.5000\\t0.0100\\n\\n'
+        for k in scaffold contig; do printf 'Main genome %s total:           \\t%s\\n' "\$k" "\$1"; done
+        printf 'Main genome scaffold sequence total:\\t%s Mb\\nMain genome contig sequence total:  \\t%s Mb  \\t0.000%% gap\\n' "\$2" "\$2"
+        printf 'Main genome scaffold N/L50:         \\t%s\\nMain genome contig N/L50:           \\t%s\\n' "\$3" "\$3"
+        printf 'Max scaffold length:                \\t%s Kbp\\nMax contig length:                  \\t%s Kbp\\n' "\$4" "\$4"
+    }
+    stats_txt 10 0.012 3/2000 3.500 > ${prefix}_contig.stats
     
     # Create filter report
     cat > ${prefix}_filter_report.txt << 'EOF'

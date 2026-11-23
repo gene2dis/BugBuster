@@ -160,8 +160,21 @@ process BBNORM {
     echo "@stub/2" | gzip > ${prefix}_norm_R2.fastq.gz
     S_files=()
     ${classify_reads}
-    if [ \${#S_files[@]} -gt 0 ]; then
-        echo "@stub" | gzip > ${prefix}_norm_singleton.fastq.gz
+    # Singleton names as the script gives them: one file keeps its compression
+    # in the suffix, several are numbered (review R4-13)
+    singleton_suffix() {
+        case "\$1" in
+            *.gz)  echo fastq.gz ;;
+            *.bz2) echo fastq.bz2 ;;
+            *)     echo fastq ;;
+        esac
+    }
+    if [ \${#S_files[@]} -eq 1 ]; then
+        cp -L "\${S_files[0]}" ${prefix}_norm_singleton.\$(singleton_suffix "\${S_files[0]}")
+    elif [ \${#S_files[@]} -gt 1 ]; then
+        for i in "\${!S_files[@]}"; do
+            cp -L "\${S_files[i]}" ${prefix}_norm_singleton_\$(( i + 1 )).\$(singleton_suffix "\${S_files[i]}")
+        done
     fi
     printf 'sample_id\\tmethod\\tpairs_in\\tpairs_kept\\tpercent_kept\\n${prefix}\\tbbnorm\\t10\\t8\\t80.00\\n' > ${prefix}_read_reduction.tsv
     touch ${prefix}_bbnorm.log

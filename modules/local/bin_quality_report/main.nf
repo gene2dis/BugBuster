@@ -37,6 +37,11 @@ process BIN_QUALITY_REPORT {
     touch Mag_quality_summary.csv
     touch All_Mag_quality_table.csv
     touch Refined_Mag_quality_table.csv
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+        matplotlib: 3.11.2
+    END_VERSIONS
     """
 }

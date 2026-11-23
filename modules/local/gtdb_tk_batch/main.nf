@@ -39,6 +39,9 @@ process GTDB_TK_BATCH {
     task.ext.when == null || task.ext.when
 
     script:
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     // pplacer threads (performance review M10): 4 placed genomes 1.5-2x
     // faster than 1 for ~7 % more memory; never more than the task's CPUs
@@ -117,6 +120,7 @@ process GTDB_TK_BATCH {
         # GTDB-Tk 2.7 removed --skip_ani_screen/--mash_db: the ANI screen
         # always runs, against the skani DB bundled in the R232 data package
         gtdbtk classify_wf \\
+            ${args} \\
             --genome_dir combined_bins \\
             --out_dir gtdbtk_output \\
             --cpus ${task.cpus} \\
@@ -148,15 +152,14 @@ process GTDB_TK_BATCH {
     stub:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     """
-    # Create stub taxonomy files for each sample
+    # Stub taxonomy files for each sample, in GTDB-Tk 2.8's 20-column summary
+    # layout as the script writes them; ar53 header-only (review R4-13)
+    header="user_genome\\tclassification\\tclosest_genome_reference\\tclosest_genome_reference_radius\\tclosest_genome_taxonomy\\tclosest_genome_ani\\tclosest_genome_af\\tclosest_placement_reference\\tclosest_placement_radius\\tclosest_placement_taxonomy\\tclosest_placement_ani\\tclosest_placement_af\\tpplacer_taxonomy\\tclassification_method\\tnote\\tother_related_references(genome_id,species_name,radius,ANI,AF)\\tmsa_percent\\ttranslation_table\\tred_value\\twarnings"
     for meta_id in ${meta_ids}; do
-        cat > \${meta_id}_gtdbtk_bac120.tsv << 'EOF'
-    user_genome	classification
-    bin.1	d__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli
-    bin.2	d__Bacteria;p__Firmicutes;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis
-    EOF
-        
-        touch \${meta_id}_gtdbtk_ar53.tsv
+        printf "\${header}\\n" > \${meta_id}_gtdbtk_bac120.tsv
+        printf 'bin.1\\td__Bacteria;p__Proteobacteria;c__Gammaproteobacteria;o__Enterobacterales;f__Enterobacteriaceae;g__Escherichia;s__Escherichia coli\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\ttaxonomic classification defined by topology and ANI\\tN/A\\tN/A\\t95.0\\t11\\tN/A\\tN/A\\n' >> \${meta_id}_gtdbtk_bac120.tsv
+        printf 'bin.2\\td__Bacteria;p__Firmicutes;c__Bacilli;o__Bacillales;f__Bacillaceae;g__Bacillus;s__Bacillus subtilis\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\tN/A\\ttaxonomic classification defined by topology and ANI\\tN/A\\tN/A\\t93.0\\t11\\tN/A\\tN/A\\n' >> \${meta_id}_gtdbtk_bac120.tsv
+        printf "\${header}\\n" > \${meta_id}_gtdbtk_ar53.tsv
     done
     
     cat <<-END_VERSIONS > versions.yml

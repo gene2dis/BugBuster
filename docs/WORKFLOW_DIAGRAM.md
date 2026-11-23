@@ -47,8 +47,8 @@ flowchart TD
     BINNING -->|gunc_prediction| GUNC_RUN["GUNC_RUN<br/>chimerism of the refined MAGs"]
     BINNING -->|"dereplicate_mags<br/>(≥ 2 binners)"| Derep["GALAH_CLUSTER → COVERM_GENOME<br/>run-level MAG clusters and<br/>their abundance per sample"]
     Clean -->|dereplicate_mags| Derep
-    ASSEMBLY -->|"contig_tax_and_arg or<br/>arg_bin_clustering or<br/>contig_level_functional"| PYRODIGAL["PYRODIGAL<br/>shared gene calling"]
-    PYRODIGAL -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| DEEPARG_CONTIGS
+    ASSEMBLY -->|"contig_tax_and_arg or<br/>arg_bin_clustering or<br/>contig_level_functional"| NFCORE_PYRODIGAL["NFCORE_PYRODIGAL<br/>shared gene calling"]
+    NFCORE_PYRODIGAL -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| DEEPARG_CONTIGS
     ASSEMBLY -->|genomad_prediction| NFCORE_GENOMAD_ENDTOEND["NFCORE_GENOMAD_ENDTOEND<br/>plasmid / virus / provirus"]
     ASSEMBLY -->|contig_tax_and_arg| ContigTax["Contig taxonomy + ARG<br/>METABULI_CLASSIFY, BLOBTOOLS,<br/>ARG_CONTIG_LEVEL_REPORT"]
     DEEPARG_CONTIGS --> ContigTax
@@ -59,7 +59,7 @@ flowchart TD
     BIN_CONTIG_LABELS --> ContigTax
     BIN_CONTIG_LABELS -->|arg_bin_clustering| BinARG["Bin-level ARG clustering<br/>BIN_ARG_SPLIT → ARG_FASTA_FORMATTER<br/>→ CLUSTERING"]
     DEEPARG_CONTIGS --> BinARG
-    PYRODIGAL -->|contig_level_functional| FUNCTIONAL_ANNOTATION["FUNCTIONAL_ANNOTATION<br/>contig: eggNOG-mapper, run_dbcan,<br/>featureCounts → AGGREGATE_FUNCTIONS<br/>MAG: Bakta per refined bin"]
+    NFCORE_PYRODIGAL -->|contig_level_functional| FUNCTIONAL_ANNOTATION["FUNCTIONAL_ANNOTATION<br/>contig: eggNOG-mapper, run_dbcan,<br/>featureCounts → AGGREGATE_FUNCTIONS<br/>MAG: Bakta per refined bin"]
     BINNING -->|"mag_level_functional<br/>(≥ 2 binners)"| FUNCTIONAL_ANNOTATION
     MICROBECENSUS --> FUNCTIONAL_ANNOTATION
 
@@ -88,7 +88,7 @@ flowchart TD
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
     classDef data fill:#FFF8E6,stroke:#E69F00,stroke-width:1.5px,color:#111
     class INPUT_CHECK,PREPARE_DATABASES,QC,NONPAREIL,TAXONOMY,ASSEMBLY,SOFTWARE_VERSIONS,RESULTS_SUMMARY on
-    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,GUNC_RUN,Derep,PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
+    class ARGS_OAP,RgiSteps,KMARVEL,MICROBECENSUS,READ_FUNCTIONAL,BINNING,MULTISAMPLE_COVERAGE,GUNC_RUN,Derep,NFCORE_PYRODIGAL,DEEPARG_CONTIGS,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,ContigTax,BIN_CONTIG_LABELS,BinARG,FUNCTIONAL_ANNOTATION opt
     class Input,Clean,Versions data
 ```
 
@@ -124,7 +124,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `MULTISAMPLE_COVERAGE` | `multisample_binning` and `include_binning` (groups of ≥ 2 samples; by `multisample_group_by`, else the whole run) | needs `assembly_mode == 'assembly'`, `include_binning`, `metabat2` in `binners`, `read_aligner == 'bwamem3'`; `multisample_group_by` needs `multisample_binning` and `sample_metadata`, with the group rules of `coassembly_group_by` (label not `multisample`); warning above 20 samples per group |
 | `GUNC_RUN` | `gunc_prediction` and `include_binning` (assemblies without refined bins skipped) | `gunc_prediction` needs `include_binning` |
 | `GALAH_CLUSTER`, `COVERM_GENOME` | `dereplicate_mags` and `include_binning` (assemblies without refined bins left out; no task without any); either assembly mode, with or without `multisample_binning` | `dereplicate_mags` needs `include_binning` and ≥ 2 `binners`; `dereplicate_ani` 80-100 |
-| `PYRODIGAL` | (`contig_tax_and_arg` or `arg_bin_clustering` or `contig_level_functional`) and an assembly | — |
+| `NFCORE_PYRODIGAL` | (`contig_tax_and_arg` or `arg_bin_clustering` or `contig_level_functional`) and an assembly | — |
 | `DEEPARG_CONTIGS` | (`contig_tax_and_arg` or `arg_bin_clustering`) and an assembly | — |
 | `BIN_CONTIG_LABELS` | `include_binning` and (`contig_tax_and_arg` or `arg_bin_clustering`) | — |
 | `NFCORE_GENOMAD_ENDTOEND` | `genomad_prediction` and an assembly (assemblies without contigs skipped) | needs an assembly |
@@ -210,8 +210,8 @@ through their `--custom_*` option.
 ```mermaid
 flowchart TD
     Reads(["[meta, reads]"]) --> Q{quality_control<br/>default true}
-    Q -->|true| FASTP["FASTP (R1/R2)<br/>+ FASTP_SINGLETON (s)"]
-    FASTP --> QFILTER["QFILTER<br/>read counts after fastp"]
+    Q -->|true| NFCORE_FASTP["NFCORE_FASTP (R1/R2)<br/>+ NFCORE_FASTP_SINGLETON (s)"]
+    NFCORE_FASTP --> QFILTER["QFILTER<br/>read counts after fastp"]
     QFILTER -->|"reads >= min_read_sample<br/>(default 0: no filter)"| Decon{read_aligner}
     Decon -->|"bwamem3 (default)"| BWAMEM3_DECONTAMINATE
     Decon -->|bowtie2| BOWTIE2_DECONTAMINATE
@@ -223,7 +223,7 @@ flowchart TD
     Clean -->|"nonpareil (default true)<br/>(R1 only)"| NONPAREIL["NONPAREIL<br/>k-mer redundancy curve<br/>+ Nonpareil.curve fit"]
 
     classDef on fill:#E8F4EC,stroke:#009E73,stroke-width:2px,color:#111
-    class FASTP,QFILTER,BWAMEM3_DECONTAMINATE,READS_REPORT,NONPAREIL on
+    class NFCORE_FASTP,QFILTER,BWAMEM3_DECONTAMINATE,READS_REPORT,NONPAREIL on
 ```
 
 ### 4. TAXONOMY
@@ -387,14 +387,14 @@ one-sample group's assembly is binned as without the option. Nothing is publishe
 
 ### 8. Contig taxonomy, contig ARGs and geNomad
 
-One Pyrodigal pass per assembly (`PYRODIGAL`, nf-core) feeds DeepARG, the bin-level split and
+One Pyrodigal pass per assembly (`NFCORE_PYRODIGAL`, nf-core) feeds DeepARG, the bin-level split and
 the functional branch. DeepARG runs once per assembly; its hits give the contig table and,
 split by bin, the bin-level ARGs.
 
 ```mermaid
 flowchart TD
-    Contigs(["contigs + BAM"]) -->|"contig_tax_and_arg or arg_bin_clustering<br/>or contig_level_functional"| PYRODIGAL["PYRODIGAL<br/>proteins + GFF"]
-    PYRODIGAL -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| DEEPARG_CONTIGS["DEEPARG_CONTIGS<br/>one run per assembly"]
+    Contigs(["contigs + BAM"]) -->|"contig_tax_and_arg or arg_bin_clustering<br/>or contig_level_functional"| NFCORE_PYRODIGAL["NFCORE_PYRODIGAL<br/>proteins + GFF"]
+    NFCORE_PYRODIGAL -->|"contig_tax_and_arg or<br/>arg_bin_clustering"| DEEPARG_CONTIGS["DEEPARG_CONTIGS<br/>one run per assembly"]
 
     Contigs -->|contig_tax_and_arg| METABULI_CLASSIFY["METABULI_CLASSIFY<br/>refseq_standard"]
     Contigs -->|contig_tax_and_arg| NFCORE_SAMTOOLS_INDEX
@@ -418,7 +418,7 @@ flowchart TD
     DEEPARG_CONTIGS -.->|"contig_level_functional:<br/>.mapping.ARG (ARG gene abundance)"| RESULTS_SUMMARY
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
+    class NFCORE_PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
 ```
 
 `METABULI_CLASSIFY` through `ARG_BLOBPLOT` need `contig_tax_and_arg`; geNomad runs on its own
@@ -433,13 +433,13 @@ with `contig_tax_and_arg`. `bin/blobtools_nodes_fix.sh` renames NCBI's `domain` 
 ```mermaid
 flowchart LR
     BIN_CONTIG_LABELS["BIN_CONTIG_LABELS<br/>contig → bin"] --> BIN_ARG_SPLIT
-    PYRODIGAL["PYRODIGAL proteins"] --> BIN_ARG_SPLIT
+    NFCORE_PYRODIGAL["NFCORE_PYRODIGAL proteins"] --> BIN_ARG_SPLIT
     DEEPARG_CONTIGS["DEEPARG_CONTIGS hits"] --> BIN_ARG_SPLIT["BIN_ARG_SPLIT<br/>hits and proteins by bin"]
     BIN_ARG_SPLIT -->|"samples with ≥ 1 hit"| ARG_FASTA_FORMATTER["ARG_FASTA_FORMATTER<br/>ARG proteins per bin"]
     ARG_FASTA_FORMATTER --> CLUSTERING["CLUSTERING<br/>MMseqs2 at four identity levels"]
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class BIN_CONTIG_LABELS,PYRODIGAL,DEEPARG_CONTIGS,BIN_ARG_SPLIT,ARG_FASTA_FORMATTER,CLUSTERING opt
+    class BIN_CONTIG_LABELS,NFCORE_PYRODIGAL,DEEPARG_CONTIGS,BIN_ARG_SPLIT,ARG_FASTA_FORMATTER,CLUSTERING opt
 ```
 
 Runs with `arg_bin_clustering` and `include_binning` (a launch check requires both).
@@ -451,7 +451,7 @@ binners (Bakta annotates only Binette's quality-filtered bins).
 
 ```mermaid
 flowchart TD
-    Prot(["PYRODIGAL proteins + GFF"]) -->|contig_level_functional| EGGNOG_MAPPER_SEARCH["EGGNOG_MAPPER_SEARCH<br/>DIAMOND, --dmnd_sensmode fast"]
+    Prot(["NFCORE_PYRODIGAL proteins + GFF"]) -->|contig_level_functional| EGGNOG_MAPPER_SEARCH["EGGNOG_MAPPER_SEARCH<br/>DIAMOND, --dmnd_sensmode fast"]
     EGGNOG_MAPPER_SEARCH --> EGGNOG_MAPPER_ANNOTATE["EGGNOG_MAPPER_ANNOTATE<br/>eggNOG-mapper 3.0.0-beta6"]
     Prot -->|"contig_level_functional and<br/>functional_cazy (default)"| RUN_DBCAN["RUN_DBCAN<br/>run_dbcan v5 CAZy"]
     BAMs(["counting_bam"]) --> FEATURECOUNTS_GENES
@@ -459,10 +459,10 @@ flowchart TD
     Ags(["MICROBECENSUS AGS<br/>(optional, non-fatal)"]) --> AGGREGATE_FUNCTIONS
     EGGNOG_MAPPER_ANNOTATE & RUN_DBCAN & FEATURECOUNTS_GENES --> AGGREGATE_FUNCTIONS["AGGREGATE_FUNCTIONS<br/>TPM + CPGE tables<br/>(KO, COG, EC, Pfam, CAZy)"]
 
-    Bins(["refined bins"]) -->|"mag_level_functional<br/>(include_binning, ≥ 2 binners)"| BAKTA_BAKTA["BAKTA_BAKTA<br/>one task per bin"]
+    Bins(["refined bins"]) -->|"mag_level_functional<br/>(include_binning, ≥ 2 binners)"| NFCORE_BAKTA_BAKTA["NFCORE_BAKTA_BAKTA<br/>one task per bin"]
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class EGGNOG_MAPPER_SEARCH,EGGNOG_MAPPER_ANNOTATE,RUN_DBCAN,FEATURECOUNTS_GENES,AGGREGATE_FUNCTIONS,BAKTA_BAKTA opt
+    class EGGNOG_MAPPER_SEARCH,EGGNOG_MAPPER_ANNOTATE,RUN_DBCAN,FEATURECOUNTS_GENES,AGGREGATE_FUNCTIONS,NFCORE_BAKTA_BAKTA opt
 ```
 
 ### 11. READ_FUNCTIONAL
@@ -547,7 +547,7 @@ results directories outside the pipeline (manual, Example 13).
 ### Quality control (QC)
 | Module | Description |
 |--------|-------------|
-| `FASTP` / `FASTP_SINGLETON` | Quality filtering and adapter trimming (nf-core fastp; paired + singleton reads) |
+| `NFCORE_FASTP` / `NFCORE_FASTP_SINGLETON` | Quality filtering and adapter trimming (nf-core fastp; paired + singleton reads) |
 | `QFILTER` | Read counts after fastp; samples below `min_read_sample` are dropped |
 | `BWAMEM3_DECONTAMINATE` / `BOWTIE2_DECONTAMINATE` | Single-pass phiX + host removal (bwa-mem3 by default) |
 | `COUNT_READS` | Read counting when `quality_control` is false |
@@ -604,7 +604,7 @@ results directories outside the pipeline (manual, Example 13).
 ### Contig taxonomy, contig and bin ARGs
 | Module | Description |
 |--------|-------------|
-| `PYRODIGAL` | Shared gene calling on the contigs (nf-core; feeds DeepARG and the functional branch) |
+| `NFCORE_PYRODIGAL` | Shared gene calling on the contigs (nf-core; feeds DeepARG and the functional branch) |
 | `DEEPARG_CONTIGS` | DeepARG on an assembly's proteins, one run per assembly |
 | `METABULI_CLASSIFY` | Per-contig taxonomy with Metabuli |
 | `NFCORE_SAMTOOLS_INDEX` | BAM index for BlobTools |
@@ -623,7 +623,7 @@ results directories outside the pipeline (manual, Example 13).
 | `RUN_DBCAN` | `contig_level_functional` and `functional_cazy` | run_dbcan v5 CAZy annotation |
 | `FEATURECOUNTS_GENES` | `contig_level_functional` | Per-gene read counts, per sample |
 | `AGGREGATE_FUNCTIONS` | `contig_level_functional` | Study-level TPM / CPGE tables |
-| `BAKTA_BAKTA` | `mag_level_functional` | Bakta per refined bin (nf-core) |
+| `NFCORE_BAKTA_BAKTA` | `mag_level_functional` | Bakta per refined bin (nf-core) |
 | `WOLTKA_ALIGN` / `WOLTKA_CLASSIFY` | `read_level_functional woltka` | Bowtie2 vs WoLr2, Woltka classification |
 | `SUPERFOCUS` | `read_level_functional superfocus` | SUPER-FOCUS vs DB_90 |
 | `HUMANN` | `read_level_functional humann` | HUMAnN 4 with MetaPhlAn prescreen |

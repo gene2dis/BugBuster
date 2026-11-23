@@ -610,7 +610,7 @@ amrfinderplus-db error, delete the `<databases_dir>/bakta/<key>/` directory
 the pinned Zenodo URL. The same checks
 apply to a custom database directory.
 
-### BAKTA_BAKTA fails mid-annotation with "amrfinder error! error code: 1"
+### NFCORE_BAKTA_BAKTA fails mid-annotation with "amrfinder error! error code: 1"
 
 **Error (after ~10 minutes of successful annotation, at the AMR expert step):**
 ```

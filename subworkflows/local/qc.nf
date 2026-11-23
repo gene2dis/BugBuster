@@ -6,8 +6,8 @@
 ----------------------------------------------------------------------------------------
 */
 
-include { FASTP                      } from '../../modules/nf-core/fastp/main'
-include { FASTP as FASTP_SINGLETON   } from '../../modules/nf-core/fastp/main'
+include { FASTP as NFCORE_FASTP           } from '../../modules/nf-core/fastp/main'
+include { FASTP as NFCORE_FASTP_SINGLETON } from '../../modules/nf-core/fastp/main'
 include { QFILTER                    } from '../../modules/local/qfilter/main'
 include { COUNT_READS                } from '../../modules/local/count_reads/main'
 include { BOWTIE2_DECONTAMINATE      } from '../../modules/local/bowtie2_decontaminate/main'
@@ -45,14 +45,14 @@ workflow QC {
                 [ meta + [single_end: true], [ reads_files[2] ], [] ]
             }
 
-        FASTP(
+        NFCORE_FASTP(
             ch_fastp_input,
             false,  // discard_trimmed_pass
             false,  // save_trimmed_fail
             false   // save_merged
         )
 
-        FASTP_SINGLETON(
+        NFCORE_FASTP_SINGLETON(
             ch_singleton_input,
             false,  // discard_trimmed_pass
             false,  // save_trimmed_fail
@@ -60,9 +60,9 @@ workflow QC {
         )
 
         // Paired-read fastp reports for the results summary (read length)
-        ch_fastp_json = FASTP.out.json.map { _meta, json_file -> json_file }
+        ch_fastp_json = NFCORE_FASTP.out.json.map { _meta, json_file -> json_file }
 
-        // FASTP and FASTP_SINGLETON report their versions on the versions topic
+        // NFCORE_FASTP and NFCORE_FASTP_SINGLETON report their versions on the versions topic
         // (collected in main.nf), not through ch_versions
 
         //
@@ -74,15 +74,15 @@ workflow QC {
         // join(remainder: true) pads samples without singletons with exactly
         // one null.
         //
-        ch_singleton_trimmed = FASTP_SINGLETON.out.reads
-            .join(FASTP_SINGLETON.out.json)
+        ch_singleton_trimmed = NFCORE_FASTP_SINGLETON.out.reads
+            .join(NFCORE_FASTP_SINGLETON.out.json)
             .map { meta, s_reads, s_json ->
                 def s_read = s_reads instanceof List ? s_reads[0] : s_reads
                 [ meta.id, [ s_read, s_json ] ]
             }
 
-        ch_fastp_combined = FASTP.out.reads
-            .join(FASTP.out.json)
+        ch_fastp_combined = NFCORE_FASTP.out.reads
+            .join(NFCORE_FASTP.out.json)
             .map { meta, reads_files, json_file ->
                 [ meta.id, meta, reads_files, json_file ]
             }

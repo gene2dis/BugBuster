@@ -39,6 +39,9 @@ process CHECKM2_BATCH {
     task.ext.when == null || task.ext.when
 
     script:
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
     // The sample of each staged bin directory, from the meta list (one meta
     // per path, in the order Nextflow stages them as bin_1, bin_2, ...), so no
@@ -111,6 +114,7 @@ process CHECKM2_BATCH {
     if [ "\$total_bins" -gt 0 ]; then
         echo "Found \$total_bins genome bins across all samples and binners. Running CheckM2 assessment..."
         checkm2 predict \\
+            ${args} \\
             --threads ${task.cpus} \\
             --input all_bins \\
             --output-directory checkm2_output \\
@@ -172,15 +176,26 @@ process CHECKM2_BATCH {
     
     stub:
     def meta_ids = meta_list.collect { m -> m instanceof Map ? (m.id ?: m['id']) : m.toString() }.unique().join(' ')
+    def bin_paths = all_bins instanceof List ? all_bins : [all_bins]
+    def staged_ids = [bin_paths, meta_list].transpose().collect { p, m -> "'${p}' '${m instanceof Map ? m.id : m}'" }.join(' ')
     """
-    # Create stub quality report files for each sample and binner
+    # Reports for the binners that were staged, as the script writes them
+    # (not a fixed metabat/semibin/comebin set), with CheckM2's 12 columns
+    # (review R4-13)
+    printf '%s\\t%s\\n' ${staged_ids} > staged_ids.tsv
+    : > binners.txt
+    for staged_dir in bin_*/; do
+        staged_dir=\${staged_dir%/}
+        bin_dir=\$(find "\$staged_dir" -mindepth 1 -maxdepth 1 -type d -o -type l | head -1)
+        [ -z "\$bin_dir" ] && continue
+        staged_id=\$(awk -F '\\t' -v d="\$bin_dir" '\$1 == d {print \$2}' staged_ids.tsv)
+        identify_bin_dir.sh "\$bin_dir" "\$staged_id" | cut -f2 >> binners.txt
+    done
     for meta_id in ${meta_ids}; do
-        for binner in metabat semibin comebin; do
-            cat > \${meta_id}_\${binner}_quality_report.tsv << 'EOF'
-    Name	Completeness	Contamination
-    bin.1	95.5	2.1
-    bin.2	87.3	1.5
-    EOF
+        for binner in \$(sort -u binners.txt); do
+            printf 'Name\\tCompleteness\\tContamination\\tCompleteness_Model_Used\\tTranslation_Table_Used\\tCoding_Density\\tContig_N50\\tAverage_Gene_Length\\tGenome_Size\\tGC_Content\\tTotal_Coding_Sequences\\tAdditional_Notes\\n' > \${meta_id}_\${binner}_quality_report.tsv
+            printf 'bin.1\\t95.5\\t2.1\\tGradient Boost (General Model)\\t11\\t0.9\\t50000\\t300\\t2000000\\t0.5\\t1800\\tNone\\n' >> \${meta_id}_\${binner}_quality_report.tsv
+            printf 'bin.2\\t87.3\\t1.5\\tGradient Boost (General Model)\\t11\\t0.88\\t30000\\t290\\t1500000\\t0.48\\t1400\\tNone\\n' >> \${meta_id}_\${binner}_quality_report.tsv
         done
     done
     

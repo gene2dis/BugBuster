@@ -36,6 +36,9 @@ process COMEBIN {
     task.ext.when == null || task.ext.when
 
     script:
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
     prefix = meta.id
     // Batch settings per attempt: -n views, -b batch size, -e/-c embedding sizes
     def settings = task.attempt == 1 ? '-n 6 -b 512 -e 1024 -c 1024' :
@@ -115,6 +118,7 @@ process COMEBIN {
     # -s: a fixed seed, so reruns give the same bins
     exit_code=0
     bash run_comebin.sh \\
+        ${args} \\
         -a ${contigs} \\
         -p ./ \\
         -o ${prefix}_comebin_bins \\

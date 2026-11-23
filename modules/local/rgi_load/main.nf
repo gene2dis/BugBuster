@@ -18,6 +18,9 @@ process RGI_LOAD {
         task.ext.when == null || task.ext.when
 
     script:
+    // Extra options for every rgi load call from a -c config (withName ...
+    // ext.args), as in every other tool module (review R2-14); none by default
+    def args = task.ext.args ?: ''
         def kmer_size = params.rgi_kmer_size ?: 61
         """
         set +u
@@ -47,7 +50,7 @@ process RGI_LOAD {
         rgi clean --local
 
         # Load CARD JSON
-        rgi load --card_json card.json --local
+        rgi load ${args} --card_json card.json --local
 
         # Create annotated reference sequences
         rgi card_annotation -i card.json > card_annotation.log 2>&1 \\
@@ -65,7 +68,7 @@ process RGI_LOAD {
         fi
 
         # Load annotated sequences
-        rgi load -i card.json \\
+        rgi load ${args} -i card.json \\
             --card_annotation \$CARD_FASTA \\
             --local
 
@@ -104,7 +107,7 @@ process RGI_LOAD {
             fi
             
             # Load WildCARD data
-            rgi load \\
+            rgi load ${args} \\
                 --card_json card.json \\
                 --wildcard_annotation \$WILDCARD_FASTA \\
                 --wildcard_index wildcard/index-for-model-sequences.txt \\

@@ -2,15 +2,17 @@
 
 Each stage lists the params that turn it on, the processes whose software_versions.yml entries show it ran,
 and what the summary takes from it. Keep it in step with main.nf when a stage or process is added. List only
-processes that run for this stage alone: one that other options also run (PYRODIGAL, DEEPARG_CONTIGS) would
-mark the stage as run, and its table as missing, when only another option ran it.
+processes that run for this stage alone: one that other options also run (NFCORE_PYRODIGAL, DEEPARG_CONTIGS) would
+mark the stage as run, and its table as missing, when only another option ran it. An nf-core module renamed with an
+NFCORE_ alias keeps its old name here too (FASTP, BAKTA_BAKTA before roadmap Phase 22), so results directories of
+earlier releases still count the stage when merged.
 """
 
 STAGES = [
     {
         "key": "qc", "title": "Read QC and host/contaminant removal",
         "params": "--quality_control, --read_aligner (bwamem3 | bowtie2)",
-        "processes": ["FASTP", "QFILTER", "BWAMEM3_DECONTAMINATE", "BOWTIE2_DECONTAMINATE", "READS_REPORT"],
+        "processes": ["NFCORE_FASTP", "FASTP", "QFILTER", "BWAMEM3_DECONTAMINATE", "BOWTIE2_DECONTAMINATE", "READS_REPORT"],
         "summary": "samples_qc (read pairs per step, depth class, low-depth flag), figure qc_read_fate",
     },
     {
@@ -134,7 +136,7 @@ STAGES = [
     {
         "key": "contig_functional", "title": "Contig-level functional (Pyrodigal, eggNOG-mapper, dbCAN, featureCounts)",
         "params": "--contig_level_functional (needs an assembly), --functional_cazy",
-        # not PYRODIGAL: the shared gene calling also runs for the contig and bin ARGs alone
+        # not NFCORE_PYRODIGAL: the shared gene calling also runs for the contig and bin ARGs alone
         "processes": ["EGGNOG_MAPPER_SEARCH", "EGGNOG_MAPPER_ANNOTATE", "RUN_DBCAN",
                       "FEATURECOUNTS_GENES", "AGGREGATE_FUNCTIONS"],
         "summary": "function_contig_long, function_contig_<ontology> (CPGE or TPM); samples_qc func_contig_*, "
@@ -143,7 +145,7 @@ STAGES = [
     {
         "key": "mag_functional", "title": "MAG annotation (Bakta)",
         "params": "--mag_level_functional (needs binning with >= 2 binners)",
-        "processes": ["BAKTA_BAKTA"],
+        "processes": ["NFCORE_BAKTA_BAKTA", "BAKTA_BAKTA"],
         "summary": "mags columns rrna_16s / rrna_23s / rrna_5s, trna_aa_types (the MIMAG high tier), cds, "
                    "pct_hypothetical, crispr_arrays",
     },
