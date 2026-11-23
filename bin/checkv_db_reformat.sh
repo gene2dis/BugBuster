@@ -20,7 +20,8 @@ wget --tries=5 --continue --waitretry=10 --no-verbose -O checkv_db.tar.gz "${db_
 found_bytes=$(stat -c %s checkv_db.tar.gz)
 if [ "${found_bytes}" != "${db_bytes}" ]; then
     echo "ERROR: CheckV database download is ${found_bytes} bytes, expected ${db_bytes}" >&2
-    exit 1
+    # 65: not retried by the download labels (nextflow.config)
+    exit 65
 fi
 
 mkdir checkv_extract

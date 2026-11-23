@@ -1419,7 +1419,10 @@ next release is tagged.
   WoLr2 (Bowtie2 index and plain maps) files, which are served uncompressed
   and have no published checksum, are checked against the byte counts of the
   release after the download, so a cut or replaced download stops there instead
-  of being stored and failing in a later task. The Kraken2, CheckM2 and GTDB-Tk
+  of being stored and failing in a later task. A mismatch exits with code 65,
+  which the download labels do not retry (wget has already retried the
+  transfer; a retry would download the whole database again); the CheckV
+  download's byte check does the same. The Kraken2, CheckM2 and GTDB-Tk
   downloads no longer write a progress bar into the task log. The
   eggNOG-mapper image's Dockerfile fetches HMMER over HTTPS and checks its
   sha256 (applies to the next image build; the pinned image is unchanged).

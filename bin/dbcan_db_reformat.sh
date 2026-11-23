@@ -39,7 +39,8 @@ for pair in ${BYTES}; do
     got=$(stat -c %s "dbcan_db/${f}" 2>/dev/null || echo missing)
     if [ "${got}" != "${want}" ]; then
         echo "ERROR: dbcan_db/${f} is ${got} bytes, the release has ${want} - a truncated download, or the server now serves another file under this URL (the registry entry pins this release: pass a copy you trust with --custom_dbcan_db, or update config/databases.config with a new key)" >&2
-        exit 1
+        # 65: not retried by the download labels (nextflow.config)
+        exit 65
     fi
 done
 

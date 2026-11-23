@@ -62,7 +62,8 @@ if [ "${kind}" = "db" ]; then
         got=$(stat -c %s "sylph_db/${name}")
         if [ "${got}" != "${bytes}" ]; then
             echo "ERROR: sylph_db/${name} is ${got} bytes, the release has ${bytes} - a truncated download, or the server now serves another file under this URL (the registry entry pins this release: pass a copy you trust with --custom_sylph_db, or update config/databases.config with a new key)" >&2
-            exit 1
+            # 65: not retried by the download labels (nextflow.config)
+            exit 65
         fi
     fi
     # the two-stage format starts with the magic bytes SY2D

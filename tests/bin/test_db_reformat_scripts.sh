@@ -362,6 +362,23 @@ expect_fail() {
     fi
 }
 
+expect_code() {
+    # expect_code <desc> <exit code> <script> <args...>: fails with that code
+    # (65: a byte-count mismatch, which the download labels do not retry)
+    local desc="$1" want="$2"; shift 2
+    local workdir="${WORK}/$(echo "${desc}" | tr ' /:' '___')" got=0
+    mkdir -p "${workdir}"
+    run_script "${workdir}" "$@" > "${workdir}.log" 2>&1 || got=$?
+    if [ "${got}" -eq "${want}" ]; then
+        echo "✓ ${desc}"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ ${desc} — expected exit ${want}, got ${got}"
+        tail -5 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    fi
+}
+
 check_file() {
     # check_file <desc> <path-relative-to-last-workdir>
     if [ -e "${LAST_WORKDIR}/$2" ]; then
@@ -405,7 +422,7 @@ expect_fail "sylph: unknown mode fails" sylph_db_reformat.sh index "${BASE_URL}/
 # byte count from the registry (roadmap Phase 22, review R6-13)
 SYLPH_BYTES=$(stat -c %s "${FIXTURES}/mini-c200.syldb")
 expect_pass "sylph: database of the registry's byte count" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syldb" "${SYLPH_BYTES}"
-expect_fail "sylph: database of another byte count fails (cut download)" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syldb" "$((SYLPH_BYTES + 1))"
+expect_code "sylph: database of another byte count fails with exit 65 (cut download)" 65 sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syldb" "$((SYLPH_BYTES + 1))"
 
 #
 # checkm2_db_reformat.sh
@@ -469,7 +486,7 @@ expect_fail "eggnog: missing files fail" eggnog_db_reformat.sh "${BASE_URL}/no_s
 # byte counts from the registry (roadmap Phase 22, review R6-13)
 EGG_BYTES=$(cd "${FIXTURES}/eggnogdb" && for f in *; do printf '%s:%s ' "${f}" "$(stat -c %s "${f}")"; done)
 expect_pass "eggnog: files of the registry's byte counts" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb" "${EGG_BYTES}"
-expect_fail "eggnog: a file of another byte count fails (cut download)" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb" "${EGG_BYTES} eggnog.db:1"
+expect_code "eggnog: a file of another byte count fails with exit 65 (cut download)" 65 eggnog_db_reformat.sh "${BASE_URL}/eggnogdb" "${EGG_BYTES} eggnog.db:1"
 
 #
 # dbcan_db_reformat.sh
@@ -486,7 +503,7 @@ expect_fail "dbcan: missing files fail" dbcan_db_reformat.sh "${BASE_URL}/no_suc
 # byte counts under the local names (roadmap Phase 22, review R6-13)
 DBCAN_BYTES="CAZy.dmnd:$(stat -c %s "${FIXTURES}/dbcandb/CAZy.dmnd") dbCAN-sub.hmm:$(stat -c %s "${FIXTURES}/dbcandb/dbCAN_sub.hmm")"
 expect_pass "dbcan: files of the registry's byte counts" dbcan_db_reformat.sh "${BASE_URL}/dbcandb" "${DBCAN_BYTES}"
-expect_fail "dbcan: a file of another byte count fails (cut download)" dbcan_db_reformat.sh "${BASE_URL}/dbcandb" "CAZy.dmnd:1"
+expect_code "dbcan: a file of another byte count fails with exit 65 (cut download)" 65 dbcan_db_reformat.sh "${BASE_URL}/dbcandb" "CAZy.dmnd:1"
 
 #
 # bakta_db_reformat.sh (runs in the bakta image FORMAT_BAKTA_DB pins; the
@@ -597,7 +614,7 @@ expect_fail "woltka: 404 base URL fails" woltka_db_reformat.sh "${BASE_URL}/no_s
 WOL_IDX="databases/bowtie2/WoLr2.rev.1.bt2l"
 WOL_BYTES="${WOL_IDX}:$(stat -c %s "${FIXTURES}/wol2/${WOL_IDX}")"
 expect_pass "woltka: index of the registry's byte count" woltka_db_reformat.sh "${BASE_URL}/wol2" "${WOL_BYTES}"
-expect_fail "woltka: index of another byte count fails (cut download)" woltka_db_reformat.sh "${BASE_URL}/wol2" "${WOL_IDX}:1"
+expect_code "woltka: index of another byte count fails with exit 65 (cut download)" 65 woltka_db_reformat.sh "${BASE_URL}/wol2" "${WOL_IDX}:1"
 RUN_IMG=""
 
 #

@@ -19,6 +19,9 @@ process RGI_LOAD_WILDCARD {
 
     script:
         def kmer_size = params.rgi_kmer_size ?: 61
+        // Extra options for rgi load from a -c config (withName ...
+        // ext.args), as in RGI_LOAD (review R2-14); none by default
+        def args = task.ext.args ?: ''
         """
         set +u
         if [ -f /usr/local/env-execute ]; then
@@ -101,7 +104,7 @@ process RGI_LOAD_WILDCARD {
         fi
         
         # Load WildCARD data into existing CARD database
-        rgi load \\
+        rgi load ${args} \\
             --card_json card.json \\
             --wildcard_annotation \$WILDCARD_FASTA \\
             --wildcard_index wildcard_data/index-for-model-sequences.txt \\
