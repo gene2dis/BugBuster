@@ -160,8 +160,10 @@ done
 for f in "${REPO_DIR}"/conf/*.config; do
     bad=$(grep -E "^\s*errorStrategy\s*=" "${f}" | grep -vF -- "${PREFIX}" || true)
     if [ -n "${bad}" ]; then fail "$(basename "${f}"): errorStrategy without the prefix: ${bad}"; fi
+    bad=$(grep -E "^\s*errorStrategy\s*=.*130\.\.145" "${f}" | grep -vF -- "${PREEMPT}" || true)
+    if [ -n "${bad}" ]; then fail "$(basename "${f}"): errorStrategy retrying listed codes without the preemption codes: ${bad}"; fi
 done
-pass "conf/*.config: every errorStrategy carries the prefix"
+pass "conf/*.config: every errorStrategy carries the prefix and, with listed codes, the preemption codes"
 
 echo ""
 echo "Passed: ${PASS}, failed: ${FAIL}"

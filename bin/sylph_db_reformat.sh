@@ -61,7 +61,7 @@ if [ "${kind}" = "db" ]; then
     if [ -n "${bytes}" ]; then
         got=$(stat -c %s "sylph_db/${name}")
         if [ "${got}" != "${bytes}" ]; then
-            echo "ERROR: sylph_db/${name} is ${got} bytes, the release has ${bytes} - truncated or wrong download" >&2
+            echo "ERROR: sylph_db/${name} is ${got} bytes, the release has ${bytes} - a truncated download, or the server now serves another file under this URL (the registry entry pins this release: pass a copy you trust with --custom_sylph_db, or update config/databases.config with a new key)" >&2
             exit 1
         fi
     fi

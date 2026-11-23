@@ -40,7 +40,7 @@ for pair in ${BYTES}; do
     want="${pair##*:}"
     got=$(stat -c %s "eggnog_db/${f}" 2>/dev/null || echo missing)
     if [ "${got}" != "${want}" ]; then
-        echo "ERROR: eggnog_db/${f} is ${got} bytes, the release has ${want} - truncated or wrong download" >&2
+        echo "ERROR: eggnog_db/${f} is ${got} bytes, the release has ${want} - a truncated download, or the server now serves another file under this URL (the registry entry pins this release: pass a copy you trust with --custom_eggnog_db, or update config/databases.config with a new key)" >&2
         exit 1
     fi
 done
