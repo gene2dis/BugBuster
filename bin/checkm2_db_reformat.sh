@@ -5,7 +5,7 @@
 #
 set -euo pipefail
 
-wget --tries=5 --continue --waitretry=10 -O checkm2_database.tar.gz \
+wget --tries=5 --continue --waitretry=10 --no-verbose -O checkm2_database.tar.gz \
     "${1:?usage: checkm2_db_reformat.sh <database-url>}"
 
 tar -xvzf checkm2_database.tar.gz

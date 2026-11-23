@@ -2,7 +2,9 @@
 #
 # Download the Web of Life release 2 (WoLr2) files needed by the Woltka
 # read-level functional backend (design doc Section 4.6.2, task T8a).
-# Usage: woltka_db_reformat.sh <wol2-base-url>   (e.g. https://ftp.microbio.me/pub/wol2)
+# Usage: woltka_db_reformat.sh <wol2-base-url> ["<path>:<bytes> ..."]
+#   (e.g. https://ftp.microbio.me/pub/wol2; the byte counts of the files with
+#   no published md5 come from the registry and are checked after the download)
 #
 # Produces woltka_db/ mirroring the FTP layout verbatim (only the files the
 # backend reads), so a hand-made mirror of the same files is a valid
@@ -28,7 +30,8 @@
 #
 set -euo pipefail
 
-base_url="${1:?usage: woltka_db_reformat.sh <wol2-base-url>}"
+base_url="${1:?usage: woltka_db_reformat.sh <wol2-base-url> [\"<path>:<bytes> ...\"]}"
+BYTES="${2:-}"
 base_url="${base_url%/}"
 
 index_files="WoLr2.1.bt2l WoLr2.2.bt2l WoLr2.3.bt2l WoLr2.4.bt2l WoLr2.rev.1.bt2l WoLr2.rev.2.bt2l"
@@ -84,6 +87,19 @@ done
 for f in ${plain_files}; do
     if [ ! -s "woltka_db/${f}" ]; then
         echo "ERROR: expected file 'woltka_db/${f}' missing or empty after download" >&2
+        exit 1
+    fi
+done
+
+# Byte counts from the registry (optional last argument, "name:bytes ..."):
+# the index and the plain maps have no published md5, so a download cut at a block boundary or
+# replaced by a proxy page has no format to fail on (review R6-13)
+for pair in ${BYTES}; do
+    f="${pair%:*}"
+    want="${pair##*:}"
+    got=$(stat -c %s "woltka_db/${f}" 2>/dev/null || echo missing)
+    if [ "${got}" != "${want}" ]; then
+        echo "ERROR: woltka_db/${f} is ${got} bytes, the release has ${want} - truncated or wrong download" >&2
         exit 1
     fi
 done

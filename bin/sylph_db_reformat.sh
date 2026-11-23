@@ -2,7 +2,8 @@
 #
 # Download one half of a sylph reference: the genome database or the
 # sylph-tax taxonomy metadata that matches it.
-# Usage: sylph_db_reformat.sh db       <database-url>   (.syldb or .syl2db)
+# Usage: sylph_db_reformat.sh db       <database-url> [<bytes>]  (.syldb or .syl2db;
+#                                                    bytes from the registry)
 #        sylph_db_reformat.sh taxonomy <metadata-url>   (.tsv.gz)
 #
 # The file lands in sylph_db/ under its URL name, which carries the release
@@ -14,9 +15,10 @@
 #
 set -euo pipefail
 
-usage="usage: sylph_db_reformat.sh <db|taxonomy> <url>"
+usage="usage: sylph_db_reformat.sh <db|taxonomy> <url> [<bytes>]"
 kind="${1:?${usage}}"
 url="${2:?${usage}}"
+bytes="${3:-}"
 name="${url##*/}"
 
 case "${kind}" in
@@ -53,6 +55,15 @@ if [ "${kind}" = "db" ]; then
     if [ "$(head -c 4096 "sylph_db/${name}" | tr -dc '\000' | wc -c)" -eq 0 ]; then
         echo "ERROR: sylph_db/${name} is text, not a sylph database - the server returned a page instead of the file" >&2
         exit 1
+    fi
+    # the registry's byte count (review R6-13): the database is not compressed,
+    # so a cut download passes the checks above
+    if [ -n "${bytes}" ]; then
+        got=$(stat -c %s "sylph_db/${name}")
+        if [ "${got}" != "${bytes}" ]; then
+            echo "ERROR: sylph_db/${name} is ${got} bytes, the release has ${bytes} - truncated or wrong download" >&2
+            exit 1
+        fi
     fi
     # the two-stage format starts with the magic bytes SY2D
     if [ "${name##*.}" = "syl2db" ] && [ "$(head -c 4 "sylph_db/${name}")" != "SY2D" ]; then

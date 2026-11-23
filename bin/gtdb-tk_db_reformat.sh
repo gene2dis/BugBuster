@@ -7,7 +7,7 @@
 #
 set -euo pipefail
 
-wget --tries=5 --continue --waitretry=10 -O gtdbtk_data.tar.gz \
+wget --tries=5 --continue --waitretry=10 --no-verbose -O gtdbtk_data.tar.gz \
     "${1:?usage: gtdb-tk_db_reformat.sh <package-url>}"
 
 mkdir gtdbtk_extract

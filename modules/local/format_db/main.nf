@@ -43,7 +43,7 @@ process FORMAT_SYLPH_DB {
 
     script:
         """
-        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db '${params.sylph_ref_db[params.sylph_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -300,7 +300,7 @@ process FORMAT_EGGNOG_DB {
 
     script:
         """
-        ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db
+        ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db '${params.eggnog_ref_db[params.eggnog_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -327,7 +327,7 @@ process FORMAT_DBCAN_DB {
 
     script:
         """
-        ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db
+        ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db '${params.dbcan_ref_db[params.dbcan_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -340,9 +340,9 @@ process FORMAT_DBCAN_DB {
 
 process FORMAT_BAKTA_DB {
     tag "format_bakta_db"
-    // Runs in the same Bakta 1.12.2 biocontainers build the BAKTA_BAKTA module
+    // Runs in the same Bakta 1.12.2 biocontainers build the NFCORE_BAKTA_BAKTA module
     // uses (quay image; under singularity/apptainer its depot sif, while
-    // BAKTA_BAKTA's override keeps the quay URI for every engine), not the
+    // NFCORE_BAKTA_BAKTA's override keeps the quay URI for every engine), not the
     // shared wget image: provisioning must run amrfinder_update —
     // the official DB tarball bundles an AMRFinderPlus DB too old for the
     // container's AMRFinderPlus binary (T7 acceptance finding, 2026-10-06) —
@@ -417,7 +417,7 @@ process FORMAT_WOLTKA_DB {
 
     script:
         """
-        ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db
+        ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db '${params.woltka_ref_db[params.woltka_db]["bytes"] ?: ''}'
         """
 
     stub:
