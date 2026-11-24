@@ -121,7 +121,12 @@ nextflow_pipeline {
     }
 
     test("Warns when a group has more than 20 samples") {
-        // the --summary_group_by check after the warning stops the run before any task
+        // -preview: the launch checks run (the warning is one of them) and no
+        // task does. It used to rely on a --summary_group_by error after the
+        // warning to stop the 21-sample run (roadmap Phase 25, RV26; review
+        // R8-08)
+        options "-preview"
+
         when {
             params {
                 input  = TestData.localSamplesheetN(outputDir, projectDir, 21)
@@ -130,12 +135,12 @@ nextflow_pipeline {
                 include_binning     = true
                 binners             = "semibin,metabat2"
                 multisample_binning = true
-                summary_group_by    = "subject"
             }
         }
 
         then {
-            assert workflow.failed
+            assert workflow.success
+            assert workflow.trace.tasks().size() == 0
             // warnings go to the log, not to the console nf-test captures
             def text = path("${outputDir}/../meta/nextflow.log").text
             assert text.contains("--multisample_binning: the run (one group without --multisample_group_by) has 21 samples, more than 20")
