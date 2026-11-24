@@ -118,12 +118,13 @@ class TestData {
 
     // The Nextflow version a pipeline test ran on, [major, minor], read from
     // the run's log (nf-test launches with -quiet, so the console has no
-    // banner; the log has "Version: 26.10.5 build 14654"): for the tests
-    // whose expected outcome differs by version (roadmap Phase 25, RV27:
-    // nf-test runs on 25.10.7 and the newest Nextflow in CI)
+    // banner; the log has "Version: 26.10.5 build 14654", and an edge
+    // release "Version: 26.11.0-edge build 15169"): for the tests whose
+    // expected outcome differs by version (roadmap Phase 25, RV27: nf-test
+    // runs on 25.10.7 and the newest Nextflow, edge included, in CI)
     static List<Integer> nextflowVersion(outputDir) {
         def log = new File("${outputDir}/../meta/nextflow.log")
-        def m = log.exists() ? (log.text =~ /(?m)^\s*Version: (\d+)\.(\d+)\.\d+ build/) : null
+        def m = log.exists() ? (log.text =~ /(?m)^\s*Version: (\d+)\.(\d+)\.\d+\S* build/) : null
         if (m == null || !m.find()) {
             throw new IllegalStateException("no 'Version: <x.y.z> build' line in ${log}")
         }
