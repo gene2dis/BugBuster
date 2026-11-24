@@ -1,0 +1,83 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ARG_FASTA_FORMATTER Module Test (roadmap Phase 25, RV25; review R8-02, R6-15)
+
+    The module and its helper, bin/extract_sequences.py, on the per-bin layout
+    the real BIN_ARG_SPLIT writes in setup from tests/data/arg_clustering/
+    (tests/bin/make_arg_cluster_fixtures.py): each bin's DeepARG hits become
+    a FASTA of the hit proteins, the header naming the bin, the ARG and its
+    class; a protein without a hit and a bin without hits write nothing.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test ARG_FASTA_FORMATTER Process"
+    script "../../modules/local/arg_fasta_formatter/main.nf"
+    process "ARG_FASTA_FORMATTER"
+
+    setup {
+        run("BIN_ARG_SPLIT") {
+            script "../../modules/local/bin_arg_split/main.nf"
+            process {
+                """
+                def d = "${projectDir}/tests/data/arg_clustering"
+                input[0] = channel.of('s1', 's2').map { s ->
+                    [ [ id: s ], file("\${d}/\${s}_contig_bins.tsv", checkIfExists: true),
+                      file("\${d}/\${s}_proteins.faa", checkIfExists: true),
+                      file("\${d}/\${s}_deep_arg.out.mapping.ARG", checkIfExists: true) ]
+                }
+                """
+            }
+        }
+    }
+
+    test("writes each bin's hit proteins with the bin, ARG and class in the header") {
+        when {
+            process {
+                """
+                input[0] = BIN_ARG_SPLIT.out.bin_args.filter { meta, _p, _d -> meta.id == 's1' }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def faas = process.out.arg_reports.flatten()
+            // s1 bin2 has a protein but no hit: no file for it
+            assert faas.collect { f -> file(f).name } == ['s1_bin1_ARGs.faa']
+            def lines = path(faas[0]).readLines()
+            def headers = lines.findAll { l -> l.startsWith('>') }
+            // k141_2_1 (bin1, no hit) is left out
+            assert headers == [
+                '>k141_1_1_from_s1_bin1_gene_SYNA_ARG_class_beta-lactam',
+                '>k141_1_2_from_s1_bin1_gene_SYNB_ARG_class_tetracycline'
+            ]
+            // one line per sequence, the whole 300-residue protein
+            assert lines.size() == 4
+            assert lines[1].length() == 300 && lines[1].startsWith('M')
+            assert lines[3].length() == 300
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("biopython: 1.88")
+        }
+    }
+
+    test("a bin per hit, including two hits of one ARG in different bins") {
+        when {
+            process {
+                """
+                input[0] = BIN_ARG_SPLIT.out.bin_args.filter { meta, _p, _d -> meta.id == 's2' }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def faas = process.out.arg_reports.flatten().sort { f -> file(f).name }
+            assert faas.collect { f -> file(f).name } == ['s2_bin1_ARGs.faa', 's2_bin2_ARGs.faa']
+            assert path(faas[0]).readLines()[0] == '>k141_7_1_from_s2_bin1_gene_SYNA_ARG_class_beta-lactam'
+            assert path(faas[1]).readLines()[0] == '>k141_9_1_from_s2_bin2_gene_SYNA_ARG_class_beta-lactam'
+        }
+    }
+}

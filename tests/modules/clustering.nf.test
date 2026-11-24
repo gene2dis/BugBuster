@@ -1,0 +1,87 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CLUSTERING Module Test (roadmap Phase 25, RV25; review R8-02)
+
+    MMseqs2 easy-cluster at the four identity tiers (90/95/99/100 %) on the
+    ARG proteins the real chain writes in setup: BIN_ARG_SPLIT and
+    ARG_FASTA_FORMATTER on tests/data/arg_clustering/
+    (tests/bin/make_arg_cluster_fixtures.py), collected as the pipeline does.
+    The proteins: P1 in two samples (identical), P1v (P1 with 21 of 300
+    residues changed, 93 % identity) and P2 (unrelated).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test CLUSTERING Process"
+    script "../../modules/local/clustering/main.nf"
+    process "CLUSTERING"
+
+    setup {
+        run("BIN_ARG_SPLIT") {
+            script "../../modules/local/bin_arg_split/main.nf"
+            process {
+                """
+                def d = "${projectDir}/tests/data/arg_clustering"
+                input[0] = channel.of('s1', 's2').map { s ->
+                    [ [ id: s ], file("\${d}/\${s}_contig_bins.tsv", checkIfExists: true),
+                      file("\${d}/\${s}_proteins.faa", checkIfExists: true),
+                      file("\${d}/\${s}_deep_arg.out.mapping.ARG", checkIfExists: true) ]
+                }
+                """
+            }
+        }
+        run("ARG_FASTA_FORMATTER") {
+            script "../../modules/local/arg_fasta_formatter/main.nf"
+            process {
+                """
+                input[0] = BIN_ARG_SPLIT.out.bin_args
+                """
+            }
+        }
+    }
+
+    test("clusters identical proteins at every tier and a 93 % variant at 90 % only") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = ARG_FASTA_FORMATTER.out.arg_reports.flatten().collect(sort: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tsvs = process.out.clusters.flatten().collectEntries { f -> [ (file(f).name): f ] }
+            assert tsvs.keySet() == ['Arg_cluster_90_cluster.tsv', 'Arg_cluster_95_cluster.tsv',
+                                     'Arg_cluster_99_cluster.tsv', 'Arg_cluster_100_cluster.tsv'] as Set
+
+            def p1a = 'k141_1_1_from_s1_bin1_gene_SYNA_ARG_class_beta-lactam'
+            def p1b = 'k141_7_1_from_s2_bin1_gene_SYNA_ARG_class_beta-lactam'
+            def p1v = 'k141_9_1_from_s2_bin2_gene_SYNA_ARG_class_beta-lactam'
+            def p2  = 'k141_1_2_from_s1_bin1_gene_SYNB_ARG_class_tetracycline'
+            // member -> representative, from MMseqs2's two-column table
+            def clusters = { name ->
+                path(tsvs[name]).readLines().collectEntries { l -> def (rep, member) = l.split('\t'); [ (member): rep ] }
+            }
+            ['90', '95', '99', '100'].each { tier ->
+                def c = clusters("Arg_cluster_${tier}_cluster.tsv")
+                assert c.keySet() == [p1a, p1b, p1v, p2] as Set
+                assert c[p1a] == c[p1b]
+                assert c[p2] != c[p1a]
+                assert c[p2] == p2
+                if (tier == '90') {
+                    assert c[p1v] == c[p1a]
+                } else {
+                    assert c[p1v] != c[p1a]
+                }
+            }
+
+            assert path(process.out.versions.get(0)).text.contains("mmseqs: 18.8cc5c")
+        }
+    }
+}

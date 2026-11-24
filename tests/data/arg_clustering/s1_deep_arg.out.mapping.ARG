@@ -1,0 +1,3 @@
+#ARG	query-start	query-end	read_id	predicted_ARG-class	best-hit	probability	identity	alignment-length	alignment-bitscore	alignment-evalue	counts
+SYNA	1	300	k141_1_1	beta-lactam	SYNA|FEATURES|syna|beta-lactam|syna	0.99	100.0	300	600.0	1e-150	1
+SYNB	1	300	k141_1_2	tetracycline	SYNB|FEATURES|synb|tetracycline|synb	0.99	100.0	300	600.0	1e-150	1
