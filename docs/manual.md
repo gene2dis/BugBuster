@@ -1838,6 +1838,29 @@ BugBuster automatically downloads required databases on first use and stores the
 | **SUPER-FOCUS DB_90** | ~0.74 GB download (~1.9 GB unpacked) for DIAMOND, or ~0.9 GB (~2.5 GB unpacked) for MMseqs2; only the selected aligner's archive | Read-level SEED subsystem profiling (SUPER-FOCUS) | `read_level_functional='superfocus'` | `--custom_superfocus_db` |
 | **HUMAnN 4 databases + MetaPhlAn vOct22** | ~71 GB download with the full ChocoPhlAn (44.8 GB), ~33 GB with the EC-filtered one (6.9 GB); plus UniRef90 EC-filtered 0.94 GB, utility mapping 2.8 GB and MetaPhlAn `mpa_vOct22_CHOCOPhlAnSGB_202403` with its Bowtie2 index ~22.5 GB | Read-level profiling with HUMAnN 4.0.0a2 | `read_level_functional='humann'` (`humann_db='v4_alpha-full'` or `'v4_alpha-ec_filtered'`) | `--custom_humann_db` |
 
+### Database Sources
+
+- **phiX_index**: [`phage phiX174 genome`](https://www.ncbi.nlm.nih.gov/nuccore/NC_001422.1?report=genbank)
+- **host_db**: [`T2T-CHM13v2.0 genome (chm13v2.0.fa.gz)`](https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz)
+- **kraken2_db**: [`kraken2 index`](https://benlangmead.github.io/aws-indexes/k2)
+- **sourmash_db**: [`sourmash kmers`](https://farm.cse.ucdavis.edu/~ctbrown/sourmash-db/gtdb-rs220/)
+- **sylph_db**: [`sylph pre-built databases`](https://sylph-docs.github.io/pre%E2%80%90built-databases/) + [`sylph-tax metadata`](https://github.com/bluenote-1577/sylph-tax)
+- **metabuli_db**: [`Metabuli databases`](https://jaebeom-kim.github.io/metabuli-doc/databases/new-database/) (`refseq_standard`: the Kraken2 PlusPF genome set)
+- **genomad_db**: [`geNomad database 1.9`](https://zenodo.org/records/14886553) (pinned; `genomad download-database` would take the latest)
+- **deeparg_db**: [`deeparg`](https://github.com/gaarangoa/deeparg)
+- **card_db**: [`CARD`](https://card.mcmaster.ca/) - Comprehensive Antibiotic Resistance Database
+- **kmarvel_db**: [`CARD 4.0.1 data`](https://card.mcmaster.ca/download/0/broadstreet-v4.0.1.tar.bz2) - protein homolog, overexpression and variant models, `aro_index.tsv` and `snps.txt` (CARD is free for academic use; commercial use needs a CARD licence)
+- **checkm2_db**: [`Checkm2_docs`](https://github.com/chklovski/CheckM2)
+- **gunc_db**: [`GUNC proGenomes 2.1 database`](https://zenodo.org/records/19631736)
+- **checkv_db**: [`CheckV database 1.5`](https://portal.nersc.gov/CheckV/)
+- **gtdbtk_db**: [`gtdbtk_db`](https://ecogenomics.github.io/GTDBTk/installing/index.html)
+- **eggnog_db**: [`emapper-3.0 data`](https://data.cgmlab.org/eggnog-mapper/emapper-3.0/data/)
+- **dbcan_db**: [`dbCAN S3 release db_v5-2-9_5-5-2026`](https://dbcan.s3.us-west-2.amazonaws.com/db_v5-2-9_5-5-2026/)
+- **woltka_db**: [`Web of Life release 2 (WoLr2)`](https://ftp.microbio.me/pub/wol2/)
+- **superfocus_db**: [`SUPER-FOCUS DB_90 (figshare, CC0): DIAMOND`](https://doi.org/10.25451/flinders.25009748.v2) / [`MMseqs2`](https://doi.org/10.25451/flinders.25009751.v2)
+- **humann_db**: [`HUMAnN v4_alpha databases`](https://github.com/biobakery/humann) (ChocoPhlAn, UniRef90 EC-filtered, utility mapping) + [`MetaPhlAn mpa_vOct22_CHOCOPhlAnSGB_202403`](https://cmprod1.cibio.unitn.it/biobakery4/metaphlan_databases/)
+- **cog_db**: [`NCBI COG 2024 definitions (cog-24.def.tab)`](https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/)
+
 ### Manual Database Download
 
 For shared HPC systems or repeated runs, pre-download databases to shared storage:
@@ -2546,13 +2569,19 @@ stops:
 
 ## Citation
 
-If you use BugBuster in your research, please cite:
+If you use BugBuster in your research, please cite the pipeline with its version
+(`nextflow run main.nf --version`) and repository, and cite the tools that ran: the
+Methods page of the run's report (`00_summary/report/`, and `results_summary.pdf`)
+lists every tool and database with its version and reference.
 
 ```
 BugBuster: Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible
 Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello
 https://github.com/gene2dis/BugBuster
 ```
+
+BugBuster is released under the MIT licence ([`LICENSE`](../LICENSE)); the tools and
+databases it uses keep their own licences.
 
 ---
 
