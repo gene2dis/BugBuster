@@ -212,7 +212,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: Integer
 - **Default**: `0`
 - **Minimum**: `0`
-- **Description**: Minimum number of reads per sample after fastp filtering, counted as single reads: R1 + R2 of the paired files (fastp's `after_filtering` total), so twice the read pairs; singleton reads do not count. Samples below it are dropped with a warning before decontamination. `0` disables the filter. Not the unit of the summary's `--summary_min_clean_pairs`, which counts read pairs after decontamination.
+- **Description**: Minimum number of reads per sample after fastp filtering, counted as single reads: R1 + R2 of the paired files (fastp's `after_filtering` total), so twice the read pairs; singleton reads do not count. Samples below it are dropped with a warning before decontamination. `0` disables the filter. Only with `--quality_control true` (the default): the filter is part of the QC step. Not the unit of the summary's `--summary_min_clean_pairs`, which counts read pairs after decontamination.
 - **Example**: `--min_read_sample 20000000` (keeps samples with at least 10 M read pairs after fastp)
 
 ---
@@ -404,7 +404,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_host_fasta`
 - **Type**: String (file path)
-- **Description**: Path to a custom host genome FASTA, plain or gzipped (e.g. a non-human host), or a comma-separated list of them (spaces around the commas are ignored; paths may not contain commas or spaces). The pipeline builds one decontamination index (`--read_aligner`) from them and the phiX genome. The bwa-mem3 build requests ~24 GB RAM per Gbp of genome, capped by `--max_memory`, and the launch memory warning covers only the built-in `--host_db`, so size `--max_memory` yourself for large or several genomes. See [`YAML_PARAMETERS_GUIDE.md`](YAML_PARAMETERS_GUIDE.md)
+- **Description**: Path to a custom host genome FASTA, plain or gzipped (e.g. a non-human host), or a comma-separated list of them (spaces around the commas are ignored; paths may not contain commas or spaces). The pipeline builds one decontamination index (`--read_aligner`) from them and the phiX genome. The bwa-mem3 build requests ~24 GB RAM per Gbp of genome, capped by `--max_memory`, and the launch memory warning covers only the built-in `--host_db`, so size `--max_memory` yourself for large or several genomes. See [Multiple Host Genomes in a Params File](DECONTAMINATION_QUICK_REFERENCE.md#multiple-host-genomes-in-a-params-file)
 - **Example**: `--custom_host_fasta /path/to/mouse_genome.fa` or `--custom_host_fasta /path/to/human.fa.gz,/path/to/mouse.fa.gz`
 
 > **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
@@ -1158,7 +1158,7 @@ Every task's request is capped at these values. With the local executor, `max_cp
 `-params-file` to change both. A `-c` config file that sets them in `params {}` changes the
 per-task caps but not the pool, so it must also set `executor { cpus = ...; memory = ... }`.
 Otherwise a task asking for more than the pool fails with `Process requirement exceeds
-available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
+available CPUs` (or `memory`); see manual §11.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
 
 ### `--max_cpus`
 - **Type**: Integer

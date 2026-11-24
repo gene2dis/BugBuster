@@ -12,7 +12,7 @@ output: "results"
 assembly_mode: "none"        # read-level results only
 nonpareil: true
 rgi_prediction: true
-max_memory: "64.GB"
+max_memory: "128.GB"        # the machine's RAM; the default aligner's human index build needs ~75 GB
 ```
 
 ```bash

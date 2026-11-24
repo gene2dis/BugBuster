@@ -159,7 +159,7 @@
                     "type": "integer",
                     "default": 0,
                     "minimum": 0,
-                    "description": "Minimum reads per sample after fastp, counted as single reads (R1 + R2 of the paired files, twice the read pairs; singletons not counted). Samples below it are dropped. 0 disables the filter.",
+                    "description": "Minimum reads per sample after fastp, counted as single reads (R1 + R2 of the paired files, twice the read pairs; singletons not counted). Samples below it are dropped. 0 disables the filter. Only with --quality_control true.",
                     "fa_icon": "fas fa-sort-numeric-up"
                 },
                 "rgi_prediction": {

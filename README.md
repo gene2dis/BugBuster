@@ -29,7 +29,7 @@ Stages in the order they run; the default column says which run without any opti
 | Stage | Tools | Switch | Default |
 |-------|-------|--------|---------|
 | Read quality control | [fastp](https://github.com/OpenGene/fastp) | `--quality_control` | on |
-| Host and phiX removal | [bwa-mem3](https://github.com/fg-labs/bwa-mem3), or [Bowtie2](https://github.com/BenLangmead/bowtie2) | `--read_aligner` | on, bwa-mem3 |
+| Host and phiX removal | [bwa-mem3](https://github.com/fg-labs/bwa-mem3), or [Bowtie2](https://github.com/BenLangmead/bowtie2) with `--read_aligner bowtie2` | `--quality_control` (with fastp) | on, bwa-mem3 |
 | Sequencing coverage | [Nonpareil](https://github.com/lmrodriguezr/nonpareil) | `--nonpareil` | on |
 | Taxonomic profile | [sylph](https://github.com/bluenote-1577/sylph) + [sylph-tax](https://github.com/bluenote-1577/sylph-tax), [Kraken2](https://ccb.jhu.edu/software/kraken2/) + [Bracken](https://github.com/jenniferlu717/Bracken), or [sourmash](https://sourmash.readthedocs.io/en/latest/index.html) | `--taxonomic_profiler` | sylph |
 | Read-level ARGs | [RGI](https://github.com/arpcard/rgi) (with pathogen of origin), [K-MARVEL](https://bitbucket.org/amr-avengers/k-marvel), [ARGs-OAP](https://github.com/xinehc/args_oap) | `--rgi_prediction`, `--kmarvel_prediction`, `--args_oap_prediction` | off |
