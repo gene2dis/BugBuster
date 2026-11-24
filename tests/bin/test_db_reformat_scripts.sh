@@ -391,12 +391,26 @@ expect_pass() {
     fi
 }
 
-expect_fail() {
-    local desc="$1"; shift
+expect_err() {
+    # expect_err <desc> <message> <args...>: the command must fail and its log
+    # must hold <message> (a fixed string). A Python traceback passes only when
+    # <message> names the exception the script raises on purpose
+    # ("ValueError: ..."), so a guard that stops working cannot pass through
+    # an unrelated crash (roadmap Phase 25, RV26; review R8-04)
+    local desc="$1" msg="$2"; shift 2
     local workdir="${WORK}/$(echo "${desc}" | tr ' /:' '___')"
     mkdir -p "${workdir}"
     if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
         echo "✗ ${desc} — expected nonzero exit, script succeeded"
+        FAIL=$((FAIL + 1))
+    elif ! grep -qF -- "${msg}" "${workdir}.log"; then
+        echo "✗ ${desc} — failed, but without '${msg}':"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    elif grep -q 'Traceback (most recent call last)' "${workdir}.log" \
+            && ! [[ "${msg}" =~ ^[A-Za-z]+(Error|Exception):\  ]]; then
+        echo "✗ ${desc} — failed with a Python traceback, not its own error:"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
         FAIL=$((FAIL + 1))
     else
         echo "✓ ${desc}"
@@ -439,9 +453,9 @@ echo "--- kraken_db_reformat.sh ---"
 expect_pass "kraken: valid tarball" kraken_db_reformat.sh "${BASE_URL}/k2_mini.tar.gz"
 check_file "kraken: hash.k2d extracted" "k2_ref_db/hash.k2d"
 check_file "kraken: taxo.k2d extracted" "k2_ref_db/taxo.k2d"
-expect_fail "kraken: corrupt tarball fails" kraken_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
-expect_fail "kraken: 404 URL fails" kraken_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
-expect_fail "kraken: tarball without k2d files fails" kraken_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+expect_err "kraken: corrupt tarball fails" "gzip: stdin: not in gzip format" kraken_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_err "kraken: 404 URL fails" "ERROR 404: File not found." kraken_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
+expect_err "kraken: tarball without k2d files fails" "ERROR: k2_ref_db/hash.k2d missing after extraction" kraken_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
 
 #
 # sylph_db_reformat.sh
@@ -451,16 +465,16 @@ expect_pass "sylph: valid database" sylph_db_reformat.sh db "${BASE_URL}/mini-c2
 check_file "sylph: database saved under its URL name" "sylph_db/mini-c200.syldb"
 expect_pass "sylph: valid taxonomy metadata" sylph_db_reformat.sh taxonomy "${BASE_URL}/mini_metadata.tsv.gz"
 check_file "sylph: metadata saved under its URL name" "sylph_db/mini_metadata.tsv.gz"
-expect_fail "sylph: empty database fails" sylph_db_reformat.sh db "${BASE_URL}/empty-c200.syldb"
+expect_err "sylph: empty database fails" "ERROR: sylph_db/empty-c200.syldb is empty after download" sylph_db_reformat.sh db "${BASE_URL}/empty-c200.syldb"
 expect_pass "sylph: two-stage database with SY2D magic" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syl2db"
-expect_fail "sylph: HTML page saved as .syldb fails" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syldb"
-expect_fail "sylph: HTML page saved as .syl2db fails" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syl2db"
-expect_fail "sylph: .syl2db without SY2D magic fails" sylph_db_reformat.sh db "${BASE_URL}/nomagic-c200.syl2db"
-expect_fail "sylph: 404 database URL fails" sylph_db_reformat.sh db "${BASE_URL}/no_such.syl2db"
-expect_fail "sylph: non-sylph database name fails" sylph_db_reformat.sh db "${BASE_URL}/k2_mini.tar.gz"
-expect_fail "sylph: corrupt metadata gzip fails" sylph_db_reformat.sh taxonomy "${BASE_URL}/corrupt_metadata.tsv.gz"
-expect_fail "sylph: gzip without accession/lineage layout fails" sylph_db_reformat.sh taxonomy "${BASE_URL}/plain_metadata.tsv.gz"
-expect_fail "sylph: unknown mode fails" sylph_db_reformat.sh index "${BASE_URL}/mini-c200.syldb"
+expect_err "sylph: HTML page saved as .syldb fails" "ERROR: sylph_db/html-c200.syldb is text, not a sylph database" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syldb"
+expect_err "sylph: HTML page saved as .syl2db fails" "ERROR: sylph_db/html-c200.syl2db is text, not a sylph database" sylph_db_reformat.sh db "${BASE_URL}/html-c200.syl2db"
+expect_err "sylph: .syl2db without SY2D magic fails" "does not start with the SY2D magic of a two-stage sylph database" sylph_db_reformat.sh db "${BASE_URL}/nomagic-c200.syl2db"
+expect_err "sylph: 404 database URL fails" "ERROR 404: File not found." sylph_db_reformat.sh db "${BASE_URL}/no_such.syl2db"
+expect_err "sylph: non-sylph database name fails" "ERROR: k2_mini.tar.gz is not a sylph database (.syldb or .syl2db)" sylph_db_reformat.sh db "${BASE_URL}/k2_mini.tar.gz"
+expect_err "sylph: corrupt metadata gzip fails" "ERROR: sylph_db/corrupt_metadata.tsv.gz is not a valid gzip file" sylph_db_reformat.sh taxonomy "${BASE_URL}/corrupt_metadata.tsv.gz"
+expect_err "sylph: gzip without accession/lineage layout fails" "ERROR: sylph_db/plain_metadata.tsv.gz is not a sylph-tax metadata file" sylph_db_reformat.sh taxonomy "${BASE_URL}/plain_metadata.tsv.gz"
+expect_err "sylph: unknown mode fails" "usage: sylph_db_reformat.sh <db|taxonomy> <url>" sylph_db_reformat.sh index "${BASE_URL}/mini-c200.syldb"
 # byte count from the registry (roadmap Phase 22, review R6-13)
 SYLPH_BYTES=$(stat -c %s "${FIXTURES}/mini-c200.syldb")
 expect_pass "sylph: database of the registry's byte count" sylph_db_reformat.sh db "${BASE_URL}/mini-c200.syldb" "${SYLPH_BYTES}"
@@ -472,8 +486,8 @@ expect_code "sylph: database of another byte count fails with exit 65 (cut downl
 echo "--- checkm2_db_reformat.sh ---"
 expect_pass "checkm2: valid tarball" checkm2_db_reformat.sh "${BASE_URL}/checkm2_database.tar.gz"
 check_file "checkm2: dmnd file extracted" "uniref100.KO.1.dmnd"
-expect_fail "checkm2: corrupt tarball fails" checkm2_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
-expect_fail "checkm2: tarball without dmnd fails" checkm2_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
+expect_err "checkm2: corrupt tarball fails" "gzip: stdin: not in gzip format" checkm2_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_err "checkm2: tarball without dmnd fails" "ERROR: no .dmnd file found after extracting checkm2_database.tar.gz" checkm2_db_reformat.sh "${BASE_URL}/taxdump.tar.gz"
 
 #
 # gtdb-tk_db_reformat.sh
@@ -481,8 +495,8 @@ expect_fail "checkm2: tarball without dmnd fails" checkm2_db_reformat.sh "${BASE
 echo "--- gtdb-tk_db_reformat.sh ---"
 expect_pass "gtdbtk: valid tarball" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_r232_data.tar.gz"
 check_file "gtdbtk: release files extracted" "gtdbtk_db/markers/marker.txt"
-expect_fail "gtdbtk: corrupt tarball fails" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
-expect_fail "gtdbtk: empty package fails" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
+expect_err "gtdbtk: corrupt tarball fails" "gzip: stdin: not in gzip format" gtdb-tk_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_err "gtdbtk: empty package fails" "ERROR: no markers/ with files in gtdbtk_data.tar.gz" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_empty.tar.gz"
 expect_pass "gtdbtk: ./release232 entries" gtdb-tk_db_reformat.sh "${BASE_URL}/gtdbtk_dotslash.tar.gz"
 check_file "gtdbtk: ./ prefix still gives gtdbtk_db/markers" "gtdbtk_db/markers/marker.txt"
 
@@ -493,10 +507,10 @@ echo "--- metabuli_db_reformat.sh ---"
 expect_pass "metabuli: valid tarball" metabuli_db_reformat.sh "${BASE_URL}/metabuli_mini.tar.gz"
 check_file "metabuli: index files in metabuli_db" "metabuli_db/diffIdx"
 check_file "metabuli: taxdump kept in metabuli_db" "metabuli_db/ncbi-taxdump/nodes.dmp"
-expect_fail "metabuli: corrupt tarball fails" metabuli_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
-expect_fail "metabuli: tarball without db.parameters fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_noparams.tar.gz"
-expect_fail "metabuli: database without a taxdump fails" metabuli_db_reformat.sh "${BASE_URL}/metabuli_notaxdump.tar.gz"
-expect_fail "metabuli: 404 URL fails" metabuli_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
+expect_err "metabuli: corrupt tarball fails" "gzip: stdin: not in gzip format" metabuli_db_reformat.sh "${BASE_URL}/corrupt.tar.gz"
+expect_err "metabuli: tarball without db.parameters fails" "ERROR: no db.parameters found after extracting the Metabuli database" metabuli_db_reformat.sh "${BASE_URL}/metabuli_noparams.tar.gz"
+expect_err "metabuli: database without a taxdump fails" "ERROR: the Metabuli database has no nodes.dmp" metabuli_db_reformat.sh "${BASE_URL}/metabuli_notaxdump.tar.gz"
+expect_err "metabuli: 404 URL fails" "ERROR 404: File not found." metabuli_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz"
 
 #
 # genomad_db_reformat.sh
@@ -507,11 +521,11 @@ GENOMAD_OLD_MD5=$(md5sum "${FIXTURES}/genomad_db_v1.8.tar.gz" | cut -d' ' -f1)
 expect_pass "genomad: valid release" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" "${GENOMAD_MD5}" 1.9
 check_file "genomad: database files in genomad_db" "genomad_db/genomad_db"
 check_file "genomad: version.txt kept" "genomad_db/version.txt"
-expect_fail "genomad: wrong md5 fails" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" \
+expect_err "genomad: wrong md5 fails" "md5sum: WARNING: 1 computed checksum did NOT match" genomad_db_reformat.sh "${BASE_URL}/genomad_db_v1.9.tar.gz" \
     00000000000000000000000000000000 1.9
-expect_fail "genomad: another release than the registry's fails" genomad_db_reformat.sh \
+expect_err "genomad: another release than the registry's fails" "ERROR: geNomad database version 1.8, expected 1.9" genomad_db_reformat.sh \
     "${BASE_URL}/genomad_db_v1.8.tar.gz" "${GENOMAD_OLD_MD5}" 1.9
-expect_fail "genomad: 404 URL fails" genomad_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz" "${GENOMAD_MD5}" 1.9
+expect_err "genomad: 404 URL fails" "ERROR 404: File not found." genomad_db_reformat.sh "${BASE_URL}/no_such_file.tar.gz" "${GENOMAD_MD5}" 1.9
 
 #
 # eggnog_db_reformat.sh
@@ -523,8 +537,8 @@ check_file "eggnog: taxid cache in eggnog_db" "eggnog_db/eggnog.db.taxids.bin"
 check_file "eggnog: eggnog.taxa.db in eggnog_db" "eggnog_db/eggnog.taxa.db"
 check_file "eggnog: diamond db in eggnog_db" "eggnog_db/eggnog_proteins.dmnd"
 check_file "eggnog: go-basic.obo in eggnog_db" "eggnog_db/go-basic.obo"
-expect_fail "eggnog: empty eggnog.db fails" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb_empty"
-expect_fail "eggnog: missing files fail" eggnog_db_reformat.sh "${BASE_URL}/no_such_dir"
+expect_err "eggnog: empty eggnog.db fails" "ERROR: expected file 'eggnog_db/eggnog.db' missing or empty after download" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb_empty"
+expect_err "eggnog: missing files fail" "ERROR 404: File not found." eggnog_db_reformat.sh "${BASE_URL}/no_such_dir"
 # byte counts from the registry (roadmap Phase 22, review R6-13)
 EGG_BYTES=$(cd "${FIXTURES}/eggnogdb" && for f in *; do printf '%s:%s ' "${f}" "$(stat -c %s "${f}")"; done)
 expect_pass "eggnog: files of the registry's byte counts" eggnog_db_reformat.sh "${BASE_URL}/eggnogdb" "${EGG_BYTES}"
@@ -540,8 +554,8 @@ check_file "dbcan: dbCAN.hmm in dbcan_db" "dbcan_db/dbCAN.hmm"
 check_file "dbcan: dbCAN_sub.hmm saved as dbCAN-sub.hmm" "dbcan_db/dbCAN-sub.hmm"
 check_file "dbcan: substrate mapping in dbcan_db" "dbcan_db/fam-substrate-mapping.tsv"
 check_file "dbcan: DB_VERSION provenance file written" "dbcan_db/DB_VERSION"
-expect_fail "dbcan: empty CAZy.dmnd fails" dbcan_db_reformat.sh "${BASE_URL}/dbcandb_empty"
-expect_fail "dbcan: missing files fail" dbcan_db_reformat.sh "${BASE_URL}/no_such_dir"
+expect_err "dbcan: empty CAZy.dmnd fails" "ERROR: expected file 'dbcan_db/CAZy.dmnd' missing or empty after download" dbcan_db_reformat.sh "${BASE_URL}/dbcandb_empty"
+expect_err "dbcan: missing files fail" "ERROR 404: File not found." dbcan_db_reformat.sh "${BASE_URL}/no_such_dir"
 # byte counts under the local names (roadmap Phase 22, review R6-13)
 DBCAN_BYTES="CAZy.dmnd:$(stat -c %s "${FIXTURES}/dbcandb/CAZy.dmnd") dbCAN-sub.hmm:$(stat -c %s "${FIXTURES}/dbcandb/dbCAN_sub.hmm")"
 expect_pass "dbcan: files of the registry's byte counts" dbcan_db_reformat.sh "${BASE_URL}/dbcandb" "${DBCAN_BYTES}"
@@ -604,12 +618,12 @@ else
     echo "✗ bakta: DB_VERSION does not record the light flavor"
     FAIL=$((FAIL + 1))
 fi
-expect_fail "bakta: schema-5 version.json fails" bakta_db_reformat.sh "${BASE_URL}/bakta_db_v5.tar.xz"
-expect_fail "bakta: missing amrfinderplus-db fails" bakta_db_reformat.sh "${BASE_URL}/bakta_db_noamr.tar.xz"
-expect_fail "bakta: corrupt tarball fails" bakta_db_reformat.sh "${BASE_URL}/corrupt.tar.xz"
-expect_fail "bakta: 404 URL fails" bakta_db_reformat.sh "${BASE_URL}/no_such_file.tar.xz"
+expect_err "bakta: schema-5 version.json fails" "ERROR: bakta_db/version.json reports schema major '5', expected 6" bakta_db_reformat.sh "${BASE_URL}/bakta_db_v5.tar.xz"
+expect_err "bakta: missing amrfinderplus-db fails" "ERROR: bakta_db/amrfinderplus-db missing or empty after extraction" bakta_db_reformat.sh "${BASE_URL}/bakta_db_noamr.tar.xz"
+expect_err "bakta: corrupt tarball fails" "tar: short read" bakta_db_reformat.sh "${BASE_URL}/corrupt.tar.xz"
+expect_err "bakta: 404 URL fails" "ERROR 404: File not found." bakta_db_reformat.sh "${BASE_URL}/no_such_file.tar.xz"
 MOCK_BIN="${MOCK_FAIL}"
-expect_fail "bakta: amrfinder_update failure fails the provisioning" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
+expect_err "bakta: amrfinder_update failure fails the provisioning" "mock amrfinder_update: simulated download failure" bakta_db_reformat.sh "${BASE_URL}/bakta_db_full.tar.xz"
 MOCK_BIN=""
 RUN_IMG=""
 
@@ -624,9 +638,9 @@ if [ ! -e "${LAST_WORKDIR}/checksums.md5" ]; then
 else
     echo "✗ cog: checksums.md5 left in the output dir"; FAIL=$((FAIL + 1))
 fi
-expect_fail "cog: md5 mismatch fails" cog_db_reformat.sh "${BASE_URL}/cog_badmd5/cog-24.def.tab"
-expect_fail "cog: non-COG layout fails" cog_db_reformat.sh "${BASE_URL}/cog_badlayout/cog-24.def.tab"
-expect_fail "cog: 404 URL fails" cog_db_reformat.sh "${BASE_URL}/no_such_dir/cog-24.def.tab"
+expect_err "cog: md5 mismatch fails" "ERROR: md5 mismatch for cog-24.def.tab" cog_db_reformat.sh "${BASE_URL}/cog_badmd5/cog-24.def.tab"
+expect_err "cog: non-COG layout fails" "ERROR: cog-24.def.tab is not an NCBI COG definitions table" cog_db_reformat.sh "${BASE_URL}/cog_badlayout/cog-24.def.tab"
+expect_err "cog: 404 URL fails" "ERROR 404: File not found." cog_db_reformat.sh "${BASE_URL}/no_such_dir/cog-24.def.tab"
 
 #
 # woltka_db_reformat.sh (runs in the woltka image FORMAT_WOLTKA_DB pins)
@@ -648,10 +662,10 @@ else
     echo "✗ woltka: DB_VERSION missing or does not record the release"
     FAIL=$((FAIL + 1))
 fi
-expect_fail "woltka: md5 mismatch (uncompressed content) fails" woltka_db_reformat.sh "${BASE_URL}/wol2_badmd5"
-expect_fail "woltka: empty index file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_emptyindex"
-expect_fail "woltka: missing map file fails" woltka_db_reformat.sh "${BASE_URL}/wol2_missing"
-expect_fail "woltka: 404 base URL fails" woltka_db_reformat.sh "${BASE_URL}/no_such_dir"
+expect_err "woltka: md5 mismatch (uncompressed content) fails" "ERROR: md5 mismatch for woltka_db/proteins/coords.txt.xz" woltka_db_reformat.sh "${BASE_URL}/wol2_badmd5"
+expect_err "woltka: empty index file fails" "ERROR: expected index file 'woltka_db/databases/bowtie2/WoLr2.3.bt2l' missing or empty after download" woltka_db_reformat.sh "${BASE_URL}/wol2_emptyindex"
+expect_err "woltka: missing map file fails" "ERROR: could not download" woltka_db_reformat.sh "${BASE_URL}/wol2_missing"
+expect_err "woltka: 404 base URL fails" "ERROR: could not download" woltka_db_reformat.sh "${BASE_URL}/no_such_dir"
 # byte counts of the files without an md5 (roadmap Phase 22, review R6-13)
 WOL_IDX="databases/bowtie2/WoLr2.rev.1.bt2l"
 WOL_BYTES="${WOL_IDX}:$(stat -c %s "${FIXTURES}/wol2/${WOL_IDX}")"
@@ -689,21 +703,21 @@ expect_pass "superfocus: mmseqs2 DB_90 archive (folder inside the zip)" superfoc
     "${BASE_URL}/sf/mmseqs90.zip" "$(sf_md5 mmseqs90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
 check_file "superfocus: mmseqs2 database unpacked flat" "superfocus_db/db/static/mmseqs2/90_clusters.db"
 check_file "superfocus: mmseqs2 .dbtype present" "superfocus_db/db/static/mmseqs2/90_clusters.db.dbtype"
-expect_fail "superfocus: archive md5 mismatch fails" superfocus_db_reformat.sh diamond \
+expect_err "superfocus: archive md5 mismatch fails" "ERROR: md5 mismatch for the diamond DB_90 archive" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/diamond90.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
-expect_fail "superfocus: database_PKs.txt md5 mismatch fails" superfocus_db_reformat.sh diamond \
+expect_err "superfocus: database_PKs.txt md5 mismatch fails" "ERROR: md5 mismatch for database_PKs.txt" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${BASE_URL}/sf/database_PKs.txt" 00000000000000000000000000000000 "SUPER-FOCUS test"
-expect_fail "superfocus: database_PKs.txt without the subsystem header fails" superfocus_db_reformat.sh diamond \
+expect_err "superfocus: database_PKs.txt without the subsystem header fails" "ERROR: database_PKs.txt does not have the SUPER-FOCUS subsystem table header" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${BASE_URL}/sf/bad_PKs.txt" "$(sf_md5 bad_PKs.txt)" "SUPER-FOCUS test"
-expect_fail "superfocus: archive without the aligner's database fails" superfocus_db_reformat.sh diamond \
+expect_err "superfocus: archive without the aligner's database fails" "superfocus_db/db/static/diamond/90_clusters.db.dmnd missing or empty after unpacking" superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/wrong.zip" "$(sf_md5 wrong.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
-expect_fail "superfocus: diamond archive given for mmseqs2 fails" superfocus_db_reformat.sh mmseqs2 \
+expect_err "superfocus: diamond archive given for mmseqs2 fails" "superfocus_db/db/static/mmseqs2/90_clusters.db missing or empty after unpacking" superfocus_db_reformat.sh mmseqs2 \
     "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
-expect_fail "superfocus: incomplete mmseqs2 database (no .dbtype) fails" superfocus_db_reformat.sh mmseqs2 \
+expect_err "superfocus: incomplete mmseqs2 database (no .dbtype) fails" "90_clusters.db.dbtype missing - incomplete MMseqs2 database" superfocus_db_reformat.sh mmseqs2 \
     "${BASE_URL}/sf/mmseqs90_nodbtype.zip" "$(sf_md5 mmseqs90_nodbtype.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
-expect_fail "superfocus: unknown aligner fails" superfocus_db_reformat.sh rapsearch \
+expect_err "superfocus: unknown aligner fails" "ERROR: unknown aligner 'rapsearch' (expected diamond or mmseqs2)" superfocus_db_reformat.sh rapsearch \
     "${BASE_URL}/sf/diamond90.zip" "$(sf_md5 diamond90.zip)" "${SF_PKS[@]}" "SUPER-FOCUS test"
-expect_fail "superfocus: 404 archive URL fails" superfocus_db_reformat.sh diamond \
+expect_err "superfocus: 404 archive URL fails" "ERROR 404: File not found." superfocus_db_reformat.sh diamond \
     "${BASE_URL}/sf/no_such.zip" 00000000000000000000000000000000 "${SF_PKS[@]}" "SUPER-FOCUS test"
 RUN_IMG=""
 
@@ -733,11 +747,11 @@ else
     echo "✗ kmarvel: leftover files next to or inside kmarvel_db/"
     FAIL=$((FAIL + 1))
 fi
-expect_fail "kmarvel: tarball md5 mismatch fails" kmarvel_db_reformat.sh \
+expect_err "kmarvel: tarball md5 mismatch fails" "md5sum: WARNING: 1 computed checksum did NOT match" kmarvel_db_reformat.sh \
     "${BASE_URL}/km/card.tar.bz2" 00000000000000000000000000000000 "CARD test"
-expect_fail "kmarvel: tarball without the variant model FASTA fails" kmarvel_db_reformat.sh \
+expect_err "kmarvel: tarball without the variant model FASTA fails" "'protein_fasta_protein_variant_model.fasta' missing or empty in the CARD data tarball" kmarvel_db_reformat.sh \
     "${BASE_URL}/km/card_novar.tar.bz2" "$(km_md5 card_novar.tar.bz2)" "CARD test"
-expect_fail "kmarvel: 404 tarball URL fails" kmarvel_db_reformat.sh \
+expect_err "kmarvel: 404 tarball URL fails" "ERROR 404: File not found." kmarvel_db_reformat.sh \
     "${BASE_URL}/km/no_such.tar.bz2" 00000000000000000000000000000000 "CARD test"
 RUN_IMG=""
 
@@ -775,19 +789,19 @@ fi
 expect_pass "humann: ChocoPhlAn archive wrapped in a folder is flattened" humann_db_reformat.sh \
     $(hu_args chocophlan_wrapped.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
 check_file "humann: wrapped ChocoPhlAn flattened into chocophlan/" "humann_db/chocophlan/SGB2091_pangenome90.fna.gz"
-expect_fail "humann: Bowtie2 index md5 mismatch fails" humann_db_reformat.sh \
+expect_err "humann: Bowtie2 index md5 mismatch fails" "ERROR: md5 mismatch for mpa_vOct22_CHOCOPhlAnSGB_202403_bt2.tar" humann_db_reformat.sh \
     $(hu_args chocophlan.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" bad_bt2.md5)
-expect_fail "humann: incomplete Bowtie2 index fails" humann_db_reformat.sh \
+expect_err "humann: incomplete Bowtie2 index fails" "rev.2.bt2l missing or empty - incomplete MetaPhlAn Bowtie2 index" humann_db_reformat.sh \
     $(hu_args chocophlan.tar.gz uniref.tar.gz utility.tar.gz bt2_incomplete.tar bt2_incomplete.md5)
-expect_fail "humann: utility mapping without the KO map fails" humann_db_reformat.sh \
+expect_err "humann: utility mapping without the KO map fails" "map_ko_uniref90.txt.gz missing or empty - not the full_mapping_v4_alpha archive" humann_db_reformat.sh \
     $(hu_args chocophlan.tar.gz uniref.tar.gz utility_noko.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
-expect_fail "humann: ChocoPhlAn archive without pangenomes fails" humann_db_reformat.sh \
+expect_err "humann: ChocoPhlAn archive without pangenomes fails" "humann_db/chocophlan holds no non-empty pangenome" humann_db_reformat.sh \
     $(hu_args empty.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
-expect_fail "humann: UniRef archive without a .dmnd fails" humann_db_reformat.sh \
+expect_err "humann: UniRef archive without a .dmnd fails" "humann_db/uniref holds no non-empty DIAMOND" humann_db_reformat.sh \
     $(hu_args chocophlan.tar.gz chocophlan.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
-expect_fail "humann: truncated archive fails" humann_db_reformat.sh \
+expect_err "humann: truncated archive fails" "ERROR: could not extract the ChocoPhlAn archive" humann_db_reformat.sh \
     $(hu_args truncated.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
-expect_fail "humann: 404 archive URL fails" humann_db_reformat.sh \
+expect_err "humann: 404 archive URL fails" "ERROR 404: File not found." humann_db_reformat.sh \
     $(hu_args no_such.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
 
 #
@@ -808,11 +822,11 @@ else
     FAIL=$((FAIL + 1))
 fi
 expect_code "checkv: wrong byte count fails with 65 (not retried)" 65 checkv_db_reformat.sh "${BASE_URL}/checkv-db-v1.5.tar.gz" 12345 1.5
-expect_fail "checkv: corrupt tarball fails" checkv_db_reformat.sh "${BASE_URL}/corrupt.tar.gz" 100 1.5
-expect_fail "checkv: 404 URL fails" checkv_db_reformat.sh "${BASE_URL}/no_such_checkv.tar.gz" 100 1.5
-expect_fail "checkv: another release in README.txt fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-old.tar.gz" "${CHECKV_OLD_BYTES}" 1.5
-expect_fail "checkv: missing checkv_reps.tsv fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-notsv.tar.gz" "${CHECKV_NOTSV_BYTES}" 1.5
-expect_fail "checkv: tarball without README.txt fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-noreadme.tar.gz" "${CHECKV_NOREADME_BYTES}" 1.5
+expect_err "checkv: corrupt tarball fails" "tar: invalid magic" checkv_db_reformat.sh "${BASE_URL}/corrupt.tar.gz" 100 1.5
+expect_err "checkv: 404 URL fails" "ERROR 404: File not found." checkv_db_reformat.sh "${BASE_URL}/no_such_checkv.tar.gz" 100 1.5
+expect_err "checkv: another release in README.txt fails" "ERROR: CheckV database version 1.4, expected 1.5" checkv_db_reformat.sh "${BASE_URL}/checkv-db-old.tar.gz" "${CHECKV_OLD_BYTES}" 1.5
+expect_err "checkv: missing checkv_reps.tsv fails" "ERROR: CheckV database file genome_db/checkv_reps.tsv missing or empty" checkv_db_reformat.sh "${BASE_URL}/checkv-db-notsv.tar.gz" "${CHECKV_NOTSV_BYTES}" 1.5
+expect_err "checkv: tarball without README.txt fails" "ERROR: no README.txt found after extracting the CheckV database" checkv_db_reformat.sh "${BASE_URL}/checkv-db-noreadme.tar.gz" "${CHECKV_NOREADME_BYTES}" 1.5
 RUN_IMG=""
 
 #
@@ -829,10 +843,10 @@ else
     echo "✗ gunc: gzipped download left beside the reference"
     FAIL=$((FAIL + 1))
 fi
-expect_fail "gunc: wrong md5 of the download fails" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" 00000000000000000000000000000000 gunc_db_test.dmnd "${GUNC_MD5}"
-expect_fail "gunc: wrong md5 of the unpacked reference fails" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd 00000000000000000000000000000000
-expect_fail "gunc: corrupt gzip with a matching md5 fails" gunc_db_reformat.sh "${BASE_URL}/gunc_corrupt.dmnd.gz" "${GUNC_CORRUPT_MD5}" gunc_corrupt.dmnd "${GUNC_MD5}"
-expect_fail "gunc: 404 URL fails" gunc_db_reformat.sh "${BASE_URL}/no_such_gunc.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd "${GUNC_MD5}"
+expect_err "gunc: wrong md5 of the download fails" "gunc_db_test.dmnd.gz: FAILED" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" 00000000000000000000000000000000 gunc_db_test.dmnd "${GUNC_MD5}"
+expect_err "gunc: wrong md5 of the unpacked reference fails" "gunc_db_test.dmnd: FAILED" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd 00000000000000000000000000000000
+expect_err "gunc: corrupt gzip with a matching md5 fails" "gzip: gunc_corrupt.dmnd.gz: not in gzip format" gunc_db_reformat.sh "${BASE_URL}/gunc_corrupt.dmnd.gz" "${GUNC_CORRUPT_MD5}" gunc_corrupt.dmnd "${GUNC_MD5}"
+expect_err "gunc: 404 URL fails" "ERROR 404: File not found." gunc_db_reformat.sh "${BASE_URL}/no_such_gunc.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd "${GUNC_MD5}"
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip

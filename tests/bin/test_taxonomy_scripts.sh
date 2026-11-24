@@ -86,14 +86,28 @@ expect_pass() {
     fi
 }
 
-expect_fail() {
-    local desc="$1"; shift
+expect_err() {
+    # expect_err <desc> <message> <args...>: the command must fail and its log
+    # must hold <message> (a fixed string). A Python traceback passes only when
+    # <message> names the exception the script raises on purpose
+    # ("ValueError: ..."), so a guard that stops working cannot pass through
+    # an unrelated crash (roadmap Phase 25, RV26; review R8-04)
+    local desc="$1" msg="$2"; shift 2
     local workdir="${NEXT_WORKDIR:-${WORK}/$(echo "${desc}" | tr ' /:' '___')}"
     NEXT_WORKDIR=""
     mkdir -p "${workdir}"
     LAST_WORKDIR="${workdir}"
     if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
         echo "✗ ${desc} — expected nonzero exit, script succeeded"
+        FAIL=$((FAIL + 1))
+    elif ! grep -qF -- "${msg}" "${workdir}.log"; then
+        echo "✗ ${desc} — failed, but without '${msg}':"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    elif grep -q 'Traceback (most recent call last)' "${workdir}.log" \
+            && ! [[ "${msg}" =~ ^[A-Za-z]+(Error|Exception):\  ]]; then
+        echo "✗ ${desc} — failed with a Python traceback, not its own error:"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
         FAIL=$((FAIL + 1))
     else
         echo "✓ ${desc}"
@@ -176,7 +190,7 @@ mkdir -p "${GARBLED}"
 printf 'just\tthree\tcolumns\n' > "${GARBLED}/bad.kraken2.report.txt"
 cp "${FIXTURES}/Reads_report_fixture.csv" "${GARBLED}/input_reads_report.csv"
 NEXT_WORKDIR="${GARBLED}"
-expect_fail "kraken2 report: garbled report fails" taxonomy_report.py --profiler kraken2 \
+expect_err "kraken2 report: garbled report fails" "does not look like a kraken2 report (expected 6 tab-separated columns" taxonomy_report.py --profiler kraken2 \
     --reports bad.kraken2.report.txt \
     --reads-report input_reads_report.csv --db-name standard-8 --output-dir .
 
@@ -299,7 +313,7 @@ GARBLED_PH="${WORK}/garbled_phyloseq"
 mkdir -p "${GARBLED_PH}"
 printf 'not\ta\tkraken\treport\n' > "${GARBLED_PH}/bad.kraken2.report_bracken.txt"
 NEXT_WORKDIR="${GARBLED_PH}"
-expect_fail "kraken2 phyloseq: garbled report fails" taxonomy_phyloseq.py --profiler kraken2 \
+expect_err "kraken2 phyloseq: garbled report fails" "ValueError: bad.kraken2.report_bracken.txt:1: expected 6 tab-separated kraken-report columns, got 4" taxonomy_phyloseq.py --profiler kraken2 \
     --input-files bad.kraken2.report_bracken.txt \
     --db-name standard-8 --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -375,7 +389,7 @@ mkdir -p "${SMPH_NOLIN}"
 sed -e '3s/,d__Bacteria;[^,]*$/,/' "${FIXTURES}/sampleA_smgather_gtdb.with-lineages.csv" \
     > "${SMPH_NOLIN}/sampleA_smgather_gtdb.with-lineages.csv"
 NEXT_WORKDIR="${SMPH_NOLIN}"
-expect_fail "sourmash phyloseq: genome without a lineage fails" taxonomy_phyloseq.py --profiler sourmash \
+expect_err "sourmash phyloseq: genome without a lineage fails" "ValueError: sampleA_smgather_gtdb.with-lineages.csv: no lineage for 1 genome(s): GCA_000000002.1" taxonomy_phyloseq.py --profiler sourmash \
     --input-files sampleA_smgather_gtdb.with-lineages.csv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -387,7 +401,7 @@ SMPH_EMPTY="${WORK}/taxonomy_phyloseq_sourmash_empty"
 mkdir -p "${SMPH_EMPTY}"
 echo "${FALLBACK_HEADER}" > "${SMPH_EMPTY}/sampleB_smgather_gtdb.with-lineages.csv"
 NEXT_WORKDIR="${SMPH_EMPTY}"
-expect_fail "sourmash phyloseq: all-samples-no-match fails" taxonomy_phyloseq.py --profiler sourmash \
+expect_err "sourmash phyloseq: all-samples-no-match fails" "ValueError: No sourmash matches in any sample" taxonomy_phyloseq.py --profiler sourmash \
     --input-files sampleB_smgather_gtdb.with-lineages.csv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -401,7 +415,7 @@ mkdir -p "${SMPH_BADHDR}"
 printf 'query_filename,match_name,average_abund,lineage\nx.fq,GCA_1 Test,1.0,d__Bacteria\n' \
     > "${SMPH_BADHDR}/sampleC_smgather_gtdb.with-lineages.csv"
 NEXT_WORKDIR="${SMPH_BADHDR}"
-expect_fail "sourmash phyloseq: malformed gather CSV fails" taxonomy_phyloseq.py --profiler sourmash \
+expect_err "sourmash phyloseq: malformed gather CSV fails" "ValueError: sampleC_smgather_gtdb.with-lineages.csv is missing expected gather columns" taxonomy_phyloseq.py --profiler sourmash \
     --input-files sampleC_smgather_gtdb.with-lineages.csv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -429,7 +443,7 @@ mkdir -p "${SY_BADREP}"
 printf 'Id\tSylph DB\tClassified\nsample1\tgtdb\t0.75\n' > "${SY_BADREP}/sample1_sylph_gtdb_report.tsv"
 cp "${FIXTURES}/Reads_report_fixture.csv" "${SY_BADREP}/input_reads_report.csv"
 NEXT_WORKDIR="${SY_BADREP}"
-expect_fail "sylph report: report missing a column fails" taxonomy_report.py --profiler sylph \
+expect_err "sylph report: report missing a column fails" "Error: sample1_sylph_gtdb_report.tsv is missing report columns ['Unclassified']" taxonomy_report.py --profiler sylph \
     --reports sample1_sylph_gtdb_report.tsv \
     --reads-report input_reads_report.csv --db-name gtdb --output-dir .
 check_grep "sylph report: missing-column failure names the column" "../taxonomy_report_sylph_badcols.log" \
@@ -444,7 +458,7 @@ cp "${FIXTURES}/sample1_sylph_gtdb_report.tsv" "${SY_BADVAL}/"
 printf 'Id\tSylph DB\tUnclassified\tClassified\nsample2\tgtdb\t0.25\thigh\n' > "${SY_BADVAL}/sample2_sylph_gtdb_report.tsv"
 cp "${FIXTURES}/Reads_report_fixture.csv" "${SY_BADVAL}/input_reads_report.csv"
 NEXT_WORKDIR="${SY_BADVAL}"
-expect_fail "sylph report: an unparsable report next to a good one fails" taxonomy_report.py --profiler sylph \
+expect_err "sylph report: an unparsable report next to a good one fails" "Error: sample2_sylph_gtdb_report.tsv cannot be parsed as a Sylph report" taxonomy_report.py --profiler sylph \
     --reports sample1_sylph_gtdb_report.tsv sample2_sylph_gtdb_report.tsv \
     --reads-report input_reads_report.csv --db-name gtdb --output-dir .
 check_grep "sylph report: unparsable-report failure names the file" "../taxonomy_report_sylph_badvalue.log" \
@@ -515,7 +529,7 @@ check_grep "sylph phyloseq: sample id is the name minus the exact suffix" "sylph
 
 # A profile not named for the --db-name database must fail, not be mislabelled
 NEXT_WORKDIR="${SYPH_LABEL}"
-expect_fail "sylph phyloseq: profile of another database label fails" taxonomy_phyloseq.py --profiler sylph \
+expect_err "sylph phyloseq: profile of another database label fails" "ValueError: sampleA_sylph_my_sylph_db.sylphmpa is not named <sample>_sylph_gtdb.sylphmpa" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleA_sylph_my_sylph_db.sylphmpa sampleA_sylph_my_sylph_db_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -528,7 +542,7 @@ cp "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa" "${SYPH_BADPAIRS}/"
 printf 'Id\tSylph DB\tUnclassified\tClassified\tRead pairs\nsampleA\tgtdb\t0.000000\t1.000000\t1.23457e+07\n' \
     > "${SYPH_BADPAIRS}/sampleA_sylph_gtdb_report.tsv"
 NEXT_WORKDIR="${SYPH_BADPAIRS}"
-expect_fail "sylph phyloseq: non-integer Read pairs fails" taxonomy_phyloseq.py --profiler sylph \
+expect_err "sylph phyloseq: non-integer Read pairs fails" "ValueError: sampleA_sylph_gtdb_report.tsv: Read pairs '1.23457e+07' for sampleA is not a whole number" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleA_sylph_gtdb.sylphmpa sampleA_sylph_gtdb_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -538,7 +552,7 @@ SYPH_EMPTY="${WORK}/taxonomy_phyloseq_sylph_empty"
 mkdir -p "${SYPH_EMPTY}"
 cp "${FIXTURES}/sampleB_sylph_gtdb.sylphmpa" "${FIXTURES}/sampleB_sylph_gtdb_report.tsv" "${SYPH_EMPTY}/"
 NEXT_WORKDIR="${SYPH_EMPTY}"
-expect_fail "sylph phyloseq: all-samples-no-hit fails" taxonomy_phyloseq.py --profiler sylph \
+expect_err "sylph phyloseq: all-samples-no-hit fails" "ValueError: No sylph genomes in any sample" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleB_sylph_gtdb.sylphmpa sampleB_sylph_gtdb_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -550,7 +564,7 @@ SYPH_NOREP="${WORK}/taxonomy_phyloseq_sylph_noreport"
 mkdir -p "${SYPH_NOREP}"
 cp "${FIXTURES}/sampleA_sylph_gtdb.sylphmpa" "${SYPH_NOREP}/"
 NEXT_WORKDIR="${SYPH_NOREP}"
-expect_fail "sylph phyloseq: profile without its report fails" taxonomy_phyloseq.py --profiler sylph \
+expect_err "sylph phyloseq: profile without its report fails" "ValueError: No SYLPH_PROFILE report (Read pairs) for sample sampleA" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleA_sylph_gtdb.sylphmpa \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
@@ -561,7 +575,7 @@ mkdir -p "${SYPH_BAD}"
 printf 'clade_name\trelative_abundance\nd__Bacteria\t100\n' > "${SYPH_BAD}/sampleC_sylph_gtdb.sylphmpa"
 cp "${FIXTURES}/sampleA_sylph_gtdb_report.tsv" "${SYPH_BAD}/sampleC_sylph_gtdb_report.tsv"
 NEXT_WORKDIR="${SYPH_BAD}"
-expect_fail "sylph phyloseq: malformed profile fails" taxonomy_phyloseq.py --profiler sylph \
+expect_err "sylph phyloseq: malformed profile fails" "ValueError: sampleC_sylph_gtdb.sylphmpa is not a sylph-tax profile (no #SampleID line)" taxonomy_phyloseq.py --profiler sylph \
     --input-files sampleC_sylph_gtdb.sylphmpa sampleC_sylph_gtdb_report.tsv \
     --db-name gtdb --output-dir . --format tables \
     --plot-levels Species --top-n 10
