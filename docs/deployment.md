@@ -4,7 +4,8 @@ This guide covers deploying BugBuster on different compute infrastructures.
 The cloud/HPC profile parameters used below (`aws_*`, `gcp_*`, `azure_*`,
 `slurm_*`) are formally documented in
 [`parameters.md` § Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters);
-the `--*_workdir` parameter of the chosen cloud profile is **required**.
+the chosen cloud profile needs a work directory in its cloud storage, given with its
+`--*_workdir` parameter or with `-work-dir` (see that section).
 
 ## Table of Contents
 

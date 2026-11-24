@@ -101,7 +101,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--include_binning`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable metagenomic binning and refinement steps
+- **Description**: Enable metagenomic binning and refinement steps. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`
 - **Example**: `--include_binning true`
 
 ### `--binners`
@@ -172,7 +172,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level taxonomy and ARG prediction. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#69-contig-taxonomy-genomad-and-deeparg-options)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
+- **Description**: Enable contig-level taxonomy and ARG prediction. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#69-contig-taxonomy-genomad-and-deeparg-options)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
 - **Example**: `--contig_tax_and_arg true --custom_metabuli_db /shared/databases/metabuli/refseq_standard`
 
 ### `--genomad_prediction`
@@ -1219,7 +1219,7 @@ available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 
 
 ## Cloud & HPC Profile Parameters
 
-These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The `--*_workdir` parameter of the chosen cloud profile is **required** — the pipeline exits immediately with an error if it is missing.
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage: give either its `--*_workdir` parameter or Nextflow's `-work-dir` with the cloud scheme (`-work-dir s3://my-bucket/work` for `aws`, `gs://` for `gcp`, `az://` for `azure`). Without either, the pipeline exits at launch with an error.
 
 ### AWS Batch (`-profile aws`)
 

@@ -324,15 +324,6 @@ interruption may not be recorded in any run; see
 - **In-task cleanup**: during process execution (rm commands in the process script), every run
 - **Nextflow cleanup** (`cleanup = true`, `low_disk` only): once, at the end of a successful run
 
-## Version History
-
-- **v2.0.0dev** - Current: this document corrected to the measured behaviour (cleanup does not lower peak usage); databases stored with `storeDir` under `<databases_dir>/<database>/<key>/` (stored once, reused across runs)
-- **v1.1** - `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir on clean reads replaced by conditional publishDir
-- **v1.0.0** - Initial disk optimization implementation
-  - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
-  - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS
-  - Phase 3: Nextflow configuration and monitoring script
-
 ## Support
 
 For issues or questions about disk space:
