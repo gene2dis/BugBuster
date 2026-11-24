@@ -39,7 +39,11 @@ SF_IMG=$(grep -o "'community.wave.seqera.io/library/super-focus[^']*'" "${REPO_D
 KMARVEL_IMG=$(grep -o "'ghcr.io/gene2dis/bugbuster-kmarvel[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
     | tr -d "'" | head -1)
 
-if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ] || [ -z "${SF_IMG}" ] || [ -z "${KMARVEL_IMG}" ]; then
+# FORMAT_CHECKV_DB runs in the pinned CheckV image (wget + DIAMOND for the index)
+CHECKV_IMG=$(grep -o "'quay.io/biocontainers/checkv:[^']*'" "${REPO_DIR}/modules/local/format_db/main.nf" \
+    | tr -d "'" | head -1)
+
+if [ -z "${DOWNLOAD_IMG}" ] || [ -z "${BAKTA_IMG}" ] || [ -z "${WOLTKA_IMG}" ] || [ -z "${REPORT_IMG}" ] || [ -z "${SF_IMG}" ] || [ -z "${KMARVEL_IMG}" ] || [ -z "${CHECKV_IMG}" ]; then
     echo "ERROR: could not extract pinned container images from the modules"
     exit 1
 fi
@@ -51,6 +55,7 @@ echo "Woltka image:   ${WOLTKA_IMG}"
 echo "Report image:   ${REPORT_IMG}"
 echo "SUPER-FOCUS image: ${SF_IMG}"
 echo "K-MARVEL image: ${KMARVEL_IMG}"
+echo "CheckV image:   ${CHECKV_IMG}"
 echo ""
 
 TMP_DIR=$(mktemp -d)
@@ -289,6 +294,43 @@ tar -cjf "${KM}/card.tar.bz2" -C "${KM}/card" .
 cp "${KM}"/card/* "${KM}/card_novar/"
 rm "${KM}/card_novar/protein_fasta_protein_variant_model.fasta"
 tar -cjf "${KM}/card_novar.tar.bz2" -C "${KM}/card_novar" .
+
+# CheckV database release tarballs (roadmap Phase 25, RV25; review R8-03): one
+# checkv-db-v1.5/ directory with the README whose first release line the
+# script reads ('## Verion 1.5', CheckV's spelling), two proteins for the
+# DIAMOND index, and the tables CheckV checks; variants with another release,
+# without checkv_reps.tsv and without a README
+CV="${TMP_DIR}/staging/checkv"
+mkdir -p "${CV}/ok/checkv-db-v1.5/genome_db" "${CV}/ok/checkv-db-v1.5/hmm_db/checkv_hmms"
+printf '## Verion 1.5 (Jan 10, 2023)\n- test release\n\n## Version 1.4\n' > "${CV}/ok/checkv-db-v1.5/README.txt"
+printf '>rep1\nMKVLITGAGSGIGLAIAKELAKRGHEVTVIDRNEEALKAVAEELGG\n>rep2\nMSTNPKPQRKTKRNTNRRPQDVKFPGGGQIVGGVYLLPRRGPRLGV\n' \
+    > "${CV}/ok/checkv-db-v1.5/genome_db/checkv_reps.faa"
+printf 'checkv_id\tlength\nrep1\t46\n' > "${CV}/ok/checkv-db-v1.5/genome_db/checkv_reps.tsv"
+printf 'type\tcount\nhigh\t1\n' > "${CV}/ok/checkv-db-v1.5/genome_db/checkv_error.tsv"
+printf 'hmm\tcount\nVOG1\t1\n' > "${CV}/ok/checkv-db-v1.5/hmm_db/checkv_hmms.tsv"
+echo h > "${CV}/ok/checkv-db-v1.5/hmm_db/checkv_hmms/1.hmm"
+tar -czf "${FIXTURES}/checkv-db-v1.5.tar.gz" -C "${CV}/ok" checkv-db-v1.5
+cp -r "${CV}/ok" "${CV}/old"
+sed -i '1s/1\.5/1.4/' "${CV}/old/checkv-db-v1.5/README.txt"
+tar -czf "${FIXTURES}/checkv-db-old.tar.gz" -C "${CV}/old" checkv-db-v1.5
+cp -r "${CV}/ok" "${CV}/notsv"
+rm "${CV}/notsv/checkv-db-v1.5/genome_db/checkv_reps.tsv"
+tar -czf "${FIXTURES}/checkv-db-notsv.tar.gz" -C "${CV}/notsv" checkv-db-v1.5
+cp -r "${CV}/ok" "${CV}/noreadme"
+rm "${CV}/noreadme/checkv-db-v1.5/README.txt"
+tar -czf "${FIXTURES}/checkv-db-noreadme.tar.gz" -C "${CV}/noreadme" checkv-db-v1.5
+CHECKV_BYTES=$(stat -c %s "${FIXTURES}/checkv-db-v1.5.tar.gz")
+CHECKV_OLD_BYTES=$(stat -c %s "${FIXTURES}/checkv-db-old.tar.gz")
+CHECKV_NOTSV_BYTES=$(stat -c %s "${FIXTURES}/checkv-db-notsv.tar.gz")
+CHECKV_NOREADME_BYTES=$(stat -c %s "${FIXTURES}/checkv-db-noreadme.tar.gz")
+
+# GUNC DIAMOND reference: a .dmnd.gz and the md5s of both forms, as the
+# registry records them (the content is not read by the script)
+printf 'gunc test reference\n' | gzip -n > "${FIXTURES}/gunc_db_test.dmnd.gz"
+GUNC_GZ_MD5=$(md5sum "${FIXTURES}/gunc_db_test.dmnd.gz" | cut -d' ' -f1)
+GUNC_MD5=$(printf 'gunc test reference\n' | md5sum | cut -d' ' -f1)
+head -c 60 /dev/urandom > "${FIXTURES}/gunc_corrupt.dmnd.gz"
+GUNC_CORRUPT_MD5=$(md5sum "${FIXTURES}/gunc_corrupt.dmnd.gz" | cut -d' ' -f1)
 
 #
 # Local HTTP server for the fixtures
@@ -747,6 +789,50 @@ expect_fail "humann: truncated archive fails" humann_db_reformat.sh \
     $(hu_args truncated.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
 expect_fail "humann: 404 archive URL fails" humann_db_reformat.sh \
     $(hu_args no_such.tar.gz uniref.tar.gz utility.tar.gz "${IDX}_bt2.tar" "${IDX}_bt2.md5")
+
+#
+# checkv_db_reformat.sh (FORMAT_CHECKV_DB, in the CheckV image; roadmap
+# Phase 25, RV25; review R8-03)
+#
+echo "--- checkv_db_reformat.sh ---"
+RUN_IMG="${CHECKV_IMG}"
+expect_pass "checkv: valid release tarball" checkv_db_reformat.sh "${BASE_URL}/checkv-db-v1.5.tar.gz" "${CHECKV_BYTES}" 1.5
+check_file "checkv: DIAMOND index built" "checkv_db/genome_db/checkv_reps.dmnd"
+check_file "checkv: README kept" "checkv_db/README.txt"
+check_file "checkv: HMM folder kept" "checkv_db/hmm_db/checkv_hmms/1.hmm"
+if [ ! -e "${LAST_WORKDIR}/checkv_db.tar.gz" ] && [ ! -e "${LAST_WORKDIR}/checkv_extract" ]; then
+    echo "✓ checkv: tarball and extract folder removed"
+    PASS=$((PASS + 1))
+else
+    echo "✗ checkv: leftover tarball or extract folder"
+    FAIL=$((FAIL + 1))
+fi
+expect_code "checkv: wrong byte count fails with 65 (not retried)" 65 checkv_db_reformat.sh "${BASE_URL}/checkv-db-v1.5.tar.gz" 12345 1.5
+expect_fail "checkv: corrupt tarball fails" checkv_db_reformat.sh "${BASE_URL}/corrupt.tar.gz" 100 1.5
+expect_fail "checkv: 404 URL fails" checkv_db_reformat.sh "${BASE_URL}/no_such_checkv.tar.gz" 100 1.5
+expect_fail "checkv: another release in README.txt fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-old.tar.gz" "${CHECKV_OLD_BYTES}" 1.5
+expect_fail "checkv: missing checkv_reps.tsv fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-notsv.tar.gz" "${CHECKV_NOTSV_BYTES}" 1.5
+expect_fail "checkv: tarball without README.txt fails" checkv_db_reformat.sh "${BASE_URL}/checkv-db-noreadme.tar.gz" "${CHECKV_NOREADME_BYTES}" 1.5
+RUN_IMG=""
+
+#
+# gunc_db_reformat.sh (FORMAT_GUNC_DB, in the download image; roadmap
+# Phase 25, RV25; review R8-03)
+#
+echo "--- gunc_db_reformat.sh ---"
+expect_pass "gunc: valid reference with both md5s" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd "${GUNC_MD5}"
+check_file "gunc: reference unpacked under its file name" "gunc_db_test.dmnd"
+if [ ! -e "${LAST_WORKDIR}/gunc_db_test.dmnd.gz" ]; then
+    echo "✓ gunc: download removed after gunzip"
+    PASS=$((PASS + 1))
+else
+    echo "✗ gunc: gzipped download left beside the reference"
+    FAIL=$((FAIL + 1))
+fi
+expect_fail "gunc: wrong md5 of the download fails" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" 00000000000000000000000000000000 gunc_db_test.dmnd "${GUNC_MD5}"
+expect_fail "gunc: wrong md5 of the unpacked reference fails" gunc_db_reformat.sh "${BASE_URL}/gunc_db_test.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd 00000000000000000000000000000000
+expect_fail "gunc: corrupt gzip with a matching md5 fails" gunc_db_reformat.sh "${BASE_URL}/gunc_corrupt.dmnd.gz" "${GUNC_CORRUPT_MD5}" gunc_corrupt.dmnd "${GUNC_MD5}"
+expect_fail "gunc: 404 URL fails" gunc_db_reformat.sh "${BASE_URL}/no_such_gunc.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd "${GUNC_MD5}"
 
 #
 # Report image smoke test (audit #21): all libraries importable, no runtime pip
