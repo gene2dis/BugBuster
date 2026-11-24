@@ -83,6 +83,32 @@ class TestData {
         return published
     }
 
+    // What a stub run published compared with a tests/data/stub_paths/
+    // list (assembly_dev, coassembly_dev: a stub run of dev with a test's
+    // settings) plus the paths the test adds: [missing: [...], unexpected:
+    // [...]], both empty when they agree (assert on the map, so a failure
+    // names the paths). One helper for every list test (roadmap Phase 25,
+    // RV26; review R8-07).
+    // Regenerating a list after a change that publishes or drops a file:
+    //   BUGBUSTER_UPDATE_STUB_PATHS=1 nf-test test tests/nonpareil.nf.test tests/coassembly_groups.nf.test
+    // rewrites each list from the run (its published paths minus the test's
+    // added ones); review the git diff of tests/data/stub_paths/ before
+    // committing it, then run the other list tests (mag_virus_quality,
+    // dereplicate, multisample) without the variable
+    static Map publishedPathsDiff(outputDir, projectDir, String list, List added = []) {
+        def listFile = new File("${projectDir}/tests/data/stub_paths/${list}.txt")
+        def published = publishedPaths(outputDir).collect { p -> p.toString() }
+        def extra = added.collect { p -> p.toString() }
+        // rewritten only when the paths differ, so an unchanged list keeps its
+        // order (the committed lists are in the shell locale's sort order)
+        def current = (published - extra).sort()
+        if (System.getenv('BUGBUSTER_UPDATE_STUB_PATHS') == '1' && current != listFile.readLines().findAll { l -> l }.sort()) {
+            listFile.text = current.join('\n') + '\n'
+        }
+        def expected = listFile.readLines().findAll { l -> l } + extra
+        return [missing: (expected - published).sort(), unexpected: (published - expected).sort()]
+    }
+
     // The database folders a run must not publish under outputDir (roadmap
     // RV14: databases live in databases_dir only; storeDir with publishDir off).
     // Checked as folders, so an empty one (DeepARG's stub) counts too

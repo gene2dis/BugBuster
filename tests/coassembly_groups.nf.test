@@ -45,19 +45,8 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            def out = new File("${outputDir}")
-            def published = []
-            out.eachFileRecurse { f ->
-                if (f.isFile()) {
-                    def rel = out.toPath().relativize(f.toPath()).toString()
-                    if (!(rel ==~ /pipeline_info\/(execution_|pipeline_dag|params_).*/) && !rel.startsWith('local_test_samplesheet')) {
-                        published << rel
-                    }
-                }
-            }
-            def expected = new File("${projectDir}/tests/data/stub_paths/coassembly_dev.txt").readLines()
             assert TestData.databaseFolders(outputDir) == []
-            assert published.sort() == expected.sort()
+            assert TestData.publishedPathsDiff(outputDir, projectDir, 'coassembly_dev') == [missing: [], unexpected: []]
         }
     }
 

@@ -52,8 +52,7 @@ nextflow_pipeline {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("GUNC") || task.name.contains("CHECKV") } == 0
             assert TestData.databaseFolders(outputDir) == []
-            assert TestData.publishedPaths(outputDir).sort() ==
-                new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines().sort()
+            assert TestData.publishedPathsDiff(outputDir, projectDir, 'assembly_dev') == [missing: [], unexpected: []]
         }
     }
 
@@ -99,9 +98,8 @@ nextflow_pipeline {
                 added << "04_binning/per_sample/${s}/quality/gunc/${s}_gunc_maxCSS_level.tsv".toString()
                 added << "06_contig_taxonomy/checkv/${s}/${s}_checkv/quality_summary.tsv".toString()
             }
-            def dev = new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines()
             assert TestData.databaseFolders(outputDir) == []
-            assert TestData.publishedPaths(outputDir).sort() == (dev + added).sort()
+            assert TestData.publishedPathsDiff(outputDir, projectDir, 'assembly_dev', added) == [missing: [], unexpected: []]
 
             // the CheckV quality summaries reach the contig report (its task: the one
             // that writes the contig table from the BlobTools tables)
