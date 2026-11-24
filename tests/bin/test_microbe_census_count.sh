@@ -18,7 +18,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
-MC_IMG="quay.io/biocontainers/microbecensus:1.1.1--pyhca03a8a_2"
+# The docker image the module pins, so a re-pin of the module re-tests the
+# wrapper against the new image (roadmap Phase 25, RV26; review R8-05)
+MC_IMG=$(grep -o "'quay.io/biocontainers/microbecensus:[^']*'" "${REPO_DIR}/modules/local/microbecensus/main.nf" | tr -d "'" | head -1)
+if [ -z "${MC_IMG}" ]; then
+    echo "ERROR: could not read the microbecensus image from modules/local/microbecensus/main.nf" >&2
+    exit 1
+fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT

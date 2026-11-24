@@ -224,9 +224,19 @@ jobs:
         run: |
           tests/bin/test_humann_scripts.sh
 
-      - name: Run eggNOG-mapper OG-parsing patch tests (design doc Q23)
+      # The host checks and, in the image digest the module pins, the check
+      # that the patch's version guard accepts the installed eggNOG-mapper
+      # (roadmap Phase 25, RV26; review R8-05)
+      - name: Run eggNOG-mapper OG-parsing patch tests in the pinned image (design doc Q23)
         run: |
-          tests/bin/test_emapper_ogs_fix.sh
+          img=$(grep -o "'ghcr.io/gene2dis/bugbuster-eggnog-mapper@sha256:[0-9a-f]*'" \
+            modules/local/eggnog_mapper_annotate/main.nf | tr -d "'")
+          if [ -z "${img}" ]; then
+            echo "ERROR: no pinned eggNOG-mapper digest in modules/local/eggnog_mapper_annotate/main.nf"
+            exit 1
+          fi
+          EMAPPER_RUN="docker run --rm -i -v ${PWD}:${PWD} -w ${PWD} ${img}" \
+            tests/bin/test_emapper_ogs_fix.sh
 
       - name: Check docs/WORKFLOW_DIAGRAM.md names every process (roadmap D1)
         run: |

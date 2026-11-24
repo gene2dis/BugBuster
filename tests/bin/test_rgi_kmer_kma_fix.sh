@@ -20,7 +20,13 @@ set -euo pipefail
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 REPO_DIR="$( cd "${SCRIPT_DIR}/../.." && pwd )"
-RGI_IMG="quay.io/biocontainers/rgi:6.0.8--pyh05cac1d_0"
+# The docker image the module pins, so a re-pin of the module re-tests the
+# wrapper against the new image (roadmap Phase 25, RV26; review R8-05)
+RGI_IMG=$(grep -o "'quay.io/biocontainers/rgi:[^']*'" "${REPO_DIR}/modules/local/rgi_kmer/main.nf" | tr -d "'" | head -1)
+if [ -z "${RGI_IMG}" ]; then
+    echo "ERROR: could not read the rgi image from modules/local/rgi_kmer/main.nf" >&2
+    exit 1
+fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
