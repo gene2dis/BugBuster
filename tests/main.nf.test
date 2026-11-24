@@ -102,10 +102,14 @@ nextflow_pipeline {
             assert r2_clean.linesGzip.size() == 6 * 4
             assert s_clean.linesGzip.size() == 4 * 4
 
-            // The summary must carry the singleton accounting columns
-            def report_text = path("${outputDir}/01_quality_control/summary/Reads_report.csv").text
-            assert report_text.contains("singleton_test")
-            assert report_text.toLowerCase().contains("singleton")
+            // The summary must carry the singleton accounting columns: their
+            // exact names and the sample's counts (reads: 10 pairs, 6 clean;
+            // singletons: 10, all kept by fastp, 4 clean). The old check
+            // matched the sample id 'singleton_test' itself and could not
+            // fail (roadmap Phase 25, RV26; review R8-27)
+            def report_lines = path("${outputDir}/01_quality_control/summary/Reads_report.csv").readLines()
+            assert report_lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed),Raw singletons,Fastp singletons,Clean singletons (contaminants removed)"
+            assert report_lines[1] == "singleton_test,20,20,12,10,10,4"
 
             // Audit #14: the NFCORE_FASTP_SINGLETON selector must carry the knob too
             def singleton_json = path("${outputDir}/01_quality_control/fastp/singleton_test/singleton_test_Singleton.fastp.json")
