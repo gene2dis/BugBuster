@@ -108,12 +108,7 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String (comma-separated)
 - **Default**: `semibin`
 - **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
-- **Description**: Selects which binning tools to run. When ≥2 binners are specified, Binette bin refinement is automatically enabled. When only one binner is selected, refinement is skipped and the binner's output is used directly.
-- **Examples**:
-  - `--binners semibin` — single fast binner, no refinement (default)
-  - `--binners semibin,metabat2` — two binners + Binette refinement
-  - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
-- **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
+- **Description**: Binners to run with `--include_binning`; two or more enable Binette refinement. Full entry under [Binning Parameters](#--binners-1); which binners to choose, and what COMEBin costs: [manual, Binner Selection](manual.md#binner-selection)
 
 ### `--multisample_binning`
 - **Type**: Boolean
@@ -787,6 +782,7 @@ The switches are under [Pipeline Execution Parameters](#pipeline-execution-param
   include_binning: true
   binners: "semibin,metabat2"
   ```
+- **Note**: COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 ([manual, Binner Selection](manual.md#binner-selection))
 
 #### `--metabat_minContig`
 - **Type**: Integer

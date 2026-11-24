@@ -234,46 +234,11 @@ nextflow log <run name> -f name,status    # run names: nextflow log
 
 ## Troubleshooting
 
-### Issue: Pipeline runs out of disk space
-
-**Cause**: The work-dir filesystem is smaller than the run's peak usage. `low_disk` does
-not help here: it deletes the work directory only after the run succeeds.
-
-**Solution**:
-1. Start the run again with `-work-dir` on a larger filesystem. Do not count on resuming
-   from a work directory copied elsewhere: task directories refer to each other by
-   absolute path
-2. Run fewer tasks at once, or split the samples into batches (see "Running With Limited
-   Disk Space")
-3. Monitor disk usage with the monitoring script
-
-### Issue: Resume not working after cleanup
-
-**Cause**: The work directory was deleted. A completed `low_disk` run deletes it.
-
-**Solution**:
-1. Verify the `work/` directory still exists
-2. If it is gone, the run has to be recomputed. Use `low_disk` only for runs you will not
-   need to resume or extend.
-
-### Issue: Work directory not empty after a successful `low_disk` run
-
-**Cause**: The run was resumed. Cleanup deletes only the tasks the final run executed;
-tasks reused from the cache and tasks aborted by the earlier interruption remain.
-
-**Solution**: delete `work/` once you no longer need to resume. `nextflow clean -f` alone
-removes only the tasks the last run executed, and a task directory created just before an
-interruption may not be recorded in any run; see
-[what each form of `nextflow clean` deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean).
-
-### Issue: Outputs missing from results directory
-
-**Solution**:
-1. Check that you're looking in the correct subdirectory:
-   - Clean reads: `output/clean_reads/{sample_id}/` (only with `--store_clean_reads`)
-   - Filtered contigs: `output/03_assembly/per_sample/{sample_id}/` (or `03_assembly/coassembly/`)
-   - Refined bins: `output/04_binning/per_sample/{sample_id}/refined_bins/` (or `04_binning/coassembly/refined_bins/`)
-2. Other outputs use their numbered publishDir locations (see `config/modules.config`)
+Disk problems are in [`troubleshooting.md`](troubleshooting.md):
+[out of disk space](troubleshooting.md#out-of-disk-space),
+[resume not working and what `nextflow clean` deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean),
+[work directory not empty after a successful `low_disk` run](troubleshooting.md#work-directory-not-empty-after-a-successful-low_disk-run)
+and [missing output files](troubleshooting.md#missing-output-files).
 
 ## Configuration Parameters
 

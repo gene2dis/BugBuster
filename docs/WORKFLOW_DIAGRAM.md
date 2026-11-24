@@ -638,35 +638,10 @@ results directories outside the pipeline (manual, section 9, Merging Batches).
 
 ## Output structure
 
-Top level of `--output`; the full tree, with every file, is in
-[`manual.md`, section 7](manual.md#7-outputs-and-how-to-read-them).
-
-```
-results/
-├── pipeline_info/               # Execution report, timeline, trace, DAG, software_versions.yml,
-│                                # contig_filtering_summary.txt, coassembly_groups.tsv /
-│                                # multisample_groups.tsv (with groups), empty_assemblies.tsv
-├── 00_summary/                  # Run summary (results_summary=true, default): report/ (HTML),
-│                                # results_summary.html / .pdf / .xlsx, README.md, LLM_GUIDE.md,
-│                                # tables/, figures/
-├── clean_reads/                 # Decontaminated reads (only if --store_clean_reads)
-├── 01_quality_control/          # fastp reports, Reads_report.csv, nonpareil/ (--nonpareil)
-├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
-│                                # phyloseq, figures
-├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
-├── 04_binning/                  # Raw and refined bins, CheckM2 quality (+ quality/gunc/),
-│                                # GTDB-Tk taxonomy, coverage and summary (co-assembly),
-│                                # dereplicated/ (galah clusters, representatives, CoverM)
-├── 05_arg_prediction/           # read_level/ (args_oap, rgi, rgi_kmer, kmarvel + summaries),
-│                                # contig_level/ (DeepARG, contig ARG table, ARG blob plot),
-│                                # bin_level/ (proteins, deeparg, arg_fasta, clustering)
-├── 06_contig_taxonomy/          # metabuli/, genomad/, checkv/, phylum blob plots
-└── 07_functional_annotation/    # gene_calling/, eggnog/, dbcan/, gene_abundance/,
-                                 # microbecensus/, summary/ (TPM/CPGE + read_* tables),
-                                 # reads/ (woltka, superfocus, humann), mags/ (Bakta)
-```
-
-Databases go to `--databases_dir` (default `<output>/../databases`), apart from the results.
+Every stage publishes into a numbered folder of `--output` (`01_quality_control/` ...
+`07_functional_annotation/`), next to `00_summary/` and `pipeline_info/`; databases go to
+`--databases_dir`. The full tree, and what each file holds: the manual,
+[section 7](manual.md#7-outputs-and-how-to-read-them).
 
 ---
 

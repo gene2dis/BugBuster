@@ -64,15 +64,18 @@ sdk install java <version>
 
 ### Invalid samplesheet format
 
-**Error:**
+**Error** (one of):
 ```
-ERROR: Invalid samplesheet: 'sample' column is empty
+Invalid samplesheet: 'sample' column is empty for row: [...]
+Invalid samplesheet: 'r1' column is empty for sample: sample1
+Invalid samplesheet: r1 and r2 are the same file for sample 'sample1': /path/to/sample1_R1.fastq.gz
 ```
 
 **Solution:**
 1. Ensure CSV has header: `sample,r1,r2,s`
 2. Check for extra spaces or special characters
-3. Use absolute paths for files
+3. Check every path (the path rules: [Samplesheet Format](manual.md#samplesheet-format) and
+   [Input Requirements](manual.md#input-requirements) in the manual)
 4. Validate with:
    ```bash
    head -5 samplesheet.csv
@@ -354,6 +357,17 @@ or waits in the queue for a long time.
 3. Queues, account and other SLURM settings are the `--slurm_*` parameters
    ([Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters)).
 
+### Work directory not empty after a successful `low_disk` run
+
+**Cause:** the run was resumed. The `low_disk` profile's cleanup deletes only the tasks
+the final run executed; tasks reused from the cache, and tasks aborted by the earlier
+interruption, remain.
+
+**Solution:** delete the work directory once you no longer need to resume. A completed
+`low_disk` run cannot be resumed anyway (its own tasks are gone), so re-running it with a
+changed option recomputes everything; see
+[`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md#the-low_disk-profile).
+
 ### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored
 
 **Error:**
@@ -491,6 +505,44 @@ check whether issue #620 is fixed in the new version and update or remove
 ---
 
 ## ARG Prediction Issues
+
+### RGI_LOAD_WILDCARD fails (`--custom_rgi_card_db` with `--custom_rgi_wildcard`)
+
+**Error** (one of):
+```
+ERROR: WildCARD directory not found: <path>
+ERROR: CARD annotation file (card_database_v*.fasta) not found in <path>: --custom_rgi_card_db must be a CARD directory loaded and annotated with 'rgi card_annotation'
+ERROR: WildCARD annotation file not created; rgi wildcard_annotation's log:
+```
+
+**Solutions:**
+1. Ensure the WildCARD files are decompressed (`gunzip *.gz`): this path passes the
+   directory to `rgi wildcard_annotation` as is
+2. Check that the CARD and WildCARD downloads are the same CARD release:
+   ```bash
+   # CARD version
+   python3 -c "import json; print(json.load(open('/path/to/card_database/card.json'))['_version'])"
+   # WildCARD version
+   grep "version" /path/to/wildcard/index-for-model-sequences.txt
+   ```
+3. Verify that `index-for-model-sequences.txt` exists in the WildCARD directory
+4. The task copies both directories into its work directory (tens of GB with a large
+   WildCARD download): keep space there, or load the database once by hand and pass it
+   with `--custom_rgi_card_db` alone ([`RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md),
+   "Manual CARD Database Preparation"), which is linked, not copied
+
+### RGI_BWT fills the work directory, or takes hours
+
+RGI writes every read the aligner reports, placed on a reference or not, to its SAM and builds its BAMs and
+read table from it (RGI 6.0.3 then scanned that table once per reference sequence with reads; 6.0.8 loads it
+into memory, ~1 KB per read). `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads
+placed on a reference (well under 1% of a metagenome), and with `--clean`, which removes the temporary files
+when the task ends. With bowtie2 and bwa the tables are those of an unfiltered run. With KMA the kept reads
+are also grouped by name, so that `samtools fixmate` (RGI 6.0.8) pairs every mate pair: the Mate Pair Linkage
+columns are filled in, and an unmapped mate is not counted as a read "with flanking sequence" (as in RGI
+6.0.3), where an unfiltered run would count some, in an order that changes between runs. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
+read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
+`RGI_BWT` task directories, or the whole `work/` once the run is done.
 
 ### RGI_BWT fails: "KMA failed", "bowtie2 failed" or "not the 6.0.8 method"
 
@@ -1060,7 +1112,8 @@ and run with `--read_aligner bowtie2` on nodes without it.
 ### Process BWAMEM3_BUILD_COMBINED failed
 
 **Exit status 3 / "needs more memory":** the human index build needs ~75 GB
-RAM; the pipeline warns at launch when `--max_memory` is lower. Either:
+RAM; the pipeline warns at launch when `--max_memory` is lower, for the built-in human
+host only. With `--custom_host_fasta`, allow ~24 GB per Gbp of combined genome. Either:
 
 - raise `--max_memory` (the build runs once per `--databases_dir`; later runs
   reuse the stored index),
@@ -1130,22 +1183,18 @@ custom_host_fasta:
 ```
 
 All the genomes go into one index; the bwa-mem3 build requests ~24 GB RAM per
-Gbp of combined genome, so raise `--max_memory` accordingly.
+Gbp of combined genome, so raise `--max_memory` accordingly. Examples for several hosts:
+[Multiple Host Genomes in a Params File](DECONTAMINATION_QUICK_REFERENCE.md#multiple-host-genomes-in-a-params-file).
 
 ### Slow index building or decontamination
 
-- Pre-build the index once and reuse it:
-  ```bash
-  cat phix.fasta host.fasta > contaminants.fasta
-  mkdir -p contaminants_index
-  bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
-
-  nextflow run main.nf ... --custom_decontamination_index contaminants_index
-  ```
-- Under `--read_aligner bowtie2`, the human index build takes about an hour
-  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`;
-  pass the index with `--read_aligner bowtie2`). bowtie2 runs with `--local`, so
-  `--bowtie_score_min` takes the local form `G,<a>,<b>` (default `G,15,6`)
+- Pre-build the index once and reuse it, or keep the same `--databases_dir`: the index
+  the pipeline builds from the default genomes is stored there and later runs skip the
+  build. The recipe for building one by hand is
+  [Building Combined Index](DECONTAMINATION_QUICK_REFERENCE.md#building-combined-index).
+- Under `--read_aligner bowtie2`, the human index build takes about an hour. bowtie2
+  runs with `--local`, so `--bowtie_score_min` takes the local form `G,<a>,<b>`
+  (default `G,15,6`)
 
 ---
 
@@ -1178,6 +1227,16 @@ Essential container in task exited
 1. Check CloudWatch logs for the job
 2. Verify compute environment has sufficient resources
 3. Check container can access S3 paths
+
+### Spot or preemptible instances: tasks are reclaimed
+
+**Symptom:** on spot (AWS), preemptible/spot (Google Cloud) or low-priority (Azure)
+instances, tasks fail when their instance is taken back.
+
+**What the pipeline does:** a task that fails with exit status 130-145 or 104, or with
+the preemption status of Google Batch (14) or Azure Batch (50001), is retried; the cloud
+profiles allow 3 retries. If tasks keep being reclaimed, use on-demand instances for the
+long ones (assembly, GTDB-Tk, eggNOG-mapper), or a queue with fewer interruptions.
 
 ### GCP: Quota exceeded
 
@@ -1220,7 +1279,12 @@ authorization error from Azure Batch or Azure Storage.
    cat .nextflow.log | grep -i error
    ```
 
-2. Check work directory for intermediate files
+2. Check that you are looking in the right folder: every output and the option that
+   produces it are in the manual,
+   [Outputs and How to Read Them](manual.md#7-outputs-and-how-to-read-them). Clean reads
+   are published only with `--store_clean_reads` (`clean_reads/<sample>/`), and a
+   co-assembly's outputs are under `<stage>/coassembly/` instead of `per_sample/`
+3. Check work directory for intermediate files
 
 ### No bins: empty bin tables, `SKIPPED.txt` instead of bins
 
