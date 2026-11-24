@@ -1,0 +1,196 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    CALCULATE_DEPTH Module Test (roadmap Phase 25, RV25; review R8-01, R8-02)
+
+    jgi_summarize_bam_contig_depths on BAMs the real aligners write in setup,
+    so the aligner -> depth step runs on real files (MetaBAT2's input and
+    BIN_DEPTH's MAG depth):
+      - BWAMEM3_INDEX + BWAMEM3_SAMTOOLS (the default --read_aligner) and
+        BOWTIE2_SAMTOOLS (the fallback) map the sylph fixture reads
+        (tests/data/sylph: 1,000 pairs simulated from phage lambda, ~6x, plus
+        500 random pairs) and the singleton fixture reads (4 lambda pairs and
+        6 lambda singletons among random reads) to the lambda genome
+        (tests/data/decontamination/host_mock.fasta, one 48,502 bp contig)
+      - a bowtie2 BAM of paired reads plus singletons holds both (its
+        depth counts the singletons)
+      - one BAM gives one depth and one variance column; two BAMs (the
+        co-assembly form: one BAM per sample against one assembly) give one
+        pair of columns per sample, and totalAvgDepth is their sum
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test CALCULATE_DEPTH Process"
+    script "../../modules/local/calculate_depth/main.nf"
+    process "CALCULATE_DEPTH"
+
+    setup {
+        run("BWAMEM3_INDEX") {
+            script "../../modules/local/bwamem3_samtools/main.nf"
+            process {
+                """
+                input[0] = [
+                    [ id: 'lambda' ],
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                ]
+                """
+            }
+        }
+        run("BWAMEM3_SAMTOOLS") {
+            script "../../modules/local/bwamem3_samtools/main.nf"
+            process {
+                """
+                input[0] = channel.of(
+                    [
+                        [ id: 'sim' ],
+                        [
+                            file("${projectDir}/tests/data/sylph/sylph_test_R1.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/sylph/sylph_test_R2.fastq.gz", checkIfExists: true)
+                        ],
+                        file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                    ],
+                    [
+                        [ id: 'single' ],
+                        [
+                            file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                        ],
+                        file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                    ]
+                ).combine(BWAMEM3_INDEX.out.index.map { _meta, index -> index })
+                """
+            }
+        }
+        run("BOWTIE2_SAMTOOLS") {
+            script "../../modules/local/bowtie2_samtools/main.nf"
+            process {
+                """
+                input[0] = channel.of(
+                    [
+                        [ id: 'sim_bt2' ],
+                        [
+                            file("${projectDir}/tests/data/sylph/sylph_test_R1.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/sylph/sylph_test_R2.fastq.gz", checkIfExists: true)
+                        ],
+                        file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                    ],
+                    [
+                        [ id: 'single_bt2' ],
+                        [
+                            file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                            file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                        ],
+                        file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                    ]
+                )
+                """
+            }
+        }
+    }
+
+    test("depth of one bwa-mem3 BAM: one contig row at about the simulated depth") {
+        when {
+            process {
+                """
+                input[0] = BWAMEM3_SAMTOOLS.out.contigs_and_bam
+                    .filter { meta, _contigs, _bam -> meta.id == 'sim' }
+                    .map { _meta, contigs, bam -> [ [ id: 'sim' ], contigs, bam ] }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def (meta, contigs, depth) = process.out.depth[0]
+            assert meta.id == 'sim'
+            assert file(contigs).name == 'host_mock.fasta'
+            assert file(depth).name == 'sim_depth.txt'
+
+            def lines = path(depth).readLines()
+            assert lines.size() == 2
+            assert lines[0] == "contigName\tcontigLen\ttotalAvgDepth\tsim_all_reads\tsim_all_reads-var"
+            def row = lines[1].split('\t')
+            assert row[0] == 'NC_001416.1'
+            assert row[1] == '48502'
+            // 1,000 pairs x 2 x 150 bp over 48.5 kb is ~6x (jgi trims the
+            // contig ends and drops low-identity reads)
+            def total = row[2] as double
+            assert total > 4.0 && total < 7.0
+            assert (row[3] as double) == total
+
+            assert path(process.out.versions.get(0)).text.contains("metabat2: 2.18")
+        }
+    }
+
+    test("two BAMs against one assembly: one depth column per sample, summed") {
+        when {
+            process {
+                """
+                input[0] = BWAMEM3_SAMTOOLS.out.contigs_and_bam
+                    .toSortedList { a, b -> a[0].id <=> b[0].id }
+                    .map { rows -> [ [ id: 'coasm' ], rows[0][1], rows.collect { row -> row[2] } ] }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.depth[0][2]).readLines()
+            assert lines.size() == 2
+            // BAMs in the order given (sorted by sample id above); jgi names
+            // each column after its BAM without the extension
+            assert lines[0] == "contigName\tcontigLen\ttotalAvgDepth\tsim_all_reads\tsim_all_reads-var\tsingle_all_reads\tsingle_all_reads-var"
+            def header = lines[0].split('\t') as List
+            def row = lines[1].split('\t')
+            def sim = row[header.indexOf('sim_all_reads')] as double
+            def single = row[header.indexOf('single_all_reads')] as double
+            assert sim > 4.0
+            // 4 lambda pairs and 6 lambda singletons of 100 bp: ~0.03x
+            assert single > 0.0 && single < 0.1
+            assert Math.abs((row[2] as double) - (sim + single)) < 1e-3
+        }
+    }
+
+    test("depth of a bowtie2 BAM matches the bwa-mem3 one") {
+        when {
+            process {
+                """
+                input[0] = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+                    .filter { meta, _contigs, _bam -> meta.id == 'sim_bt2' }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.depth[0][2]).readLines()
+            assert lines[0] == "contigName\tcontigLen\ttotalAvgDepth\tsim_bt2_all_reads\tsim_bt2_all_reads-var"
+            def total = lines[1].split('\t')[2] as double
+            assert total > 4.0 && total < 7.0
+        }
+    }
+
+    test("a bowtie2 BAM holds the singletons as well as the pairs") {
+        // 4 lambda pairs (800 bp) and 6 lambda singletons (600 bp) of 100 bp
+        // reads: ~0.029x with the singletons merged in, ~0.016x without
+        when {
+            process {
+                """
+                input[0] = BOWTIE2_SAMTOOLS.out.contigs_and_bam
+                    .filter { meta, _contigs, _bam -> meta.id == 'single_bt2' }
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.depth[0][2]).readLines()
+            assert lines[0] == "contigName\tcontigLen\ttotalAvgDepth\tsingle_bt2_all_reads\tsingle_bt2_all_reads-var"
+            def total = lines[1].split('\t')[2] as double
+            assert total > 0.024 && total < 0.035
+        }
+    }
+}
