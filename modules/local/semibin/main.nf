@@ -41,6 +41,9 @@ process SEMIBIN {
     task.ext.when == null || task.ext.when
 
     script:
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
     prefix = meta.id
     def is_coassembly = meta.coassembly as boolean
     def train_self = is_coassembly && params.semibin_coassembly_mode == 'train_self'
@@ -110,6 +113,7 @@ process SEMIBIN {
             [ -f "\$model" ] || model=contig_output/model.h5
             status=0
             SemiBin2 bin_short \\
+                     ${args} \\
                      -i ${contigs} \\
                      --model "\$model" \\
                      --random-seed ${seed} \\
@@ -163,6 +167,7 @@ process SEMIBIN {
         else
             status=0
             SemiBin2 single_easy_bin \\
+                     ${args} \\
                      -i ${contigs} \\
                      -b ${bam} \\
                      -o ${prefix}_semibin_bins \\

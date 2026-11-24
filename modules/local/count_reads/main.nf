@@ -5,7 +5,7 @@ process COUNT_READS {
 
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ubuntu:24.04' :
-        'ubuntu:24.04' }"
+        'docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac' }"
 
     input:
         tuple val(meta), path(reads)

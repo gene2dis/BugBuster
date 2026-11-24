@@ -45,7 +45,6 @@ output:
 notes:
   - This module only runs when params.create_phyloseq_rds is set to true
   - Provides backward compatibility for R-based downstream analysis
-  - Optional validation mode available via task.ext.validate
 
 authors:
   - "@ffuentessantander"

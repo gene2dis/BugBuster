@@ -25,7 +25,7 @@ process CONTIG_FILTER_SUMMARY {
     
     container "${ workflow.containerEngine in ['singularity', 'apptainer'] && !task.ext.singularity_pull_docker_container ?
         'https://depot.galaxyproject.org/singularity/ubuntu:24.04' :
-        'ubuntu:24.04' }"
+        'docker.io/library/ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac' }"
     
     input:
     path(filter_reports)
@@ -175,7 +175,7 @@ process CONTIG_FILTER_SUMMARY {
     
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
-        bash: 5.2.21
+        bash: 5.2.21(1)-release
     END_VERSIONS
     """
 }

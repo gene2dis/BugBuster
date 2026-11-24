@@ -51,6 +51,7 @@ nextflow_pipeline {
                     added << "01_quality_control/nonpareil/${s}/${f}".toString()
                 }
             }
+            assert TestData.databaseFolders(outputDir) == []
             assert TestData.publishedPaths(outputDir).sort() ==
                 (new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines() + added).sort()
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains('nonpareil: 3.5.5')

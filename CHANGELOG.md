@@ -580,6 +580,36 @@ next release is tagged.
 
 ### Changed
 
+- **Breaking (`-c` configs naming nf-core processes)**: the nf-core fastp,
+  Pyrodigal and Bakta modules are imported under an `NFCORE_` name, as the
+  other nf-core modules are (roadmap Phase 22): `NFCORE_FASTP`,
+  `NFCORE_FASTP_SINGLETON`, `NFCORE_PYRODIGAL`, `NFCORE_BAKTA_BAKTA`. A `-c`
+  file with `withName: '.*:FASTP'` (or `PYRODIGAL`, `BAKTA_BAKTA`) must use the
+  new name, e.g. `withName: '.*:NFCORE_FASTP' { cpus = 10 }`. Their
+  `software_versions.yml` blocks are named the same way, and `-resume` runs
+  these tasks again once. The results summary recognises both names, so
+  results directories of earlier releases still merge.
+- `software_versions.yml` (and the report's Methods) now name the Kraken2,
+  sourmash, CheckM2 and GTDB-Tk database releases (`kraken2_db`,
+  `sourmash_db`, `checkm2_db`, `gtdbtk_db`): the registry's description of the
+  release, or `custom (<file name>)` for a `--custom_*` database. Before, only
+  the tools were recorded for these four (roadmap Phase 22).
+- SemiBin2, COMEBin, GTDB-Tk, CheckM2, MMseqs2 (bin ARG clustering),
+  `jgi_summarize_bam_contig_depths`, BlobTools and `rgi load` now take extra
+  options from `ext.args` in a `-c` config (`withName: 'SEMIBIN' { ext.args =
+  '...' }`), as every other tool does; none is set by default, so command lines
+  are unchanged (roadmap Phase 22).
+- `-profile slurm` no longer sets its own time limit per label (4 h ... 168 h):
+  the labels' limits apply, and they grow with each retry. This is what was
+  in force before on every Nextflow version; the `process_long`, `error_ignore`
+  and `error_retry` labels, which no process used, are removed (roadmap
+  Phase 22).
+- The `ubuntu:24.04` image of QFILTER, COUNT_READS and CONTIG_FILTER_SUMMARY is
+  pinned by digest (`docker.io/library/ubuntu:24.04@sha256:68ee2200...`, the
+  2026-10-02 build: bash 5.2.21, gzip 1.12); the floating tag could change the
+  tools between pulls, and an unqualified name fails under podman without
+  search registries (roadmap Phase 22).
+
 - **Breaking (samplesheet)**: sample names that the pipeline's tables cannot
   carry are rejected at launch, with every offending name and its reason in one
   error (roadmap Phase 20). Rejected: names that read as a number (digits only
@@ -1330,6 +1360,92 @@ next release is tagged.
   these params aborts the run at startup
 
 ### Fixed
+
+- **Databases** (roadmap Phase 22):
+  - A downloaded database was also copied into the results directory: the
+    first run that downloaded one wrote it to `--databases_dir` and a second
+    full copy to `<output>/format/`, `<output>/download/` or `<output>/rgi/`
+    (the default publish rule still applied to the 19 database processes after
+    they moved to `storeDir`). Those folders are no longer written; databases
+    live in `--databases_dir` only. Results folders from earlier runs may still
+    hold them and can be deleted.
+  - The copies of builds from your own files (the decontamination index from
+    `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with
+    `--custom_rgi_wildcard`, a `--custom_sourmash_db` lineages database) made
+    by a `-stub` run now go under `<databases_dir>/stub/`, as the stored
+    databases of a stub run already did, instead of where a real run's copy is
+    taken from.
+  - The sylph, CheckM2, COG and sourmash taxonomy databases are declared by
+    their file names instead of a pattern, so no other file left in a store
+    folder can be taken for the database. File names are unchanged and
+    existing stores are reused.
+
+- **Profiles** (roadmap Phase 22):
+  - On Nextflow >= 26.04 the slurm, AWS, GCP and Azure profiles' settings were
+    replaced by the defaults that `nextflow.config` set after them: under
+    `-profile slurm` the run used the local executor's queue size (16 jobs,
+    `--max_cpus`) instead of 100 (`--slurm_queue_size` had no effect), and the
+    cloud profiles retried twice instead of three times and did not retry a
+    preempted spot VM (exit 14 on Google Batch, 50001 on Azure Batch). The
+    defaults now come before the profiles. The preemption codes are retried by
+    every error rule, including the per-process ones (downloads, eggNOG-mapper,
+    RGI, ...), which no profile setting could reach.
+  - `-profile slurm_singularity` set only the executor; it now has the
+    settings of `-profile slurm,singularity` (queues, account, queue size, image
+    cache). `-profile local_docker` now switches the other container engines
+    off, as `-profile docker` does.
+  - The default `--databases_dir` (`<output>/../databases`) now follows an
+    `output` set by a profile: the `test` profile without `--output` stored no
+    database; it now stores them in `./databases`. An `output` set only in a
+    `-c` config file still cannot set the default (that file is read later): a
+    launch warning says to set `databases_dir` there too.
+  - GTDB_TK_BATCH and WOLTKA_ALIGN (256 GB per attempt, clamped to
+    `--max_memory`) no longer retry an out-of-memory exit once their request is
+    at the cap, where a retry got the same memory and repeated the whole job.
+
+- **Alignment steps** (roadmap Phase 22):
+  - BOWTIE2_DECONTAMINATE (`--read_aligner bowtie2`) wrote bowtie2's full SAM
+    output (every read, ~1.2 times the uncompressed FASTQ) to the work
+    directory and deleted it at the end; it now goes to `/dev/null`.
+  - BOWTIE2_SAMTOOLS left a large-genome Bowtie2 index (`.bt2l`, assemblies
+    over ~4 Gbp) in every sample's work directory.
+  - The aligner and samtools in the same pipe (BWAMEM3_DECONTAMINATE,
+    BWAMEM3_SAMTOOLS, BOWTIE2_SAMTOOLS) each used all of the task's CPUs, up to
+    twice the CPUs reserved; samtools now gets a quarter (at most 4) and the
+    aligner the rest. Alignments are unchanged (bwa-mem3 runs with a fixed
+    batch size; bowtie2 aligns each read on its own).
+
+- **Database downloads** (roadmap Phase 22): the eggNOG, dbCAN, sylph and
+  WoLr2 (Bowtie2 index and plain maps) files, which are served uncompressed
+  and have no published checksum, are checked against the byte counts of the
+  release after the download, so a cut or replaced download stops there instead
+  of being stored and failing in a later task. A mismatch exits with code 65,
+  which the download labels do not retry (wget has already retried the
+  transfer; a retry would download the whole database again); the CheckV
+  download's byte check does the same. The Kraken2, CheckM2 and GTDB-Tk
+  downloads no longer write a progress bar into the task log. The
+  eggNOG-mapper image's Dockerfile fetches HMMER over HTTPS and checks its
+  sha256 (applies to the next image build; the pinned image is unchanged).
+
+- **Parameter checks** (roadmap Phase 22):
+  - `--custom_sourmash_db` given on the command line as the documentation
+    showed (`'["kmers.zip","lineages.csv"]'`) failed validation ("Value is
+    [string] but should be [array]"). The command line now takes that quoted
+    list or a comma-separated pair (`'kmers.zip,lineages.csv'`); a params file
+    still takes a list. A value without exactly two files stops at launch.
+  - Eleven database-key parameters (`--bakta_db`, `--checkm2_db`,
+    `--gtdbtk_db`, `--eggnog_db`, `--dbcan_db`, `--cog_db`, `--woltka_db`,
+    `--superfocus_db`, `--sourmash_db`, `--host_db`, `--phiX_index`) accepted
+    any value, and a typo stopped the run with "Cannot get property 'url' on
+    null object". Each now has the registry's keys as its allowed values, so
+    `--bakta_db v6.0-lite` is rejected at launch with "Expected any of
+    [v6.0-full, v6.0-light]".
+  - Launch warnings for two options that are ignored: `--custom_rgi_wildcard`
+    without `--custom_rgi_card_db` (the pipeline downloads CARD and WildCARD
+    itself), and `--custom_host_fasta` / `--custom_phiX_fasta` together with
+    `--custom_decontamination_index` (the pre-built index is used as it is).
+  - `docs/parameters.md` now says that `--rgi_card_version` pins CARD only:
+    WildCARD is always the latest release.
 
 - **Results summary** (roadmap Phase 21):
   - A `--sample_metadata` column named `cluster`, `relative_abundance_pct`,

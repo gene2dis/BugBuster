@@ -111,6 +111,12 @@ process BWAMEM3_SAMTOOLS {
     script:
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
+    // The aligner and samtools share the task's CPUs instead of each taking all
+    // of them (review R4-18): samtools gets a quarter, at most 4, the aligner
+    // the rest. Alignments do not depend on the aligner's thread count
+    // (bwa-mem3 runs with a fixed -K batch size; bowtie2 aligns each read alone)
+    def st_threads = Math.min(4, Math.max(1, (task.cpus as int).intdiv(4)))
+    def aln_threads = Math.max(1, (task.cpus as int) - st_threads)
     // != null, not ?:, so that 0 (filter off) is honoured
     def min_identity = task.ext.min_identity != null ? task.ext.min_identity : 0.95
     def min_aligned_length = task.ext.min_aligned_length != null ? task.ext.min_aligned_length : 50
@@ -165,10 +171,10 @@ process BWAMEM3_SAMTOOLS {
         map_reads() {
             local out=\$1
             shift
-            bwa-mem3 mem ${args} -t ${task.cpus} -K 100000000 \${idx} "\$@" \\
+            bwa-mem3 mem ${args} -t ${aln_threads} -K 100000000 \${idx} "\$@" \\
                 | filter_alignments.sh ${min_identity} ${min_aligned_length} \\
                 | samtools fixmate -u - - \\
-                | samtools sort ${args2} -@ ${task.cpus} -o "\${out}" -
+                | samtools sort ${args2} -@ ${st_threads} -o "\${out}" -
         }
 
         map_reads ${prefix}_lib0_paired.bam ${reads[0]} ${reads[1]}

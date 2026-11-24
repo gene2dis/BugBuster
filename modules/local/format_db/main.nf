@@ -37,11 +37,13 @@ process FORMAT_SYLPH_DB {
         val(db)
 
     output:
-        path("sylph_db/*.syl*db"), emit: db
+        // Fixed name (the URL's file name, as the script saves it): storeDir
+        // checks only that declared outputs exist (CONTRIBUTING, Databases)
+        path("sylph_db/${db.tokenize('/')[-1]}"), emit: db
 
     script:
         """
-        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db
+        ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db '${params.sylph_ref_db[params.sylph_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -61,7 +63,7 @@ process FORMAT_SYLPH_TAXONOMY {
         val(taxonomy)
 
     output:
-        path("sylph_db/*.tsv.gz"), emit: taxonomy
+        path("sylph_db/${taxonomy.tokenize('/')[-1]}"), emit: taxonomy
 
     script:
         """
@@ -218,7 +220,7 @@ process FORMAT_CHECKM2_DB {
         val(db)
 
     output:
-        path("*.dmnd")
+        path("${params.checkm2_ref_db[params.checkm2_db]["file"]}")
 
     script:
         """
@@ -227,7 +229,7 @@ process FORMAT_CHECKM2_DB {
 
     stub:
         """
-        touch uniref100.KO.1.dmnd
+        touch ${params.checkm2_ref_db[params.checkm2_db]["file"]}
         """
 }
 
@@ -298,7 +300,7 @@ process FORMAT_EGGNOG_DB {
 
     script:
         """
-        ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db
+        ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db '${params.eggnog_ref_db[params.eggnog_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -325,7 +327,7 @@ process FORMAT_DBCAN_DB {
 
     script:
         """
-        ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db
+        ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db '${params.dbcan_ref_db[params.dbcan_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -338,9 +340,9 @@ process FORMAT_DBCAN_DB {
 
 process FORMAT_BAKTA_DB {
     tag "format_bakta_db"
-    // Runs in the same Bakta 1.12.2 biocontainers build the BAKTA_BAKTA module
+    // Runs in the same Bakta 1.12.2 biocontainers build the NFCORE_BAKTA_BAKTA module
     // uses (quay image; under singularity/apptainer its depot sif, while
-    // BAKTA_BAKTA's override keeps the quay URI for every engine), not the
+    // NFCORE_BAKTA_BAKTA's override keeps the quay URI for every engine), not the
     // shared wget image: provisioning must run amrfinder_update —
     // the official DB tarball bundles an AMRFinderPlus DB too old for the
     // container's AMRFinderPlus binary (T7 acceptance finding, 2026-10-06) —
@@ -381,7 +383,7 @@ process FORMAT_COG_DB {
         val(db)
 
     output:
-        path("*.def.tab")
+        path("${db.tokenize('/')[-1]}")
 
     script:
         """
@@ -390,7 +392,7 @@ process FORMAT_COG_DB {
 
     stub:
         """
-        touch cog-24.def.tab
+        touch ${db.tokenize('/')[-1]}
         """
 }
 
@@ -415,7 +417,7 @@ process FORMAT_WOLTKA_DB {
 
     script:
         """
-        ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db
+        ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db '${params.woltka_ref_db[params.woltka_db]["bytes"] ?: ''}'
         """
 
     stub:
@@ -553,7 +555,7 @@ process SOURMASH_TAX_PREPARE {
         path(tax_file)
 
     output:
-        path("*.sqldb"), emit: tax_db
+        path("taxonomy.sqldb"), emit: tax_db
         path "versions.yml", emit: versions
 
     script:

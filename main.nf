@@ -156,10 +156,10 @@ include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samt
 include { BLOBPLOT         } from './modules/local/blobplot/main'
 
 	// ORF PREDICTION IN CONTIGS AND BINS
-	// PYRODIGAL is the shared contig gene-calling step (design doc Q9): one
+	// NFCORE_PYRODIGAL (nf-core pyrodigal) is the shared contig gene-calling step (design doc Q9): one
 	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
 	// (contig_level_functional)
-include { PYRODIGAL        } from './modules/nf-core/pyrodigal/main'
+include { PYRODIGAL as NFCORE_PYRODIGAL } from './modules/nf-core/pyrodigal/main'
 
 	// ARG PREDICTION IN READS
 include { ARGS_OAP         } from './modules/local/args_oap/main'
@@ -188,7 +188,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -387,6 +387,22 @@ workflow {
     if (params.taxonomic_profiler == 'sylph' && (params.custom_sylph_db as boolean) != (params.custom_sylph_taxonomy as boolean)) {
         error("--custom_sylph_db and --custom_sylph_taxonomy must be given together: a sylph database and the sylph-tax metadata of the same release (e.g. gtdb-r232-c200-dbv2.syl2db with gtdb_r232_metadata.tsv.gz). Pass both, or neither to download the --sylph_db entry")
     }
+    // Custom database options that are ignored in these combinations (review
+    // R1-04): PREPARE_DATABASES adds a WildCARD directory only to a custom CARD
+    // database, and takes a pre-built decontamination index instead of FASTAs
+    if (flagOn(params.rgi_prediction) && params.custom_rgi_wildcard && !params.custom_rgi_card_db) {
+        log.warn "--custom_rgi_wildcard is ignored without --custom_rgi_card_db: the pipeline downloads CARD (--rgi_card_version ${params.rgi_card_version}) and, with --rgi_include_wildcard, the latest WildCARD itself. Pass the CARD database the WildCARD directory belongs to with --custom_rgi_card_db"
+    }
+    if (flagOn(params.quality_control) && params.custom_decontamination_index && (params.custom_host_fasta || params.custom_phiX_fasta)) {
+        def fasta_opts = [params.custom_host_fasta ? '--custom_host_fasta' : null, params.custom_phiX_fasta ? '--custom_phiX_fasta' : null].findAll { o -> o }
+        log.warn "${fasta_opts.join(' and ')} ${fasta_opts.size() > 1 ? 'are' : 'is'} ignored: --custom_decontamination_index is a pre-built index and is used as it is, so reads are not decontaminated against ${fasta_opts.size() > 1 ? 'these FASTAs' : 'this FASTA'} unless the index was built from ${fasta_opts.size() > 1 ? 'them' : 'it'}. Drop --custom_decontamination_index to build a new index from the FASTAs"
+    }
+    // --custom_sourmash_db is a [k-mer file, lineages file] pair; a list from a
+    // params file, or on the command line a JSON-style list or a comma-separated
+    // pair (sourmashCustomFiles). One entry would leave the lineages unset
+    if (params.taxonomic_profiler == 'sourmash' && params.custom_sourmash_db && sourmashCustomFiles().size() != 2) {
+        error("--custom_sourmash_db needs exactly two files, the sourmash k-mer database and its lineages CSV, got ${sourmashCustomFiles().size()}: ${sourmashCustomFiles().join(', ') ?: '(none)'}. On the command line: --custom_sourmash_db 'kmers.zip,lineages.csv' (or '[\"kmers.zip\",\"lineages.csv\"]'); in a params file, a list of two paths")
+    }
     // The default profiler is sylph since 2.0.0 (before, sourmash): a command
     // that names only another profiler's database would now download the
     // sylph database and ignore its own, so say so before the downloads start
@@ -408,6 +424,14 @@ workflow {
     // results-neutral)
     if (workflow.profile.tokenize(',').contains('low_disk') && (flagOn(params.contig_level_functional) || flagOn(params.mag_level_functional) || params.read_level_functional != 'none')) {
         log.warn "functional annotation under -profile low_disk: the work dir is deleted when the run succeeds, so a completed run cannot be resumed (re-running with changed options repeats the long eggNOG-mapper / read-level steps), and the functional databases (eggNOG 7 ~44 GB, dbCAN ~7.4 GB, Bakta full ~31.9 GB download / light ~1.3 GB, WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB download, HUMAnN ~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered) are stored at --databases_dir regardless of this profile"
+    }
+
+    // databases_dir defaults to <output>/../databases in nextflow.config, after
+    // the profiles. An output set in a -c config file is merged later and never
+    // reaches that default (review R2-03): without a warning, every database
+    // would be downloaded again into each new work directory
+    if (params.output && !params.databases_dir) {
+        log.warn "--databases_dir is not set: output (${params.output}) comes from a -c config file, which is read after the default <output>/../databases is computed, so no database is stored for later runs and each new work directory downloads them again. Set databases_dir in the same file (or pass --databases_dir / --output on the command line)"
     }
 
     // Databases published by releases before storeDir (roadmap M9) sit where
@@ -818,19 +842,19 @@ workflow {
     def run_contig_deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
     if ( (run_contig_deeparg || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
         //
-        // Run nf-core PYRODIGAL for contig ORF prediction
-        // nf-core PYRODIGAL signature:
+        // Run nf-core pyrodigal (NFCORE_PYRODIGAL) for contig ORF prediction
+        // nf-core pyrodigal signature:
         //   input:  tuple val(meta), path(fasta) + val(output_format)
         //   output: tuple val(meta), path("*.faa.gz"), emit: faa
         //           tuple val(meta), path("*.gff.gz"), emit: annotations
         //
-        PYRODIGAL(
+        NFCORE_PYRODIGAL(
             ch_contigs_meta,
             "gff"  // output_format
         )
-        ch_contig_proteins  = PYRODIGAL.out.faa
-        ch_contig_genes_gff = PYRODIGAL.out.annotations
-        ch_versions = ch_versions.mix(PYRODIGAL.out.versions.first())
+        ch_contig_proteins  = NFCORE_PYRODIGAL.out.faa
+        ch_contig_genes_gff = NFCORE_PYRODIGAL.out.annotations
+        ch_versions = ch_versions.mix(NFCORE_PYRODIGAL.out.versions.first())
     }
 
     //

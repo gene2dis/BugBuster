@@ -46,14 +46,16 @@ process BOWTIE2_DECONTAMINATE {
         exit 1
     fi
 
-    # Align paired-end reads and extract unmapped (clean) reads
+    # Align paired-end reads and extract unmapped (clean) reads. Only the
+    # --un-conc files and the summary are used: the SAM (every read, ~1.2x the
+    # uncompressed FASTQ) goes to /dev/null instead of the work dir (review R4-09)
     bowtie2 \\
         ${args} \\
         -x ${index_db}/\${basename} \\
         -p ${task.cpus} \\
         -1 ${r1} \\
         -2 ${r2} \\
-        --un-conc-gz ${prefix}_clean_tmp.%.fastq.gz > ${prefix}_bowtie_mapped_${db_alias} \\
+        --un-conc-gz ${prefix}_clean_tmp.%.fastq.gz > /dev/null \\
         2> ${prefix}_bowtie2_paired.log \\
         || { rc=\$?; cat ${prefix}_bowtie2_paired.log >&2; exit \$rc; }
     cat ${prefix}_bowtie2_paired.log >&2
@@ -75,13 +77,12 @@ process BOWTIE2_DECONTAMINATE {
         -x ${index_db}/\${basename} \\
         -p ${task.cpus} \\
         -U ${singleton} \\
-        --un-gz ${prefix}_singleton_clean > ${prefix}_bowtie_singleton_mapped_${db_alias} \\
+        --un-gz ${prefix}_singleton_clean > /dev/null \\
         2> ${prefix}_bowtie2_singleton.log \\
         || { rc=\$?; cat ${prefix}_bowtie2_singleton.log >&2; exit \$rc; }
     cat ${prefix}_bowtie2_singleton.log >&2
 
     mv ${prefix}_singleton_clean ${prefix}_Singleton_clean.fastq.gz
-    rm -f ${prefix}_bowtie_singleton_mapped_${db_alias}
 
     Singleton_count=\$(clean_read_count.sh ${prefix}_bowtie2_singleton.log bowtie2-unpaired)
     echo -e \"Id\\tClean reads (${db_alias} removed)\\tClean singletons (${db_alias} removed)\" > ${prefix}_${db_alias}_decontamination_report.tsv
@@ -90,9 +91,6 @@ process BOWTIE2_DECONTAMINATE {
     echo -e \"Id\\tClean reads (${db_alias} removed)\" > ${prefix}_${db_alias}_decontamination_report.tsv
     echo -e \"${prefix}\\t\${final_reads}\" >> ${prefix}_${db_alias}_decontamination_report.tsv
     """}
-
-    # Clean up alignment output
-    rm -f ${prefix}_bowtie_mapped_${db_alias}
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":

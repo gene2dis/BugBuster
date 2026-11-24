@@ -104,7 +104,7 @@ time observed on the pipeline's own validation runs:
 | `WOLTKA_ALIGN` | read (woltka) | 64.8 GB | — | test data; the WoLr2 index alone needs ≥ 68 GB RAM |
 | `HUMANN` | read (humann) | 23.5 GB | ~9 min per sample | test data, full ChocoPhlAn |
 | `SUPERFOCUS` | read (superfocus) | ~16 GB | 66–93 min per sample | real samples, DIAMOND |
-| `BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
+| `NFCORE_BAKTA_BAKTA` | MAG | 7.9–12.7 GB | 16–24 min per bin | real bins |
 
 These are observations, not limits: needs grow with input size and community
 complexity. The eggNOG search requests 16 CPUs and 96 GB on the first attempt;
@@ -120,7 +120,7 @@ eggNOG-mapper's default `sensitive` DIAMOND mode; the pipeline now runs it with
 11 min instead of 56 and 3,241 instead of 37,762 CPU seconds, for 1.6 % fewer
 proteins with a seed ortholog. The annotate step (8 CPUs, 48 GB on the first
 attempt) peaked at 35.1 GB. `RUN_DBCAN` runs on 8 CPUs (16 GB), as fast as on
-16, and `BAKTA_BAKTA` on 4 CPUs (16 GB) per bin.
+16, and `NFCORE_BAKTA_BAKTA` on 4 CPUs (16 GB) per bin.
 
 #### Contig taxonomy (Metabuli) and geNomad
 
@@ -206,10 +206,10 @@ cd BugBuster
 
 ## 4. Database Management
 
-BugBuster automatically downloads required databases on first use and stores them in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Each one goes into a folder named after the database and its registry key (`<databases_dir>/<database>/<key>/`, e.g. `kraken/standard-8/k2_ref_db`; the full layout is under [Database Storage Directory](#database-storage-directory)). A later run with the same `--databases_dir` finds them there and skips the download or build (except the sourmash k-mer database, below) (Nextflow `storeDir`; the log shows `[skipping] Stored process`), whatever its work directory. Selecting another version (e.g. `--kraken2_db gtdb_220`) downloads it into its own folder. The files are moved out of the work directory, so each database is stored once.
+BugBuster automatically downloads required databases on first use and stores them in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory. Each one goes into a folder named after the database and its registry key (`<databases_dir>/<database>/<key>/`, e.g. `kraken/standard-8/k2_ref_db`; the full layout is under [Database Storage Directory](#database-storage-directory)). A later run with the same `--databases_dir` finds them there and skips the download or build (except the sourmash k-mer database, below) (Nextflow `storeDir`; the log shows `[skipping] Stored process`), whatever its work directory. Selecting another version (e.g. `--kraken2_db gtdb_220`) downloads it into its own folder. The files are moved out of the work directory, so each database is stored once, in `--databases_dir` only: nothing is copied into the results directory.
 
 - **Refreshing a database**: delete its `<databases_dir>/<database>/<key>/` folder; the next run downloads it again. Do the same if a download was interrupted while being stored (a folder with missing files is taken as complete). RGI's default `--rgi_card_version latest` is stored as `rgi/latest_wildcard_k61`: the first run fixes which CARD release `latest` means for that `--databases_dir` (the stored `versions.yml` records the real version); delete the folder or pin `--rgi_card_version` to update it.
-- **Builds from your own files** (the decontamination index from `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with `--custom_rgi_wildcard`, the sourmash taxonomy from a `--custom_sourmash_db` lineages file) have no version to key a folder on: they run in every new run and are copied to `<databases_dir>` for reuse through the matching `--custom_*` option.
+- **Builds from your own files** (the decontamination index from `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with `--custom_rgi_wildcard`, the sourmash taxonomy from a `--custom_sourmash_db` lineages file) have no version to key a folder on: they run in every new run and are copied to `<databases_dir>` for reuse through the matching `--custom_*` option (under `<databases_dir>/stub/` in a `-stub` run).
 - **`-stub` runs** store their placeholder files under `<databases_dir>/stub/`, never where a real run would take them for a database.
 - **`--custom_*` paths** are used in place and never copied.
 - **The sourmash k-mer database** (`gtdb-reps-rs220-k31.zip`, `--taxonomic_profiler sourmash`) is not downloaded by a pipeline task but staged by Nextflow from its URL into each work directory: a new work directory fetches it again. Download it once and pass it with `--custom_sourmash_db` to avoid that.
@@ -693,7 +693,7 @@ breaks `-resume`.
 | `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
 | `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
 | `--custom_kraken_db` | Path to custom Kraken2 database directory; outputs are labelled with the directory's name |
-| `--custom_sourmash_db` | List of paths: `["kmer.zip", "lineages.csv"]`; outputs are labelled with the k-mer file's name without extension |
+| `--custom_sourmash_db` | The k-mer database and its lineages CSV: `'kmer.zip,lineages.csv'` or `'["kmer.zip", "lineages.csv"]'` on the command line, a list of the two in a params file; outputs are labelled with the k-mer file's name without extension |
 | `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
 | `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
 | `--custom_checkm2_db` | Path to CheckM2 database file |
@@ -1356,8 +1356,8 @@ nextflow run main.nf \
 | `apptainer` | Run with Apptainer containers |
 | `conda` | Run with Conda environments |
 | `slurm` | Submit jobs to SLURM scheduler |
-| `slurm_singularity` | SLURM with Singularity |
-| `local_docker` | Docker with the container user mapped to yours (`-u $(id -u):$(id -g)`) |
+| `slurm_singularity` | Legacy name for `-profile slurm,singularity` (same settings) |
+| `local_docker` | Legacy name for `-profile docker` (same settings) |
 | `aws` | Run on AWS Batch |
 | `gcp` | Run on Google Cloud |
 | `azure` | Run on Azure Batch |
@@ -1851,7 +1851,7 @@ databases/                            # Database storage (configurable via --dat
 └── stub/                             # Placeholder databases of -stub runs (same layout)
 ```
 
-Copies of builds from your own files (not reused automatically, pass them with `--custom_*`): `bwamem3_index/contaminants_index` or `bowtie_index/contaminants_index` (from `--custom_host_fasta` / `--custom_phiX_fasta`), `rgi/card_db_with_wildcard` (from `--custom_rgi_wildcard`) and `sourmash/taxonomy.sqldb` (from a `--custom_sourmash_db` lineages file).
+Copies of builds from your own files (not reused automatically, pass them with `--custom_*`): `bwamem3_index/contaminants_index` or `bowtie_index/contaminants_index` (from `--custom_host_fasta` / `--custom_phiX_fasta`), `rgi/card_db_with_wildcard` (from `--custom_rgi_wildcard`) and `sourmash/taxonomy.sqldb` (from a `--custom_sourmash_db` lineages file); a `-stub` run puts its placeholders for these under `stub/` too.
 
 ### Conditional Outputs
 

@@ -21,7 +21,7 @@
 # the bakta container, which is why FORMAT_BAKTA_DB uses that container.
 #
 # A DB_VERSION file records the flavor, source URL and the refreshed
-# AMRFinderPlus DB version on ONE line for provenance (BAKTA_BAKTA cats it
+# AMRFinderPlus DB version on ONE line for provenance (NFCORE_BAKTA_BAKTA cats it
 # into versions.yml, so it must stay single-line; absent in a custom DB, the
 # module records 'custom') - the spec requires the light-DB choice to be
 # recorded because it changes results.

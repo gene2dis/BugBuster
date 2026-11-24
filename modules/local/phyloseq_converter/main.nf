@@ -38,6 +38,10 @@ process PHYLOSEQ_CONVERTER {
     stub:
     """
     touch ${db_name}_phyloseq.RDS
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        r-base: 4.5.2
+        bioconductor-phyloseq: 1.54.0
+    END_VERSIONS
     """
 }

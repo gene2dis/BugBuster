@@ -62,6 +62,13 @@ process TAXONOMY_PHYLOSEQ {
     if [ "${profiler}" = "sylph" ]; then
         touch ${profiler}_${db_name}_read_counts.tsv
     fi
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+        numpy: 2.5.4
+        matplotlib: 3.11.2
+        h5py: 3.16.0
+    END_VERSIONS
     """
 }

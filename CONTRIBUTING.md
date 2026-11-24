@@ -142,14 +142,24 @@ feat(modules): add DIAMOND module for protein alignment
   `.collect()`, `.toList()` and `groupTuple` follow task completion order, which changes the
   task's cache key between runs and makes `-resume` re-run it. (`sort: true` orders by work
   directory path, which is stable while the upstream tasks are cached, not by sample name.)
-- Every `errorStrategy` in `nextflow.config` and `config/modules.config` must start with
-  `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
+- Every `errorStrategy` in `nextflow.config`, `config/modules.config` and `conf/` must start
+  with `task.exitStatus == Integer.MAX_VALUE && task.executor == 'local' ? 'terminate' : ...`
   (then your own rule, e.g. `'retry'`). A local task with no exit status asked for more CPUs
   or memory than the local executor's pool and can never be scheduled (a task killed while
   running reports its signal status, e.g. 137, instead); with `'finish'`, `'retry'` or
-  `'ignore'` instead, the run can hang forever waiting for it. Profiles that switch to a
-  non-local executor (`conf/aws.config`, `conf/slurm.config`, ...) have no such pool and
-  are exempt
+  `'ignore'` instead, the run can hang forever waiting for it. A rule that retries listed
+  exit codes also retries the cloud preemption codes,
+  `task.exitStatus == ['google-batch': 14, 'azurebatch': 50001][task.executor]` (as in
+  `nextflow.config`'s default rule): a `withLabel` or `withName` rule replaces the default
+  one under every profile, so a profile cannot add them. The slurm and cloud profiles set
+  only `maxRetries` and leave the rule to `nextflow.config`
+- Settings that a profile may override (the default `process` rules, `conf/base.config`)
+  go before the `profiles {}` block in `nextflow.config`: with the strict config parser a
+  later block wins, and placed after the profiles they replaced the slurm and cloud
+  settings. The resource labels stay after it (under the legacy parser a profile's
+  `withLabel` block placed later would replace the whole label block), and so do
+  `config/databases.config` and `config/modules.config`. `tests/bin/test_profile_config.sh`
+  checks the resolved config of every profile
 - CI and nf-test run under docker only, so nothing automated exercises the image a process
   gets under singularity/apptainer. A separately built singularity image (a Seqera
   `oras://` variant, a depot.galaxyproject.org sif) can lack tools its docker twin has:
@@ -167,7 +177,7 @@ feat(modules): add DIAMOND module for protein alignment
   to task) but shares the host `/tmp`. A tool that names its temp files by PID (tRNAscan-SE's
   `/tmp/tscan<PID>`, inside Bakta) can collide with a task running beside it, so give such a
   process a `TMPDIR` in its task directory: `ext.tmpdir_in_task = true` in its
-  `config/modules.config` block (see BAKTA_BAKTA), which `conf/base.config`'s `containerOptions`
+  `config/modules.config` block (see NFCORE_BAKTA_BAKTA), which `conf/base.config`'s `containerOptions`
   turns into `--env TMPDIR=$PWD`. Not a `beforeScript`, which would replace the `module load` an
   HPC config puts there, and not a `withName` `containerOptions`, which would replace base.config's
 - Upstream bugs are worked around in `bin/`, never by editing an image:
@@ -219,8 +229,13 @@ in the same form as the existing blocks:
 ```groovy
 withName: 'FORMAT_TOOL_DB' {
     storeDir = { params.databases_dir != null ? "${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}tool/${params.tool_db}" : null }
+    publishDir = [enabled: false]
 }
 ```
+
+- **Switch `publishDir` off.** Without it, the default rule in `conf/base.config`
+  also copies the stored database into `<output>/<first word of the process name>/`
+  (`format/`, `download/`, ...), a second full copy in the results directory.
 
 - **The closure returns `null` without `databases_dir`**, which turns storeDir off
   (module-level nf-tests run without `--output`). The `stub/` prefix keeps `-stub`
@@ -242,7 +257,7 @@ withName: 'FORMAT_TOOL_DB' {
 - **A build from the user's own files** (`--custom_host_fasta`, `--custom_rgi_wildcard`,
   a `--custom_sourmash_db` lineages file) has no version to key on. It runs every time
   and keeps a `publishDir` copy in `databases_dir`, for reuse through the matching
-  `--custom_*` option.
+  `--custom_*` option. Its publish path takes the same `stub/` prefix as storeDir.
 - **Every database has a `--custom_*` parameter** that bypasses the process and uses the
   path in place.
 

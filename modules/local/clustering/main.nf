@@ -17,13 +17,16 @@ process CLUSTERING {
         path "versions.yml", emit: versions
 
     script:
+    // Extra tool options from a -c config (withName ... ext.args), as in every
+    // other tool module (review R2-14); none set by default
+    def args = task.ext.args ?: ''
 
         """
         cat *.faa > mmseq_db.faa
-        mmseqs easy-cluster mmseq_db.faa Arg_cluster_90 tmp --min-seq-id 0.9 -c 0.8 --cov-mode 0 --threads $task.cpus
-        mmseqs easy-cluster mmseq_db.faa Arg_cluster_95 tmp --min-seq-id 0.95 -c 0.8 --cov-mode 0 --threads $task.cpus
-        mmseqs easy-cluster mmseq_db.faa Arg_cluster_99 tmp --min-seq-id 0.99 -c 0.9 --cov-mode 0 --threads $task.cpus
-        mmseqs easy-cluster mmseq_db.faa Arg_cluster_100 tmp --min-seq-id 1.0 -c 0.9 --cov-mode 0 --threads $task.cpus
+        mmseqs easy-cluster mmseq_db.faa Arg_cluster_90 tmp --min-seq-id 0.9 -c 0.8 --cov-mode 0 --threads $task.cpus ${args}
+        mmseqs easy-cluster mmseq_db.faa Arg_cluster_95 tmp --min-seq-id 0.95 -c 0.8 --cov-mode 0 --threads $task.cpus ${args}
+        mmseqs easy-cluster mmseq_db.faa Arg_cluster_99 tmp --min-seq-id 0.99 -c 0.9 --cov-mode 0 --threads $task.cpus ${args}
+        mmseqs easy-cluster mmseq_db.faa Arg_cluster_100 tmp --min-seq-id 1.0 -c 0.9 --cov-mode 0 --threads $task.cpus ${args}
         rm mmseq_db.faa
 
         cat <<-END_VERSIONS > versions.yml

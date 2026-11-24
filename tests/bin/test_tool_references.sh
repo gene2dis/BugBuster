@@ -94,6 +94,19 @@ sv = repo / "subworkflows" / "local" / "software_versions.nf"
 for m in re.finditer(r'"\s{4}([A-Za-z0-9_.-]+):\s', sv.read_text()):
     add(m.group(1), str(sv.relative_to(repo)))
 
+# [ process, tool, version ] tuples mixed into ch_versions by a subworkflow (the
+# database releases PREPARE_DATABASES records; roadmap Phase 22, review R2-08):
+# [ 'PROCESS', 'tool', ... ]
+TUPLE = re.compile(r"""\[\s*['"]([A-Z][A-Z0-9_:]*)['"]\s*,\s*['"]([A-Za-z0-9_.-]+)['"]\s*,""")
+tuple_keys = 0
+for f in sorted((repo / "subworkflows" / "local").glob("*.nf")):
+    for m in TUPLE.finditer(f.read_text()):
+        add(m.group(2), str(f.relative_to(repo)))
+        tuple_keys += 1
+if tuple_keys < 4:
+    problems.append(f"only {tuple_keys} versions tuples found in subworkflows/local (expected the four database "
+                    "releases of prepare_databases.nf): the TUPLE pattern no longer matches")
+
 if len(keys) < 50:
     problems.append(f"only {len(keys)} version keys found: the parsing above no longer matches the modules")
 

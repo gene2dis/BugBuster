@@ -30,7 +30,7 @@ include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
 include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
-include { flagOn                  } from './utils_params'
+include { flagOn; sourmashCustomFiles } from './utils_params'
 
 workflow PREPARE_DATABASES {
     
@@ -69,6 +69,11 @@ workflow PREPARE_DATABASES {
             ch_kraken_ref = channel.fromList(params.kraken_ref_db[params.kraken2_db]["url"])
             ch_kraken_db = FORMAT_KRAKEN_DB(ch_kraken_ref)
         }
+        // The database release, which no Kraken2 versions entry records
+        // (review R2-08): the registry's dbversion, or the custom database's
+        // name. A [process, tool, version] tuple, read by SOFTWARE_VERSIONS
+        ch_versions = ch_versions.mix(channel.of([ 'PREPARE_DATABASES', 'kraken2_db',
+            params.custom_kraken_db ? "custom (${file(params.custom_kraken_db).name})" : params.kraken_ref_db[params.kraken2_db]["dbversion"] ]))
     }
 
     //
@@ -77,7 +82,7 @@ workflow PREPARE_DATABASES {
     if ( params.taxonomic_profiler == "sourmash" ) {
         if ( params.custom_sourmash_db ) {
             // Custom database: expect list with [kmer_db, lineages_file]
-            ch_sourmash_files = channel.fromList(params.custom_sourmash_db)
+            ch_sourmash_files = channel.fromList(sourmashCustomFiles())
                 .map { filepath -> file(filepath, checkIfExists: true) }
                 .collect()
             
@@ -93,6 +98,9 @@ workflow PREPARE_DATABASES {
             ch_sourmash_lineages = ch_sourmash_files.map { files -> files[1] }
         }
         
+        ch_versions = ch_versions.mix(channel.of([ 'PREPARE_DATABASES', 'sourmash_db',
+            params.custom_sourmash_db ? "custom (${file(sourmashCustomFiles()[0]).name})" : params.sourmash_ref_db[params.sourmash_db]["dbversion"] ]))
+
         // Prepare taxonomy database ONCE (not per-sample)
         SOURMASH_TAX_PREPARE(ch_sourmash_lineages)
         ch_sourmash_tax_db = SOURMASH_TAX_PREPARE.out.tax_db
@@ -258,6 +266,13 @@ workflow PREPARE_DATABASES {
             ch_checkm2_ref = channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
             ch_checkm2_db = FORMAT_CHECKM2_DB(ch_checkm2_ref)
         }
+        // GTDB-Tk and CheckM2 database releases, as for Kraken2 above
+        ch_versions = ch_versions.mix(channel.of(
+            [ 'PREPARE_DATABASES', 'gtdbtk_db',
+              params.custom_gtdbtk_db ? "custom (${file(params.custom_gtdbtk_db).name})" : params.gtdbtk_ref_db[params.gtdbtk_db]["dbversion"] ],
+            [ 'PREPARE_DATABASES', 'checkm2_db',
+              params.custom_checkm2_db ? "custom (${file(params.custom_checkm2_db).name})" : params.checkm2_ref_db[params.checkm2_db]["dbversion"] ]
+        ))
     }
 
     //

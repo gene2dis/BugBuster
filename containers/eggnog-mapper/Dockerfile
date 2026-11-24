@@ -30,6 +30,8 @@ ARG DIAMOND_SHA256=5d04a9ecbbceea5d1a6496070155012c2538788def552f85e0d65095a532a
 ARG MMSEQS_COMMIT=17b688d21dda57fc5f5b7286ecba7ec003d4717f
 ARG MMSEQS_SHA256=f35d2a3642987da84457a644be25090b764ec8ffe1f3f0f79c5ec64bc21709d2
 ARG HMMER_VERSION=3.4
+# sha256 of the source tarball, as in the bioconda hmmer 3.4 recipe (review R6-14)
+ARG HMMER_SHA256=ca70d94fd0cf271bd7063423aabb116d42de533117343a9b27a65c17ff06fbf3
 ARG PRODIGAL_VERSION=2.6.3
 ARG PRODIGAL_SHA256=80a3d7acb08ba9f63dde6b6ef4e95ec356128ac355f36960ea722f381150f246
 
@@ -67,10 +69,13 @@ RUN mkdir -p /opt/diamond /opt/prodigal \
     && chmod +x /opt/diamond/diamond /opt/prodigal/prodigal \
     && rm -f /tmp/diamond.tar.gz /tmp/mmseqs.tar.gz
 
-# HMMER, compiled from source as upstream does
+# HMMER, compiled from source as upstream does; the tarball is checked before
+# it is unpacked
 RUN mkdir -p /tmp/hmmer-build \
-    && curl -fsSL "http://eddylab.org/software/hmmer/hmmer-${HMMER_VERSION}.tar.gz" \
-        | tar -xz -C /tmp/hmmer-build --strip-components=1 \
+    && curl -fsSL -o /tmp/hmmer.tar.gz "https://eddylab.org/software/hmmer/hmmer-${HMMER_VERSION}.tar.gz" \
+    && echo "${HMMER_SHA256}  /tmp/hmmer.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/hmmer.tar.gz -C /tmp/hmmer-build --strip-components=1 \
+    && rm -f /tmp/hmmer.tar.gz \
     && cd /tmp/hmmer-build \
     && ./configure --prefix=/opt/hmmer > /dev/null \
     && make -j"$(nproc)" > /dev/null \

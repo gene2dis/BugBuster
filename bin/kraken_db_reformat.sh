@@ -5,7 +5,7 @@
 #
 set -euo pipefail
 
-wget --tries=5 --continue --waitretry=10 -O k2_db.tar.gz \
+wget --tries=5 --continue --waitretry=10 --no-verbose -O k2_db.tar.gz \
     "${1:?usage: kraken_db_reformat.sh <database-url>}"
 
 mkdir k2_ref_db

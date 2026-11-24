@@ -55,6 +55,7 @@ nextflow_pipeline {
             assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_BWAMEM3_SAMTOOLS (") == 2
             assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_CALCULATE_DEPTH (multisample)") == 1
             assert count("MULTISAMPLE_COVERAGE:MULTISAMPLE_SPLIT_DEPTH (multisample)") == 1
+            assert TestData.databaseFolders(outputDir) == []
             assert TestData.publishedPaths(outputDir).sort() ==
                 new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines().sort()
 

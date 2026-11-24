@@ -31,6 +31,10 @@ process ARG_CONTIG_LEVEL_REPORT {
     stub:
     """
     touch Contig_tax_and_arg_prediction.tsv
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+    END_VERSIONS
     """
 }

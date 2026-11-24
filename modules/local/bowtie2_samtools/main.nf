@@ -42,6 +42,12 @@ process BOWTIE2_SAMTOOLS {
     prefix = meta.id
     def args = task.ext.args ?: ''
     def args2 = task.ext.args2 ?: ''
+    // The aligner and samtools share the task's CPUs instead of each taking all
+    // of them (review R4-18): samtools gets a quarter, at most 4, the aligner
+    // the rest. Alignments do not depend on the aligner's thread count
+    // (bwa-mem3 runs with a fixed -K batch size; bowtie2 aligns each read alone)
+    def st_threads = Math.min(4, Math.max(1, (task.cpus as int).intdiv(4)))
+    def aln_threads = Math.max(1, (task.cpus as int) - st_threads)
     
     // Input validation
     if (!meta || !meta.id) {
@@ -106,13 +112,13 @@ process BOWTIE2_SAMTOOLS {
     bowtie2 \\
         ${args} \\
         -x ${prefix}_index \\
-        -p ${task.cpus} \\
+        -p ${aln_threads} \\
         -1 ${reads[0]} \\
         -2 ${reads[1]} \\
         2> ${prefix}_paired.log \\
         | samtools sort \\
             ${args2} \\
-            -@ ${task.cpus} \\
+            -@ ${st_threads} \\
             -o ${prefix}_paired.bam -
     
     # Handle singleton reads if present
@@ -120,16 +126,16 @@ process BOWTIE2_SAMTOOLS {
         bowtie2 \\
             ${args} \\
             -x ${prefix}_index \\
-            -p ${task.cpus} \\
+            -p ${aln_threads} \\
             -U ${reads[2]} \\
             2> ${prefix}_singleton.log \\
             | samtools sort \\
                 ${args2} \\
-                -@ ${task.cpus} \\
+                -@ ${st_threads} \\
                 -o ${prefix}_singleton.bam -
         
         # CLEANUP: Remove Bowtie2 index files after singleton alignment
-        rm -f ${prefix}_index*.bt2 2>/dev/null || true
+        rm -f ${prefix}_index*.bt2 ${prefix}_index*.bt2l 2>/dev/null || true
         
         # Merge paired and singleton BAMs
         samtools merge \\
@@ -144,7 +150,7 @@ process BOWTIE2_SAMTOOLS {
         # No singletons - rename paired BAM
         mv ${prefix}_paired.bam ${prefix}_all_reads.bam
         # CLEANUP: Remove Bowtie2 index files
-        rm -f ${prefix}_index*.bt2 2>/dev/null || true
+        rm -f ${prefix}_index*.bt2 ${prefix}_index*.bt2l 2>/dev/null || true
     fi
     
     # CLEANUP: Remove log files

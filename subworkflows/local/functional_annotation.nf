@@ -40,7 +40,7 @@ include { EGGNOG_MAPPER_ANNOTATE } from '../../modules/local/eggnog_mapper_annot
 include { RUN_DBCAN              } from '../../modules/local/run_dbcan/main'
 include { FEATURECOUNTS_GENES    } from '../../modules/local/featurecounts_genes/main'
 include { AGGREGATE_FUNCTIONS    } from '../../modules/local/aggregate_functions/main'
-include { BAKTA_BAKTA            } from '../../modules/nf-core/bakta/bakta/main'
+include { BAKTA_BAKTA as NFCORE_BAKTA_BAKTA } from '../../modules/nf-core/bakta/bakta/main'
 include { flagOn                 } from './utils_params'
 
 workflow FUNCTIONAL_ANNOTATION {
@@ -176,11 +176,11 @@ workflow FUNCTIONAL_ANNOTATION {
                 .sort { f -> f.name }
                 .collect { f -> [ meta + [bin: f.baseName], f ] }
         }
-        BAKTA_BAKTA(ch_bins, ch_bakta_db.first(), [], [], [], [])
-        ch_bakta_gff = BAKTA_BAKTA.out.gff
-        ch_bakta_tsv = BAKTA_BAKTA.out.tsv
-        ch_bakta_txt = BAKTA_BAKTA.out.txt
-        ch_versions  = ch_versions.mix(BAKTA_BAKTA.out.versions.first())
+        NFCORE_BAKTA_BAKTA(ch_bins, ch_bakta_db.first(), [], [], [], [])
+        ch_bakta_gff = NFCORE_BAKTA_BAKTA.out.gff
+        ch_bakta_tsv = NFCORE_BAKTA_BAKTA.out.tsv
+        ch_bakta_txt = NFCORE_BAKTA_BAKTA.out.txt
+        ch_versions  = ch_versions.mix(NFCORE_BAKTA_BAKTA.out.versions.first())
     } else {
         ch_bakta_gff = channel.empty()
         ch_bakta_tsv = channel.empty()

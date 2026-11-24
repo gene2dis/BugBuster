@@ -17,11 +17,15 @@ process BLOBTOOLS {
 
     script:
         def prefix = "${meta.id}"
+        // Extra tool options from a -c config (withName ... ext.args), as in every
+        // other tool module (review R2-14); none set by default
+        def args = task.ext.args ?: ''
 
         """
         # nodesdb: BLOBTOOLS_NODESDB's parse of the Metabuli database's
         # taxdump, built once for every sample; read here, not written
         blobtools create \\
+                  ${args} \\
                   --infile ${contigs} \\
                   --hitsfile ${hits} \\
                   --db ${nodesdb} \\

@@ -47,6 +47,11 @@ process TAXONOMY_REPORT {
     stub:
     """
     touch Reads_report.csv
-    touch versions.yml
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        python: 3.13.18
+        pandas: 3.1.0
+        matplotlib: 3.11.2
+    END_VERSIONS
     """
 }
