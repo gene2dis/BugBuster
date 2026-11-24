@@ -56,7 +56,7 @@ Complete reference for all BugBuster pipeline parameters.
   copying), hence the `copy` default. `symlink` and `rellink` point into the work
   directory and break when it is deleted (`low_disk`, `nextflow clean`). Don't use `move`
   (later tasks still read the published outputs from the work directory). See the
-  [manual](manual.md#61-inputoutput-options)
+  [manual](manual.md#66-output-directory-and-publishing-mode)
 - **Example**: `--publish_dir_mode link`
 
 ---
@@ -72,7 +72,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--nonpareil`
 - **Type**: Boolean
 - **Default**: `true`
-- **Description**: Estimate each sample's sequencing coverage with Nonpareil 3.5.5 (k-mer mode, `-k 24 -X 10000 -n 1024`) on R1 of the clean reads (the input reads with `--quality_control false`), and fit its curve with the Nonpareil R package (`Nonpareil.curve`). Coverage is the estimated share of the sample's community its reads already cover; the fit adds the sequence diversity index Nd and the read pairs needed for 95 % coverage. R2 and the singleton file are not used (R2 adds no fragments of its own). Outputs go to `01_quality_control/nonpareil/<sample>/` (`<sample>.npo` curve, `.npl` log, `<sample>_nonpareil.tsv` values, `<sample>_nonpareil_curve.tsv` curve and model); the summary adds `samples_qc` `nonpareil_coverage`, `nonpareil_diversity` and `nonpareil_depth_95pct`, the figure `nonpareil_curves` and a note for samples below `--summary_min_nonpareil_coverage`. Nd and the 95 % depth are blank when the curve cannot be fitted (too few reads). Nonpareil's k-mer mode has no seed, so values change slightly from run to run. Failure is non-fatal: the sample gets no Nonpareil values. Cost per 10 M read pairs (roadmap Phase 17): about 3 min with 2 CPUs (5 CPU-minutes, ~14 % of that sample's QC), a few MB of memory and 3 GB of transient disk (an uncompressed copy of R1, removed at the end); it grows with the read count, and more CPUs do not shorten it
+- **Description**: Estimate each sample's sequencing coverage with Nonpareil 3.5.5 (k-mer mode, `-k 24 -X 10000 -n 1024`) on R1 of the clean reads (the input reads with `--quality_control false`): coverage (0-1), the sequence diversity index Nd and the read pairs needed for 95 % coverage. Outputs in `01_quality_control/nonpareil/<sample>/` and the summary's `samples_qc` and `nonpareil_curves`. Non-fatal: a sample whose run fails gets no values. What the values and the figure mean, and the cost (about 3 min and 5 CPU-minutes per 10 M read pairs): [manual, section 7.3](manual.md#73-quality-control-sequencing-coverage-and-taxonomy)
 - **Example**: `--nonpareil false`
 
 ### `--assembly_mode`
@@ -88,7 +88,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--coassembly_group_by`
 - **Type**: String (a column name)
 - **Default**: none (every sample in one co-assembly)
-- **Description**: Co-assemble the samples in groups: one co-assembly per distinct value of this column of `--sample_metadata` (the table the run summary reads: a `sample` column, or sample names in the first column; TSV, or CSV by its `.csv` extension). Each sample's reads are aligned to its own group's co-assembly only; binning, contig taxonomy and ARGs, geNomad, the functional branches and the summary run per group. A one-sample group is allowed (that sample's assembly, run in co-assembly mode). The group's label is the value with every character outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` replaced by `_` (`site 1` becomes `site_1`); its outputs go under `<stage>/coassembly/<label>/` (for example `04_binning/coassembly/site_1/`), and `pipeline_info/coassembly_groups.tsv` lists each sample's group. Stops at launch: without `--assembly_mode coassembly` or `--sample_metadata`; when the table has no such column; when a samplesheet sample has no row or no value (all such samples are listed); when two values give the same label or labels that differ only in letter case (`SiteA` and `sitea`: one folder on a case-insensitive filesystem), or a label is a sample id or `coassembly`, or does not start with a letter or digit. Rows for samples not in the samplesheet are ignored. Independent of `--summary_group_by`, which only groups the summary's figures (both may name the same column). Keep each group's samples in one run: a group split across runs (batches) is co-assembled once per run
+- **Description**: Co-assemble the samples in groups: one co-assembly per distinct value of this column of `--sample_metadata` (a `sample` column, or sample names in the first column; TSV, or CSV by its `.csv` extension). The group's label is the value with every character outside `A-Z`, `a-z`, `0-9`, `.`, `_` and `-` replaced by `_` (`site 1` becomes `site_1`); its outputs go under `<stage>/coassembly/<label>/`, and `pipeline_info/coassembly_groups.tsv` lists each sample's group. Stops at launch: without `--assembly_mode coassembly` or `--sample_metadata`; when the table has no such column; when a samplesheet sample has no row or no value (all such samples are listed); when two values give the same label or labels that differ only in letter case (`SiteA` and `sitea`: one folder on a case-insensitive filesystem); when a label breaks the sample-name rules ([manual, section 4](manual.md#input-requirements)) or is a sample id. Rows for samples not in the samplesheet are ignored. Independent of `--summary_group_by`, which only groups the summary's figures (both may name the same column). How each group is assembled and binned, and why a group's samples belong in one run: [manual, section 5.6](manual.md#56-assembly)
 - **Example**: `--sample_metadata samples.tsv --coassembly_group_by site`
 
 ### `--taxonomic_profiler`
@@ -101,24 +101,19 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--include_binning`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable metagenomic binning and refinement steps
+- **Description**: Enable metagenomic binning and refinement steps. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`
 - **Example**: `--include_binning true`
 
 ### `--binners`
 - **Type**: String (comma-separated)
 - **Default**: `semibin`
 - **Options**: Any combination of `comebin`, `semibin`, `metabat2` (at least one required)
-- **Description**: Selects which binning tools to run. When ≥2 binners are specified, Binette bin refinement is automatically enabled. When only one binner is selected, refinement is skipped and the binner's output is used directly.
-- **Examples**:
-  - `--binners semibin` — single fast binner, no refinement (default)
-  - `--binners semibin,metabat2` — two binners + Binette refinement
-  - `--binners semibin,metabat2,comebin` — all three binners + Binette refinement
-- **Note**: Only takes effect when `--include_binning true` is set. COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 (see the manual, Binning Options)
+- **Description**: Binners to run with `--include_binning`; two or more enable Binette refinement. Full entry under [Binning Parameters](#--binners-1); which binners to choose, and what COMEBin costs: [manual, Binner Selection](manual.md#binner-selection)
 
 ### `--multisample_binning`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Multi-sample binning of per-sample assemblies: MetaBAT2 bins each assembly with one depth column per sample of its group (`--multisample_group_by`, or the whole run). Each sample is aligned once more (bwa-mem3, with the per-sample alignment's identity and length filters) to the concatenation of its group's assemblies, whose contigs are named `<sample>:<contig>`; the concatenation's depth table is split back per assembly for MetaBAT2. SemiBin2 keeps its pre-trained model and COMEBin its coverage on the sample's own BAM, and everything else that reads the per-sample alignment (the MAG depth, featureCounts, BlobTools) is unchanged: the concatenation's depths are competitive (a read from a genome assembled in several samples counts on one copy only) and are not abundance. A group with one sample in the samplesheet is binned as without the option (a group that QC leaves with one sample still goes through the concatenation, with that sample alone). Cost: one extra alignment per sample, against a reference that grows with the group; a launch warning when a group has more than 20 samples (index memory: 2.3 GB for 252 Mbp; a genome assembled in k samples has its reads split k ways). Needs `--assembly_mode assembly` (a co-assembly already gives MetaBAT2 one depth column per sample), `--include_binning`, `metabat2` in `--binners` and `--read_aligner bwamem3`; rejected at launch otherwise. Nothing new is published apart from `pipeline_info/multisample_groups.tsv` with `--multisample_group_by`. On 4 samples (Phase 18a benchmark, `docs/benchmarks/multisample_binning_2026.md`): CheckM2 high-quality refined bins 27 → 29, MIMAG high 3 → 4, the same 31 species, for ~40 % more alignment-plus-binning CPU (COMEBin on the group's BAMs was measured in Phase 18b and gave no reliable gain in the refined bins)
+- **Description**: Multi-sample binning of per-sample assemblies: MetaBAT2 bins each assembly with one depth column per sample of its group (`--multisample_group_by`, or the whole run), from one extra bwa-mem3 alignment of each sample to the concatenation of its group's assemblies. SemiBin2, COMEBin, the MAG depth, featureCounts and BlobTools keep the sample's own alignment. Needs `--assembly_mode assembly`, `--include_binning`, `metabat2` in `--binners` and `--read_aligner bwamem3`; rejected at launch otherwise. A launch warning when a group has more than 20 samples. Nothing new is published apart from `pipeline_info/multisample_groups.tsv` with `--multisample_group_by`. How it works, what it gained in the benchmark and what it costs: [manual, section 5.7](manual.md#57-binning)
 - **Example**: `--include_binning true --binners semibin,metabat2 --multisample_binning true`
 
 ### `--multisample_group_by`
@@ -130,25 +125,25 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--dereplicate_mags`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run-level dereplication of the refined MAGs and their abundance in every sample. galah 0.6.2 (skani 0.4.0) clusters the refined MAGs of every assembly of the run at `--dereplicate_ani` and picks each cluster's representative by completeness − 5 × contamination (`--quality-formula completeness-5contamination`, from Binette's CheckM2 reports; the MAGs below `--bin_min_completeness` / above `--bin_max_contamination` are left out, as Binette leaves them out). CoverM 0.8.0 `genome` then maps each sample's clean read pairs to the representatives (strobealign, reads at ≥ 97 % identity, every representative reported) for its relative abundance (% of the sample's reads, with an `unmapped` row), mean and trimmed mean depth and covered fraction. Outputs in `04_binning/dereplicated/`: `mag_clusters.tsv` (assembly, bin, genome = `<assembly>_<bin>`, representative), `representatives/<assembly>_<bin>.fa` and `abundance/<sample>_coverm_genome.tsv`; the summary gains `mag_clusters` and `mag_cluster_abundance`. With or without `--multisample_binning`, in either assembly mode. Needs `--include_binning` and at least two `--binners` (rejected at launch otherwise). **The clusters and the abundance cover this run's samples only**: a study processed in several runs dereplicates its MAGs downstream, from the merged results. Cost on 4 samples (Phase 18a): galah seconds, CoverM ~1.3 CPU-hours and ~14 GB in all
+- **Description**: Run-level dereplication of the refined MAGs and their abundance in every sample. galah 0.6.2 (skani 0.4.0) clusters the refined MAGs of every assembly of the run at `--dereplicate_ani` and keeps one representative per cluster, chosen by completeness − 5 × contamination (`--quality-formula completeness-5contamination`, from Binette's CheckM2 reports; the MAGs below `--bin_min_completeness` / above `--bin_max_contamination` are left out, as Binette leaves them out). CoverM 0.8.0 `genome` then gives each representative's abundance in every sample. Outputs in `04_binning/dereplicated/` (`mag_clusters.tsv`, `representatives/`, `abundance/`); the summary gains `mag_clusters` and `mag_cluster_abundance`. **The clusters cover this run's samples only.** Either assembly mode, with or without `--multisample_binning`; needs `--include_binning` and at least two `--binners` (rejected at launch otherwise). How it works and what it costs: [manual, section 5.7](manual.md#57-binning)
 - **Example**: `--include_binning true --binners semibin,metabat2 --dereplicate_mags true`
 
 ### `--dereplicate_ani`
 - **Type**: Number (80-100)
 - **Default**: `95`
-- **Description**: Average nucleotide identity (%) at which `--dereplicate_mags` clusters MAGs: 95 for species, 99 for strains (galah `--ani`; below 90 its 90 % pre-clustering is lowered to the same value). In the Phase 18a benchmark, 99 split one species of four samples' MAGs into two clusters
+- **Description**: Average nucleotide identity (%) at which `--dereplicate_mags` clusters MAGs: 95 for species, 99 for strains (galah `--ani`; below 90 its 90 % pre-clustering is lowered to the same value). In the [multi-sample binning benchmark](benchmarks/multisample_binning_2026.md), 99 split one species of four samples' MAGs into two clusters
 - **Example**: `--dereplicate_ani 99`
 
 ### `--gunc_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Check each assembly's refined MAGs (Binette's, or the single binner's bins) for chimerism with GUNC 1.1.1 (DIAMOND 2.1.24, Prodigal 2.6.3) against `--gunc_db`. GUNC maps the MAG's genes to its reference and scores, at the taxonomic level where they split the most, how cleanly they separate into clades by contig (the clade separation score): it finds chimeras across distant lineages that CheckM2's completeness and contamination can miss. Needs `--include_binning` (rejected at launch otherwise); an assembly without refined bins is skipped with a warning. GUNC's maxCSS-level table goes to `04_binning/<per_sample/<sample> | coassembly[/<group>]>/quality/gunc/<assembly>_gunc_maxCSS_level.tsv`, and the summary's `mags` table gains `gunc_pass`, `clade_separation_score`, `contamination_portion` and `reference_representation_score`. A GUNC fail flags the MAG and does not change its MIMAG `quality_tier`. Cost in the Phase 16 harness: 15-35 min, ~9 GB and ~7 busy CPUs per assembly of 6-36 MAGs (8 CPUs, 16 GB requested)
+- **Description**: Check each assembly's refined MAGs (Binette's, or the single binner's bins) for chimerism with GUNC 1.1.1 (DIAMOND 2.1.24, Prodigal 2.6.3) against `--gunc_db`. Needs `--include_binning` (rejected at launch otherwise); an assembly without refined bins is skipped with a warning. GUNC's maxCSS-level table goes to `04_binning/<per_sample/<sample> | coassembly[/<group>]>/quality/gunc/<assembly>_gunc_maxCSS_level.tsv`, and the summary's `mags` table gains `gunc_pass`, `clade_separation_score`, `contamination_portion` and `reference_representation_score`. A GUNC fail flags the MAG and does not change its MIMAG `quality_tier`. What the scores mean: [manual, section 7.5](manual.md#75-mags); cost (8 CPUs and 16 GB requested; 15-35 min and ~9 GB per assembly measured): manual, section 5.7
 - **Example**: `--gunc_prediction true --custom_gunc_db /shared/databases/gunc/gunc_db_progenomes2.1.dmnd`
 
 ### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 6.12)
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/`; what they hold: [manual, section 7.4](manual.md#74-read-level-arg-outputs); cost: manual, section 5.4
 - **Example**: `--args_oap_prediction true`
 - **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
 
@@ -172,25 +167,25 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level taxonomy and ARG prediction. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#69-contig-taxonomy-genomad-and-deeparg-options)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
+- **Description**: Enable contig-level taxonomy and ARG prediction. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`. Metabuli 1.2.0 classifies every contig against `--metabuli_db` (score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`); BlobTools turns its calls and the read coverage into the contig tables and the phylum blob plot; DeepARG predicts ARGs on the proteins of the shared Pyrodigal gene calling (`07_functional_annotation/gene_calling/`, the gene set `--contig_level_functional` uses too). The combined table is `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` ([its columns](manual.md#76-contig-taxonomy-and-arg-table)); how it works and what it costs: [manual, section 5.8](manual.md#58-contig-taxonomy-deeparg-genomad-and-checkv). Contig taxonomy no longer uses BLAST against NCBI nt: `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
 - **Example**: `--contig_tax_and_arg true --custom_metabuli_db /shared/databases/metabuli/refseq_standard`
 
 ### `--genomad_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 (nf-core `genomad/endtoend`, end-to-end with `--cleanup`), against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/` (`genomad/coassembly/<group>/` with `--coassembly_group_by`). With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `mobile_class`, `plasmid_score`, `virus_score`, `provirus` (provirus regions overlapping the ARG gene), `virus_taxonomy` and `plasmid_conjugation_genes`, and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. geNomad's plasmid class also takes integrative conjugative elements and transposon cargo. Cost in the Phase 9c benchmark: 1.1-5.5 CPU-h and ~18 GB per assembly (`process_medium`)
+- **Description**: Classify each assembly's contigs as chromosome, plasmid or virus and find proviruses with geNomad 1.13.0 against `--genomad_db` (1.9, a 0.84 GB download). Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Results in `06_contig_taxonomy/genomad/<sample>/` (`genomad/coassembly/<group>/` with `--coassembly_group_by`). With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains the geNomad columns ([manual, section 7.6](manual.md#76-contig-taxonomy-and-arg-table)) and `00_summary/tables/arg_contig_mobile.tsv` counts ARG genes per class on plasmid and virus contigs and in proviruses. Cost: [manual, section 5.8](manual.md#58-contig-taxonomy-deeparg-genomad-and-checkv) (~18 GB and 1.1-5.5 CPU-hours per assembly)
 - **Example**: `--genomad_prediction true --custom_genomad_db /shared/databases/genomad_db`
 
 ### `--checkv_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Estimate the quality of geNomad's virus calls with CheckV 1.1.1 (`end_to_end`; DIAMOND 2.1.8, HMMER 3.4) against `--checkv_db`: each assembly's whole virus contigs and the provirus regions geNomad found inside contigs (its `<assembly>_filtered_contigs_virus.fna.gz`) get a completeness (from amino-acid identity to CheckV's genomes, else from its HMMs), host contamination, closed-genome evidence and a quality tier (`Complete`, `High-quality`, `Medium-quality`, `Low-quality`, `Not-determined`). Needs `--genomad_prediction` (rejected at launch otherwise). Results in `06_contig_taxonomy/checkv/<sample>/<sample>_checkv/` (co-assembly: `checkv/coassembly/coassembly_checkv/`, or `checkv/coassembly/<group>/<group>_checkv/` with `--coassembly_group_by`; `quality_summary.tsv`, `completeness.tsv`, `contamination.tsv`, `complete_genomes.tsv`, `viruses.fna`, `proviruses.fna`); an assembly without virus calls gets a header-only `quality_summary.tsv`. With `--contig_tax_and_arg` too, `Contig_tax_and_arg_prediction.tsv` gains `checkv_quality`, `checkv_completeness`, `checkv_contamination` and `checkv_provirus` (for virus contigs, and for ARG genes inside proviruses, one value per overlapping region), and `00_summary/tables/arg_contig_mobile.tsv` counts the ARG genes on virus contigs and in proviruses by CheckV tier. CheckV only reads its database. Cost in the Phase 16 harness: 0.6-6.6 min and 1.6-2.5 GB per assembly (8 CPUs, 8 GB requested)
+- **Description**: Estimate the quality of geNomad's virus calls with CheckV 1.1.1 (`end_to_end`; DIAMOND 2.1.8, HMMER 3.4) against `--checkv_db`: completeness, host contamination and a quality tier for each assembly's virus contigs and geNomad's provirus regions. Needs `--genomad_prediction` (rejected at launch otherwise). Results in `06_contig_taxonomy/checkv/<sample>/<sample>_checkv/` (co-assembly: `checkv/coassembly/coassembly_checkv/`, or `checkv/coassembly/<group>/<group>_checkv/` with `--coassembly_group_by`); an assembly without virus calls gets a header-only `quality_summary.tsv`. With `--contig_tax_and_arg` too, the contig table gains the `checkv_*` columns and `arg_contig_mobile.tsv` counts ARG genes on virus contigs and in proviruses by tier. CheckV only reads its database. The tiers and the cost (8 CPUs and 8 GB requested): [manual, section 5.8](manual.md#58-contig-taxonomy-deeparg-genomad-and-checkv)
 - **Example**: `--genomad_prediction true --checkv_prediction true --custom_checkv_db /shared/databases/checkv/checkv-db-v1.5`
 
 ### `--contig_level_functional`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable the contig-level functional annotation branch: shared Pyrodigal gene calling on contigs (published to `07_functional_annotation/gene_calling/`), eggNOG-mapper v3 annotation of the predicted proteins (published to `07_functional_annotation/eggnog/`), run_dbcan v5 CAZy annotation of the same proteins (on by default, `--functional_cazy`; published to `07_functional_annotation/dbcan/`), per-gene abundance quantification with featureCounts over the gene coordinates (published to `07_functional_annotation/gene_abundance/`, per sample in both assembly modes; multi-mapping policy via `--featurecounts_multimap`), MicrobeCensus average genome size estimation for CPGE normalization (on by default, `--microbecensus`), and study-level aggregation into TPM and copies-per-genome-equivalent tables per functional ontology (KO, COG, EC, Pfam, CAZy — plus the dbCAN CAZy calls as a separate backend) with an annotated-fraction report and AGS summary (published to `07_functional_annotation/summary/`). Downloads the eggNOG 7 database (~44 GB) and the dbCAN database (~7.4 GB) on first use. Requires an assembly (`--assembly_mode assembly` or `coassembly`). Runs on every container engine: singularity/apptainer use the official eggNOG-mapper 3.0.0-beta6 Apptainer image, docker/podman and the cloud profiles use the pipeline-built `ghcr.io/gene2dis/bugbuster-eggnog-mapper` image of the same version (see the container note in the manual). Memory: the eggNOG-mapper search peaked at ~80 GB on a real 5-sample co-assembly — see [Functional annotation branches](manual.md#functional-annotation-branches) in the manual for observed per-step requirements
+- **Description**: Enable the contig-level functional annotation branch: the shared Pyrodigal gene calling, eggNOG-mapper v3 annotation of the predicted proteins, run_dbcan v5 CAZy annotation (`--functional_cazy`, on by default), featureCounts per-gene read counts (`--featurecounts_multimap`), MicrobeCensus average genome size (`--microbecensus`, on by default) and study-level TPM and copies-per-genome-equivalent tables per ontology (KO, COG, EC, Pfam, CAZy, with dbCAN's CAZy calls as a separate backend). Outputs under `07_functional_annotation/` ([manual, section 7.7](manual.md#77-functional-annotation-tables)). Downloads eggNOG 7 (~44 GB) and dbCAN (~7.4 GB) on first use. Needs an assembly (`--assembly_mode assembly` or `coassembly`; rejected at launch otherwise). Runs on every container engine (image note in [manual, section 5.9](manual.md#59-contig-and-mag-functional-annotation)). The eggNOG-mapper search requests 96 GB (~80 GB peak on a real co-assembly): see [Functional annotation branches](manual.md#functional-annotation-branches)
 - **Example**: `--contig_level_functional true`
 
 ### `--mag_level_functional`
@@ -203,24 +198,22 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: String
 - **Default**: `none`
 - **Options**: `woltka`, `superfocus`, `humann`, `none`
-- **Description**: Optional read-level functional profiling of the host-removed reads, one backend per run (validated at launch). `woltka`: Bowtie2 alignment against the Web of Life release 2 genomes (WoLr2) with the SHOGUN multi-hit settings, Woltka ORF classification (a read is assigned to an ORF when ≥ 80 % of it lies inside; mates count separately; a read whose reported alignments — up to 16 within the score threshold — hit k ORFs counts 1/k toward each unless `--woltka_uniq`), then per-function read counts and RPK for KO, EC (via KO), COG functional categories (via KO; WoLr2's COG ids mapped with the `--cog_db` table, as in the contig branch), Pfam families (by name, as in the contig branch; the versioned accession is kept in `description`) and MetaCyc pathways — each read counted once toward each distinct term of its ORF. Per-sample tables go to `07_functional_annotation/reads/woltka/<sample>/`; study-level `read_function_abundance.tsv` (same schema as the contig branch, `source = reads`, native unit = reads, plus CPGE from MicrobeCensus), `read_function_wide_<ontology>_{native,cpge}.tsv`, `read_annotated_fraction.tsv` and `read_sample_summary.tsv` go to `07_functional_annotation/summary/`. Reported **separately** from the assembly-based tables, never merged (read-level profiling recovers the unassembled fraction but over-predicts). Needs no assembly (works with `--assembly_mode none`) and runs on any container engine. Downloads the WoLr2 subset (~94 GB, `--woltka_db`) on first use unless `--custom_woltka_db` is given; the alignment needs **≥ 68 GB RAM** per task (the WoLr2 index requirement)
-  `superfocus`: SUPER-FOCUS 1.8 against its DB_90 SEED subsystem cluster database with DIAMOND blastx (default) or MMseqs2 (`--superfocus_aligner`). Each sample's R1, R2 and singleton reads are concatenated into one query (mates count separately); a read's equal-best-e-value hits passing the SUPER-FOCUS defaults (≥ 60 % identity, ≥ 15 aa, e-value ≤ 1e-5; `SUPERFOCUS` `ext.args`) are counted, each read with a hit contributing exactly 1, divided 1/k across the k distinct SEED (subsystem, function) assignments of its best hits. The pipeline sums these to SEED subsystem levels 1–3 (ontologies `seed_level1`, `seed_level2`, `seed_level3`, path-qualified accessions `L1` / `L1 | L2` / `L1 | L2 | L3`); SEED is never mapped to KO or EC. Per-sample tables go to `07_functional_annotation/reads/superfocus/<sample>/`; the same `read_*` summary tables are written, with only the three `read_function_wide_seed_level{1,2,3}_native.tsv` matrices — **no CPGE** (a SEED hit has no gene length, so no RPK; `cpge_status = not_applicable`, AGS/GE still reported). Downloads the DB_90 archive for the selected aligner only (~0.74 GB DIAMOND / ~0.9 GB MMseqs2, `--superfocus_db`) unless `--custom_superfocus_db` is given; runs on any container engine
-  `humann`: HUMAnN 4.0.0a2 (an **alpha** release, pinned exactly) with its MetaPhlAn 4.1.2 prescreen against the MetaPhlAn database `mpa_vOct22_CHOCOPhlAnSGB_202403` (the only one this HUMAnN version accepts), nucleotide search against the prescreened ChocoPhlAn pangenomes, then translated search of the remaining reads against UniRef90 (EC-filtered, the only protein database HUMAnN 4 offers). Each sample's R1, R2 and singleton reads are concatenated into one input (mates count separately). HUMAnN runs with `--count-normalization RPKs`; the pipeline reports MetaCyc pathway abundance (`metacyc`) and regroups the gene families to KO (`ko`, UniRef90 families only — UniClust90 families never map to a KO) and level-4 EC (`ec`) itself, a family carrying several terms contributing its full RPK to each. KO tables are sparse: HUMAnN 4.0.0a2 ships a legacy UniRef90→KO map, and on the nf-core test reads only 17–18 % of the gene-family abundance mapped to a KO (EC 39–61 %); the per-ontology share is reported in `read_annotated_fraction.tsv`. `abundance_native` is RPK (`native_unit = rpk`) and CPGE = RPK / genome equivalents. Per-sample HUMAnN tables (`_1_metaphlan_profile`, `_2_genefamilies`, `_3_reactions`, `_4_pathabundance`, log) go to `07_functional_annotation/reads/humann/<sample>/`, with the same `read_*` summary tables (six wide matrices: ko/ec/metacyc × native/cpge). Sample names must not contain `s__` or `t__` (a HUMAnN 4.0.0a2 defect; rejected at launch). Downloads ~71 GB (`--humann_db v4_alpha-full`) or ~33 GB (`v4_alpha-ec_filtered`) unless `--custom_humann_db` is given; runs on any container engine; the MetaPhlAn prescreen loads a ~20 GB Bowtie2 index (HUMAnN peaked at ~23.5 GB per sample on the test data; see [Functional annotation branches](manual.md#functional-annotation-branches))
+- **Description**: Read-level functional profiling of the host-removed reads, one backend per run (validated at launch): `woltka` (Bowtie2 against the Web of Life release 2 genomes, then Woltka: KO, EC, COG category, Pfam and MetaCyc read counts, with copies per genome equivalent), `superfocus` (SUPER-FOCUS 1.8 against DB_90 with DIAMOND or MMseqs2, `--superfocus_aligner`: SEED subsystem levels 1-3 read counts, no copies per genome equivalent) or `humann` (HUMAnN 4.0.0a2, an alpha release, with a MetaPhlAn 4.1.2 prescreen: MetaCyc pathways, KO and EC in RPK, with copies per genome equivalent; its KO tables are sparse). Needs no assembly (works with `--assembly_mode none`); runs on any container engine. Per-sample tables in `07_functional_annotation/reads/<backend>/<sample>/`, study-level `read_*` tables in `07_functional_annotation/summary/`, reported **separately** from the assembly-based tables, never merged. Downloads WoLr2 (~94 GB), DB_90 for the selected aligner (~0.74 GB DIAMOND / ~0.9 GB MMseqs2) or the HUMAnN databases (~71 GB, or ~33 GB with `--humann_db v4_alpha-ec_filtered`) unless the matching `--custom_*` is given; the Woltka alignment needs **≥ 68 GB RAM**. How each backend counts reads, and its caveats: [manual, section 5.5](manual.md#55-read-level-functional-profiling); its tables: [manual, section 7.7](manual.md#77-functional-annotation-tables)
 - **Note**: Independent of `--contig_level_functional` and `--mag_level_functional` — all three can be enabled in the same launch. MicrobeCensus then runs once per sample and feeds the CPGE of both the contig and the read tables, and the read tables stay in their own `read_*` files.
 - **Example**: `--read_level_functional woltka --custom_woltka_db /shared/databases/wol2`; `--read_level_functional superfocus --custom_superfocus_db /shared/databases/superfocus`; `--read_level_functional humann --custom_humann_db /shared/databases/humann`
 
 ### `--arg_bin_clustering`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable bin-level ARGs and their clustering for horizontal gene transfer inference. Requires `--include_binning`. The ARGs are DEEPARG_CONTIGS' hits on the whole assembly (shared Pyrodigal proteins) split by refined bin (`BIN_ARG_SPLIT`), not a DeepARG run per bin: DeepARG min-max scales its features over its input file, so per-bin runs gave probabilities that depended on the bin (Phase 9a, M8). Per-bin hits and proteins in `05_arg_prediction/bin_level/{deeparg,proteins}/<sample>/`, the ARG proteins per bin (the clustering input, headers `<gene>_from_<sample>_<bin>_gene_<ARG>_ARG_class_<class>`) in `bin_level/arg_fasta/<sample>/`, MMseqs2 clusters in `bin_level/clustering/`
+- **Description**: Enable bin-level ARGs and their clustering for horizontal gene transfer inference. Requires `--include_binning`. The ARGs are DEEPARG_CONTIGS' hits on the whole assembly (shared Pyrodigal proteins) split by refined bin (`BIN_ARG_SPLIT`), not a DeepARG run per bin: DeepARG min-max scales its features over its input file, so per-bin runs gave probabilities that depended on the bin. Per-bin hits and proteins in `05_arg_prediction/bin_level/{deeparg,proteins}/<sample>/`, the ARG proteins per bin (the clustering input, headers `<gene>_from_<sample>_<bin>_gene_<ARG>_ARG_class_<class>`) in `bin_level/arg_fasta/<sample>/`, MMseqs2 clusters in `bin_level/clustering/`
 - **Example**: `--arg_bin_clustering true`
 
 ### `--min_read_sample`
 - **Type**: Integer
 - **Default**: `0`
 - **Minimum**: `0`
-- **Description**: Minimum number of reads required per sample after QC filtering. Samples below this threshold are excluded.
-- **Example**: `--min_read_sample 10000000`
+- **Description**: Minimum number of reads per sample after fastp filtering, counted as single reads: R1 + R2 of the paired files (fastp's `after_filtering` total), so twice the read pairs; singleton reads do not count. Samples below it are dropped with a warning before decontamination. `0` disables the filter. Only with `--quality_control true` (the default): the filter is part of the QC step. Not the unit of the summary's `--summary_min_clean_pairs`, which counts read pairs after decontamination.
+- **Example**: `--min_read_sample 20000000` (keeps samples with at least 10 M read pairs after fastp)
 
 ---
 
@@ -248,7 +241,8 @@ Complete reference for all BugBuster pipeline parameters.
 - **Options**: `standard-8`, `gtdb_220`
 - **Description**: Kraken2 database selection
 - **Size**: 7.5 GB (standard-8), 497 GB (gtdb_220)
-- **Example**: `--kraken2_db gtdb_220`
+- **Memory**: `KRAKEN2` needs about 1.1 × the size of the database's `hash.k2d` + 2 GB of RAM, capped by `--max_memory` (default 128 GB): `gtdb_220` needs a node with several hundred GB of RAM ([KRAKEN2 is killed ...](troubleshooting.md#kraken2-is-killed-exit-137-or-runs-for-hours-with-a-large-kraken2-database))
+- **Example**: `--kraken2_db standard-8`
 
 ### `--sourmash_db`
 - **Type**: String
@@ -410,7 +404,7 @@ Override automatic downloads by providing custom database paths:
 
 ### `--custom_host_fasta`
 - **Type**: String (file path)
-- **Description**: Path to a custom host genome FASTA, plain or gzipped (e.g. a non-human host), or a comma-separated list of them (spaces around the commas are ignored; paths may not contain commas or spaces). The pipeline builds one decontamination index (`--read_aligner`) from them and the phiX genome. The bwa-mem3 build requests ~24 GB RAM per Gbp of genome, capped by `--max_memory`, and the launch memory warning covers only the built-in `--host_db`, so size `--max_memory` yourself for large or several genomes. See [`YAML_PARAMETERS_GUIDE.md`](YAML_PARAMETERS_GUIDE.md)
+- **Description**: Path to a custom host genome FASTA, plain or gzipped (e.g. a non-human host), or a comma-separated list of them (spaces around the commas are ignored; paths may not contain commas or spaces). The pipeline builds one decontamination index (`--read_aligner`) from them and the phiX genome. The bwa-mem3 build requests ~24 GB RAM per Gbp of genome, capped by `--max_memory`, and the launch memory warning covers only the built-in `--host_db`, so size `--max_memory` yourself for large or several genomes. See [Multiple Host Genomes in a Params File](DECONTAMINATION_QUICK_REFERENCE.md#multiple-host-genomes-in-a-params-file)
 - **Example**: `--custom_host_fasta /path/to/mouse_genome.fa` or `--custom_host_fasta /path/to/human.fa.gz,/path/to/mouse.fa.gz`
 
 > **Removed**: the old `--custom_phiX_index` and `--custom_bowtie_host_index` parameters no longer exist (passing them aborts the run) — use `--custom_decontamination_index`, `--custom_phiX_fasta`, or `--custom_host_fasta` instead.
@@ -613,21 +607,8 @@ FastP's filters below; the switches are `--quality_control` and `--nonpareil` (s
 - **Example**: `--sylph_read_seq_id 99.5` (typical Illumina)
 
 ### Sylph outputs
-Sylph runs with sylph's defaults plus `-u` (estimate the unknown fraction) and
-`--read-seq-id` when `--sylph_read_seq_id` is set. Per sample it publishes the genome
-profile and the sylph-tax lineage profile under `02_taxonomy/sylph/`. The
-`02_taxonomy/tables/` set holds:
-
-- `sylph_<db>_otu_table.tsv`: sylph's **relative (taxonomic) abundance** of each
-  genome (`t__` accession), coverage-normalised, MetaPhlAn-like; this is the
-  table behind the plots and the phyloseq objects
-- `sylph_<db>_read_counts.tsv`: **estimated read pairs per genome**,
-  `sequence_abundance / 100 × the read pairs given to sylph`. With `-u`,
-  `sequence_abundance` is the genome's share of all input reads (unknown
-  included), so the column sums to the classified pairs
-- The `Classified` column of `Reads_report_taxonomy.csv` (`Reads_report.csv` with the
-  profiler's columns added) is the sum of `sequence_abundance / 100`
-  (capped at 1.0); see `--sylph_read_seq_id` when it looks too high
+The sylph tables (relative abundance, estimated read pairs per genome, the `Classified`
+column) are explained in the manual, [section 7.3](manual.md#taxonomy-tables-02_taxonomytables).
 
 ---
 
@@ -660,7 +641,7 @@ The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level 
 ARGs-OAP), read functional and MicrobeCensus results, and the assembly-based stages, into TSV tables, an Excel
 workbook, figures (PDF, SVG, PNG and their values as CSV), a multi-page offline HTML report (`report/`), the same
 report as a PDF (`results_summary.pdf`), a `README.md` and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
-clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.17, for how the results are reported.
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 7.2, for how the results are reported.
 
 ### `--results_summary`
 - **Type**: Boolean
@@ -801,6 +782,7 @@ The switches are under [Pipeline Execution Parameters](#pipeline-execution-param
   include_binning: true
   binners: "semibin,metabat2"
   ```
+- **Note**: COMEBin runs on CPU only and is costly: 38 CPU-hours on a 37 Mbp assembly, about 370 times SemiBin2 ([manual, Binner Selection](manual.md#binner-selection))
 
 #### `--metabat_minContig`
 - **Type**: Integer
@@ -917,14 +899,14 @@ The switches are under [Pipeline Execution Parameters](#pipeline-execution-param
 - **Type**: Number
 - **Default**: `0.2`
 - **Range**: 0-1
-- **Description**: Metabuli `--min-score`: minimum sequence similarity score for a contig to be classified. Chosen with `--metabuli_min_sp_score` in the Phase 9c benchmark: without cutoffs Metabuli classified ~97 % of contigs, but its low-score calls mostly disagreed with BLAST against nt
+- **Description**: Metabuli `--min-score`: minimum sequence similarity score for a contig to be classified. Chosen with `--metabuli_min_sp_score` in the [contig classifiers benchmark](benchmarks/contig_classifiers_2026.md): without cutoffs Metabuli classified ~97 % of contigs, but its low-score calls mostly disagreed with BLAST against nt
 - **Example**: `--metabuli_min_score 0.3`
 
 ### `--metabuli_min_sp_score`
 - **Type**: Number
 - **Default**: `0.5`
 - **Range**: 0-1
-- **Description**: Metabuli `--min-sp-score`: minimum score for a species-level (or lower) call; below it the call moves to genus or higher (below 0.5, species calls agreed with BLAST 15-44 % of the time in Phase 9c)
+- **Description**: Metabuli `--min-sp-score`: minimum score for a species-level (or lower) call; below it the call moves to genus or higher (below 0.5, species calls agreed with BLAST 15-44 % of the time in the [contig classifiers benchmark](benchmarks/contig_classifiers_2026.md))
 - **Example**: `--metabuli_min_sp_score 0.6`
 
 ---
@@ -1176,7 +1158,7 @@ Every task's request is capped at these values. With the local executor, `max_cp
 `-params-file` to change both. A `-c` config file that sets them in `params {}` changes the
 per-task caps but not the pool, so it must also set `executor { cpus = ...; memory = ... }`.
 Otherwise a task asking for more than the pool fails with `Process requirement exceeds
-available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
+available CPUs` (or `memory`); see manual §11.1. `-profile test` sets 2 CPUs / 6 GB / 6 h.
 
 ### `--max_cpus`
 - **Type**: Integer
@@ -1218,7 +1200,7 @@ available CPUs` (or `memory`); see manual §10.1. `-profile test` sets 2 CPUs / 
 
 ## Cloud & HPC Profile Parameters
 
-These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The `--*_workdir` parameter of the chosen cloud profile is **required** — the pipeline exits immediately with an error if it is missing.
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage, given with its `--*_workdir` parameter (`--aws_workdir s3://my-bucket/work`, `--gcp_workdir gs://…`, `--azure_workdir az://…`); without it the pipeline exits at launch with an error. Give the parameter even when you also pass Nextflow's `-work-dir`: the launch check does not yet recognise a cloud `-work-dir` on its own.
 
 ### AWS Batch (`-profile aws`)
 

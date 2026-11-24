@@ -118,7 +118,7 @@
                 "mag_level_functional": {
                     "type": "boolean",
                     "default": false,
-                    "description": "Enable MAG-level functional annotation: Bakta annotation of every refined bin (per-bin GFF3/GBFF/FAA/FNA/TSV). Requires --include_binning and at least two --binners, so that only MetaWRAP quality-filtered bins are annotated. Bins are expected to be bacterial.",
+                    "description": "Enable MAG-level functional annotation: Bakta annotation of every refined bin (per-bin GFF3/GBFF/FAA/FNA/TSV). Requires --include_binning and at least two --binners, so that only Binette-refined bins that pass the completeness and contamination filter are annotated. Bins are expected to be bacterial.",
                     "fa_icon": "fas fa-sitemap"
                 },
                 "read_level_functional": {
@@ -159,7 +159,7 @@
                     "type": "integer",
                     "default": 0,
                     "minimum": 0,
-                    "description": "Minimum number of reads required per sample after QC filtering.",
+                    "description": "Minimum reads per sample after fastp, counted as single reads (R1 + R2 of the paired files, twice the read pairs; singletons not counted). Samples below it are dropped. 0 disables the filter. Only with --quality_control true.",
                     "fa_icon": "fas fa-sort-numeric-up"
                 },
                 "rgi_prediction": {
@@ -482,7 +482,7 @@
                 },
                 "custom_rgi_wildcard": {
                     "type": "string",
-                    "description": "Path to a WildCARD variants archive to combine with the CARD database.",
+                    "description": "Path to a WildCARD directory (the variants download, decompressed: no .gz files) to combine with --custom_rgi_card_db.",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },
@@ -1251,7 +1251,7 @@
             "title": "Results summary options",
             "type": "object",
             "fa_icon": "fas fa-clipboard-list",
-            "description": "Run-level summary in 00_summary/: TSV tables, Excel workbook, figures, a self-contained HTML report, a README (Markdown and DOCX) and LLM_GUIDE.md of the QC, taxonomy, read-level ARG (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus results. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
+            "description": "Run-level summary in 00_summary/: tables, Excel workbook, figures, HTML and PDF reports, README and LLM guide of every stage that ran. The same script (bin/results_summary.py) merges several finished results directories outside the pipeline.",
             "properties": {
                 "results_summary": {
                     "type": "boolean",

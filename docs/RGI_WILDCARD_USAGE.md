@@ -121,8 +121,11 @@ wildcard_directory/
 └── ... (other variant files)
 ```
 
-The k-mer files must match `--rgi_kmer_size` (61 by default); the database step
-fails when they are missing.
+The k-mer files must match `--rgi_kmer_size` (61 by default). When they are
+missing the database step still succeeds (it warns that the k-mer database is not
+loaded), and the pathogen-of-origin step is skipped with a warning; `rgi bwt` and
+its reports still run, and the summary reports the samples' RGI hosts as
+`no_kmer_data`.
 
 **Note:** The files must be decompressed (`gunzip *.gz` first): this path passes the directory to `rgi wildcard_annotation` as is. Only the automatic download decompresses WildCARD.
 
@@ -238,51 +241,9 @@ nextflow run main.nf \
 
 ## Troubleshooting
 
-### Issue: WildCARD Processing Fails
-
-**Symptom**: Error during `rgi wildcard_annotation`
-
-**Solutions:**
-1. Ensure WildCARD files are decompressed
-2. Check CARD and WildCARD versions match
-3. Verify `index-for-model-sequences.txt` exists
-
-### Issue: Version Mismatch
-
-**Symptom**: "Version mismatch between CARD and WildCARD"
-
-**Solution:**
-```bash
-# Check CARD version
-python3 -c "import json; print(json.load(open('/path/to/card_database/card.json'))['_version'])"
-
-# Check WildCARD version
-grep "version" /path/to/wildcard/index-for-model-sequences.txt
-
-# Download matching versions
-```
-
-### Issue: Insufficient Disk Space
-
-**Symptom**: Pipeline fails during WildCARD processing
-
-**Solution:**
-- Ensure at least 100 GB free space in work directory
-- Use `--databases_dir` to specify location with sufficient space
-- Consider using CARD-only mode if space is limited
-
-**Symptom**: the work directory grows by tens of GB per sample during `RGI_BWT`, or a task takes hours
-
-RGI writes every read the aligner reports, placed on a reference or not, to its SAM and builds its BAMs and
-read table from it (RGI 6.0.3 then scanned that table once per reference sequence with reads; 6.0.8 loads it
-into memory, ~1 KB per read). `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads
-placed on a reference (well under 1% of a metagenome), and with `--clean`, which removes the temporary files
-when the task ends. With bowtie2 and bwa the tables are those of an unfiltered run. With KMA the kept reads
-are also grouped by name, so that `samtools fixmate` (RGI 6.0.8) pairs every mate pair: the Mate Pair Linkage
-columns are filled in, and an unmapped mate is not counted as a read "with flanking sequence" (as in RGI
-6.0.3), where an unfiltered run would count some, in an order that changes between runs. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
-read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
-`RGI_BWT` task directories, or the whole `work/` once the run is done.
+RGI problems are in [`troubleshooting.md`](troubleshooting.md#arg-prediction-issues):
+WildCARD processing (`RGI_LOAD_WILDCARD`), disk use of `RGI_BWT`, and the `RGI_BWT` /
+`RGI_KMER` failures.
 
 ## Best Practices
 
@@ -381,8 +342,9 @@ rgi database --version --local   # verify both are loaded
 cat localDB/loaded_databases.json   # "card_kmers": {"kmer_sizes": ["61"]}
 ```
 
-Without the k-mer load, `rgi kmer_query` writes nothing and RGI_KMER stops
-with an error.
+Without the k-mer load, the pipeline warns at launch that the pathogen-of-origin
+step (RGI_KMER, `rgi kmer_query`) is skipped, and does not run it; `rgi bwt` and
+its reports still run.
 
 ### Step 5: Use the prepared database
 

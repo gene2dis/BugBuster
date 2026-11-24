@@ -4,7 +4,8 @@ This guide covers deploying BugBuster on different compute infrastructures.
 The cloud/HPC profile parameters used below (`aws_*`, `gcp_*`, `azure_*`,
 `slurm_*`) are formally documented in
 [`parameters.md` § Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters);
-the `--*_workdir` parameter of the chosen cloud profile is **required**.
+the chosen cloud profile needs a work directory in its cloud storage, given with its
+`--*_workdir` parameter (see that section).
 
 ## Table of Contents
 
@@ -260,66 +261,19 @@ nextflow run main.nf \
 
 ## Resource Recommendations
 
-### Minimum Requirements
+### Machine Size and Databases
 
-| Component | Memory | CPUs | Storage |
-|-----------|--------|------|---------|
-| QC + Taxonomy | 16 GB | 4 | 50 GB |
-| Assembly | 64 GB | 16 | 100 GB |
-| Binning | 128 GB | 16 | 200 GB |
-| Full Pipeline | 256 GB | 32 | 500 GB |
-
-A run also builds the human decontamination index: ~75 GB RAM with the default
-aligner (bwa-mem3). It is built once per `--databases_dir` and reused by later
-runs that share it (put `--databases_dir` on shared storage for a cluster); or
-use `--read_aligner bowtie2` (~6 GB, about an hour) on smaller nodes and on CPUs
-without AVX2. Set `--max_memory` to what a
-node offers: decontamination and MEGAHIT request 72 GB each on the first attempt
-(`process_high`), all capped by it.
-
-### Pre-downloaded Databases
-
-For better performance, pre-download databases to shared storage:
-
-```bash
-# Kraken2 Standard-8 (~7.5 GB)
-# Sourmash GTDB r220 (~17 GB)
-# Sylph GTDB r232 .syl2db (~19 GB) + sylph-tax metadata (~5.5 MB; recipe in manual.md)
-# Metabuli refseq_standard (~80 GB download / ~110 GB unpacked, contig taxonomy)
-# geNomad 1.9 (~0.84 GB download / 2.2 GB unpacked) and CheckV 1.5 (~1.68 GB / 6.4 GB)
-# DeepARG (~4.8 GB, contig and bin ARGs)
-# CheckM2 (~2.9 GB)
-# GUNC proGenomes 2.1 (~7.2 GB download / 13.5 GB unpacked)
-# GTDB-TK r232 (~61 GB download; only R232 works with the pinned GTDB-Tk 2.8.0)
-# eggNOG 7 / emapper-3.0 (~44 GB, functional annotation branch)
-# dbCAN db_v5-2-9_5-5-2026 (~7.4 GB, functional annotation branch)
-# Bakta DB v6.0 (full 31.9 GB / light 1.3 GB download, MAG annotation branch)
-# Web of Life WoLr2 subset (~94 GB, read-level Woltka branch; recipe in manual.md)
-# SUPER-FOCUS DB_90 (~0.74 GB DIAMOND / ~0.9 GB MMseqs2 download, read-level SUPER-FOCUS branch; recipe in manual.md)
-# HUMAnN 4 databases + MetaPhlAn vOct22 (~71 GB with the full ChocoPhlAn / ~33 GB EC-filtered, read-level HUMAnN branch; layout in manual.md)
-```
-
-Then specify paths:
-
-```bash
-nextflow run main.nf \
-    --custom_sylph_db /shared/db/sylph/gtdb-r232-c200-dbv2.syl2db \
-    --custom_sylph_taxonomy /shared/db/sylph/gtdb_r232_metadata.tsv.gz \
-    --custom_checkm2_db /shared/db/checkm2/uniref100.KO.1.dmnd \
-    --custom_gunc_db /shared/db/gunc/gunc_db_progenomes2.1.dmnd \
-    --custom_metabuli_db /shared/db/metabuli/refseq_standard \
-    --custom_genomad_db /shared/db/genomad/genomad_db \
-    --custom_checkv_db /shared/db/checkv/checkv-db-v1.5 \
-    --custom_deeparg_db /shared/db/deeparg \
-    --custom_gtdbtk_db /shared/db/gtdbtk/release232 \
-    --custom_eggnog_db /shared/db/eggnog/eggnog_db \
-    --custom_dbcan_db /shared/db/dbcan/dbcan_db \
-    --custom_bakta_db /shared/db/bakta/bakta_db \
-    --custom_woltka_db /shared/db/wol2 \
-    --custom_superfocus_db /shared/db/superfocus \
-    --custom_humann_db /shared/db/humann \
-    ...
-```
+What each set of options asks of a node (memory, CPUs, database disk) is in the
+manual's [hardware table](manual.md#hardware-requirements). On a cluster or in the
+cloud, set `--max_memory` and `--max_cpus` to the largest node or instance type the
+jobs can get: every request is capped by them. Decontamination and MEGAHIT request
+72 GB each on the first attempt. The human decontamination index (~75 GB RAM with
+bwa-mem3) is built once per `--databases_dir`, so put `--databases_dir` on storage
+every node can read: the first run downloads and builds the databases there and
+later runs reuse them. On small nodes or CPUs without AVX2, use
+`--read_aligner bowtie2` (~6 GB, about an hour). To download databases by hand
+instead (for compute nodes without internet access), see the manual,
+[section 8](manual.md#manual-database-download).
 
 > **Note — functional annotation branches on cloud executors:**
 > `--contig_level_functional` runs under the docker-based `aws`, `gcp` and
@@ -341,28 +295,8 @@ nextflow run main.nf \
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **Out of memory**: Increase `--max_memory` or use larger instance types
-2. **Spot instance preemption**: retried when the exit status is 130–145 or 104. GCP's preemption status 14 and Azure's 50001 are currently not retried ([#31](https://github.com/gene2dis/BugBuster/issues/31))
-3. **Container pull failures**: Check network access or use pre-cached images
-4. **S3/GCS access denied**: Verify IAM roles and bucket permissions
-
-### Debug Mode
-
-```bash
-nextflow run main.nf \
-    --input samplesheet.csv \
-    --output ./results \
-    -profile docker \
-    -resume \
-    -with-trace \
-    -with-report \
-    -with-dag
-```
-
-### Getting Help
-
-- [BugBuster GitHub Issues](https://github.com/gene2dis/BugBuster/issues)
-- [Nextflow Documentation](https://nextflow.io/docs/latest/)
-- [nf-core Community](https://nf-co.re/)
+Cluster and cloud problems (SLURM jobs, access denied, quotas, spot instances,
+authentication) are in [`troubleshooting.md`](troubleshooting.md#cloud-execution-issues),
+with the rest of the troubleshooting. Questions:
+[BugBuster GitHub Issues](https://github.com/gene2dis/BugBuster/issues),
+[Nextflow documentation](https://nextflow.io/docs/latest/).

@@ -15,7 +15,7 @@ Disk use comes from three places, which behave differently:
    `storeDir`, one folder per database and version (`<databases_dir>/<database>/<key>/`):
    the files are moved out of the work directory, so each database is on disk once, and a
    later run with the same `--databases_dir` skips the download (see
-   [Database Management](manual.md#4-database-management)). Old versions are not removed
+   [Database Management](manual.md#8-databases)). Old versions are not removed
    when you select a new one; delete their folders to free the space.
 
 BugBuster reduces disk use in two ways:
@@ -91,8 +91,10 @@ What this means in practice:
 - **After a resumed run succeeds, some task directories are left behind.** Cleanup deletes
   only the tasks the final run executed. Tasks reused from the cache, and tasks aborted by
   the interruption, stay in `work/`. Delete `work/` once you no longer need to resume.
-  `nextflow clean -f` is not enough here: it removes only the last run's tasks, and a
-  task directory created just before the interruption may not be recorded in any run.
+  `nextflow clean -f` is not enough here: it removes only the tasks the last run
+  executed, and a task directory created just before the interruption may not be
+  recorded in any run (what each form of `nextflow clean` deletes:
+  [troubleshooting](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean)).
 - The final results directory is the same with or without the profile, plus
   `clean_reads/`.
 
@@ -141,7 +143,9 @@ Peak usage is in the work directory, so:
    Co-assembly needs all samples in one run.
 4. **Free space between runs**: once a run's results are final, delete its work directory.
    This is what `low_disk` does automatically on success. (`nextflow clean -f` removes
-   only the last run's tasks, so after resumed runs it leaves the earlier ones behind.)
+   only the tasks the last run executed, so after resumed runs it leaves the earlier ones
+   behind; never run it on a run you still want to resume:
+   [what it deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean).)
 5. **Monitor usage** with the monitoring script below to see where the peak is.
 
 ## Monitoring Disk Usage
@@ -230,46 +234,11 @@ nextflow log <run name> -f name,status    # run names: nextflow log
 
 ## Troubleshooting
 
-### Issue: Pipeline runs out of disk space
-
-**Cause**: The work-dir filesystem is smaller than the run's peak usage. `low_disk` does
-not help here: it deletes the work directory only after the run succeeds.
-
-**Solution**:
-1. Start the run again with `-work-dir` on a larger filesystem. Do not count on resuming
-   from a work directory copied elsewhere: task directories refer to each other by
-   absolute path
-2. Run fewer tasks at once, or split the samples into batches (see "Running With Limited
-   Disk Space")
-3. Monitor disk usage with the monitoring script
-
-### Issue: Resume not working after cleanup
-
-**Cause**: The work directory was deleted. A completed `low_disk` run deletes it.
-
-**Solution**:
-1. Verify the `work/` directory still exists
-2. If it is gone, the run has to be recomputed. Use `low_disk` only for runs you will not
-   need to resume or extend.
-
-### Issue: Work directory not empty after a successful `low_disk` run
-
-**Cause**: The run was resumed. Cleanup deletes only the tasks the final run executed;
-tasks reused from the cache and tasks aborted by the earlier interruption remain.
-
-**Solution**: delete `work/` once you no longer need to resume. `nextflow clean -f` alone
-removes only the last run's tasks; `nextflow clean -f <run name>` (names from
-`nextflow log`) removes an earlier run's recorded tasks, but a task directory created just
-before an interruption may not be recorded in any run.
-
-### Issue: Outputs missing from results directory
-
-**Solution**:
-1. Check that you're looking in the correct subdirectory:
-   - Clean reads: `output/clean_reads/{sample_id}/` (only with `--store_clean_reads`)
-   - Filtered contigs: `output/03_assembly/per_sample/{sample_id}/` (or `03_assembly/coassembly/`)
-   - Refined bins: `output/04_binning/per_sample/{sample_id}/refined_bins/` (or `04_binning/coassembly/refined_bins/`)
-2. Other outputs use their numbered publishDir locations (see `config/modules.config`)
+Disk problems are in [`troubleshooting.md`](troubleshooting.md):
+[out of disk space](troubleshooting.md#out-of-disk-space),
+[resume not working and what `nextflow clean` deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean),
+[work directory not empty after a successful `low_disk` run](troubleshooting.md#work-directory-not-empty-after-a-successful-low_disk-run)
+and [missing output files](troubleshooting.md#missing-output-files).
 
 ## Configuration Parameters
 
@@ -319,15 +288,6 @@ before an interruption may not be recorded in any run.
 
 - **In-task cleanup**: during process execution (rm commands in the process script), every run
 - **Nextflow cleanup** (`cleanup = true`, `low_disk` only): once, at the end of a successful run
-
-## Version History
-
-- **v2.0.0dev** - Current: this document corrected to the measured behaviour (cleanup does not lower peak usage); databases stored with `storeDir` under `<databases_dir>/<database>/<key>/` (stored once, reused across runs)
-- **v1.1** - `low_disk` profile (work-dir deletion after success + clean-reads publishing); storeDir on clean reads replaced by conditional publishDir
-- **v1.0.0** - Initial disk optimization implementation
-  - Phase 1: storeDir for BOWTIE2, BBMAP, METAWRAP
-  - Phase 2: Internal cleanup for MEGAHIT, BOWTIE2_SAMTOOLS
-  - Phase 3: Nextflow configuration and monitoring script
 
 ## Support
 

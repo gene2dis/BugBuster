@@ -25,9 +25,9 @@ This guide covers common issues and solutions when running BugBuster.
 
 ### Nextflow version too old
 
-**Error:**
+**Error** (shown here for Nextflow 25.04.8; the version in brackets is the one you run):
 ```
-ERROR: Nextflow version 25.10.0 or later is required
+Failed requirement - Plugin nf-schema@2.7.3 requires Nextflow version >=25.10.0 (current 25.04.8)
 ```
 
 **Solution:**
@@ -64,15 +64,18 @@ sdk install java <version>
 
 ### Invalid samplesheet format
 
-**Error:**
+**Error** (one of):
 ```
-ERROR: Invalid samplesheet: 'sample' column is empty
+Invalid samplesheet: 'sample' column is empty for row: [...]
+Invalid samplesheet: 'r1' column is empty for sample: sample1
+Invalid samplesheet: r1 and r2 are the same file for sample 'sample1': /path/to/sample1_R1.fastq.gz
 ```
 
 **Solution:**
 1. Ensure CSV has header: `sample,r1,r2,s`
 2. Check for extra spaces or special characters
-3. Use absolute paths for files
+3. Check every path (the path rules: [Samplesheet Format](manual.md#samplesheet-format) and
+   [Input Requirements](manual.md#input-requirements) in the manual)
 4. Validate with:
    ```bash
    head -5 samplesheet.csv
@@ -80,15 +83,20 @@ ERROR: Invalid samplesheet: 'sample' column is empty
 
 ### Files not found
 
-**Error:**
+**Error** (a path in the samplesheet does not exist; the run stops at launch):
 ```
-ERROR: Cannot find file: /path/to/reads.fastq.gz
+ERROR ~ No such file or directory: /path/to/sample1_R1.fastq.gz
+```
+or, for a file with another extension:
+```
+Invalid R1 file extension for sample 'sample1': sample1_R1.fastq.bz2. Must be one of: .fastq, .fq, .fastq.gz, .fq.gz
 ```
 
 **Solution:**
-1. Use absolute paths in samplesheet
-2. Check file permissions: `ls -la /path/to/reads.fastq.gz`
-3. Ensure files are not compressed with unsupported format
+1. Check the path and its permissions: `ls -la /path/to/sample1_R1.fastq.gz`. A
+   relative path is read from the directory you launch Nextflow in; the path rules are
+   under [Samplesheet Format](manual.md#samplesheet-format) in the manual
+2. Recompress other formats (`.bz2`, `.zst`) to `.gz`
 
 ### Invalid sample name
 
@@ -156,13 +164,14 @@ or set the values in a `-params-file` YAML, where `false` and numbers keep their
 
 ## Resource Errors
 
-### Out of memory
+### Out of memory: a task fails with exit status 137
 
-**Error:**
+**Error** (Nextflow's message; the process name and tag are those of the failed task):
 ```
-Process exceeded memory limit
-exitCode: 137
+Process `QC:BWAMEM3_DECONTAMINATE (sample1)` terminated with an error exit status (137)
 ```
+Exit status 137 means the task was killed, usually by the container engine or the
+scheduler for using more memory than it requested.
 
 **Solution:**
 1. Increase memory limits:
@@ -246,16 +255,23 @@ process {
 No space left on device
 ```
 
-**Solution:**
-1. Clean work directory:
-   ```bash
-   nextflow clean -f
-   ```
+The tasks that finished before the error are still in the work directory, and `-resume`
+reuses them once there is space again. Do not run `nextflow clean -f` first: it deletes
+exactly those tasks (see [the next entry](#resume-not-working-or-freeing-space-safely-nextflow-clean)).
 
-2. Use external storage for work directory:
+**Solution:**
+1. Free space without touching this run's work directory: delete the work directories of
+   other runs whose results are final, or their tasks with
+   `nextflow clean -f -before <this run's name>` (run names: `nextflow log`; see the next
+   entry for what it keeps). Then re-run the same command with `-resume`.
+
+2. If the filesystem is too small for the run, start it again with the work directory on a
+   larger one:
    ```bash
    nextflow run main.nf -work-dir /scratch/work ...
    ```
+   This run starts from scratch: a work directory copied to another place is not resumed
+   (task directories refer to each other by absolute path).
 
 3. Run fewer tasks at once (lower `--max_cpus` with the local executor) or split the
    samples into batches; see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md#running-with-limited-disk-space).
@@ -264,11 +280,41 @@ Note that `cleanup = true` (the `low_disk` profile) does not help with this erro
 deletes the work directory only after the run succeeds, so peak usage during the run is
 unchanged.
 
+### Resume not working, or freeing space safely (`nextflow clean`)
+
+**What `-resume` needs.** A task is reused when its work directory is still there and its
+inputs, parameters and script are unchanged (input files are matched by path and size).
+So `-resume` needs:
+- the same launch directory (it holds the run history and task cache in `.nextflow/`) and
+  the same `-work-dir`;
+- the work directories of the finished tasks. A completed `low_disk` run has deleted them
+  (an interrupted or failed one has not), and a work directory copied to another place is
+  not resumed.
+
+`nextflow log` lists the runs; `nextflow log <run name> -f name,status` shows which tasks
+of a run were taken from the cache (`CACHED`).
+
+**What `nextflow clean` deletes.** Without a run name, `nextflow clean -f` deletes the work
+directories of the tasks the **last run executed**. Tasks it took from the cache, and the
+tasks of earlier runs, stay. After a failed or interrupted run, these are the finished
+tasks that `-resume` would reuse, so the next run repeats them. Use it only for a run you
+will not resume. Other forms:
+- `nextflow clean -n ...` lists what the same command would delete, without deleting it;
+- `nextflow clean -f <run name>` cleans one run, and `-before <run name>` or
+  `-but <run name>` the runs before it or all others. Each keeps the tasks that a later
+  run reused, so the work of a run you resumed survives the cleaning of the runs it came
+  from;
+- once a run's results are final and you will not resume or extend it, deleting its whole
+  work directory frees everything, including task directories no run recorded (a task
+  started just before an interruption). The `low_disk` profile does this after a
+  successful run.
+
 ### Process timeout
 
-**Error:**
+**Error** (local executor; the time in brackets is the task's limit). On a cluster the
+scheduler stops the job instead, and the task fails with the scheduler's exit status:
 ```
-Process exceeded time limit
+Process exceeded running time limit (<time>)
 ```
 
 **Solution:**
@@ -292,6 +338,35 @@ With the local executor, a task killed at its time limit can instead fail with
 the error strategy stops the run instead of retrying it with more time. Compare the task's
 start and end times with its `time` setting; if they match, raise `time` for that process as
 above and `-resume`.
+
+### SLURM: a job fails, or is killed at its time limit
+
+**Symptom:** a task fails under `-profile slurm` with an exit status from the scheduler,
+or waits in the queue for a long time.
+
+**Solution:**
+1. Find the task in `.nextflow.log` (`grep -A5 "Error executing process" .nextflow.log`)
+   and look at its work directory: `.command.err`, `.command.log` and `.exitcode`. The
+   SLURM job id is in the log; `sacct -j <job id> --format=JobID,State,Elapsed,MaxRSS,ReqMem`
+   shows whether SLURM stopped it for time or memory, and `squeue -u $USER` what is still
+   queued.
+2. Each task asks for the time of its resource label, 4 h, 8 h, 24 h or 72 h (48 h for
+   the large database downloads), times the attempt, capped by `--max_time` (240 h by default): a retried task gets more time. To
+   give one process more from the start, set `time` in its
+   `withName` block of a `-c` config (see [Process timeout](#process-timeout)).
+3. Queues, account and other SLURM settings are the `--slurm_*` parameters
+   ([Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters)).
+
+### Work directory not empty after a successful `low_disk` run
+
+**Cause:** the run was resumed. The `low_disk` profile's cleanup deletes only the tasks
+the final run executed; tasks reused from the cache, and tasks aborted by the earlier
+interruption, remain.
+
+**Solution:** delete the work directory once you no longer need to resume. A completed
+`low_disk` run cannot be resumed anyway (its own tasks are gone), so re-running it with a
+changed option recomputes everything; see
+[`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md#the-low_disk-profile).
 
 ### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored
 
@@ -369,12 +444,20 @@ Unable to find image 'container:tag' locally
 
 **Solution:**
 1. Check internet connectivity
-2. Verify container exists (look up the exact tag in the module's `main.nf`):
+2. Pull the image by hand to see the registry's own error. Copy the full image URI from
+   the process's `container` line (`modules/local/<tool>/main.nf` or
+   `modules/nf-core/<tool>/main.nf`; where the line holds two URIs, the first is used
+   under singularity/apptainer and the second under docker/podman). A `container`
+   setting in the process's `withName` block of `config/modules.config` takes precedence
+   over the module's line. For fastp, for example:
    ```bash
-   docker pull quay.io/biocontainers/fastp:<tag>
+   docker pull community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11
    ```
 
-3. Use alternative registry if blocked
+3. Behind a firewall or proxy, allow the registries the images come from: `quay.io`,
+   `community.wave.seqera.io` and `community-cr-prod.seqera.io` (Seqera Containers),
+   `depot.galaxyproject.org` (singularity images), `ghcr.io`, `docker.io` and
+   `data.cgmlab.org` (the eggNOG-mapper image under singularity/apptainer)
 
 ### eggNOG-mapper image cannot be pulled under docker/podman
 
@@ -422,6 +505,44 @@ check whether issue #620 is fixed in the new version and update or remove
 ---
 
 ## ARG Prediction Issues
+
+### RGI_LOAD_WILDCARD fails (`--custom_rgi_card_db` with `--custom_rgi_wildcard`)
+
+**Error** (one of):
+```
+ERROR: WildCARD directory not found: <path>
+ERROR: CARD annotation file (card_database_v*.fasta) not found in <path>: --custom_rgi_card_db must be a CARD directory loaded and annotated with 'rgi card_annotation'
+ERROR: WildCARD annotation file not created; rgi wildcard_annotation's log:
+```
+
+**Solutions:**
+1. Ensure the WildCARD files are decompressed (`gunzip *.gz`): this path passes the
+   directory to `rgi wildcard_annotation` as is
+2. Check that the CARD and WildCARD downloads are the same CARD release:
+   ```bash
+   # CARD version
+   python3 -c "import json; print(json.load(open('/path/to/card_database/card.json'))['_version'])"
+   # WildCARD version
+   grep "version" /path/to/wildcard/index-for-model-sequences.txt
+   ```
+3. Verify that `index-for-model-sequences.txt` exists in the WildCARD directory
+4. The task copies both directories into its work directory (tens of GB with a large
+   WildCARD download): keep space there, or load the database once by hand and pass it
+   with `--custom_rgi_card_db` alone ([`RGI_WILDCARD_USAGE.md`](RGI_WILDCARD_USAGE.md),
+   "Manual CARD Database Preparation"), which is linked, not copied
+
+### RGI_BWT fills the work directory, or takes hours
+
+RGI writes every read the aligner reports, placed on a reference or not, to its SAM and builds its BAMs and
+read table from it (RGI 6.0.3 then scanned that table once per reference sequence with reads; 6.0.8 loads it
+into memory, ~1 KB per read). `RGI_BWT` runs rgi through `bin/rgi_bwt_kma_fix.py`, which keeps only the reads
+placed on a reference (well under 1% of a metagenome), and with `--clean`, which removes the temporary files
+when the task ends. With bowtie2 and bwa the tables are those of an unfiltered run. With KMA the kept reads
+are also grouped by name, so that `samtools fixmate` (RGI 6.0.8) pairs every mate pair: the Mate Pair Linkage
+columns are filled in, and an unmapped mate is not counted as a read "with flanking sequence" (as in RGI
+6.0.3), where an unfiltered run would count some, in an order that changes between runs. Runs made before this fix (BugBuster 2.0.0dev, October 2026) needed about 400 bytes per clean
+read on disk per running task and kept the files afterwards: delete the `*.temp.*` files of finished
+`RGI_BWT` task directories, or the whole `work/` once the run is done.
 
 ### RGI_BWT fails: "KMA failed", "bowtie2 failed" or "not the 6.0.8 method"
 
@@ -800,9 +921,8 @@ assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
 humann version '<X>' is not among the versions this parser was verified against ...
 ```
 
-**Cause:** deliberate guards (design doc Section 4.6.1: HUMAnN 4 is an alpha
-whose output layout may change between builds; silent misparsing is the failure
-being prevented). The pinned build is HUMAnN 4.0.0a2, run with
+**Cause:** deliberate guards: HUMAnN 4 is an alpha whose output layout may change
+between builds, and silent misparsing is the failure being prevented. The pinned build is HUMAnN 4.0.0a2, run with
 `--count-normalization RPKs`; a header that names other units (e.g. `Adjusted
 CPMs`) means `--count-normalization` was overridden in the `HUMANN` `ext.args`.
 
@@ -821,23 +941,32 @@ the raw `_2_genefamilies.tsv` yourself, drop that row first.
 
 ### Database download failed
 
-**Error:**
+**Symptom:** a database task (`FORMAT_*_DB`, `DOWNLOAD_*`) fails. Its `.command.err`
+shows the download tool's own error (wget's, for a URL that cannot be reached or returns
+an HTTP error), or one of the pipeline's checks on what was downloaded, for example:
 ```
-ERROR: Failed to download database from URL
+ERROR: dbcan_db/<file> is <N> bytes, the release has <M> - a truncated download, or the server now serves another file under this URL (...)
+ERROR: md5 mismatch for <file> (got <md5>, expected <md5>) - corrupt or truncated download
+ERROR: k2_ref_db/hash.k2d missing after extraction
 ```
+
+**Cause and what the pipeline does:** a failed download task is retried up to three
+times. A byte-count mismatch (exit status 65) is not retried: the server is serving a
+different file under the pinned URL, and downloading it again would give the same file.
 
 **Solution:**
-1. Check internet connectivity
-2. Use pre-downloaded databases:
+1. Check that the machine running the task can reach the URL (on a cluster, the compute
+   nodes may have no internet access; then download on a login node, see below)
+2. Download the database yourself and pass it with its `--custom_*` option (recipes and
+   the expected layout: [Manual Database Download](manual.md#manual-database-download)):
    ```bash
-   nextflow run main.nf \
+   nextflow run main.nf ... \
        --custom_sylph_db /path/to/gtdb-r232-c200-dbv2.syl2db \
        --custom_sylph_taxonomy /path/to/gtdb_r232_metadata.tsv.gz \
-       --custom_checkm2_db /path/to/checkm2_db \
-       ...
+       --custom_checkm2_db /path/to/uniref100.KO.1.dmnd
    ```
-
-3. Download manually and specify path
+3. For a byte-count mismatch, check the database's release page: if the file was
+   replaced upstream, pass a copy you trust with the `--custom_*` option
 
 ### A stored database is incomplete, outdated or a placeholder
 
@@ -863,22 +992,20 @@ Placeholder files from `-stub` runs are kept apart under
 
 ### Database checksum mismatch
 
-**Error:**
-```
-ERROR: Database checksum verification failed
-```
+**Symptom:** a database task fails with
+`ERROR: md5 mismatch for <file> (...) - corrupt or truncated download`, or `md5sum -c`
+reports the file as `FAILED` (geNomad, GUNC, K-MARVEL's CARD tarball).
 
 **Solution:**
-1. Delete corrupted download and retry
-2. Download from alternative source
-3. Use custom database path
+1. Re-run with `-resume`: the task downloads the file again (a failed task stores nothing
+   in `--databases_dir`)
+2. If it fails again, download the file yourself, check its checksum against the
+   database's release page, and pass it with the `--custom_*` option
 
-### GTDB-TK memory error
+### GTDB-TK is killed or runs out of memory
 
-**Error:**
-```
-MemoryError in GTDB-TK
-```
+**Symptom:** `GTDB_TK_BATCH` fails with exit status 137, or its log reports that a step
+(usually pplacer) ran out of memory.
 
 **Solution:**
 1. `GTDB_TK_BATCH` already requests 256 GB, but the request is capped at
@@ -949,7 +1076,7 @@ BlobTools tables, so do not substitute a newer one.
 
 **Symptom (b):** *The following invalid input values have been detected:
 --custom_blast_db* (or `--blast_db`, `--taxdump_files`,
-`--custom_taxdump_files`). Contig taxonomy uses Metabuli since Phase 9b and these
+`--custom_taxdump_files`). Contig taxonomy now uses Metabuli and these
 parameters were removed; drop them and give `--custom_metabuli_db` instead.
 
 **Symptom (c):** in results of earlier versions, every contig's
@@ -965,7 +1092,8 @@ says 1.9; a mismatch means a corrupted or replaced Zenodo file. With
 `--custom_genomad_db`, the directory must hold the unpacked database
 (`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); geNomad
 1.13.0 takes database 1.9. `NFCORE_GENOMAD_ENDTOEND` requests 8 CPUs and 36 GB (about
-18 GB used per assembly in the Phase 9c benchmark); an out-of-memory failure is
+18 GB used per assembly in the
+[contig classifiers benchmark](benchmarks/contig_classifiers_2026.md)); an out-of-memory failure is
 retried with twice the memory.
 
 ---
@@ -984,7 +1112,8 @@ and run with `--read_aligner bowtie2` on nodes without it.
 ### Process BWAMEM3_BUILD_COMBINED failed
 
 **Exit status 3 / "needs more memory":** the human index build needs ~75 GB
-RAM; the pipeline warns at launch when `--max_memory` is lower. Either:
+RAM; the pipeline warns at launch when `--max_memory` is lower, for the built-in human
+host only. With `--custom_host_fasta`, allow ~24 GB per Gbp of combined genome. Either:
 
 - raise `--max_memory` (the build runs once per `--databases_dir`; later runs
   reuse the stored index),
@@ -1054,22 +1183,18 @@ custom_host_fasta:
 ```
 
 All the genomes go into one index; the bwa-mem3 build requests ~24 GB RAM per
-Gbp of combined genome, so raise `--max_memory` accordingly.
+Gbp of combined genome, so raise `--max_memory` accordingly. Examples for several hosts:
+[Multiple Host Genomes in a Params File](DECONTAMINATION_QUICK_REFERENCE.md#multiple-host-genomes-in-a-params-file).
 
 ### Slow index building or decontamination
 
-- Pre-build the index once and reuse it:
-  ```bash
-  cat phix.fasta host.fasta > contaminants.fasta
-  mkdir -p contaminants_index
-  bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
-
-  nextflow run main.nf ... --custom_decontamination_index contaminants_index
-  ```
-- Under `--read_aligner bowtie2`, the human index build takes about an hour
-  (`bowtie2-build --threads 16 contaminants.fasta contaminants_index/contaminants`;
-  pass the index with `--read_aligner bowtie2`). bowtie2 runs with `--local`, so
-  `--bowtie_score_min` takes the local form `G,<a>,<b>` (default `G,15,6`)
+- Pre-build the index once and reuse it, or keep the same `--databases_dir`: the index
+  the pipeline builds from the default genomes is stored there and later runs skip the
+  build. The recipe for building one by hand is
+  [Building Combined Index](DECONTAMINATION_QUICK_REFERENCE.md#building-combined-index).
+- Under `--read_aligner bowtie2`, the human index build takes about an hour. bowtie2
+  runs with `--local`, so `--bowtie_score_min` takes the local form `G,<a>,<b>`
+  (default `G,15,6`)
 
 ---
 
@@ -1103,6 +1228,16 @@ Essential container in task exited
 2. Verify compute environment has sufficient resources
 3. Check container can access S3 paths
 
+### Spot or preemptible instances: tasks are reclaimed
+
+**Symptom:** on spot (AWS), preemptible/spot (Google Cloud) or low-priority (Azure)
+instances, tasks fail when their instance is taken back.
+
+**What the pipeline does:** a task that fails with exit status 130-145 or 104, or with
+the preemption status of Google Batch (14) or Azure Batch (50001), is retried; the cloud
+profiles allow 3 retries. If tasks keep being reclaimed, use on-demand instances for the
+long ones (assembly, GTDB-Tk, eggNOG-mapper), or a queue with fewer interruptions.
+
 ### GCP: Quota exceeded
 
 **Error:**
@@ -1117,10 +1252,8 @@ Quota exceeded for resource
 
 ### Azure: Authentication failed
 
-**Error:**
-```
-Azure Batch authentication failed
-```
+**Symptom:** the run stops before any task starts, with an authentication or
+authorization error from Azure Batch or Azure Storage.
 
 **Solution:**
 1. Verify environment variables:
@@ -1146,7 +1279,12 @@ Azure Batch authentication failed
    cat .nextflow.log | grep -i error
    ```
 
-2. Check work directory for intermediate files
+2. Check that you are looking in the right folder: every output and the option that
+   produces it are in the manual,
+   [Outputs and How to Read Them](manual.md#7-outputs-and-how-to-read-them). Clean reads
+   are published only with `--store_clean_reads` (`clean_reads/<sample>/`), and a
+   co-assembly's outputs are under `<stage>/coassembly/` instead of `per_sample/`
+3. Check work directory for intermediate files
 
 ### No bins: empty bin tables, `SKIPPED.txt` instead of bins
 
@@ -1234,6 +1372,11 @@ nextflow run main.nf \
     -dump-channels
 ```
 
+For a `-resume` that re-runs tasks it should reuse, add the `debug` profile
+(`-profile docker,debug`): it keeps the work directory, dumps each task's hash inputs to
+`.nextflow.log` (compare two runs' hashes to see which input changed) and prints each
+task's host name.
+
 ### Inspect failed process
 
 ```bash
@@ -1245,6 +1388,14 @@ ls -la work/xx/xxxxxxxx/
 cat work/xx/xxxxxxxx/.command.log
 cat work/xx/xxxxxxxx/.command.err
 ```
+
+### Resource use of a finished run
+
+Every run writes `pipeline_info/execution_report_<timestamp>.html` (resource use per
+process), `execution_timeline_<timestamp>.html` and `execution_trace_<timestamp>.txt`
+(one line per task: run time, %CPU, peak memory, I/O, the requested CPUs, memory and
+time, the attempt and the work directory). Compare a task's peak memory and time with its
+request before raising limits.
 
 ### Test with stub mode
 

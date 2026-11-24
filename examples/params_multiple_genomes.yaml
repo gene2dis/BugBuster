@@ -80,7 +80,7 @@ max_memory: "150.GB"
 # custom_phiX_fasta: "/data/genomes/phix.fasta"
 # 
 # # Other QC parameters
-# min_read_sample: 10000
+# min_read_sample: 20000   # single reads (R1 + R2) after fastp, twice the read pairs
 # store_clean_reads: true
 # 
 # # Aligner: bwa-mem3 (default) needs ~20-25 GB RAM per Gbp of combined

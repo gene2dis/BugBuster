@@ -6,7 +6,7 @@ antimicrobial resistance gene (ARG) prediction, functional annotation and a run-
 summary report. This page shows how the stages connect and which parameter switches each
 one on. The one-figure overview is [`images/bugbuster_overview.svg`](images/bugbuster_overview.svg);
 parameters are described in [`parameters.md`](parameters.md) and the outputs in
-[`manual.md`, section 8](manual.md#8-output-structure).
+[`manual.md`, section 7](manual.md#7-outputs-and-how-to-read-them).
 
 **How to read the diagrams.** Every box is a process or subworkflow named as in `main.nf`
 (nf-core modules under their import alias, e.g. `NFCORE_SAMTOOLS_INDEX`). An edge label is
@@ -505,7 +505,7 @@ flowchart TD
 The stage inputs are optional: a stage that did not run gives an empty list, and the summary
 leaves its section out. The reads report, `software_versions.yml`, the ARG priority table, the
 watchlist and `assets/report` are always given (the two tables default to files in `assets/`). The same script (`bin/results_summary.py`) also merges several finished
-results directories outside the pipeline (manual, Example 13).
+results directories outside the pipeline (manual, section 9, Merging Batches).
 
 ---
 
@@ -638,35 +638,10 @@ results directories outside the pipeline (manual, Example 13).
 
 ## Output structure
 
-Top level of `--output`; the full tree, with every file, is in
-[`manual.md`, section 8](manual.md#8-output-structure).
-
-```
-results/
-├── pipeline_info/               # Execution report, timeline, trace, DAG, software_versions.yml,
-│                                # contig_filtering_summary.txt, coassembly_groups.tsv /
-│                                # multisample_groups.tsv (with groups), empty_assemblies.tsv
-├── 00_summary/                  # Run summary (results_summary=true, default): report/ (HTML),
-│                                # results_summary.html / .pdf / .xlsx, README.md, LLM_GUIDE.md,
-│                                # tables/, figures/
-├── clean_reads/                 # Decontaminated reads (only if --store_clean_reads)
-├── 01_quality_control/          # fastp reports, Reads_report.csv, nonpareil/ (--nonpareil)
-├── 02_taxonomy/                 # sylph / kraken2 + bracken / sourmash results, tables,
-│                                # phyloseq, figures
-├── 03_assembly/                 # per_sample/ or coassembly/ (coassembly/<group>/ per group): contigs, filtered contigs, stats
-├── 04_binning/                  # Raw and refined bins, CheckM2 quality (+ quality/gunc/),
-│                                # GTDB-Tk taxonomy, coverage and summary (co-assembly),
-│                                # dereplicated/ (galah clusters, representatives, CoverM)
-├── 05_arg_prediction/           # read_level/ (args_oap, rgi, rgi_kmer, kmarvel + summaries),
-│                                # contig_level/ (DeepARG, contig ARG table, ARG blob plot),
-│                                # bin_level/ (proteins, deeparg, arg_fasta, clustering)
-├── 06_contig_taxonomy/          # metabuli/, genomad/, checkv/, phylum blob plots
-└── 07_functional_annotation/    # gene_calling/, eggnog/, dbcan/, gene_abundance/,
-                                 # microbecensus/, summary/ (TPM/CPGE + read_* tables),
-                                 # reads/ (woltka, superfocus, humann), mags/ (Bakta)
-```
-
-Databases go to `--databases_dir` (default `<output>/../databases`), apart from the results.
+Every stage publishes into a numbered folder of `--output` (`01_quality_control/` ...
+`07_functional_annotation/`), next to `00_summary/` and `pipeline_info/`; databases go to
+`--databases_dir`. The full tree, and what each file holds: the manual,
+[section 7](manual.md#7-outputs-and-how-to-read-them).
 
 ---
 
