@@ -6,7 +6,7 @@ antimicrobial resistance gene (ARG) prediction, functional annotation and a run-
 summary report. This page shows how the stages connect and which parameter switches each
 one on. The one-figure overview is [`images/bugbuster_overview.svg`](images/bugbuster_overview.svg);
 parameters are described in [`parameters.md`](parameters.md) and the outputs in
-[`manual.md`, section 8](manual.md#8-output-structure).
+[`manual.md`, section 7](manual.md#7-outputs-and-how-to-read-them).
 
 **How to read the diagrams.** Every box is a process or subworkflow named as in `main.nf`
 (nf-core modules under their import alias, e.g. `NFCORE_SAMTOOLS_INDEX`). An edge label is
@@ -505,7 +505,7 @@ flowchart TD
 The stage inputs are optional: a stage that did not run gives an empty list, and the summary
 leaves its section out. The reads report, `software_versions.yml`, the ARG priority table, the
 watchlist and `assets/report` are always given (the two tables default to files in `assets/`). The same script (`bin/results_summary.py`) also merges several finished
-results directories outside the pipeline (manual, Example 13).
+results directories outside the pipeline (manual, section 9, Merging Batches).
 
 ---
 
@@ -639,7 +639,7 @@ results directories outside the pipeline (manual, Example 13).
 ## Output structure
 
 Top level of `--output`; the full tree, with every file, is in
-[`manual.md`, section 8](manual.md#8-output-structure).
+[`manual.md`, section 7](manual.md#7-outputs-and-how-to-read-them).
 
 ```
 results/

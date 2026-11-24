@@ -56,7 +56,7 @@ Complete reference for all BugBuster pipeline parameters.
   copying), hence the `copy` default. `symlink` and `rellink` point into the work
   directory and break when it is deleted (`low_disk`, `nextflow clean`). Don't use `move`
   (later tasks still read the published outputs from the work directory). See the
-  [manual](manual.md#61-inputoutput-options)
+  [manual](manual.md#66-output-directory-and-publishing-mode)
 - **Example**: `--publish_dir_mode link`
 
 ---
@@ -148,7 +148,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 6.12)
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 5.4)
 - **Example**: `--args_oap_prediction true`
 - **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
 
@@ -172,7 +172,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--contig_tax_and_arg`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Enable contig-level taxonomy and ARG prediction. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#69-contig-taxonomy-genomad-and-deeparg-options)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
+- **Description**: Enable contig-level taxonomy and ARG prediction. Needs an assembly (`--assembly_mode assembly` or `coassembly`); rejected at launch with `--assembly_mode none`. Metabuli 1.2.0 classifies every contig (`classify --seq-mode 3 --lineage 1`, score cutoffs `--metabuli_min_score` / `--metabuli_min_sp_score`) against `--metabuli_db` (`refseq_standard` by default, 80 GB download, 110 GB unpacked); BlobTools turns its calls, the read coverage and the database's own taxdump into the contig tables and the phylum blob plot; DeepARG runs on the proteins of the shared Pyrodigal gene-calling step, published to `07_functional_annotation/gene_calling/` — the same gene set `--contig_level_functional` uses (one gene-calling pass when both are on). `05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv` has Metabuli's seven ranks (`superkingdom` = NCBI `domain`, or Viruses), `taxonomy_rank` and `taxonomy_score`, the bin columns with `--include_binning` and the geNomad columns with `--genomad_prediction` (column list in [the manual](manual.md#76-contig-taxonomy-and-arg-table)). Replaced megablast against NCBI nt in Phase 9b (`docs/benchmarks/contig_classifiers_2026.md`); `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` were removed and are rejected at launch
 - **Example**: `--contig_tax_and_arg true --custom_metabuli_db /shared/databases/metabuli/refseq_standard`
 
 ### `--genomad_prediction`
@@ -661,7 +661,7 @@ The run-level summary (`00_summary/`) consolidates the QC, taxonomy, read-level 
 ARGs-OAP), read functional and MicrobeCensus results, and the assembly-based stages, into TSV tables, an Excel
 workbook, figures (PDF, SVG, PNG and their values as CSV), a multi-page offline HTML report (`report/`), the same
 report as a PDF (`results_summary.pdf`), a `README.md` and `LLM_GUIDE.md`. Counts are read pairs, ARG abundance is RPM/RPKM of
-clean read pairs, and ARG calls carry a reporting tier. See the manual, section 6.17, for how the results are reported.
+clean read pairs, and ARG calls carry a reporting tier. See the manual, section 7.2, for how the results are reported.
 
 ### `--results_summary`
 - **Type**: Boolean

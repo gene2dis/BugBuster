@@ -425,7 +425,7 @@ results/
 
 **Database Storage**: Databases are stored separately at `<output_dir>/../databases/<database>/<key>/` by default (configurable via `--databases_dir`) and reused by later runs.
 
-For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#8-output-structure).
+For detailed output descriptions, see [`docs/manual.md`](docs/manual.md#7-outputs-and-how-to-read-them).
 
 ## Documentation
 

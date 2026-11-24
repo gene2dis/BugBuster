@@ -15,7 +15,7 @@ Disk use comes from three places, which behave differently:
    `storeDir`, one folder per database and version (`<databases_dir>/<database>/<key>/`):
    the files are moved out of the work directory, so each database is on disk once, and a
    later run with the same `--databases_dir` skips the download (see
-   [Database Management](manual.md#4-database-management)). Old versions are not removed
+   [Database Management](manual.md#8-databases)). Old versions are not removed
    when you select a new one; delete their folders to free the space.
 
 BugBuster reduces disk use in two ways:
