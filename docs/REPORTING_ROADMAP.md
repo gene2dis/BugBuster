@@ -238,8 +238,7 @@ contig table as `checkv_*` columns.
 - **Left out on purpose:** a GUNC fail is a flag and does not change the MIMAG `quality_tier` (owner, 2026-11-06). The
   stage-level binning reports (`bin_quality_report.py`, `bin_summary.py`) do not show GUNC, and the summary has no
   CheckV figure (owner, 2026-11-12).
-- **Verified** on a 4-sample per-sample assembly run: 11 of 45 MAGs fail GUNC (4 of the 26 that CheckM2 rates at
-  least 90 % complete and at most 5 % contaminated); 3 ARG genes on viruses or in proviruses, all CheckV medium
+- **Verified** on a 4-sample per-sample assembly run (the GUNC fail counts are in the manual, section 7.5); 3 ARG genes on viruses or in proviruses, all CheckV medium
   quality. GUNC's reference (proGenomes 2.1, or GTDB r214) is older than GTDB r232, which the caveat states.
 - **Report (roadmap Phase 19):** Methods names and cites GUNC, CheckV, HMMER and Prodigal (before, it listed their
   raw version keys without a reference); the MAGs page counts the MAGs that pass, fail and were not scored, the PDF

@@ -336,6 +336,24 @@ the error strategy stops the run instead of retrying it with more time. Compare 
 start and end times with its `time` setting; if they match, raise `time` for that process as
 above and `-resume`.
 
+### SLURM: a job fails, or is killed at its time limit
+
+**Symptom:** a task fails under `-profile slurm` with an exit status from the scheduler,
+or waits in the queue for a long time.
+
+**Solution:**
+1. Find the task in `.nextflow.log` (`grep -A5 "Error executing process" .nextflow.log`)
+   and look at its work directory: `.command.err`, `.command.log` and `.exitcode`. The
+   SLURM job id is in the log; `sacct -j <job id> --format=JobID,State,Elapsed,MaxRSS,ReqMem`
+   shows whether SLURM stopped it for time or memory, and `squeue -u $USER` what is still
+   queued.
+2. Each task asks for the time of its resource label, 4 h, 8 h, 24 h or 72 h, times the
+   attempt, capped by `--max_time` (240 h by default): a retried task gets more time. To
+   give one process more from the start, set `time` in its
+   `withName` block of a `-c` config (see [Process timeout](#process-timeout)).
+3. Queues, account and other SLURM settings are the `--slurm_*` parameters
+   ([Cloud & HPC Profile Parameters](parameters.md#cloud--hpc-profile-parameters)).
+
 ### "Process requirement exceeds available CPUs" (or memory), or raised limits seem ignored
 
 **Error:**
@@ -412,12 +430,20 @@ Unable to find image 'container:tag' locally
 
 **Solution:**
 1. Check internet connectivity
-2. Verify container exists (look up the exact tag in the module's `main.nf`):
+2. Pull the image by hand to see the registry's own error. Copy the full image URI from
+   the process's `container` line (`modules/local/<tool>/main.nf` or
+   `modules/nf-core/<tool>/main.nf`; where the line holds two URIs, the first is used
+   under singularity/apptainer and the second under docker/podman). A `container`
+   setting in the process's `withName` block of `config/modules.config` takes precedence
+   over the module's line. For fastp, for example:
    ```bash
-   docker pull quay.io/biocontainers/fastp:<tag>
+   docker pull community.wave.seqera.io/library/fastp:1.4.0--df415eab5e33cb11
    ```
 
-3. Use alternative registry if blocked
+3. Behind a firewall or proxy, allow the registries the images come from: `quay.io`,
+   `community.wave.seqera.io` and `community-cr-prod.seqera.io` (Seqera Containers),
+   `depot.galaxyproject.org` (singularity images), `ghcr.io`, `docker.io` and
+   `data.cgmlab.org` (the eggNOG-mapper image under singularity/apptainer)
 
 ### eggNOG-mapper image cannot be pulled under docker/podman
 
@@ -843,9 +869,8 @@ assemble the root as described for `--custom_humann_db` in `docs/parameters.md`
 humann version '<X>' is not among the versions this parser was verified against ...
 ```
 
-**Cause:** deliberate guards (design doc Section 4.6.1: HUMAnN 4 is an alpha
-whose output layout may change between builds; silent misparsing is the failure
-being prevented). The pinned build is HUMAnN 4.0.0a2, run with
+**Cause:** deliberate guards: HUMAnN 4 is an alpha whose output layout may change
+between builds, and silent misparsing is the failure being prevented. The pinned build is HUMAnN 4.0.0a2, run with
 `--count-normalization RPKs`; a header that names other units (e.g. `Adjusted
 CPMs`) means `--count-normalization` was overridden in the `HUMANN` `ext.args`.
 
@@ -999,7 +1024,7 @@ BlobTools tables, so do not substitute a newer one.
 
 **Symptom (b):** *The following invalid input values have been detected:
 --custom_blast_db* (or `--blast_db`, `--taxdump_files`,
-`--custom_taxdump_files`). Contig taxonomy uses Metabuli since Phase 9b and these
+`--custom_taxdump_files`). Contig taxonomy now uses Metabuli and these
 parameters were removed; drop them and give `--custom_metabuli_db` instead.
 
 **Symptom (c):** in results of earlier versions, every contig's
@@ -1015,7 +1040,8 @@ says 1.9; a mismatch means a corrupted or replaced Zenodo file. With
 `--custom_genomad_db`, the directory must hold the unpacked database
 (`genomad_db`, `genomad_marker_metadata.tsv`, `version.txt`, ...); geNomad
 1.13.0 takes database 1.9. `NFCORE_GENOMAD_ENDTOEND` requests 8 CPUs and 36 GB (about
-18 GB used per assembly in the Phase 9c benchmark); an out-of-memory failure is
+18 GB used per assembly in the
+[contig classifiers benchmark](benchmarks/contig_classifiers_2026.md)); an out-of-memory failure is
 retried with twice the memory.
 
 ---
@@ -1282,6 +1308,11 @@ nextflow run main.nf \
     -dump-channels
 ```
 
+For a `-resume` that re-runs tasks it should reuse, add the `debug` profile
+(`-profile docker,debug`): it keeps the work directory, dumps each task's hash inputs to
+`.nextflow.log` (compare two runs' hashes to see which input changed) and prints each
+task's host name.
+
 ### Inspect failed process
 
 ```bash
@@ -1293,6 +1324,14 @@ ls -la work/xx/xxxxxxxx/
 cat work/xx/xxxxxxxx/.command.log
 cat work/xx/xxxxxxxx/.command.err
 ```
+
+### Resource use of a finished run
+
+Every run writes `pipeline_info/execution_report_<timestamp>.html` (resource use per
+process), `execution_timeline_<timestamp>.html` and `execution_trace_<timestamp>.txt`
+(one line per task: run time, %CPU, peak memory, I/O, the requested CPUs, memory and
+time, the attempt and the work directory). Compare a task's peak memory and time with its
+request before raising limits.
 
 ### Test with stub mode
 
