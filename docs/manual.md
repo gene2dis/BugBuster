@@ -2526,7 +2526,7 @@ lists every tool and database with its version and reference.
 
 ```
 BugBuster: Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible
-Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello
+Microbial Data Science Lab, Facultad de Ingeniería, Universidad del Desarrollo
 https://github.com/gene2dis/BugBuster
 ```
 
