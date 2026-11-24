@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 The pipeline self-reports this state as `2.0.0dev` (manifest version) until the
 next release is tagged.
 
+### Upgrading from 1.1
+
+What a run of 1.1 must change to run on this version, one line per breaking change; the
+bold label names the full entry below (search for it).
+
+- **Nextflow 25.10.0 or later** (was 24.04.0), with nf-schema 2.7.3. *Breaking (Nextflow version)*, Changed.
+- **Default taxonomic profiler is sylph** (was sourmash): it downloads the 19 GB sylph database; add `--taxonomic_profiler sourmash` to continue a series of sourmash results. *Breaking (default taxonomic profiler)*, Changed.
+- **Default aligner is bwa-mem3** (was Bowtie2): its human index needs ~75 GB RAM to build and a CPU with AVX2; use `--read_aligner bowtie2` otherwise, and add it to keep using a Bowtie2 `--custom_decontamination_index`. *Breaking (default aligner)*, Changed.
+- **Sample names**: names that read as numbers or missing values (`001`, `NA`, `true`), names containing `__` or ending in `_`, and `coassembly` / `multisample` stop the run at launch; rename such samples (`S001`). *Breaking (samplesheet)*, Changed.
+- **Group labels** of `--coassembly_group_by` / `--multisample_group_by` follow the same rules: give such values a letter. *Breaking (group labels)*, Changed.
+- **`-c` configs naming nf-core processes**: `FASTP`, `PYRODIGAL` and `BAKTA_BAKTA` are now `NFCORE_FASTP`, `NFCORE_PYRODIGAL`, `NFCORE_BAKTA_BAKTA` in `withName` selectors. *Breaking (`-c` configs naming nf-core processes)*, Changed.
+- **GTDB-Tk takes only GTDB R232 data**: delete a cached R220 `databases/gtdbtk/` or pass an R232 directory with `--custom_gtdbtk_db`. *Breaking (GTDB-Tk databases)*, Changed.
+- **Databases are stored under `<databases_dir>/<database>/<key>/`**: databases downloaded by 1.1 (no `<key>/` level) are not found; pass them with `--custom_*` or delete them and let the pipeline download again. *Databases are stored once and reused across runs*, Changed.
+- **Bin refinement is Binette** (was MetaWRAP): refined bins are `refined_bins/<sample>_binette_bins/binette_binN.fa`; `--metawrap_completeness` / `--metawrap_contamination` still work, with a warning, as `--bin_min_completeness` / `--bin_max_contamination`. *Breaking (bin refinement)*, Changed.
+- **Contig taxonomy is Metabuli** (was megablast against NCBI nt): `--blast_db`, `--custom_blast_db`, `--taxdump_files` and `--custom_taxdump_files` are removed (a run that passes one stops); use `--custom_metabuli_db` for a local database. *Breaking (contig taxonomy)*, Changed, and *Breaking* (megablast), Removed.
+- **Bin-level ARGs** come from the assembly's DeepARG run split by bin: the per-bin files keep their paths, with other content. *Breaking (bin-level ARGs)*, Changed.
+- **Gene calling output moved** from `05_arg_prediction/contig_level/prodigal/` to `07_functional_annotation/gene_calling/`. *Breaking (output layout)*, Changed.
+- **Co-assembly CheckM2 and GTDB-Tk reports moved** to `04_binning/coassembly/quality/checkm2/` and `04_binning/coassembly/taxonomy/gtdbtk/`. *Breaking (output layout)*, Changed.
+- **KARGA and KARGVA are removed**: drop `--karga_db`, `--kargva_db`, `--custom_karga_db` and `--custom_kargva_db` from params files; `--read_arg_prediction` now runs ARGs-OAP only (use `--args_oap_prediction`). *Breaking* (KARGA and KARGVA), Removed.
+- **MetaCerberus is removed**: drop `--contig_level_metacerberus` and the `--metacerberus_*` options; `--contig_level_functional` is the contig annotation branch. *Breaking* (MetaCerberus), Removed.
+
 ### Added
 
 - **Run-level MAG dereplication** (`--dereplicate_mags`, off by default; needs
@@ -580,6 +601,22 @@ next release is tagged.
 
 ### Changed
 
+- **User documentation reorganised, one home per kind of content**: the README
+  keeps what the pipeline is, the stages and their switches, installation, the
+  test profile, one real run with what a default run does and costs, where the
+  results are, and links; the manual follows the order a user works (install
+  and test, samplesheet, choosing what runs with each stage's needs and costs,
+  running, outputs and how to read them, databases, merging batches); the
+  parameter tables live in `docs/parameters.md`, troubleshooting in
+  `docs/troubleshooting.md`, and `docs/YAML_PARAMETERS_GUIDE.md` is the general
+  `-params-file` guide. Recipes that failed or wasted a run were corrected (the
+  Bakta database by hand needs its AMRFinderPlus refresh; the default human
+  genome is not passed as `--custom_host_fasta`; no `nextflow clean -f` before
+  `-resume`), quoted error messages are the pipeline's real ones, and
+  `--min_read_sample` is documented in single reads (R1 + R2). The schema's
+  descriptions of `--custom_rgi_wildcard`, `--mag_level_functional`,
+  `--min_read_sample` and the results summary are current. The pipeline is
+  released under the MIT licence (`LICENSE`).
 - **Breaking (`-c` configs naming nf-core processes)**: the nf-core fastp,
   Pyrodigal and Bakta modules are imported under an `NFCORE_` name, as the
   other nf-core modules are (roadmap Phase 22): `NFCORE_FASTP`,
