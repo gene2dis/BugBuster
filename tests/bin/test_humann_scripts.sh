@@ -142,8 +142,12 @@ M="${TMP_DIR}/mpa"; mkdir -p "${M}"
 in_humann "${M}" "zcat /fix/reads/htest_R1.fastq.gz > r.fastq; metaphlan r.fastq --input_type fastq ${MPA_OPTS} --offline \
     -o profile.tsv --bowtie2out bt2.txt" > "${M}/run.log" 2>&1 || true
 check "module MetaPhlAn options extracted (${MPA_OPTS})" "[ -n \"${MPA_OPTS}\" ] && echo '${MPA_OPTS}' | grep -q -- '--bowtie2db /fix/db/metaphlan --index mpa_vOct22_CHOCOPhlAnSGB_202403'"
+# Accepted options get MetaPhlAn as far as its Bowtie2 mapping step, which
+# then fails on the placeholder index ("bowtie2-align exited"): requiring that
+# line keeps the check from passing on a container that never started or a
+# run that stopped before parsing (roadmap Phase 25, RV26; review R8-10)
 check "MetaPhlAn 4.1.2 accepts every option the module passes" \
-    "! grep -qE 'unrecognized arguments|invalid choice' ${M}/run.log"
+    "! grep -qE 'unrecognized arguments|invalid choice' ${M}/run.log && grep -q 'bowtie2-align exited' ${M}/run.log"
 
 #
 # humann_function_profile.py

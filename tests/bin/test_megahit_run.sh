@@ -21,7 +21,13 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 RUN="${REPO_DIR}/bin/megahit_run.sh"
-MEGAHIT_IMG="quay.io/biocontainers/megahit:1.2.9--h43eeafb_4"
+# The docker image the module pins, so a re-pin of the module re-tests the
+# wrapper against the new image (roadmap Phase 25, RV26; review R8-05)
+MEGAHIT_IMG=$(grep -o "'quay.io/biocontainers/megahit:[^']*'" "${REPO_DIR}/modules/local/megahit/main.nf" | tr -d "'" | head -1)
+if [ -z "${MEGAHIT_IMG}" ]; then
+    echo "ERROR: could not read the megahit image from modules/local/megahit/main.nf" >&2
+    exit 1
+fi
 
 TMP_DIR=$(mktemp -d)
 trap 'rm -rf "${TMP_DIR}"' EXIT
@@ -112,11 +118,10 @@ real_megahit() {
     [ -f "${TMP_DIR}/real/real_assembly/final.contigs.fa" ] &&
     grep -q "Memory used: 1800000000" "${TMP_DIR}/real/real_assembly/log"
 }
-if command -v docker > /dev/null 2>&1; then
-    check "real MEGAHIT runs through it with a 90% budget (Memory used: 1800000000)" real_megahit
-else
-    echo "- docker not found: real MEGAHIT check skipped"
-fi
+# No skip without docker: a missing docker fails the suite instead of a
+# hollow "all passed" (roadmap Phase 25, RV26; review R8-10)
+check "docker is available for the real MEGAHIT check" command -v docker
+check "real MEGAHIT runs through it with a 90% budget (Memory used: 1800000000)" real_megahit
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
