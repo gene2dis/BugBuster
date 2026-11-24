@@ -10,6 +10,8 @@ genome) and writes tests/data/reads/singleton_test_{R1,R2,S}.fastq.gz:
   leaving exactly 6 clean pairs (12 reads).
 - S: 4 non-host singletons + 6 host-derived singletons, leaving exactly
   4 clean singletons.
+- singleton_test_{R1,R2}.fastq: the mates uncompressed (the plain-FASTQ input
+  tests of sylph_profile and count_reads).
 
 Reads are exact 100-mers at uniform Q40 with no long G runs, so fastp
 (default pipeline settings) keeps all of them and the expected clean counts
@@ -84,6 +86,14 @@ def main():
         # mtime=0 keeps the gzip output byte-identical across regenerations
         with gzip.GzipFile(out, "wb", mtime=0) as handle:
             handle.write("".join(records).encode())
+        print(f"wrote {out} ({len(records)} reads)")
+
+    # Plain copies of the mates, the uncompressed-input case of
+    # tests/modules/sylph_profile.nf.test and count_reads.nf.test (roadmap
+    # Phase 25, RV26; review R8-09: they were not regenerated with the .gz)
+    for name, records in [("R1", r1), ("R2", r2)]:
+        out = OUT_DIR / f"singleton_test_{name}.fastq"
+        out.write_text("".join(records))
         print(f"wrote {out} ({len(records)} reads)")
 
 
