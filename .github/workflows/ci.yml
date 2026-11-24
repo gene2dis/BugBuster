@@ -23,7 +23,11 @@ jobs:
   test:
     name: Run pipeline tests
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     strategy:
+      # one version failing does not cancel the other, so a failure on the
+      # newest Nextflow alone points at Nextflow, not the change
+      fail-fast: false
       matrix:
         NXF_VER:
           - "25.10.7"
@@ -37,13 +41,24 @@ jobs:
         with:
           version: "${{ matrix.NXF_VER }}"
 
+      # The committed reads (tests/data/reads: the first 500 pairs of the
+      # nf-core reads assets/test_samplesheet.csv points to), so CI downloads
+      # no test data (roadmap Phase 25, RV27; review R8-11)
+      - name: Write a samplesheet of the committed test reads
+        run: |
+          reads="${GITHUB_WORKSPACE}/tests/data/reads"
+          printf 'sample,r1,r2,s\ntest_sample1,%s,%s,\ntest_sample2,%s,%s,\n' \
+            "${reads}/test_sample1_R1.fastq.gz" "${reads}/test_sample1_R2.fastq.gz" \
+            "${reads}/test_sample2_R1.fastq.gz" "${reads}/test_sample2_R2.fastq.gz" \
+            > "${RUNNER_TEMP}/local_samplesheet.csv"
+
       - name: Run pipeline with test profile (stub)
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub --output ./results_stub
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker -stub --input "${RUNNER_TEMP}/local_samplesheet.csv" --output ./results_stub
 
       - name: Run pipeline with test profile
         run: |
-          nextflow run ${GITHUB_WORKSPACE} -profile test,docker --output ./results
+          nextflow run ${GITHUB_WORKSPACE} -profile test,docker --input "${RUNNER_TEMP}/local_samplesheet.csv" --output ./results
 
       - name: Check resource-limit overrides (-c, -params-file, CLI; design doc Q22)
         run: |
@@ -54,8 +69,9 @@ jobs:
           tests/bin/test_profile_config.sh
 
   lint:
-    name: Nextflow config lint
+    name: Nextflow lint, config and schema checks
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4
@@ -65,6 +81,12 @@ jobs:
         with:
           version: "latest-everything"
 
+      # Strict-syntax check of every script and config file (roadmap Phase 25,
+      # RV27; review R8-12): errors fail the job, warnings are reported only
+      - name: Lint the scripts and config files
+        run: |
+          nextflow lint .
+
       - name: Validate nextflow.config
         run: |
           nextflow config -flat ${GITHUB_WORKSPACE} > /dev/null
@@ -73,16 +95,29 @@ jobs:
         run: |
           tests/bin/test_schema_db_enums.sh
 
-      - name: Check schema validation
+      - name: Validate nextflow_schema.json and its defaults against the config (roadmap Phase 25, RV27)
         run: |
-          if [ -f "nextflow_schema.json" ]; then
-            echo "Schema file exists"
-            python3 -c "import json; json.load(open('nextflow_schema.json'))"
-          fi
+          sudo apt-get update -qq && sudo apt-get install -y -qq python3-jsonschema > /dev/null
+          tests/bin/test_schema_params.sh
+
+      - name: Check every tests/bin suite is run by this workflow (roadmap Phase 25, RV27)
+        run: |
+          tests/bin/test_ci_wiring.sh
 
   nf-test:
     name: Run nf-test suite
     runs-on: ubuntu-latest
+    # 25.10.7 ran the suite in 3 h 12 min locally (roadmap Phase 22); the
+    # newest Nextflow in ~75 min on CI
+    timeout-minutes: 240
+    strategy:
+      # the minimum supported Nextflow and the newest (roadmap Phase 25, RV27;
+      # review R8-13); one failing does not cancel the other
+      fail-fast: false
+      matrix:
+        NXF_VER:
+          - "25.10.7"
+          - "latest-everything"
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4
@@ -96,12 +131,14 @@ jobs:
       - name: Install Nextflow
         uses: nf-core/setup-nextflow@v2
         with:
-          version: "latest-everything"
+          version: "${{ matrix.NXF_VER }}"
 
-      - name: Install nf-test
+      # Pinned: the installer otherwise takes the newest release that day
+      - name: Install nf-test 0.9.5
         run: |
-          curl -fsSL https://get.nf-test.com | bash
+          curl -fsSL https://get.nf-test.com | bash -s 0.9.5
           sudo mv nf-test /usr/local/bin/
+          nf-test version
 
       - name: Run nf-test
         run: |
@@ -110,6 +147,7 @@ jobs:
   db-scripts:
     name: Test DB reformat scripts and pinned containers
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4
@@ -121,6 +159,7 @@ jobs:
   report-scripts:
     name: Test taxonomy/report scripts and pinned container
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - name: Check out pipeline code
         uses: actions/checkout@v4

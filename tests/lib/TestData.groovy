@@ -3,11 +3,13 @@
  */
 class TestData {
 
-    // Local two-sample samplesheet for the stub and validation tests: the
-    // first 500 read pairs of the nf-core reads the test profile downloads
-    // (tests/bin/make_test_read_fixtures.sh). Stub runs ignore read content,
-    // and GitHub raw downloads failed intermittently on CI runners
-    // (2026-10-09); the real-data test still uses assets/test_samplesheet.csv.
+    // Local two-sample samplesheet: the first 500 read pairs of the nf-core
+    // reads the test profile downloads (tests/bin/make_test_read_fixtures.sh).
+    // GitHub raw downloads failed intermittently on CI runners (2026-10-09),
+    // so no test reads them: every nf-test, including the real QC-only run,
+    // takes this sheet, and the CI profile runs pass the same reads with
+    // --input (roadmap Phase 25, RV27; review R8-11). Only -profile test
+    // without --input still downloads assets/test_samplesheet.csv's reads.
     static String localSamplesheet(outputDir, projectDir) {
         def sheet = new File("${outputDir}", "local_test_samplesheet.csv")
         sheet.parentFile.mkdirs()
@@ -86,5 +88,25 @@ class TestData {
     // Checked as folders, so an empty one (DeepARG's stub) counts too
     static List<String> databaseFolders(outputDir) {
         return ['format', 'download', 'rgi'].findAll { d -> new File("${outputDir}", d).exists() }
+    }
+
+    // The Nextflow version a pipeline test ran on, [major, minor], read from
+    // the run's log (nf-test launches with -quiet, so the console has no
+    // banner; the log has "Version: 26.10.5 build 14654"): for the tests
+    // whose expected outcome differs by version (roadmap Phase 25, RV27:
+    // nf-test runs on 25.10.7 and the newest Nextflow in CI)
+    static List<Integer> nextflowVersion(outputDir) {
+        def log = new File("${outputDir}/../meta/nextflow.log")
+        def m = log.exists() ? (log.text =~ /(?m)^\s*Version: (\d+)\.(\d+)\.\d+ build/) : null
+        if (m == null || !m.find()) {
+            throw new IllegalStateException("no 'Version: <x.y.z> build' line in ${log}")
+        }
+        return [m.group(1) as Integer, m.group(2) as Integer]
+    }
+
+    // True when the run's Nextflow is older than major.minor
+    static boolean nextflowBefore(outputDir, int major, int minor) {
+        def (ma, mi) = nextflowVersion(outputDir)
+        return ma < major || (ma == major && mi < minor)
     }
 }

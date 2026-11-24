@@ -10,9 +10,12 @@ nextflow_pipeline {
     script "../main.nf"
 
     test("Run with test profile - QC only") {
+        // The committed reads (TestData.localSamplesheet): the first 500 pairs
+        // of the nf-core reads assets/test_samplesheet.csv points to, so the
+        // test downloads nothing (roadmap Phase 25, RV27; review R8-11)
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "none"
@@ -1486,16 +1489,18 @@ nextflow_pipeline {
         }
     }
 
-    test("String-valued CLI toggles and numbers are honoured (Nextflow >= 26.04)") {
+    test("String-valued CLI toggles and numbers are honoured (Nextflow >= 26.04; rejected on 25.10)") {
         // Design doc Q13: on Nextflow >= 26.04 every CLI parameter arrives as a
         // String (`--include_binning false` is the truthy String "false"; a
         // number is a String too), and nf-schema validates without converting.
         // nf-test hands these String values through the same way, so this test
         // reproduces the CLI form. Before the fix, include_binning "false" with
         // assembly_mode none was rejected at launch and min_read_sample "10"
-        // crashed QC. Runs where the nf-test suite runs (CI: latest Nextflow);
-        // Nextflow 25.10 converts CLI values itself and its nf-schema rejects
-        // String booleans given this way, so the case cannot arise there.
+        // crashed QC. Nextflow 25.10 converts CLI values itself, so the case
+        // cannot arise there from a command line; given this way (params
+        // file), its nf-schema rejects the String values at launch, which is
+        // what the test asserts on 25.10 (roadmap Phase 25, RV27: nf-test runs
+        // on 25.10.7 and the newest Nextflow in CI)
         options "-stub"
 
         when {
@@ -1528,6 +1533,15 @@ nextflow_pipeline {
         }
 
         then {
+            if (TestData.nextflowBefore(outputDir, 26, 4)) {
+                assert workflow.failed
+                def text = (workflow.stdout + workflow.stderr).join('\n')
+                assert text.contains("Validation of pipeline parameters failed!")
+                assert text.contains("--include_binning (false): Value is [string] but should be [boolean]")
+                assert text.contains("--min_read_sample (10): Value is [string] but should be [integer]")
+                assert workflow.trace.tasks().size() == 0
+                return
+            }
             assert workflow.success
             // "true": QC ran; the min_read_sample comparison passed both samples
             assert workflow.trace.tasks().count { task -> task.name.contains("QC:NFCORE_FASTP (") } == 2

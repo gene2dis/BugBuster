@@ -21,7 +21,7 @@ nextflow_pipeline {
 
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
             }
         }
