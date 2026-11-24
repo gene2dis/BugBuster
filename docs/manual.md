@@ -2029,66 +2029,15 @@ directory with `--custom_decontamination_index` instead: a bwa-mem3 or bwa-mem2
 index (`*.bwt.2bit.64`) under the default aligner, or a Bowtie2 index (`*.bt2`)
 under `--read_aligner bowtie2`.
 
-### Database Selection Options
+### Database Keys and Custom Paths
 
-| Parameter | Default | Options | Description |
-|-----------|---------|---------|-------------|
-| `--phiX_index` | `phiX174` | `phiX174` | PhiX genome for decontamination |
-| `--host_db` | `human` | `human` | Host genome for read removal |
-| `--kraken2_db` | `standard-8` | `standard-8`, `gtdb_220` | Kraken2 database version |
-| `--sourmash_db` | `gtdb_220_k31` | `gtdb_220_k31` | Sourmash database version |
-| `--sylph_db` | `gtdb_r232` | `gtdb_r232`, `gtdb_r226`, `gtdb_r220` | Sylph database (GTDB reps, c200) + matching sylph-tax metadata |
-| `--checkm2_db` | `v3` | `v3` | CheckM2 database version |
-| `--gunc_db` | `progenomes_2.1` | `progenomes_2.1`, `gtdb_214` | GUNC reference for `--gunc_prediction` (proGenomes 2.1, or GTDB release 214) |
-| `--gtdbtk_db` | `release_232` | `release_232` | GTDB-TK database release (only R232 works with the pinned GTDB-Tk 2.8.0) |
-| `--eggnog_db` | `emapper-3.0` | `emapper-3.0` | eggNOG 7 data for eggNOG-mapper v3 |
-| `--dbcan_db` | `db_v5-2-9_5-5-2026` | `db_v5-2-9_5-5-2026` | dbCAN database release for run_dbcan v5 |
-| `--bakta_db` | `v6.0-full` | `v6.0-full`, `v6.0-light` | Bakta database flavor; the light DB changes annotation results, so selecting it is always explicit and is recorded in provenance (`software_versions.yml`) |
-| `--woltka_db` | `wolr2` | `wolr2` | Web of Life release for the Woltka read-level backend |
-| `--superfocus_db` | `db90` | `db90` | SUPER-FOCUS database for the SUPER-FOCUS read-level backend (DB_90, figshare CC0) |
-| `--humann_db` | `v4_alpha-full` | `v4_alpha-full`, `v4_alpha-ec_filtered` | HUMAnN 4 database set: full (44.8 GB) or EC-filtered (6.9 GB) ChocoPhlAn, plus UniRef90 EC-filtered, utility mapping and MetaPhlAn vOct22 (recorded in provenance) |
-| `--cog_db` | `cog-24` | `cog-24` | NCBI COG definitions table mapping eggNOG's (contig branch) and WoLr2's (Woltka read backend) COG ids to COG functional categories |
-| `--kmarvel_db` | `card_v4.0.1` | `card_v4.0.1` | CARD release for K-MARVEL (CARD 4.0.1 data tarball, the release upstream's `get_ref_db.sh` fetches) |
-| `--metabuli_db` | `refseq_standard` | `refseq_standard`, `gtdb232` | Metabuli database for contig taxonomy (`gtdb232`: GTDB names, 634 GB download, not benchmarked) |
-| `--genomad_db` | `v1.9` | `v1.9` | geNomad database release (pinned Zenodo file) |
-| `--checkv_db` | `v1.5` | `v1.5` | CheckV database release (pinned NERSC file) |
-
-### Custom Database Paths
-
-| Parameter | Description |
-|-----------|-------------|
-| `--custom_decontamination_index` | Path to a pre-built combined index directory (host + phiX) matching `--read_aligner`: bwa-mem3/bwa-mem2 (`*.bwt.2bit.64`, default) or Bowtie2 (`*.bt2`) |
-| `--custom_phiX_fasta` | Path to a custom phiX genome FASTA (index is built by the pipeline) |
-| `--custom_host_fasta` | Path to a custom host genome FASTA (index is built by the pipeline) |
-| `--custom_kraken_db` | Path to custom Kraken2 database directory; outputs are labelled with the directory's name |
-| `--custom_sourmash_db` | The k-mer database and its lineages CSV: `'kmer.zip,lineages.csv'` or `'["kmer.zip", "lineages.csv"]'` on the command line, a list of the two in a params file; outputs are labelled with the k-mer file's name without extension |
-| `--custom_sylph_db` | Path to a sylph genome database file (`.syldb` or `.syl2db`); requires `--custom_sylph_taxonomy`; outputs are labelled with its file name |
-| `--custom_sylph_taxonomy` | Path to the sylph-tax metadata file of the same release (accession, tab, `d__...;s__...` lineage; `.tsv` or `.tsv.gz`); requires `--custom_sylph_db` |
-| `--custom_checkm2_db` | Path to CheckM2 database file |
-| `--custom_gunc_db` | Path to a GUNC DIAMOND database file under GUNC's own name (`gunc_db_progenomes2.1.dmnd`, `gunc_db_gtdb214.dmnd`: GUNC reads the reference from the name) |
-| `--custom_gtdbtk_db` | Path to the directory directly containing the unarchived GTDB-Tk reference data (e.g. the extracted `release232/`); only R232 data works with the pinned GTDB-Tk 2.8.0, R220/R226 does not (see `docs/parameters.md`) |
-| `--custom_deeparg_db` | Path to DeepARG database directory |
-| `--custom_metabuli_db` | Path to a Metabuli database directory (`db.parameters`, `diffIdx`, `info`, `taxonomyDB`, and its taxdump `nodes.dmp`/`names.dmp` at most one directory down, e.g. `ncbi-taxdump/`) |
-| `--custom_genomad_db` | Path to a geNomad database directory (`genomad_db`, `version.txt`, ...; geNomad 1.13 takes database 1.9) |
-| `--custom_checkv_db` | Path to a CheckV database directory (`genome_db/`, `hmm_db/`, `README.txt`) |
-| `--custom_rgi_card_db` | Path to pre-prepared CARD database directory |
-| `--custom_rgi_wildcard` | Path to WildCARD directory (use with `--custom_rgi_card_db`) |
-| `--custom_kmarvel_db` | Path to a K-MARVEL database directory: `CARD_protein_all.fasta`, `metadata.tsv` (CARD `aro_index.tsv`) and `snps.txt` (CARD `snps.txt`); no BLAST index needed. Its `DB_VERSION`, or the FASTA's md5 without one, goes to `software_versions.yml` |
-| `--custom_eggnog_db` | Path to eggNOG 7 data directory (emapper-3.0 layout, see `docs/parameters.md`) |
-| `--custom_dbcan_db` | Path to dbCAN database directory (run_dbcan v5 layout, see `docs/parameters.md`) |
-| `--custom_bakta_db` | Path to Bakta database directory (schema 6 layout, see `docs/parameters.md`) |
-| `--custom_woltka_db` | Path to a local WoLr2 mirror in the FTP layout (see `docs/parameters.md`) |
-| `--custom_superfocus_db` | Path to a SUPER-FOCUS database ROOT, the directory containing `db/` (see `docs/parameters.md`) |
-| `--custom_humann_db` | Path to a HUMAnN database ROOT with `chocophlan/`, `uniref/`, `utility_mapping/` and `metaphlan/` (see `docs/parameters.md`) |
-| `--custom_cog_db` | Path to a local NCBI COG definitions table (`cog-24.def.tab` layout) |
-
-### Database Storage Options
-
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--databases_dir` | `<output>/../databases` | Directory for storing downloaded databases (separate from results) |
-
-By default, databases are stored in a `databases/` directory at the same level as your output directory. Later runs with the same `--databases_dir` reuse them without downloading again; see [Database Management](#8-databases).
+Each database has a key parameter that selects its release (`--kraken2_db`,
+`--sylph_db`, `--gunc_db`, ...; the keys and their sizes are in the table above) and a
+`--custom_*` parameter for a copy you already have, with the layout each one expects:
+[Database Selection Parameters](parameters.md#database-selection-parameters) and
+[Custom Database Paths](parameters.md#custom-database-paths). `--databases_dir` (default
+`<output>/../databases`) is where they are stored:
+[`--databases_dir`](parameters.md#--databases_dir).
 
 ### Database Storage Directory
 
