@@ -116,7 +116,7 @@ BugBuster is released under the [MIT licence](LICENSE). The tools it runs and th
 
 ## Credits
 
-gene2dis/BUGBUSTER was originally written by the Microbial Data Science Lab, Center for Bioinformatics and Integrative Biology, Universidad Andres Bello. Its development was led by Francisco A. Fuentes 
+gene2dis/BUGBUSTER is developed by the Microbial Data Science Lab, Facultad de Ingeniería, Universidad del Desarrollo. Its development was led by Francisco A. Fuentes 
 
 We thank the following people for their extensive assistance in the development of this pipeline:
 
