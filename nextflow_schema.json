@@ -159,7 +159,7 @@
                     "type": "integer",
                     "default": 0,
                     "minimum": 0,
-                    "description": "Minimum number of reads required per sample after QC filtering.",
+                    "description": "Minimum reads per sample after fastp, counted as single reads (R1 + R2 of the paired files, twice the read pairs; singletons not counted). Samples below it are dropped. 0 disables the filter.",
                     "fa_icon": "fas fa-sort-numeric-up"
                 },
                 "rgi_prediction": {

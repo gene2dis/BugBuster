@@ -132,7 +132,7 @@ See [docs/deployment.md](docs/deployment.md) for detailed deployment instruction
 
 ## Databases
 
-All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, one folder per database and version (`<databases_dir>/<database>/<key>/`). Only databases required for your selected pipeline options will be downloaded. A later run with the same `--databases_dir` reuses them without downloading again; selecting another version downloads it into its own folder. Databases you already have are passed with the `--custom_*` parameters and used in place.
+All databases are automatically downloaded on first use and stored in `<output_dir>/../databases/` by default (configurable via `--databases_dir`), separate from the results directory, one folder per database and version (`<databases_dir>/<database>/<key>/`). Only databases required for your selected pipeline options will be downloaded. A later run with the same `--databases_dir` reuses them without downloading again; selecting another version downloads it into its own folder. Databases you already have are passed with the `--custom_*` parameters and used in place, except the genome FASTA options (`--custom_host_fasta`, `--custom_phiX_fasta`), from which the decontamination index is built again in every run: pass a pre-built index with `--custom_decontamination_index` instead.
 
 You can use custom databases by specifying paths with `--custom_*` parameters (see table below).
 
@@ -143,7 +143,7 @@ You can use custom databases by specifying paths with `--custom_*` parameters (s
 | **phiX174 Genome** | 5.4 kB | PhiX contamination removal (combined index built locally) | `quality_control=true` | `--custom_phiX_fasta` |
 | **Human Host Genome (T2T-CHM13v2.0)** | 940 MB | Host read removal (combined index built locally) | `quality_control=true` | `--custom_host_fasta` (or `--custom_decontamination_index` for a pre-built index) |
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` | `--custom_kraken_db` |
-| **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
+| **Kraken2 GTDB r220** | 497 GB (and RAM for its `hash.k2d`: several hundred GB) | Taxonomic profiling | `kraken2_db='gtdb_220'` | `--custom_kraken_db` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` | `--custom_sourmash_db` |
 | **Sylph GTDB r232 (c200, two-stage .syl2db)** + sylph-tax metadata | 19 GB + 5.5 MB (`gtdb_r226` 18 GB, `gtdb_r220` 13.1 GB) | Taxonomic profiling | `taxonomic_profiler='sylph'` | `--custom_sylph_db`, `--custom_sylph_taxonomy` |
 | **Metabuli refseq_standard** | 80 GB download, 110 GB unpacked (`gtdb232`: 634 / 744 GB) | Contig taxonomy (its own NCBI taxdump also feeds BlobTools) | `contig_tax_and_arg=true` | `--custom_metabuli_db` |
@@ -219,7 +219,7 @@ sample2,/path/to/sample2_R1.fastq.gz,/path/to/sample2_R2.fastq.gz,/path/to/sampl
 | `--taxonomic_profiler` | `sylph` | `kraken2`, `sourmash`, `sylph`, or `none` (default `sourmash` before 2.0.0) |
 | `--include_binning` | `false` | Enable binning and refinement |
 | `--binners` | `semibin` | Binners to run: `comebin`, `semibin`, `metabat2` (comma-separated; ≥2 enables Binette refinement) |
-| `--min_read_sample` | `0` | Minimum reads required after QC |
+| `--min_read_sample` | `0` | Minimum reads after fastp, counted as single reads (R1 + R2, twice the read pairs; singletons not counted) |
 
 ### Feature Toggles
 

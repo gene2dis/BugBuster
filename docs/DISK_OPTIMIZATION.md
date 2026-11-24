@@ -91,8 +91,10 @@ What this means in practice:
 - **After a resumed run succeeds, some task directories are left behind.** Cleanup deletes
   only the tasks the final run executed. Tasks reused from the cache, and tasks aborted by
   the interruption, stay in `work/`. Delete `work/` once you no longer need to resume.
-  `nextflow clean -f` is not enough here: it removes only the last run's tasks, and a
-  task directory created just before the interruption may not be recorded in any run.
+  `nextflow clean -f` is not enough here: it removes only the tasks the last run
+  executed, and a task directory created just before the interruption may not be
+  recorded in any run (what each form of `nextflow clean` deletes:
+  [troubleshooting](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean)).
 - The final results directory is the same with or without the profile, plus
   `clean_reads/`.
 
@@ -141,7 +143,9 @@ Peak usage is in the work directory, so:
    Co-assembly needs all samples in one run.
 4. **Free space between runs**: once a run's results are final, delete its work directory.
    This is what `low_disk` does automatically on success. (`nextflow clean -f` removes
-   only the last run's tasks, so after resumed runs it leaves the earlier ones behind.)
+   only the tasks the last run executed, so after resumed runs it leaves the earlier ones
+   behind; never run it on a run you still want to resume:
+   [what it deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean).)
 5. **Monitor usage** with the monitoring script below to see where the peak is.
 
 ## Monitoring Disk Usage
@@ -258,9 +262,9 @@ not help here: it deletes the work directory only after the run succeeds.
 tasks reused from the cache and tasks aborted by the earlier interruption remain.
 
 **Solution**: delete `work/` once you no longer need to resume. `nextflow clean -f` alone
-removes only the last run's tasks; `nextflow clean -f <run name>` (names from
-`nextflow log`) removes an earlier run's recorded tasks, but a task directory created just
-before an interruption may not be recorded in any run.
+removes only the tasks the last run executed, and a task directory created just before an
+interruption may not be recorded in any run; see
+[what each form of `nextflow clean` deletes](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean).
 
 ### Issue: Outputs missing from results directory
 

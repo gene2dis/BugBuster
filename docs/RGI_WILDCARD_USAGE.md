@@ -121,8 +121,11 @@ wildcard_directory/
 └── ... (other variant files)
 ```
 
-The k-mer files must match `--rgi_kmer_size` (61 by default); the database step
-fails when they are missing.
+The k-mer files must match `--rgi_kmer_size` (61 by default). When they are
+missing the database step still succeeds (it warns that the k-mer database is not
+loaded), and the pathogen-of-origin step is skipped with a warning; `rgi bwt` and
+its reports still run, and the summary reports the samples' RGI hosts as
+`no_kmer_data`.
 
 **Note:** The files must be decompressed (`gunzip *.gz` first): this path passes the directory to `rgi wildcard_annotation` as is. Only the automatic download decompresses WildCARD.
 
@@ -381,8 +384,9 @@ rgi database --version --local   # verify both are loaded
 cat localDB/loaded_databases.json   # "card_kmers": {"kmer_sizes": ["61"]}
 ```
 
-Without the k-mer load, `rgi kmer_query` writes nothing and RGI_KMER stops
-with an error.
+Without the k-mer load, the pipeline warns at launch that the pathogen-of-origin
+step (RGI_KMER, `rgi kmer_query`) is skipped, and does not run it; `rgi bwt` and
+its reports still run.
 
 ### Step 5: Use the prepared database
 

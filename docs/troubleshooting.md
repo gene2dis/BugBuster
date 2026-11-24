@@ -25,9 +25,9 @@ This guide covers common issues and solutions when running BugBuster.
 
 ### Nextflow version too old
 
-**Error:**
+**Error** (shown here for Nextflow 25.04.8; the version in brackets is the one you run):
 ```
-ERROR: Nextflow version 25.10.0 or later is required
+Failed requirement - Plugin nf-schema@2.7.3 requires Nextflow version >=25.10.0 (current 25.04.8)
 ```
 
 **Solution:**
@@ -80,15 +80,20 @@ ERROR: Invalid samplesheet: 'sample' column is empty
 
 ### Files not found
 
-**Error:**
+**Error** (a path in the samplesheet does not exist; the run stops at launch):
 ```
-ERROR: Cannot find file: /path/to/reads.fastq.gz
+ERROR ~ No such file or directory: /path/to/sample1_R1.fastq.gz
+```
+or, for a file with another extension:
+```
+Invalid R1 file extension for sample 'sample1': sample1_R1.fastq.bz2. Must be one of: .fastq, .fq, .fastq.gz, .fq.gz
 ```
 
 **Solution:**
-1. Use absolute paths in samplesheet
-2. Check file permissions: `ls -la /path/to/reads.fastq.gz`
-3. Ensure files are not compressed with unsupported format
+1. Check the path and its permissions: `ls -la /path/to/sample1_R1.fastq.gz`. A
+   relative path is read from the directory you launch Nextflow in; the path rules are
+   under [Samplesheet Format](manual.md#samplesheet-format) in the manual
+2. Recompress other formats (`.bz2`, `.zst`) to `.gz`
 
 ### Invalid sample name
 
@@ -156,13 +161,14 @@ or set the values in a `-params-file` YAML, where `false` and numbers keep their
 
 ## Resource Errors
 
-### Out of memory
+### Out of memory: a task fails with exit status 137
 
-**Error:**
+**Error** (Nextflow's message; the process name and tag are those of the failed task):
 ```
-Process exceeded memory limit
-exitCode: 137
+Process `QC:BWAMEM3_DECONTAMINATE (sample1)` terminated with an error exit status (137)
 ```
+Exit status 137 means the task was killed, usually by the container engine or the
+scheduler for using more memory than it requested.
 
 **Solution:**
 1. Increase memory limits:
@@ -246,16 +252,23 @@ process {
 No space left on device
 ```
 
-**Solution:**
-1. Clean work directory:
-   ```bash
-   nextflow clean -f
-   ```
+The tasks that finished before the error are still in the work directory, and `-resume`
+reuses them once there is space again. Do not run `nextflow clean -f` first: it deletes
+exactly those tasks (see [the next entry](#resume-not-working-or-freeing-space-safely-nextflow-clean)).
 
-2. Use external storage for work directory:
+**Solution:**
+1. Free space without touching this run's work directory: delete the work directories of
+   other runs whose results are final, or their tasks with
+   `nextflow clean -f -before <this run's name>` (run names: `nextflow log`; see the next
+   entry for what it keeps). Then re-run the same command with `-resume`.
+
+2. If the filesystem is too small for the run, start it again with the work directory on a
+   larger one:
    ```bash
    nextflow run main.nf -work-dir /scratch/work ...
    ```
+   This run starts from scratch: a work directory copied to another place is not resumed
+   (task directories refer to each other by absolute path).
 
 3. Run fewer tasks at once (lower `--max_cpus` with the local executor) or split the
    samples into batches; see [`DISK_OPTIMIZATION.md`](DISK_OPTIMIZATION.md#running-with-limited-disk-space).
@@ -264,11 +277,41 @@ Note that `cleanup = true` (the `low_disk` profile) does not help with this erro
 deletes the work directory only after the run succeeds, so peak usage during the run is
 unchanged.
 
+### Resume not working, or freeing space safely (`nextflow clean`)
+
+**What `-resume` needs.** A task is reused when its work directory is still there and its
+inputs, parameters and script are unchanged (input files are matched by path and size).
+So `-resume` needs:
+- the same launch directory (it holds the run history and task cache in `.nextflow/`) and
+  the same `-work-dir`;
+- the work directories of the finished tasks. A completed `low_disk` run has deleted them
+  (an interrupted or failed one has not), and a work directory copied to another place is
+  not resumed.
+
+`nextflow log` lists the runs; `nextflow log <run name> -f name,status` shows which tasks
+of a run were taken from the cache (`CACHED`).
+
+**What `nextflow clean` deletes.** Without a run name, `nextflow clean -f` deletes the work
+directories of the tasks the **last run executed**. Tasks it took from the cache, and the
+tasks of earlier runs, stay. After a failed or interrupted run, these are the finished
+tasks that `-resume` would reuse, so the next run repeats them. Use it only for a run you
+will not resume. Other forms:
+- `nextflow clean -n ...` lists what the same command would delete, without deleting it;
+- `nextflow clean -f <run name>` cleans one run, and `-before <run name>` or
+  `-but <run name>` the runs before it or all others. Each keeps the tasks that a later
+  run reused, so the work of a run you resumed survives the cleaning of the runs it came
+  from;
+- once a run's results are final and you will not resume or extend it, deleting its whole
+  work directory frees everything, including task directories no run recorded (a task
+  started just before an interruption). The `low_disk` profile does this after a
+  successful run.
+
 ### Process timeout
 
-**Error:**
+**Error** (local executor; the time in brackets is the task's limit). On a cluster the
+scheduler stops the job instead, and the task fails with the scheduler's exit status:
 ```
-Process exceeded time limit
+Process exceeded running time limit (<time>)
 ```
 
 **Solution:**
@@ -821,23 +864,32 @@ the raw `_2_genefamilies.tsv` yourself, drop that row first.
 
 ### Database download failed
 
-**Error:**
+**Symptom:** a database task (`FORMAT_*_DB`, `DOWNLOAD_*`) fails. Its `.command.err`
+shows the download tool's own error (wget's, for a URL that cannot be reached or returns
+an HTTP error), or one of the pipeline's checks on what was downloaded, for example:
 ```
-ERROR: Failed to download database from URL
+ERROR: dbcan_db/<file> is <N> bytes, the release has <M> - a truncated download, or the server now serves another file under this URL (...)
+ERROR: md5 mismatch for <file> (got <md5>, expected <md5>) - corrupt or truncated download
+ERROR: k2_ref_db/hash.k2d missing after extraction
 ```
+
+**Cause and what the pipeline does:** a failed download task is retried up to three
+times. A byte-count mismatch (exit status 65) is not retried: the server is serving a
+different file under the pinned URL, and downloading it again would give the same file.
 
 **Solution:**
-1. Check internet connectivity
-2. Use pre-downloaded databases:
+1. Check that the machine running the task can reach the URL (on a cluster, the compute
+   nodes may have no internet access; then download on a login node, see below)
+2. Download the database yourself and pass it with its `--custom_*` option (recipes and
+   the expected layout: [Manual Database Download](manual.md#manual-database-download)):
    ```bash
-   nextflow run main.nf \
+   nextflow run main.nf ... \
        --custom_sylph_db /path/to/gtdb-r232-c200-dbv2.syl2db \
        --custom_sylph_taxonomy /path/to/gtdb_r232_metadata.tsv.gz \
-       --custom_checkm2_db /path/to/checkm2_db \
-       ...
+       --custom_checkm2_db /path/to/uniref100.KO.1.dmnd
    ```
-
-3. Download manually and specify path
+3. For a byte-count mismatch, check the database's release page: if the file was
+   replaced upstream, pass a copy you trust with the `--custom_*` option
 
 ### A stored database is incomplete, outdated or a placeholder
 
@@ -863,22 +915,20 @@ Placeholder files from `-stub` runs are kept apart under
 
 ### Database checksum mismatch
 
-**Error:**
-```
-ERROR: Database checksum verification failed
-```
+**Symptom:** a database task fails with
+`ERROR: md5 mismatch for <file> (...) - corrupt or truncated download`, or `md5sum -c`
+reports the file as `FAILED` (geNomad, GUNC, K-MARVEL's CARD tarball).
 
 **Solution:**
-1. Delete corrupted download and retry
-2. Download from alternative source
-3. Use custom database path
+1. Re-run with `-resume`: the task downloads the file again (a failed task stores nothing
+   in `--databases_dir`)
+2. If it fails again, download the file yourself, check its checksum against the
+   database's release page, and pass it with the `--custom_*` option
 
-### GTDB-TK memory error
+### GTDB-TK is killed or runs out of memory
 
-**Error:**
-```
-MemoryError in GTDB-TK
-```
+**Symptom:** `GTDB_TK_BATCH` fails with exit status 137, or its log reports that a step
+(usually pplacer) ran out of memory.
 
 **Solution:**
 1. `GTDB_TK_BATCH` already requests 256 GB, but the request is capped at
@@ -1117,10 +1167,8 @@ Quota exceeded for resource
 
 ### Azure: Authentication failed
 
-**Error:**
-```
-Azure Batch authentication failed
-```
+**Symptom:** the run stops before any task starts, with an authentication or
+authorization error from Azure Batch or Azure Storage.
 
 **Solution:**
 1. Verify environment variables:

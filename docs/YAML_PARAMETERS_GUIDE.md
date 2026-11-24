@@ -36,7 +36,7 @@ custom_phiX_fasta: "/data/genomes/phix174.fasta"
 
 **Usage:**
 ```bash
-nextflow run main.nf -params-file params.yaml
+nextflow run main.nf -params-file params.yaml -profile docker
 ```
 
 ### 2. Multiple Host Organisms
@@ -150,7 +150,7 @@ output: "results"
 
 # Quality Control
 quality_control: true
-min_read_sample: 10000000  # optional; default 0 disables the sample filter
+min_read_sample: 20000000  # optional; single reads (R1 + R2) after fastp, so 10 M pairs; default 0 disables the filter
 store_clean_reads: true
 
 # Multiple contaminant genomes
@@ -268,7 +268,7 @@ max_memory: "64.GB"
 
 ```bash
 # Create params.yaml with your configuration
-nextflow run main.nf -params-file params.yaml
+nextflow run main.nf -params-file params.yaml -profile docker
 ```
 
 ### With Profile
@@ -281,24 +281,24 @@ nextflow run main.nf -params-file params.yaml -profile docker
 nextflow run main.nf -params-file params.yaml -profile slurm
 
 # Use low disk profile
-nextflow run main.nf -params-file params.yaml -profile low_disk
+nextflow run main.nf -params-file params.yaml -profile docker,low_disk
 ```
 
 ### Override Specific Parameters
 
 ```bash
 # Override output directory
-nextflow run main.nf -params-file params.yaml --output different_results
+nextflow run main.nf -params-file params.yaml --output different_results -profile docker
 
 # Override max memory
-nextflow run main.nf -params-file params.yaml --max_memory 256.GB
+nextflow run main.nf -params-file params.yaml --max_memory 256.GB -profile docker
 ```
 
 ### Resume Failed Run
 
 ```bash
 # Resume from last checkpoint
-nextflow run main.nf -params-file params.yaml -resume
+nextflow run main.nf -params-file params.yaml -resume -profile docker
 ```
 
 ## Validation
@@ -324,7 +324,7 @@ done
 
 ```bash
 # See what would be executed without running
-nextflow run main.nf -params-file params.yaml -preview
+nextflow run main.nf -params-file params.yaml -preview -profile docker
 ```
 
 ## Troubleshooting
@@ -358,7 +358,7 @@ custom_host_fasta: '/path/file1.fasta,/path/file2.fasta'
 max_memory: "128.GB"
 
 # Or in command line
-nextflow run main.nf -params-file params.yaml --max_memory 128.GB
+nextflow run main.nf -params-file params.yaml --max_memory 128.GB -profile docker
 ```
 
 ### Issue: Index building takes too long

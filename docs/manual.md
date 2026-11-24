@@ -78,7 +78,7 @@ The figure at the top of this manual shows the stages from reads to results. [WO
   ~150 GB). The request is capped by `--max_memory`, so **a large co-assembly
   needs `--max_memory` above its 128 GB default**; otherwise it gets 128 GB
   and may run out of memory (see
-  [Out of memory](troubleshooting.md#out-of-memory)). Binette bin refinement
+  [Out of memory](troubleshooting.md#out-of-memory-a-task-fails-with-exit-status-137)). Binette bin refinement
   requests 36 GB on the first attempt (peaks of 11-13 GB measured).
 - **The bwa-mem3 index build** needs ~75 GB for the human host (the request is
   ~90 GB for the default gzipped genome, capped by `--max_memory`). It runs
@@ -211,7 +211,7 @@ BugBuster automatically downloads required databases on first use and stores the
 - **Refreshing a database**: delete its `<databases_dir>/<database>/<key>/` folder; the next run downloads it again. Do the same if a download was interrupted while being stored (a folder with missing files is taken as complete). RGI's default `--rgi_card_version latest` is stored as `rgi/latest_wildcard_k61`: the first run fixes which CARD release `latest` means for that `--databases_dir` (the stored `versions.yml` records the real version); delete the folder or pin `--rgi_card_version` to update it.
 - **Builds from your own files** (the decontamination index from `--custom_host_fasta` / `--custom_phiX_fasta`, RGI with `--custom_rgi_wildcard`, the sourmash taxonomy from a `--custom_sourmash_db` lineages file) have no version to key a folder on: they run in every new run and are copied to `<databases_dir>` for reuse through the matching `--custom_*` option (under `<databases_dir>/stub/` in a `-stub` run).
 - **`-stub` runs** store their placeholder files under `<databases_dir>/stub/`, never where a real run would take them for a database.
-- **`--custom_*` paths** are used in place and never copied.
+- **`--custom_*` paths** are used in place and never copied, except the genome FASTA options (`--custom_host_fasta`, `--custom_phiX_fasta`): they are the input of an index build that runs in every run (previous point).
 - **The sourmash k-mer database** (`gtdb-reps-rs220-k31.zip`, `--taxonomic_profiler sourmash`) is not downloaded by a pipeline task but staged by Nextflow from its URL into each work directory: a new work directory fetches it again. Download it once and pass it with `--custom_sourmash_db` to avoid that.
 - **One run at a time fills a new database folder.** Nextflow has no lock on these folders: two runs started together against an empty `--databases_dir` both download, and a run started while another is still moving a large database into place can take the half-moved folder as complete. Let the first run store its databases before starting others that share the directory.
 - **Earlier releases** published databases without the `<key>/` level (e.g. `kraken/k2_ref_db`); this release does not find them there. Pass them with the `--custom_*` options, or delete them and let the pipeline download again.
@@ -223,7 +223,7 @@ BugBuster automatically downloads required databases on first use and stores the
 | **phiX174 genome (FASTA)** | 5.4 kB | PhiX contamination removal | `quality_control=true` |
 | **Human host genome T2T-CHM13v2.0 (FASTA)** | 940 MB | Host read removal | `quality_control=true` |
 | **Kraken2 Standard-8** | 7.5 GB | Taxonomic profiling | `taxonomic_profiler='kraken2'` |
-| **Kraken2 GTDB r220** | 497 GB | Taxonomic profiling | `kraken2_db='gtdb_220'` |
+| **Kraken2 GTDB r220** | 497 GB; `KRAKEN2` needs about 1.1 × the size of the database's `hash.k2d` + 2 GB of RAM, capped by `--max_memory`: several hundred GB for this one | Taxonomic profiling | `kraken2_db='gtdb_220'` |
 | **Sourmash GTDB r220** | 17 GB | Taxonomic profiling | `taxonomic_profiler='sourmash'` |
 | **Sylph GTDB r232 (c200 .syl2db) + sylph-tax metadata** | 19 GB + 5.5 MB | Taxonomic profiling | `taxonomic_profiler='sylph'` |
 | **Metabuli refseq_standard** | 80 GB download, 110 GB unpacked | Contig taxonomy; its own NCBI taxdump (2026-04-03) feeds BlobTools | `contig_tax_and_arg=true` |
@@ -284,11 +284,22 @@ wget -O /shared/databases/bugbuster/gtdbtk_r232.tar.gz \
     https://data.gtdb.ecogenomic.org/releases/release232/232.0/auxillary_files/gtdbtk_package/full_package/gtdbtk_r232_data.tar.gz
 tar -xzf /shared/databases/bugbuster/gtdbtk_r232.tar.gz -C /shared/databases/bugbuster/
 
-# Download the Bakta database v6.0 (full, 31.9 GB; use db-light.tar.xz for
-# the 1.3 GB light DB — note the light DB changes annotation results)
+# Bakta database v6.0: simplest is to let the pipeline download it into the
+# shared --databases_dir (one run with --mag_level_functional true), which also
+# refreshes its AMRFinderPlus database. By hand (full, 31.9 GB; db-light.tar.xz
+# for the 1.3 GB light DB, which changes annotation results), the refresh is
+# required: the tarball's AMRFinderPlus database is too old for the AMRFinderPlus
+# in the pipeline's Bakta 1.12.2 image, and without the refresh every
+# NFCORE_BAKTA_BAKTA task fails at its AMR step (~300 MB from NCBI)
 wget -P /shared/databases/bugbuster/bakta/ \
     https://zenodo.org/record/14916843/files/db.tar.xz
 tar -xJf /shared/databases/bugbuster/bakta/db.tar.xz -C /shared/databases/bugbuster/bakta/
+docker run --rm -u $(id -u):$(id -g) \
+    -v /shared/databases/bugbuster/bakta/db/amrfinderplus-db:/amrdb \
+    quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0 \
+    amrfinder_update --force_update --database /amrdb
+# (singularity/apptainer: singularity exec -B .../amrfinderplus-db:/amrdb
+#  docker://quay.io/biocontainers/bakta:1.12.2--pyhdfd78af_0 amrfinder_update ...)
 
 # Download the Web of Life (WoLr2) subset the Woltka read-level backend uses
 # (~94 GB), keeping the FTP layout so the directory works as --custom_woltka_db.
@@ -339,17 +350,27 @@ find $R/metaphlan -mindepth 2 -type f -exec mv -t $R/metaphlan {} +
 # functional categories in the contig branch)
 wget -P /shared/databases/bugbuster/cog/ \
     https://ftp.ncbi.nlm.nih.gov/pub/COG/COG2024/data/cog-24.def.tab
-
-# Download human host genome (T2T-CHM13v2.0); the pipeline builds the
-# combined phiX + host index (bwa-mem3, or Bowtie2 under --read_aligner bowtie2)
-# from FASTA on first use
-wget -P /shared/databases/bugbuster/ \
-    https://s3-us-west-2.amazonaws.com/human-pangenomics/T2T/CHM13/assemblies/analysis_set/chm13v2.0.fa.gz
 ```
+
+The human host genome needs no download step: with the default `--host_db human`
+the pipeline downloads it (940 MB) and builds the combined phiX + host index once
+per `--databases_dir`, stored in
+`<databases_dir>/bwamem3_index/phiX174_human/contaminants_index/`
+(`bowtie_index/phiX174_human/` under `--read_aligner bowtie2`). Later runs with the
+same `--databases_dir` find it there and skip both. Do not pass the default genome
+with `--custom_host_fasta`: an index built from a custom FASTA is rebuilt in every
+run (~75 GB RAM for a human host). To use the stored index from another
+`--databases_dir`, pass it with
+`--custom_decontamination_index <databases_dir>/bwamem3_index/phiX174_human/contaminants_index`.
 
 ### Using Custom Databases
 
-Specify custom database paths to skip automatic downloads:
+Specify custom database paths to skip automatic downloads. Each path below is a
+database prepared as above (the Bakta one with its AMRFinderPlus refresh); the
+decontamination index is the one an earlier run with
+`--databases_dir /shared/databases/bugbuster` stored. Passing that
+`--databases_dir` instead finds every stored database without any `--custom_*`
+option:
 
 ```bash
 nextflow run main.nf \
@@ -357,7 +378,7 @@ nextflow run main.nf \
     --output ./results \
     --custom_sylph_db /shared/databases/bugbuster/sylph/gtdb-r232-c200-dbv2.syl2db \
     --custom_sylph_taxonomy /shared/databases/bugbuster/sylph/gtdb_r232_metadata.tsv.gz \
-    --custom_host_fasta /shared/databases/bugbuster/chm13v2.0.fa.gz \
+    --custom_decontamination_index /shared/databases/bugbuster/bwamem3_index/phiX174_human/contaminants_index \
     --custom_checkm2_db /shared/databases/bugbuster/checkm2/uniref100.KO.1.dmnd \
     --custom_gtdbtk_db /shared/databases/bugbuster/release232 \
     --custom_bakta_db /shared/databases/bugbuster/bakta/db \
@@ -417,7 +438,8 @@ Singleton reads are processed in both QC modes: with `--quality_control true`
 (default) they are trimmed by a dedicated single-end fastp run, decontaminated
 alongside the paired reads, and carried into downstream assembly/profiling
 steps that accept them. A few caveats: the `--min_read_sample` threshold counts
-paired reads only; Kraken2 profiles the paired reads only (it runs in
+the reads of the paired files only, R1 and R2 each (twice the read pairs), not the
+singletons; Kraken2 profiles the paired reads only (it runs in
 `--paired` mode); and read-level RGI ARG prediction (`--rgi_prediction`) also
 uses the paired reads only (`rgi bwt` accepts a single read pair); Sylph
 profiles the paired reads only too (sylph would treat a singleton file as a
@@ -537,7 +559,7 @@ breaks `-resume`.
 | `--woltka_uniq` | `false` | `true`, `false` | Woltka: leave reads whose reported alignments hit several ORFs unassigned instead of dividing them 1/k |
 | `--superfocus_aligner` | `diamond` | `diamond`, `mmseqs2` | SUPER-FOCUS search backend (DIAMOND blastx or MMseqs2); selects which DB_90 archive is downloaded |
 | `--arg_bin_clustering` | `false` | `true`, `false` | ARG clustering for HGT inference: the assembly's DeepARG hits split by refined bin (no per-bin DeepARG run), then MMseqs2 |
-| `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads required after QC |
+| `--min_read_sample` | `0` | Integer ≥ 0 | Minimum reads after fastp, counted as single reads (R1 + R2, twice the read pairs; singletons not counted) |
 | `--store_clean_reads` | `false` | `true`, `false` | Publish the decontaminated reads to `<output>/clean_reads/` (publishing only; `-resume` is the task cache) |
 | `--featurecounts_multimap` | `primary` | `primary`, `all`, `none` | featureCounts multi-mapping policy for gene counts: primary alignments only, every reported alignment (`-M`), or no multi-mapping reads |
 
@@ -2025,8 +2047,6 @@ nextflow run main.nf \
     --output ./results \
     --assembly_mode coassembly \
     --include_binning true \
-    --taxonomic_profiler kraken2 \
-    --kraken2_db gtdb_220 \
     -profile singularity
 ```
 
@@ -2127,8 +2147,6 @@ Enhanced taxonomy profiling with custom visualization:
 nextflow run main.nf \
     --input samplesheet.csv \
     --output ./results \
-    --taxonomic_profiler kraken2 \
-    --kraken2_db gtdb_220 \
     --taxonomy_plot_levels "Phylum,Class,Order,Family,Genus" \
     --taxonomy_top_n_taxa 20 \
     --create_phyloseq_rds true \
@@ -2362,17 +2380,11 @@ squeue -u $USER
 
 #### Resume Not Working
 
-```bash
-# Check work directory exists
-ls -la work/
-
-# Force fresh run: simply omit -resume
-nextflow run main.nf ...
-
-# Clean and restart
-nextflow clean -f
-nextflow run main.nf ...
-```
+`-resume` needs the same launch directory, the same `-work-dir` and the work directories
+of the finished tasks. Do not run `nextflow clean -f` before resuming: it deletes the tasks
+the last run executed, which are the ones `-resume` would reuse. What `-resume` needs and
+what each form of `nextflow clean` deletes:
+[Resume not working, or freeing space safely](troubleshooting.md#resume-not-working-or-freeing-space-safely-nextflow-clean).
 
 ### Debug Mode
 

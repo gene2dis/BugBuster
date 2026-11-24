@@ -219,8 +219,8 @@ Complete reference for all BugBuster pipeline parameters.
 - **Type**: Integer
 - **Default**: `0`
 - **Minimum**: `0`
-- **Description**: Minimum number of reads required per sample after QC filtering. Samples below this threshold are excluded.
-- **Example**: `--min_read_sample 10000000`
+- **Description**: Minimum number of reads per sample after fastp filtering, counted as single reads: R1 + R2 of the paired files (fastp's `after_filtering` total), so twice the read pairs; singleton reads do not count. Samples below it are dropped with a warning before decontamination. `0` disables the filter. Not the unit of the summary's `--summary_min_clean_pairs`, which counts read pairs after decontamination.
+- **Example**: `--min_read_sample 20000000` (keeps samples with at least 10 M read pairs after fastp)
 
 ---
 
@@ -248,7 +248,8 @@ Complete reference for all BugBuster pipeline parameters.
 - **Options**: `standard-8`, `gtdb_220`
 - **Description**: Kraken2 database selection
 - **Size**: 7.5 GB (standard-8), 497 GB (gtdb_220)
-- **Example**: `--kraken2_db gtdb_220`
+- **Memory**: `KRAKEN2` needs about 1.1 × the size of the database's `hash.k2d` + 2 GB of RAM, capped by `--max_memory` (default 128 GB): `gtdb_220` needs a node with several hundred GB of RAM ([KRAKEN2 is killed ...](troubleshooting.md#kraken2-is-killed-exit-137-or-runs-for-hours-with-a-large-kraken2-database))
+- **Example**: `--kraken2_db standard-8`
 
 ### `--sourmash_db`
 - **Type**: String

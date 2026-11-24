@@ -110,12 +110,14 @@ cat phix.fasta host.fasta > contaminants.fasta
 # Build the bwa-mem3 index (default aligner; ~75 GB RAM for a human host)
 mkdir contaminants_index
 bwa-mem3 index -t 16 -p contaminants_index/contaminants contaminants.fasta
-nextflow run main.nf --custom_decontamination_index contaminants_index
+nextflow run main.nf --input samples.csv --output results -profile docker \
+    --custom_decontamination_index contaminants_index
 
 # Or a Bowtie2 index for the fallback
 mkdir bowtie2_index
 bowtie2-build contaminants.fasta bowtie2_index/contaminants
-nextflow run main.nf --read_aligner bowtie2 --custom_decontamination_index bowtie2_index
+nextflow run main.nf --input samples.csv --output results -profile docker \
+    --read_aligner bowtie2 --custom_decontamination_index bowtie2_index
 ```
 
 ---
@@ -161,7 +163,8 @@ for the built-in human host only; with `--custom_host_fasta`, allow ~24 GB per
 Gbp of genome.
 Pass a pre-built index, or use the bowtie2 fallback:
 ```bash
-nextflow run main.nf --max_memory 64.GB --read_aligner bowtie2
+nextflow run main.nf --input samples.csv --output results -profile docker \
+    --max_memory 64.GB --read_aligner bowtie2
 ```
 
 ### "Illegal instruction" in a BWAMEM3_* task
@@ -169,7 +172,8 @@ The bioconda bwa-mem3 build needs a CPU with AVX2 (x86-64-v3). Use `--read_align
 
 ### Resume Failed Run
 ```bash
-nextflow run main.nf -resume
+# the same command as the failed run, plus -resume
+nextflow run main.nf --input samples.csv --output results -profile docker -resume
 ```
 
 ### Check Statistics
