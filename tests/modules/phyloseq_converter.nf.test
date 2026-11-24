@@ -1,0 +1,67 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    PHYLOSEQ_CONVERTER Module Test (roadmap Phase 25, RV25; review R6-15, R8-02)
+
+    --create_phyloseq_rds: the real TAXONOMY_PHYLOSEQ (setup, the kraken2
+    fixture reports of tests/modules/taxonomy_phyloseq.nf.test) writes the
+    three tables, and the module turns them into an RDS with
+    bin/tables_to_phyloseq_simple.R. What the RDS holds is checked in
+    tests/bin/test_tables_to_phyloseq.sh, which reads it back with phyloseq.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test PHYLOSEQ_CONVERTER Process"
+    script "../../modules/local/phyloseq_converter/main.nf"
+    process "PHYLOSEQ_CONVERTER"
+
+    setup {
+        run("TAXONOMY_PHYLOSEQ") {
+            script "../../modules/local/taxonomy_phyloseq/main.nf"
+            process {
+                """
+                input[0] = [
+                    file("${projectDir}/tests/data/taxonomy/sample1.kraken2.report_bracken.txt", checkIfExists: true),
+                    file("${projectDir}/tests/data/taxonomy/sample2.kraken2.report_bracken.txt", checkIfExists: true)
+                ]
+                input[1] = 'kraken2'
+                input[2] = 'standard-8'
+                input[3] = 'Phylum,Genus'
+                input[4] = 10
+                """
+            }
+        }
+    }
+
+    test("writes the phyloseq RDS from the TAXONOMY_PHYLOSEQ tables") {
+        when {
+            params {
+                output = "${outputDir}"
+                create_phyloseq_rds = true
+            }
+            process {
+                """
+                input[0] = TAXONOMY_PHYLOSEQ.out.otu_table
+                input[1] = TAXONOMY_PHYLOSEQ.out.tax_table
+                input[2] = TAXONOMY_PHYLOSEQ.out.sample_metadata
+                input[3] = 'standard-8'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rds = process.out.phyloseq_rds.get(0)
+            assert file(rds).name == 'standard-8_phyloseq.RDS'
+            // saveRDS writes gzip: magic bytes 1f 8b
+            def bytes = file(rds).bytes
+            assert bytes.length > 100
+            assert (bytes[0] & 0xff) == 0x1f && (bytes[1] & 0xff) == 0x8b
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("bioconductor-phyloseq: 1.54.0")
+            assert versions.contains("r-base: 4.5.2")
+        }
+    }
+}
