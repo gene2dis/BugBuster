@@ -143,7 +143,7 @@ Complete reference for all BugBuster pipeline parameters.
 ### `--args_oap_prediction`
 - **Type**: Boolean
 - **Default**: `false`
-- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/` (see the manual, section 5.4)
+- **Description**: Run [ARGs-OAP](https://github.com/xinehc/args_oap) 4.0.0 at read level: stage one (16S and cell-number estimates, ARG-like reads) and stage two (SARG search, normalised by type, subtype and gene: copies per cell, per 16S copy, ppm). Results in `05_arg_prediction/read_level/args_oap/` and `args_oap_summary/`; what they hold: [manual, section 7.4](manual.md#74-read-level-arg-outputs); cost: manual, section 5.4
 - **Example**: `--args_oap_prediction true`
 - **Note**: Independent of `--rgi_prediction` and `--kmarvel_prediction`; the three read-level ARG tools each have their own switch
 
@@ -1200,7 +1200,7 @@ available CPUs` (or `memory`); see manual §11.1. `-profile test` sets 2 CPUs / 
 
 ## Cloud & HPC Profile Parameters
 
-These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage: give either its `--*_workdir` parameter or Nextflow's `-work-dir` with the cloud scheme (`-work-dir s3://my-bucket/work` for `aws`, `gs://` for `gcp`, `az://` for `azure`). Without either, the pipeline exits at launch with an error.
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage, given with its `--*_workdir` parameter (`--aws_workdir s3://my-bucket/work`, `--gcp_workdir gs://…`, `--azure_workdir az://…`); without it the pipeline exits at launch with an error. Give the parameter even when you also pass Nextflow's `-work-dir`: the launch check does not yet recognise a cloud `-work-dir` on its own.
 
 ### AWS Batch (`-profile aws`)
 

@@ -350,8 +350,8 @@ or waits in the queue for a long time.
    SLURM job id is in the log; `sacct -j <job id> --format=JobID,State,Elapsed,MaxRSS,ReqMem`
    shows whether SLURM stopped it for time or memory, and `squeue -u $USER` what is still
    queued.
-2. Each task asks for the time of its resource label, 4 h, 8 h, 24 h or 72 h, times the
-   attempt, capped by `--max_time` (240 h by default): a retried task gets more time. To
+2. Each task asks for the time of its resource label, 4 h, 8 h, 24 h or 72 h (48 h for
+   the large database downloads), times the attempt, capped by `--max_time` (240 h by default): a retried task gets more time. To
    give one process more from the start, set `time` in its
    `withName` block of a `-c` config (see [Process timeout](#process-timeout)).
 3. Queues, account and other SLURM settings are the `--slurm_*` parameters

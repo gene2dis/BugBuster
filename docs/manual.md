@@ -1905,7 +1905,8 @@ tar -xzf /shared/databases/bugbuster/gtdbtk_r232.tar.gz -C /shared/databases/bug
 # Bakta database v6.0: simplest is to let the pipeline download it into the
 # shared --databases_dir (one run with --mag_level_functional true), which also
 # refreshes its AMRFinderPlus database. By hand (full, 31.9 GB; db-light.tar.xz
-# for the 1.3 GB light DB, which changes annotation results), the refresh is
+# for the 1.3 GB light DB, which changes annotation results and unpacks to
+# db-light/ instead of db/: use that folder name below), the refresh is
 # required: the tarball's AMRFinderPlus database is too old for the AMRFinderPlus
 # in the pipeline's Bakta 1.12.2 image, and without the refresh every
 # NFCORE_BAKTA_BAKTA task fails at its AMR step (~300 MB from NCBI)
@@ -2297,7 +2298,7 @@ nextflow run main.nf \
     --quality_control true \
     --assembly_mode assembly \
     -profile aws,docker \
-    -work-dir s3://bucket/work
+    --aws_workdir s3://bucket/work
 ```
 
 ### Example 8: Using Pre-downloaded Databases
