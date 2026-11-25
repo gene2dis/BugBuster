@@ -10,9 +10,12 @@ nextflow_pipeline {
     script "../main.nf"
 
     test("Run with test profile - QC only") {
+        // The committed reads (TestData.localSamplesheet): the first 500 pairs
+        // of the nf-core reads assets/test_samplesheet.csv points to, so the
+        // test downloads nothing (roadmap Phase 25, RV27; review R8-11)
         when {
             params {
-                input  = "${projectDir}/assets/test_samplesheet.csv"
+                input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 quality_control    = true
                 assembly_mode      = "none"
@@ -99,10 +102,14 @@ nextflow_pipeline {
             assert r2_clean.linesGzip.size() == 6 * 4
             assert s_clean.linesGzip.size() == 4 * 4
 
-            // The summary must carry the singleton accounting columns
-            def report_text = path("${outputDir}/01_quality_control/summary/Reads_report.csv").text
-            assert report_text.contains("singleton_test")
-            assert report_text.toLowerCase().contains("singleton")
+            // The summary must carry the singleton accounting columns: their
+            // exact names and the sample's counts (reads: 10 pairs, 6 clean;
+            // singletons: 10, all kept by fastp, 4 clean). The old check
+            // matched the sample id 'singleton_test' itself and could not
+            // fail (roadmap Phase 25, RV26; review R8-27)
+            def report_lines = path("${outputDir}/01_quality_control/summary/Reads_report.csv").readLines()
+            assert report_lines[0] == "Id,Raw reads,Fastp,Clean reads (contaminants removed),Raw singletons,Fastp singletons,Clean singletons (contaminants removed)"
+            assert report_lines[1] == "singleton_test,20,20,12,10,10,4"
 
             // Audit #14: the NFCORE_FASTP_SINGLETON selector must carry the knob too
             def singleton_json = path("${outputDir}/01_quality_control/fastp/singleton_test/singleton_test_Singleton.fastp.json")
@@ -1486,16 +1493,18 @@ nextflow_pipeline {
         }
     }
 
-    test("String-valued CLI toggles and numbers are honoured (Nextflow >= 26.04)") {
+    test("String-valued CLI toggles and numbers are honoured (Nextflow >= 26.04; rejected on 25.10)") {
         // Design doc Q13: on Nextflow >= 26.04 every CLI parameter arrives as a
         // String (`--include_binning false` is the truthy String "false"; a
         // number is a String too), and nf-schema validates without converting.
         // nf-test hands these String values through the same way, so this test
         // reproduces the CLI form. Before the fix, include_binning "false" with
         // assembly_mode none was rejected at launch and min_read_sample "10"
-        // crashed QC. Runs where the nf-test suite runs (CI: latest Nextflow);
-        // Nextflow 25.10 converts CLI values itself and its nf-schema rejects
-        // String booleans given this way, so the case cannot arise there.
+        // crashed QC. Nextflow 25.10 converts CLI values itself, so the case
+        // cannot arise there from a command line; given this way (params
+        // file), its nf-schema rejects the String values at launch, which is
+        // what the test asserts on 25.10 (roadmap Phase 25, RV27: nf-test runs
+        // on 25.10.7 and the newest Nextflow in CI)
         options "-stub"
 
         when {
@@ -1528,6 +1537,15 @@ nextflow_pipeline {
         }
 
         then {
+            if (TestData.nextflowBefore(outputDir, 26, 4)) {
+                assert workflow.failed
+                def text = (workflow.stdout + workflow.stderr).join('\n')
+                assert text.contains("Validation of pipeline parameters failed!")
+                assert text.contains("--include_binning (false): Value is [string] but should be [boolean]")
+                assert text.contains("--min_read_sample (10): Value is [string] but should be [integer]")
+                assert workflow.trace.tasks().size() == 0
+                return
+            }
             assert workflow.success
             // "true": QC ran; the min_read_sample comparison passed both samples
             assert workflow.trace.tasks().count { task -> task.name.contains("QC:NFCORE_FASTP (") } == 2

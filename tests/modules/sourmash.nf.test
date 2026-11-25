@@ -1,0 +1,108 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SOURMASH Module Test (roadmap Phase 25, RV25; review R8-02)
+
+    sketch -> gather -> tax annotate against a committed two-genome database
+    (tests/data/sourmash/two_genome_k31.zip + two_genome_lineages.csv,
+    tests/bin/make_sourmash_fixtures.sh), with the taxonomy prepared by the
+    real SOURMASH_TAX_PREPARE in setup:
+      - reads simulated from GCF_900000001.1: one match with its lineage, and
+        the report's classified fraction above zero
+      - B. fragilis reads (tests/data/reads/test_sample1): no match, so the
+        module's header-only CSV and a fully unclassified report
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test SOURMASH Process"
+    script "../../modules/local/sourmash/main.nf"
+    process "SOURMASH"
+
+    setup {
+        run("SOURMASH_TAX_PREPARE") {
+            script "../../modules/local/format_db/main.nf"
+            process {
+                """
+                input[0] = file("${projectDir}/tests/data/sourmash/two_genome_lineages.csv", checkIfExists: true)
+                """
+            }
+        }
+    }
+
+    test("finds the simulated genome and annotates its lineage") {
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'sim' ],
+                    [
+                        file("${projectDir}/tests/data/sourmash/sm_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/sourmash/sm_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/sourmash/two_genome_k31.zip", checkIfExists: true)
+                ]).combine(SOURMASH_TAX_PREPARE.out.tax_db)
+                input[1] = 'testdb'
+                input[2] = 'species'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def gather = path(process.out.sourmash_gather.get(0))
+            assert file(gather.toString()).name == 'sim_smgather_testdb.with-lineages.csv'
+            def rows = gather.readLines()
+            def header = rows[0].split(',') as List
+            assert header[0] == 'intersect_bp' && header[-1] == 'lineage'
+            // one match, the simulated genome, with its lineage appended
+            assert rows.size() == 2
+            assert rows[1].contains('GCF_900000001.1')
+            assert !rows[1].contains('GCF_900000002.1')
+            assert rows[1].endsWith('d__Bacteria;p__Synthetica;c__Synthetia;o__Synthetales;f__Synthetaceae;g__Synthetus;s__Synthetus alpha')
+            // k=31 for --sourmash_tax_rank species
+            assert rows[1].split(',')[header.indexOf('ksize')] == '31'
+
+            def report = path(process.out.report.get(0)).readLines()
+            assert file(process.out.report.get(0)).name == 'sim_species_testdb_report.tsv'
+            assert report[0] == "Id\tSourmash DB\tUnclassified\tClassified"
+            def fields = report[1].split('\t')
+            assert fields[0] == 'sim' && fields[1] == 'testdb'
+            // error-free reads of one database genome: nearly all classified
+            def classified = fields[3] as double
+            assert classified > 0.9 && classified <= 1.0
+            assert Math.abs((fields[2] as double) + classified - 1.0) < 1e-6
+
+            assert path(process.out.versions.get(0)).text.contains("sourmash: 4.9.4")
+        }
+    }
+
+    test("no match: the header-only CSV and an unclassified report") {
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'nomatch' ],
+                    [
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/sourmash/two_genome_k31.zip", checkIfExists: true)
+                ]).combine(SOURMASH_TAX_PREPARE.out.tax_db)
+                input[1] = 'testdb'
+                input[2] = 'species'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.sourmash_gather.get(0)).readLines()
+            assert rows.size() == 1
+            assert rows[0].split(',').size() == 33
+            assert rows[0].endsWith(',lineage')
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[1] == "nomatch\ttestdb\t1\t0"
+        }
+    }
+}

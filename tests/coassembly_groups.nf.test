@@ -45,19 +45,8 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            def out = new File("${outputDir}")
-            def published = []
-            out.eachFileRecurse { f ->
-                if (f.isFile()) {
-                    def rel = out.toPath().relativize(f.toPath()).toString()
-                    if (!(rel ==~ /pipeline_info\/(execution_|pipeline_dag|params_).*/) && !rel.startsWith('local_test_samplesheet')) {
-                        published << rel
-                    }
-                }
-            }
-            def expected = new File("${projectDir}/tests/data/stub_paths/coassembly_dev.txt").readLines()
             assert TestData.databaseFolders(outputDir) == []
-            assert published.sort() == expected.sort()
+            assert TestData.publishedPathsDiff(outputDir, projectDir, 'coassembly_dev') == [missing: [], unexpected: []]
         }
     }
 
@@ -245,21 +234,34 @@ nextflow_pipeline {
 
     test("Reads a metadata table with spaces around its names and ids") {
         // The CSV header ' site' and the ids ' test_sample1 ' are read trimmed,
-        // like the samplesheet: the run reaches the label check (both rows
-        // matched, column found) instead of failing on the column or the rows
+        // like the samplesheet, and the values too: both rows are matched and
+        // give their own group. A stub run with every later stage off, which
+        // checks the groups themselves (it used to pass through the label
+        // check's failure; roadmap Phase 25, RV26; review R8-08)
+        options "-stub"
+
         when {
             params {
                 input  = TestData.localSamplesheet(outputDir, projectDir)
                 output = "${outputDir}"
                 assembly_mode       = "coassembly"
-                sample_metadata     = TestData.metadataTable(outputDir, "m.csv", "sample, site\n test_sample1 ,site 1\ntest_sample2 , site/1\n")
+                sample_metadata     = TestData.metadataTable(outputDir, "m.csv", "sample, site\n test_sample1 ,site 1\ntest_sample2 , site 2 \n")
                 coassembly_group_by = "site"
+                quality_control     = false
+                nonpareil           = false
+                taxonomic_profiler  = "none"
+                results_summary     = false
+                max_cpus   = 2
+                max_memory = "6.GB"
             }
         }
 
         then {
-            assert workflow.failed
-            assert (workflow.stdout + workflow.stderr).join('\n').contains("'site 1' and 'site/1' both become 'site_1'")
+            assert workflow.success
+            assert path("${outputDir}/pipeline_info/coassembly_groups.tsv").text ==
+                "sample\tgroup\ntest_sample1\tsite_1\ntest_sample2\tsite_2\n"
+            // one co-assembly per group
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("ASSEMBLY:MEGAHIT (") } == 2
         }
     }
 

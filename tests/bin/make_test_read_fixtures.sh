@@ -5,7 +5,10 @@
 # licence) the test profile uses (assets/test_samplesheet.csv). The stub and
 # validation nf-tests read these instead of downloading from GitHub, whose
 # raw-file downloads failed intermittently on CI runners (2026-10-09). Read
-# content does not matter to a stub run; a real run still uses the full files.
+# content does not matter to a stub run. Since roadmap Phase 25 (RV27) CI's
+# real test-profile run and the real QC nf-tests use them too (--input with a
+# samplesheet of these files); -profile test without --input still downloads
+# the full files.
 #
 # Output is byte-stable (gzip -n). Requires curl and network access.
 #

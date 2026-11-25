@@ -1,0 +1,103 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    KMARVEL Module Test (roadmap Phase 25, RV25/RV26; review R8-06)
+
+    The module's own script in its pinned image, on a synthetic database in
+    CARD 4.0.1's layout (tests/data/kmarvel/db_synthetic, made-up proteins,
+    no CARD data; tests/bin/make_kmarvel_fixtures.py) with the pipeline's
+    thresholds (config/modules.config):
+      - reads simulated from a back-translated copy of SynR-1: the one ARG
+        found, at full identity and coverage, confirmed by blastp
+      - B. fragilis reads (tests/data/reads/test_sample1): no ARG, the
+        header-only table kmarvel_check_output.sh writes
+    The database has no DB_VERSION and no BLAST index, so the module indexes
+    a copy of the FASTA in the task and records its md5.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test KMARVEL Process"
+    script "../../modules/local/kmarvel/main.nf"
+    process "KMARVEL"
+
+    test("finds the simulated ARG and confirms it with blastp") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sim' ],
+                    [
+                        file("${projectDir}/tests/data/kmarvel/kmarvel_sim_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/kmarvel/kmarvel_sim_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/kmarvel/db_synthetic", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def (meta, tsv) = process.out.tsv[0]
+            assert meta.id == 'sim'
+            assert file(tsv).name == 'sim_kmarvel.tsv'
+            def rows = path(tsv).readLines()
+            def header = rows[0].split('\t') as List
+            assert header[0] == 'aro_full_name' && header.contains('blast_predicted_aro_id')
+            // one ARG: SynR-1, not the two proteins with no reads
+            assert rows.size() == 2
+            def row = rows[1].split('\t')
+            def col = { name -> row[header.indexOf(name)] }
+            assert col('aro_id') == 'ARO:9000001'
+            assert col('aro_full_name') == 'synthetic resistance protein SynR-1'
+            assert col('model') == 'protein homolog model'
+            assert (col('identity') as double) == 100.0
+            assert (col('assembly_coverage') as double) == 100.0
+            assert (col('supporting_reads') as int) > 100
+            assert col('blast_predicted_aro_id') == 'ARO:9000001'
+
+            assert file(process.out.json.get(0)).name == 'sim_kmarvel.json'
+            assert path(process.out.json.get(0)).text.contains('"ARO:9000001"')
+            assert file(process.out.log.get(0)).name == 'sim_kmarvel.log'
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains('kmarvel: 1.0.0')
+            assert versions.contains('blast: 2.17.0')
+            assert versions.contains('card: "custom (CARD_protein_all.fasta md5 7ab62bcfd470fede27d33af239fdc984)"')
+        }
+    }
+
+    test("reads without an ARG give the header-only table") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'none' ],
+                    [
+                        file("${projectDir}/tests/data/reads/test_sample1_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/test_sample1_R2.fastq.gz", checkIfExists: true)
+                    ]
+                ]
+                input[1] = file("${projectDir}/tests/data/kmarvel/db_synthetic", checkIfExists: true)
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def rows = path(process.out.tsv[0][1]).readLines()
+            assert rows.size() == 1
+            assert rows[0].startsWith('aro_full_name\taro_id\t')
+            assert rows[0].contains('blast_e_value')
+        }
+    }
+}

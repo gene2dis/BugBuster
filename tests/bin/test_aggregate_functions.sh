@@ -102,14 +102,28 @@ expect_pass() {
     fi
 }
 
-expect_fail() {
-    local desc="$1"; shift
+expect_err() {
+    # expect_err <desc> <message> <args...>: the command must fail and its log
+    # must hold <message> (a fixed string). A Python traceback passes only when
+    # <message> names the exception the script raises on purpose
+    # ("ValueError: ..."), so a guard that stops working cannot pass through
+    # an unrelated crash (roadmap Phase 25, RV26; review R8-04)
+    local desc="$1" msg="$2"; shift 2
     local workdir="${NEXT_WORKDIR:-${WORK}/$(echo "${desc}" | tr ' /:' '___')}"
     NEXT_WORKDIR=""
     mkdir -p "${workdir}"
     LAST_WORKDIR="${workdir}"
     if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
-        echo "✗ ${desc} — expected failure, got success"
+        echo "✗ ${desc} — expected nonzero exit, script succeeded"
+        FAIL=$((FAIL + 1))
+    elif ! grep -qF -- "${msg}" "${workdir}.log"; then
+        echo "✗ ${desc} — failed, but without '${msg}':"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    elif grep -q 'Traceback (most recent call last)' "${workdir}.log" \
+            && ! [[ "${msg}" =~ ^[A-Za-z]+(Error|Exception):\  ]]; then
+        echo "✗ ${desc} — failed with a Python traceback, not its own error:"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
         FAIL=$((FAIL + 1))
     else
         echo "✓ ${desc}"
@@ -321,20 +335,20 @@ check "groups: 5.2 keeps assembly_mode coassembly and every sample" \
 check "groups: sampleZ (g2) gets no term of contig_1_1, sampleA (g1) does" \
     "[ \"\$(diff <(grep -P '^sampleA\t' '${D}/annotated_fraction.tsv' | grep -P '\tany\t' | cut -f3,4) <(grep -P '^sampleZ\t' '${D}/annotated_fraction.tsv' | grep -P '\tany\t' | cut -f3,4) > /dev/null; echo \$?)\" = 1 ]"
 printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\n' > "${D}/groups_missing.tsv"
-NEXT_WORKDIR="${D}" expect_fail "groups: a sample without a group fails" \
+NEXT_WORKDIR="${D}" expect_err "groups: a sample without a group fails" "Error: --coassembly-groups has no group for sample(s) ['sampleZ']" \
     --assembly-mode coassembly --coassembly-groups groups_missing.tsv \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
     --annotations g1.emapper.annotations g2.emapper.annotations \
     --gffs g1.gff.gz g2.gff.gz \
     --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_missing
 printf 'sample\tgroup\nsampleA\tg1\nsampleB\tg1\nsampleZ\tg3\n' > "${D}/groups_other.tsv"
-NEXT_WORKDIR="${D}" expect_fail "groups: annotation files of other groups fail" \
+NEXT_WORKDIR="${D}" expect_err "groups: annotation files of other groups fail" "Error: groups of --counts ['g1', 'g3'] and --annotations ['g1', 'g2'] do not match" \
     --assembly-mode coassembly --coassembly-groups groups_other.tsv \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
     --annotations g1.emapper.annotations g2.emapper.annotations \
     --gffs g1.gff.gz g2.gff.gz \
     --cog-def cog-fixture.def.tab --eggnog-versions-yml eggnog_versions.yml --output-dir out_other
-NEXT_WORKDIR="${D}" expect_fail "groups: --coassembly-groups with --assembly-mode assembly fails" \
+NEXT_WORKDIR="${D}" expect_err "groups: --coassembly-groups with --assembly-mode assembly fails" "Error: --coassembly-groups needs --assembly-mode coassembly" \
     --assembly-mode assembly --coassembly-groups coassembly_groups.tsv \
     --counts sampleA.featureCounts.txt sampleB.featureCounts.txt sampleZ.featureCounts.txt \
     --annotations g1.emapper.annotations g2.emapper.annotations \
@@ -380,25 +394,25 @@ NEG_ARGS=(--assembly-mode assembly --counts sampleA.featureCounts.txt
 
 D="${WORK}/neg_renamed"; seed_negative "${D}"
 sed -i 's/\tKEGG_ko\t/\tKEGG_KO_RENAMED\t/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "renamed column in annotations header fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "renamed column in annotations header fails" "does not match the verified emapper-3.0.0-beta6 layout (22 columns). Got 22 columns" "${NEG_ARGS[@]}"
 check_grep "  ...with a layout-drift message" "../neg_renamed.log" "does not match the verified"
 
 D="${WORK}/neg_21col"; seed_negative "${D}"
 sed -i 's/\tannotation_confidence$//; s/\th--h------h-h$//' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "21-column annotations header fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "21-column annotations header fails" "does not match the verified emapper-3.0.0-beta6 layout (22 columns). Got 21 columns" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_23col"; seed_negative "${D}"
 sed -i 's/\tannotation_confidence$/\tannotation_confidence\tmd5/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "23-column (--md5) annotations header fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "23-column (--md5) annotations header fails" "does not match the verified emapper-3.0.0-beta6 layout (22 columns). Got 23 columns" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_unknown_version"; seed_negative "${D}"
 sed -i 's/eggnog-mapper: 3.0.0-beta6/eggnog-mapper: 9.9.9/' "${D}/eggnog_versions.yml"
-NEXT_WORKDIR="${D}" expect_fail "unverified emapper version fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "unverified emapper version fails" "Error: eggnog-mapper version '9.9.9' is not among the layouts this parser was verified against" "${NEG_ARGS[@]}"
 check_grep "  ...naming the known-layout set" "../neg_unknown_version.log" "not among the layouts"
 
 D="${WORK}/neg_missing_version"; seed_negative "${D}"
 grep -v 'eggnog-mapper:' "${FIXTURES}/eggnog_versions.yml" > "${D}/eggnog_versions.yml"
-NEXT_WORKDIR="${D}" expect_fail "missing emapper version in versions.yml fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "missing emapper version in versions.yml fails" "Error: no 'eggnog-mapper:' version found in eggnog_versions.yml" "${NEG_ARGS[@]}"
 
 # Q16: the letter form ('S', the only letter value in eggNOG 7) and the
 # trailing-space quirk of real cog-24 (fixture COG0002 -> 'O ')
@@ -412,58 +426,58 @@ NEXT_WORKDIR="${D}" expect_pass "COG id whose table category has a trailing spac
 check_grep "  ...as cog term O" "function_abundance.tsv" "eggnog-mapper.cog.O.."
 
 D="${WORK}/neg_cog_no_table"; seed_negative "${D}"
-NEXT_WORKDIR="${D}" expect_fail "COG id without --cog-def fails (Q16)" --assembly-mode assembly \
+NEXT_WORKDIR="${D}" expect_err "COG id without --cog-def fails (Q16)" "Error: COG_category value 'COG0001' is a COG id, but no --cog-def table was given" --assembly-mode assembly \
     --counts sampleA.featureCounts.txt --annotations sampleA.emapper.annotations \
     --gffs sampleA.gff.gz --eggnog-versions-yml eggnog_versions.yml --output-dir .
 check_grep "  ...asking for the COG table" "../neg_cog_no_table.log" "no --cog-def"
 D="${WORK}/neg_cog_unknown_id"; seed_negative "${D}"
 sed -i 's/\tCOG0001\t/\tCOG9999\t/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "COG id missing from the COG table fails (Q16)" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "COG id missing from the COG table fails (Q16)" "Error: COG id 'COG9999' is not in the --cog-def table" "${NEG_ARGS[@]}"
 check_grep "  ...naming the id" "../neg_cog_unknown_id.log" "COG id .COG9999. is not in the --cog-def table"
 D="${WORK}/neg_cog_other_form"; seed_negative "${D}"
 sed -i 's/\tCOG0001\t/\tCOG0001,COG0002\t/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "COG_category in an unverified form fails (Q16)" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "COG_category in an unverified form fails (Q16)" "Error: COG_category value 'COG0001,COG0002' is neither category letters nor a COG id" "${NEG_ARGS[@]}"
 D="${WORK}/neg_cog_bad_table"; seed_negative "${D}"
 printf 'not a cog table\n' > "${D}/cog-fixture.def.tab"
-NEXT_WORKDIR="${D}" expect_fail "malformed COG definitions table fails (Q16)" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "malformed COG definitions table fails (Q16)" "Error: cog-fixture.def.tab:1: expected the NCBI COG definitions layout" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_pfam_no_coords"; seed_negative "${D}"
 sed -i 's/MockPfam_10_95,MockPfam_150_290,Mock_dom_2_5_60/MockPfam/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "PFAMs value without the v3 coordinate suffix fails (Q15)" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "PFAMs value without the v3 coordinate suffix fails (Q15)" "Error: PFAMs value 'MockPfam' is not '<pfam_name>_<start>_<end>'" "${NEG_ARGS[@]}"
 check_grep "  ...naming the offending PFAMs value" "../neg_pfam_no_coords.log" "PFAMs value .MockPfam. is not"
 
 D="${WORK}/neg_header_disagrees"; seed_negative "${D}"
 sed -i 's/^## emapper-3.0.0-beta6$/## emapper-2.1.15/' "${D}/sampleA.emapper.annotations"
-NEXT_WORKDIR="${D}" expect_fail "'## emapper-' line disagreeing with versions.yml fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "'## emapper-' line disagreeing with versions.yml fails" "header says emapper-2.1.15 but versions.yml says 3.0.0-beta6" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_id_mismatch"; seed_negative "${D}"
 printf 'contig_1_99\tcontig_1\t950\t999\t+\t50\t7\n' >> "${D}/sampleA.featureCounts.txt"
-NEXT_WORKDIR="${D}" expect_fail "counts/GFF gene id mismatch fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "counts/GFF gene id mismatch fails" "counted gene ids do not match the GFF gene set (missing from counts: []; not in GFF: ['contig_1_99'])" "${NEG_ARGS[@]}"
 
 D="${WORK}/neg_length_mismatch"; seed_negative "${D}"
 sed -i 's/contig_1_1\tcontig_1\t1\t300\t+\t300\t30/contig_1_1\tcontig_1\t1\t300\t+\t299\t30/' "${D}/sampleA.featureCounts.txt"
-NEXT_WORKDIR="${D}" expect_fail "featureCounts Length vs GFF length mismatch fails" "${NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "featureCounts Length vs GFF length mismatch fails" "featureCounts Length disagrees with the GFF for genes ['contig_1_1']" "${NEG_ARGS[@]}"
 
 #
 # 5. AGS guard: deliberate loud failures (T5)
 #
 D="${WORK}/neg_ags_header"; seed_negative "${D}"
 printf 'sample\tags\tge\ttb\nsampleA\t3000000\t2.0\t6000000\n' > "${D}/sampleA.ags.tsv"
-NEXT_WORKDIR="${D}" expect_fail "wrong ags.tsv header fails" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
+NEXT_WORKDIR="${D}" expect_err "wrong ags.tsv header fails" "Error: sampleA.ags.tsv: unexpected ags.tsv header" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
 check_grep "  ...naming the expected header" "../neg_ags_header.log" "unexpected ags.tsv header"
 
 D="${WORK}/neg_ags_unknown"; seed_negative "${D}"
 sed 's/^sampleA\t/sampleQ\t/' "${FIXTURES}/sampleA.ags.tsv" > "${D}/sampleQ.ags.tsv"
-NEXT_WORKDIR="${D}" expect_fail "ags table for a sample not in --counts fails" "${NEG_ARGS[@]}" --ags sampleQ.ags.tsv
+NEXT_WORKDIR="${D}" expect_err "ags table for a sample not in --counts fails" "Error: --ags sample ids not present in --counts: ['sampleQ']" "${NEG_ARGS[@]}" --ags sampleQ.ags.tsv
 
 D="${WORK}/neg_ags_zero_ge"; seed_negative "${D}"
 sed 's/\t2.0\t/\t0\t/' "${FIXTURES}/sampleA.ags.tsv" > "${D}/sampleA.ags.tsv"
-NEXT_WORKDIR="${D}" expect_fail "non-positive genome_equivalents fails" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
+NEXT_WORKDIR="${D}" expect_err "non-positive genome_equivalents fails" "Error: sampleA.ags.tsv: genome_equivalents must be a positive number, got '0'" "${NEG_ARGS[@]}" --ags sampleA.ags.tsv
 check_grep "  ...naming the offending field" "../neg_ags_zero_ge.log" "genome_equivalents must be a positive number"
 
 D="${WORK}/neg_ags_id_mismatch"; seed_negative "${D}"
 cp "${FIXTURES}/sampleA.ags.tsv" "${D}/sampleM.ags.tsv"
-NEXT_WORKDIR="${D}" expect_fail "ags filename/embedded sample_id mismatch fails" "${NEG_ARGS[@]}" --ags sampleM.ags.tsv
+NEXT_WORKDIR="${D}" expect_err "ags filename/embedded sample_id mismatch fails" "embedded sample_id 'sampleA' does not match the filename-derived id 'sampleM'" "${NEG_ARGS[@]}" --ags sampleM.ags.tsv
 
 #
 # 6. dbCAN CAZy branch (T6): happy paths
@@ -551,35 +565,35 @@ DBCAN_NEG_ARGS=("${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv
 
 D="${WORK}/neg_dbcan_header"; seed_dbcan_negative "${D}"
 sed -i 's/^Gene ID\t/GeneID\t/' "${D}/sampleA.overview.tsv"
-NEXT_WORKDIR="${D}" expect_fail "corrupt overview header fails" "${DBCAN_NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "corrupt overview header fails" "overview column header does not match the verified run_dbcan v5 layout" "${DBCAN_NEG_ARGS[@]}"
 check_grep "  ...with a layout-drift message" "../neg_dbcan_header.log" "does not match the verified"
 
 D="${WORK}/neg_dbcan_row"; seed_dbcan_negative "${D}"
 printf 'contig_1_1\tGH1\tbad\n' >> "${D}/sampleA.overview.tsv"
-NEXT_WORKDIR="${D}" expect_fail "overview row with the wrong field count fails" "${DBCAN_NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "overview row with the wrong field count fails" "Error: sampleA.overview.tsv: line 3 has 3 fields, expected 8" "${DBCAN_NEG_ARGS[@]}"
 
 D="${WORK}/neg_dbcan_version"; seed_dbcan_negative "${D}"
 sed -i 's/run_dbcan: 5.2.9/run_dbcan: 9.9.9/' "${D}/dbcan_versions.yml"
-NEXT_WORKDIR="${D}" expect_fail "unverified run_dbcan version fails" "${DBCAN_NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "unverified run_dbcan version fails" "Error: run_dbcan version '9.9.9' is not among the layouts this parser was verified against" "${DBCAN_NEG_ARGS[@]}"
 check_grep "  ...naming the known-layout set" "../neg_dbcan_version.log" "not among the layouts"
 
 D="${WORK}/neg_dbcan_noversions"; seed_dbcan_negative "${D}"
-NEXT_WORKDIR="${D}" expect_fail "--dbcan without --dbcan-versions-yml fails" \
+NEXT_WORKDIR="${D}" expect_err "--dbcan without --dbcan-versions-yml fails" "Error: --dbcan given without --dbcan-versions-yml" \
     "${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv
 check_grep "  ...naming the missing input" "../neg_dbcan_noversions.log" "without --dbcan-versions-yml"
 
 D="${WORK}/neg_dbcan_stray"; seed_dbcan_negative "${D}"
 printf 'contig_1_99\t-\tGH1(1-50)\t-\t-\t1\tGH1\t-\n' >> "${D}/sampleA.overview.tsv"
-NEXT_WORKDIR="${D}" expect_fail "dbCAN gene id not in the GFF fails" "${DBCAN_NEG_ARGS[@]}"
+NEXT_WORKDIR="${D}" expect_err "dbCAN gene id not in the GFF fails" "dbCAN gene ids not present in the GFF: ['contig_1_99']" "${DBCAN_NEG_ARGS[@]}"
 check_grep "  ...naming the stray id" "../neg_dbcan_stray.log" "dbCAN gene ids not present"
 
 D="${WORK}/neg_dbcan_sample"; seed_dbcan_negative "${D}"
 mv "${D}/sampleA.overview.tsv" "${D}/sampleQ.overview.tsv"
-NEXT_WORKDIR="${D}" expect_fail "dbCAN sample set not matching --counts fails" \
+NEXT_WORKDIR="${D}" expect_err "dbCAN sample set not matching --counts fails" "sample ids of --counts ['sampleA'] and --dbcan ['sampleQ'] do not match" \
     "${NEG_ARGS[@]}" --dbcan sampleQ.overview.tsv --dbcan-versions-yml dbcan_versions.yml
 
 D="${WORK}/neg_dbcan_duplicate"; seed_dbcan_negative "${D}"
-NEXT_WORKDIR="${D}" expect_fail "duplicate overview for one sample fails" \
+NEXT_WORKDIR="${D}" expect_err "duplicate overview for one sample fails" "Error: duplicate --dbcan overview for 'sampleA'" \
     "${NEG_ARGS[@]}" --dbcan sampleA.overview.tsv sampleA.overview.tsv \
     --dbcan-versions-yml dbcan_versions.yml
 

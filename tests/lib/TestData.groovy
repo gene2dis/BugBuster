@@ -3,11 +3,13 @@
  */
 class TestData {
 
-    // Local two-sample samplesheet for the stub and validation tests: the
-    // first 500 read pairs of the nf-core reads the test profile downloads
-    // (tests/bin/make_test_read_fixtures.sh). Stub runs ignore read content,
-    // and GitHub raw downloads failed intermittently on CI runners
-    // (2026-10-09); the real-data test still uses assets/test_samplesheet.csv.
+    // Local two-sample samplesheet: the first 500 read pairs of the nf-core
+    // reads the test profile downloads (tests/bin/make_test_read_fixtures.sh).
+    // GitHub raw downloads failed intermittently on CI runners (2026-10-09),
+    // so no test reads them: every nf-test, including the real QC-only run,
+    // takes this sheet, and the CI profile runs pass the same reads with
+    // --input (roadmap Phase 25, RV27; review R8-11). Only -profile test
+    // without --input still downloads assets/test_samplesheet.csv's reads.
     static String localSamplesheet(outputDir, projectDir) {
         def sheet = new File("${outputDir}", "local_test_samplesheet.csv")
         sheet.parentFile.mkdirs()
@@ -81,10 +83,66 @@ class TestData {
         return published
     }
 
+    // What a stub run published compared with a tests/data/stub_paths/
+    // list (assembly_dev, coassembly_dev: a stub run of dev with a test's
+    // settings) plus the paths the test adds: [missing: [...], unexpected:
+    // [...]], both empty when they agree (assert on the map, so a failure
+    // names the paths). One helper for every list test (roadmap Phase 25,
+    // RV26; review R8-07).
+    // Regenerating a list after a change that publishes or drops a file:
+    //   BUGBUSTER_UPDATE_STUB_PATHS=1 nf-test test tests/nonpareil.nf.test tests/coassembly_groups.nf.test
+    // rewrites each list from the run (its published paths minus the test's
+    // added ones); review the git diff of tests/data/stub_paths/ before
+    // committing it, then run the other list tests (mag_virus_quality,
+    // dereplicate, multisample) without the variable
+    static Map publishedPathsDiff(outputDir, projectDir, String list, List added = []) {
+        def listFile = new File("${projectDir}/tests/data/stub_paths/${list}.txt")
+        def published = publishedPaths(outputDir).collect { p -> p.toString() }
+        def extra = added.collect { p -> p.toString() }
+        // The update keeps the list's own order (the committed lists are in the
+        // shell locale's sort order): paths no longer published are removed and
+        // new ones inserted before the first line that collates after them, so
+        // the diff to review holds only the paths that changed
+        def current = published - extra
+        def existing = listFile.readLines().findAll { l -> l }
+        if (System.getenv('BUGBUSTER_UPDATE_STUB_PATHS') == '1' && current.toSet() != existing.toSet()) {
+            def collator = java.text.Collator.getInstance(Locale.US)
+            def kept = existing.findAll { l -> l in current }
+            (current - existing).toSorted(collator).each { p ->
+                def i = kept.findIndexOf { l -> collator.compare(l, p) > 0 }
+                kept.add(i < 0 ? kept.size() : i, p)
+            }
+            listFile.text = kept.join('\n') + '\n'
+        }
+        def expected = listFile.readLines().findAll { l -> l } + extra
+        return [missing: (expected - published).sort(), unexpected: (published - expected).sort()]
+    }
+
     // The database folders a run must not publish under outputDir (roadmap
     // RV14: databases live in databases_dir only; storeDir with publishDir off).
     // Checked as folders, so an empty one (DeepARG's stub) counts too
     static List<String> databaseFolders(outputDir) {
         return ['format', 'download', 'rgi'].findAll { d -> new File("${outputDir}", d).exists() }
+    }
+
+    // The Nextflow version a pipeline test ran on, [major, minor], read from
+    // the run's log (nf-test launches with -quiet, so the console has no
+    // banner; the log has "Version: 26.10.5 build 14654", and an edge
+    // release "Version: 26.11.0-edge build 15169"): for the tests whose
+    // expected outcome differs by version (roadmap Phase 25, RV27: nf-test
+    // runs on 25.10.7 and the newest Nextflow, edge included, in CI)
+    static List<Integer> nextflowVersion(outputDir) {
+        def log = new File("${outputDir}/../meta/nextflow.log")
+        def m = log.exists() ? (log.text =~ /(?m)^\s*Version: (\d+)\.(\d+)\.\d+\S* build/) : null
+        if (m == null || !m.find()) {
+            throw new IllegalStateException("no 'Version: <x.y.z> build' line in ${log}")
+        }
+        return [m.group(1) as Integer, m.group(2) as Integer]
+    }
+
+    // True when the run's Nextflow is older than major.minor
+    static boolean nextflowBefore(outputDir, int major, int minor) {
+        def (ma, mi) = nextflowVersion(outputDir)
+        return ma < major || (ma == major && mi < minor)
     }
 }

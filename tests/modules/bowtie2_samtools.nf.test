@@ -1,0 +1,100 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    BOWTIE2_SAMTOOLS Module Test (roadmap Phase 25, RV25; review R8-02)
+
+    Reads -> contigs for --read_aligner bowtie2 (the fallback aligner; its
+    bwa-mem3 twin is tests/modules/bwamem3_samtools.nf.test), against the
+    lambda genome (tests/data/decontamination/host_mock.fasta) with the
+    singleton fixture reads (4 lambda pairs and 6 lambda singletons among
+    random reads):
+      - paired reads plus singletons: one merged BAM, and the CPU split
+        between bowtie2 and samtools (review R4-18: at 4 CPUs samtools gets
+        1 thread and bowtie2 3)
+      - empty contig set: header-only BAM plus the empty-contig report
+    What the BAM holds is checked through the depth it gives in
+    tests/modules/calculate_depth.nf.test (bowtie2 cases).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test BOWTIE2_SAMTOOLS Process"
+    script "../../modules/local/bowtie2_samtools/main.nf"
+    process "BOWTIE2_SAMTOOLS"
+
+    test("maps one sample's paired reads plus singletons, threads split 3 + 1 at 4 CPUs") {
+        when {
+            params {
+                max_cpus   = 4
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'test' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_S.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/decontamination/host_mock.fasta", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.bam_only[0][1]).name == "test_all_reads.bam"
+            assert file(process.out.bam_only[0][1]).size() > 0
+            assert file(process.out.contigs_and_bam[0][1]).name == "host_mock.fasta"
+            assert process.out.empty_contig_report.size() == 0
+
+            // The task script: both libraries aligned with 3 bowtie2 threads,
+            // sorted with 1 samtools thread, then merged
+            def scripts = []
+            new File("${outputDir}/../work").eachFileRecurse { f -> if (f.name == '.command.sh') scripts << f }
+            assert scripts.size() == 1
+            // (line continuations and indentation folded to single spaces)
+            def script = scripts[0].text.replaceAll(/\s*\\\n\s*/, ' ').replaceAll(/ +/, ' ')
+            assert script.contains("-p 3 -1 singleton_test_R1.fastq.gz -2 singleton_test_R2.fastq.gz")
+            assert script.contains("-p 3 -U singleton_test_S.fastq.gz")
+            assert script.count("samtools sort -@ 1 -o ") == 2
+            assert script.contains("samtools merge -@ 4 test_all_reads.bam test_paired.bam test_singleton.bam")
+
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("bowtie2: 2.5.5")
+            assert versions.contains("samtools: 1.24")
+        }
+    }
+
+    test("writes a header-only BAM and a report for an empty contig set") {
+        when {
+            process {
+                """
+                def empty_fasta = file("${outputDir}/empty_contigs.fa")
+                empty_fasta.parent.mkdirs()
+                empty_fasta.text = ''
+                input[0] = [
+                    [ id: 'empty' ],
+                    [
+                        file("${projectDir}/tests/data/reads/singleton_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/reads/singleton_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    empty_fasta
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.bam_only[0][1]).size() > 0
+            def report = path(process.out.empty_contig_report.get(0)).readLines()
+            assert report.contains("sample_id\tempty")
+            assert report.contains("stage\tBOWTIE2_SAMTOOLS")
+            assert report.contains("empty_contig_detected\tTRUE")
+            assert path(process.out.versions.get(0)).text.contains("bowtie2: 2.5.5")
+        }
+    }
+}

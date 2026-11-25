@@ -52,8 +52,7 @@ nextflow_pipeline {
                 }
             }
             assert TestData.databaseFolders(outputDir) == []
-            assert TestData.publishedPaths(outputDir).sort() ==
-                (new File("${projectDir}/tests/data/stub_paths/assembly_dev.txt").readLines() + added).sort()
+            assert TestData.publishedPathsDiff(outputDir, projectDir, 'assembly_dev', added) == [missing: [], unexpected: []]
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains('nonpareil: 3.5.5')
         }
     }

@@ -86,14 +86,28 @@ expect_pass() {
     fi
 }
 
-expect_fail() {
-    local desc="$1"; shift
+expect_err() {
+    # expect_err <desc> <message> <args...>: the command must fail and its log
+    # must hold <message> (a fixed string). A Python traceback passes only when
+    # <message> names the exception the script raises on purpose
+    # ("ValueError: ..."), so a guard that stops working cannot pass through
+    # an unrelated crash (roadmap Phase 25, RV26; review R8-04)
+    local desc="$1" msg="$2"; shift 2
     local workdir="${NEXT_WORKDIR:-${WORK}/$(echo "${desc}" | tr ' /:' '___')}"
     NEXT_WORKDIR=""
     mkdir -p "${workdir}"
     LAST_WORKDIR="${workdir}"
     if run_script "${workdir}" "$@" > "${workdir}.log" 2>&1; then
         echo "✗ ${desc} — expected nonzero exit, script succeeded"
+        FAIL=$((FAIL + 1))
+    elif ! grep -qF -- "${msg}" "${workdir}.log"; then
+        echo "✗ ${desc} — failed, but without '${msg}':"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
+        FAIL=$((FAIL + 1))
+    elif grep -q 'Traceback (most recent call last)' "${workdir}.log" \
+            && ! [[ "${msg}" =~ ^[A-Za-z]+(Error|Exception):\  ]]; then
+        echo "✗ ${desc} — failed with a Python traceback, not its own error:"
+        tail -3 "${workdir}.log" | sed 's/^/    /'
         FAIL=$((FAIL + 1))
     else
         echo "✓ ${desc}"
@@ -250,8 +264,8 @@ RU_EMPTY="${WORK}/report_unify_empty_filtered"
 mkdir -p "${RU_EMPTY}"
 printf 'Id\tClean reads (contaminants removed)\ns1\t850\n' > "${RU_EMPTY}/s1_contaminants_decontamination_report.tsv"
 NEXT_WORKDIR="${RU_EMPTY}"
-expect_fail "report_unify: filtered mode without fastp reports fails" report_unify.py contaminants
-expect_fail "report_unify: none mode without fastp reports fails" report_unify.py none
+expect_err "report_unify: filtered mode without fastp reports fails" "Error: No fastp reports found" report_unify.py contaminants
+expect_err "report_unify: none mode without fastp reports fails" "Error: No fastp reports found" report_unify.py none
 
 #
 # taxonomy_report.py — missing required reads report must fail (previously it
@@ -263,7 +277,7 @@ TR_WORK="${WORK}/taxonomy_report_missing_reads"
 mkdir -p "${TR_WORK}"
 cp "${FIXTURES}/sample1.kraken2.report.txt" "${TR_WORK}/"
 NEXT_WORKDIR="${TR_WORK}"
-expect_fail "taxonomy_report: missing reads report fails" taxonomy_report.py --profiler kraken2 \
+expect_err "taxonomy_report: missing reads report fails" "Error: Required reads report nonexistent_reads_report.csv is missing or unreadable" taxonomy_report.py --profiler kraken2 \
     --reports sample1.kraken2.report.txt \
     --reads-report nonexistent_reads_report.csv --db-name standard-8 --output-dir .
 check_grep "taxonomy_report: failure names the missing input" "../taxonomy_report_missing_reads.log" \
@@ -305,7 +319,7 @@ check_file "bin_quality: placeholder plot written" "Total_bins_quality_plot.png"
 BQ_NONE="${WORK}/bin_quality_none"
 mkdir -p "${BQ_NONE}"
 NEXT_WORKDIR="${BQ_NONE}"
-expect_fail "bin_quality: no CheckM2 file still fails" bin_quality_report.py
+expect_err "bin_quality: no CheckM2 file still fails" "ERROR: No quality report files found (*_quality_report.tsv)" bin_quality_report.py
 
 #
 # bin_tax_report.py (GTDB-Tk batch summary format)
@@ -349,7 +363,7 @@ check_file "bin_tax: placeholder plot written" "MAGs_tax_plot.png"
 BT_NONE="${WORK}/bin_tax_none"
 mkdir -p "${BT_NONE}"
 NEXT_WORKDIR="${BT_NONE}"
-expect_fail "bin_tax: no GTDB-Tk file still fails" bin_tax_report.py
+expect_err "bin_tax: no GTDB-Tk file still fails" "ERROR: No GTDB-Tk taxonomy files found" bin_tax_report.py
 
 #
 # bin_summary.py — audit item #11: ALL staged quality and taxonomy files must be
@@ -411,7 +425,7 @@ cp "${BS_WORK}/s1_bin_depth.tsv" "${BS_WORK}/coassembly_gtdbtk_bac120.tsv" "${BS
 printf 'Name\tCompleteness\tContamination\tContig_N50\tGenome_Size\tTotal_Coding_Sequences\n' \
     > "${BS_EMPTY}/coassembly_semibin_quality_report.tsv"
 NEXT_WORKDIR="${BS_EMPTY}"
-expect_fail "bin_summary: header-only quality with classified bins fails" bin_summary.py
+expect_err "bin_summary: header-only quality with classified bins fails" "ERROR: all quality reports are empty - no bins were assessed" bin_summary.py
 
 # No refined bin at all: header-only quality and taxonomy, no depth files
 # (the bin depth step is skipped). Warn and write a header-only summary
@@ -431,7 +445,7 @@ BS_NONE="${WORK}/bin_summary_none"
 mkdir -p "${BS_NONE}"
 printf 'user_genome\tclassification\n' > "${BS_NONE}/coassembly_gtdbtk_bac120.tsv"
 NEXT_WORKDIR="${BS_NONE}"
-expect_fail "bin_summary: no quality file still fails" bin_summary.py
+expect_err "bin_summary: no quality file still fails" "ERROR: No quality report files found (*quality_report.tsv)" bin_summary.py
 
 #
 # kmarvel_report.py — real K-MARVEL tables (tests/data/kmarvel: sampleA with
@@ -460,12 +474,12 @@ check_grep "kmarvel_report: empty matrix keeps the sample header" \
     "KMARVEL_supporting_reads_matrix.tsv" "^aro_id	aro_full_name	sampleB$"
 check_grep "kmarvel_report: empty gene-family matrix keeps the sample header" \
     "KMARVEL_gene_family_matrix.tsv" "^gene_family	sampleB$"
-expect_fail "kmarvel_report: no input tables fails" kmarvel_report.py
+expect_err "kmarvel_report: no input tables fails" "ERROR: no K-MARVEL tables given" kmarvel_report.py
 KM_BAD="${WORK}/kmarvel_report_bad"
 mkdir -p "${KM_BAD}"
 cut -f1-5 "${REPO_DIR}/tests/data/kmarvel/sampleA_kmarvel.tsv" > "${KM_BAD}/s1_kmarvel.tsv"
 NEXT_WORKDIR="${KM_BAD}"
-expect_fail "kmarvel_report: table without the K-MARVEL columns fails" kmarvel_report.py s1_kmarvel.tsv
+expect_err "kmarvel_report: table without the K-MARVEL columns fails" "ERROR: s1_kmarvel.tsv lacks columns: model" kmarvel_report.py s1_kmarvel.tsv
 
 #
 # args_oap_report.py — ARGs-OAP 4.0.0 stage two rows (tests/data/args_oap:
@@ -510,13 +524,13 @@ expect_pass "args_oap_report: stage two status taken from ARGS_OAP" args_oap_rep
 check_grep "args_oap_report: marker overrides the summed counts" "args_oap_cells.tsv" "^sampleF	2100	0.1	0.4	0.0	not_normalised$"
 echo maybe > "${AO_MARK}/sampleF_args_oap/stage_two_status.txt"
 NEXT_WORKDIR="${AO_MARK}"
-expect_fail "args_oap_report: an unknown stage two status fails" args_oap_report.py sampleF_args_oap
+expect_err "args_oap_report: an unknown stage two status fails" "stage_two_status.txt: unknown status 'maybe'" args_oap_report.py sampleF_args_oap
 AO_BAD="${WORK}/args_oap_report_bad"
 mkdir -p "${AO_BAD}/sampleD_args_oap" "${AO_BAD}/sampleE_out"
 NEXT_WORKDIR="${AO_BAD}"
-expect_fail "args_oap_report: a directory without metadata.txt fails" args_oap_report.py sampleD_args_oap
+expect_err "args_oap_report: a directory without metadata.txt fails" "ERROR: sampleD_args_oap/metadata.txt not found" args_oap_report.py sampleD_args_oap
 NEXT_WORKDIR="${AO_BAD}"
-expect_fail "args_oap_report: a directory not named <sample>_args_oap fails" args_oap_report.py sampleE_out
+expect_err "args_oap_report: a directory not named <sample>_args_oap fails" "ERROR: sampleE_out is not a <sample>_args_oap directory" args_oap_report.py sampleE_out
 
 #
 # blobplot.py / arg_blobplot.py: one figure per assembly in the shared style (roadmap Phase 11d), each as PDF, SVG
@@ -590,7 +604,7 @@ mkdir -p "${ACR_NOTAX}"
 cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
    "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_NOTAX}/"
 NEXT_WORKDIR="${ACR_NOTAX}"
-expect_fail "arg_contig_level_report: no Metabuli file fails" arg_contig_level_report.py
+expect_err "arg_contig_level_report: no Metabuli file fails" "ERROR: No Metabuli files found (*_classifications.tsv)" arg_contig_level_report.py
 
 #
 # bin_contig_labels.py + the report's bin columns (Phase 9b, L5 a): contig ->
@@ -627,7 +641,7 @@ else
     echo "✗ bin_contig_labels: marker-only bins dir gives a header-only table"; FAIL=$((FAIL + 1))
 fi
 NEXT_WORKDIR="${BCL_WORK}"
-expect_fail "bin_contig_labels: missing bins dir argument fails" bin_contig_labels.py test_sample2
+expect_err "bin_contig_labels: missing bins dir argument fails" "usage: bin_contig_labels.py <sample> <bins dir>" bin_contig_labels.py test_sample2
 ACB_WORK="${WORK}/arg_contig_level_report_bins"
 mkdir -p "${ACB_WORK}"
 cp "${ACR_WORK}"/test_sample2_* "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BCL_WORK}"/test_sample2_gtdbtk_*.tsv "${ACB_WORK}/"
@@ -680,7 +694,7 @@ else
     echo "✗ bin_arg_split: genes of unbinned contigs are dropped"; FAIL=$((FAIL + 1))
 fi
 NEXT_WORKDIR="${BAS_WORK}"
-expect_fail "bin_arg_split: a file that is not a DeepARG table fails" bin_arg_split.py test_sampleX \
+expect_err "bin_arg_split: a file that is not a DeepARG table fails" "has no read_id column (not a DeepARG .mapping.ARG file)" bin_arg_split.py test_sampleX \
     test_sample2_contig_bins.tsv test_sample2.faa.gz test_sample2_contig_bins.tsv
 
 #
@@ -761,7 +775,7 @@ mkdir -p "${ACCN_WORK}"
 cp "${ACR_WORK}"/test_sample2_* "${ACC_WORK}/test_sample2_checkv_quality_summary.tsv" "${ACCN_WORK}/"
 rm -f "${ACCN_WORK}/Contig_tax_and_arg_prediction.tsv"
 NEXT_WORKDIR="${ACCN_WORK}"
-expect_fail "arg_contig_level_report: CheckV tables without geNomad's fail" arg_contig_level_report.py
+expect_err "arg_contig_level_report: CheckV tables without geNomad's fail" "ERROR: CheckV quality summaries but no geNomad tables" arg_contig_level_report.py
 
 echo ""
 echo "=== Results: ${PASS} passed, ${FAIL} failed ==="
