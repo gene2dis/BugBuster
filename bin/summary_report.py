@@ -169,8 +169,8 @@ def reading_guide(ctx):
         units.append("ARGs-OAP abundance is copies per cell (SARG copies / ARGs-OAP cells), a different unit: do not "
                      "add it to RPKM.")
     if (ctx.get("functional") or {}).get("unit") == "cpge":
-        units.append("The read functional profile is in CPGE: reads per kb of gene per MicrobeCensus genome "
-                     "equivalent. It is proportional to copies per genome, not an estimate of them: a single-copy "
+        units.append("The read functional profile is in CPGE: reads per kb of gene per genome equivalent, "
+                     "the genome equivalents estimated with MicrobeCensus. It is proportional to copies per genome, not an estimate of them: a single-copy "
                      "gene found in every genome is about 1000 / read length, less where the reference misses part "
                      "of the community.")
     units.append(f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "

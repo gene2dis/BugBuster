@@ -1064,7 +1064,9 @@ docs = [open("out/README.md").read(), open("out/LLM_GUIDE.md").read()]
 docs += [html.unescape(open(p).read()) for p in glob.glob("out/report/*.html")]
 assert not any("copies of that gene per community member" in t for t in docs)
 assert "a single-copy gene recovered in full is about 1000 / read length" in docs[1]
-assert any("CPGE (reads per kb per MicrobeCensus genome equivalent)" in t for t in docs[2:])
+assert any("CPGE (reads per kb per genome equivalent)" in t for t in docs[2:])
+assert not any("per MicrobeCensus genome equivalent" in t for t in docs)  # the unit, not the estimator
+assert any("genome equivalents estimated with MicrobeCensus" in t for t in docs[2:])
 PYEOF
 check "fmt() rounds before choosing the format (no 1e+03)" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys

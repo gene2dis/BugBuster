@@ -42,7 +42,8 @@ Units: Reads_report.csv counts single reads (both mates); the counts here are in
 pairs (= reads / 2), the unit K-MARVEL and sylph use, except the columns the data dictionary
 marks 'mates counted separately' (RGI mapped reads, functional reads, reads on contigs and
 genes) and ARGs-OAP's read_count and ppm. Functional profiles are in CPGE, reads per kb per
-MicrobeCensus genome equivalent (a single-copy gene is about 1000 / read length, not 1).
+genome equivalent (genome equivalents from MicrobeCensus; a single-copy gene is about 1000 / read
+length, not 1).
 ARG abundance is normalised to the
 sample's clean read pairs: RPM = supporting read pairs / clean pairs x 1e6, and
 RPKM = RPM / (reference gene length in kb), the length being the CARD reference
@@ -82,7 +83,7 @@ import pandas as pd
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_columns import read_table  # noqa: E402
-from summary_common import (CPGE_LABEL, NA_NOT_RUN, die, first_value, natural_key, norm_taxon,  # noqa: E402
+from summary_common import (CPGE_GE_SOURCE, CPGE_LABEL, NA_NOT_RUN, die, first_value, natural_key, norm_taxon,  # noqa: E402
                             parse_versions, sample_status, strip_gtdb, warn)
 from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mark_low_depth,  # noqa: E402
                               prevalence_table, species_rank, watchlist_table)
@@ -453,7 +454,7 @@ def method_notes(ctx):
     if ctx.get("functional"):
         f = ctx["functional"]
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
-                     f"{CPGE_LABEL if f['unit'] == 'cpge' else f['unit']}. "
+                     f"{CPGE_LABEL + ', ' + CPGE_GE_SOURCE if f['unit'] == 'cpge' else f['unit']}. "
                      "Reported apart from any contig-level functional profile.")
     t = ctx["tables"]
     if "taxonomy_long" in t:
@@ -502,7 +503,7 @@ def method_notes(ctx):
         c = ctx["contig_functional"]
         notes.append(f"Contig functional profile: eggNOG-mapper and dbCAN on the predicted genes, featureCounts per "
                      f"sample ({', '.join(c['ontologies'])}), in "
-                     f"{CPGE_LABEL if c['unit'] == 'cpge' else 'TPM'}. "
+                     f"{CPGE_LABEL + ', ' + CPGE_GE_SOURCE if c['unit'] == 'cpge' else 'TPM'}. "
                      "Reported apart from the read-level profile.")
     return notes, arg_notes
 
@@ -915,7 +916,7 @@ def main(argv=None):
                     "unit": next(iter(ftables.values()))[1] if ftables else "",
                     "n_samples": len(func["ran"] & set(order))}
 
-    # ---- ARG RPKM per MicrobeCensus genome equivalent (RPKG), when MicrobeCensus ran
+    # ---- ARG RPKM per genome equivalent (RPKG), when MicrobeCensus ran
     if "mc_genome_equivalents" in samples and samples["mc_genome_equivalents"].notna().any() \
             and "clean_pairs" in samples:
         rpkm = {n: tables[n][0] for n in ("arg_gene_rpkm", "arg_family_rpkm", "arg_drug_class_rpkm") if n in tables}

@@ -32,7 +32,7 @@ WIDE_CELL = ("<sample>", "one column per sample. 0 = not detected in a sample of
                          "not detected in a low-depth sample (unknown, not absent); NA_not_run = the method did not "
                          "run on the sample")
 
-WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 / MicrobeCensus genome equivalents. 0 = "
+WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 / genome equivalents. 0 = "
                              "not detected; blank = a call without an RPKM; NA_no_ags = no MicrobeCensus estimate for "
                              "the sample; NA_low_depth / NA_not_run as in the other wide tables")
 
@@ -344,7 +344,7 @@ TABLE_DOCS = {
                          "(SUPER-FOCUS); ko, ec, metacyc (HUMAnN)"),
             ("accession, term_description", "term and its name (blank where the backend gives none; COG "
                                              "categories named from NCBI COG)"),
-            ("abundance_cpge", "CPGE: reads per kb per MicrobeCensus genome equivalent (RPK / genome equivalents; "
+            ("abundance_cpge", "CPGE: reads per kb per genome equivalent (RPK / genome equivalents; "
                                "see CPGE in the units list). Blank without MicrobeCensus, or for SUPER-FOCUS"),
             ("abundance_native, native_unit", "abundance in the backend's unit (Woltka, SUPER-FOCUS: reads, mates "
                                               "counted separately and fractional for multi-hit reads; HUMAnN: RPK)"),
@@ -361,7 +361,7 @@ TABLE_DOCS = {
     },
     "arg_gene_rpkg": {
         "title": "ARG genes x samples (RPKG)",
-        "description": "arg_gene_rpkm per MicrobeCensus genome equivalent: supporting read pairs per kb of gene per "
+        "description": "arg_gene_rpkm per genome equivalent: supporting read pairs per kb of gene per "
                        "genome equivalent (an estimate of cells), so samples of different average genome size compare. "
                        "Written when MicrobeCensus ran.",
         "columns": [("gene", "gene (allele numbers collapsed)"), ("tier, category", "tier and category (arg_long)"),
@@ -369,12 +369,12 @@ TABLE_DOCS = {
     },
     "arg_family_rpkg": {
         "title": "ARG gene families x samples (RPKG)",
-        "description": "arg_family_rpkm per MicrobeCensus genome equivalent.",
+        "description": "arg_family_rpkm per genome equivalent.",
         "columns": [("gene_family", "CARD AMR gene family"), WIDE_RPKG],
     },
     "arg_drug_class_rpkg": {
         "title": "ARG drug classes x samples (RPKG)",
-        "description": "arg_drug_class_rpkm per MicrobeCensus genome equivalent. A multi-class gene counts in each "
+        "description": "arg_drug_class_rpkm per genome equivalent. A multi-class gene counts in each "
                        "class, so the rows are not additive.",
         "columns": [("tier_group", "acquired (tiers 1-2), intrinsic/efflux (tier 3), or CARD mutation present "
                                    "(tier 4 rows with resistance_snp_status card_snp_present)"),
@@ -560,7 +560,7 @@ TABLE_DOCS = {
             ("count", "reads featureCounts assigned to the gene (mates counted separately)"),
             ("tpm", "transcripts-per-million style share of the sample's reads on predicted genes (TPM in the "
                     "units list)"),
-            ("cpge", "CPGE: reads per kb per MicrobeCensus genome equivalent (CPGE in the units list; blank "
+            ("cpge", "CPGE: reads per kb per genome equivalent (CPGE in the units list; blank "
                      "without MicrobeCensus)"),
         ],
     },
@@ -605,7 +605,7 @@ TABLE_DOCS = {
             ("abundance_tpm", "TPM: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of RPK_j) * "
                               "1e6, summed over the term's genes. The share of the sample's functional pool, relative "
                               "to reads on predicted genes (pct_reads_on_genes); compositional"),
-            ("abundance_cpge", "CPGE: reads per kb per MicrobeCensus genome equivalent, CPGE_i = RPK_i / "
+            ("abundance_cpge", "CPGE: reads per kb per genome equivalent, CPGE_i = RPK_i / "
                                "genome_equivalents (CPGE in the units list). Not compositional; blank without "
                                "MicrobeCensus"),
         ],
@@ -795,8 +795,8 @@ UNITS = [
                    "and ARGs-OAP nRead count single reads too"),
     ("RPM, RPKM", "K-MARVEL / RGI: supporting read pairs per million clean read pairs; RPM per kb of reference gene. "
                   "Comparable between samples of different depth; not copies per cell"),
-    ("CPGE", "functional profiles: reads (mates counted separately) per kb of gene per MicrobeCensus genome "
-             "equivalent, CPGE_i = RPK_i / genome_equivalents, with RPK_i = count_i / (length_i / 1000) and "
+    ("CPGE", "functional profiles: reads (mates counted separately) per kb of gene per genome equivalent, "
+             "the genome equivalents estimated with MicrobeCensus. CPGE_i = RPK_i / genome_equivalents, with RPK_i = count_i / (length_i / 1000) and "
              "genome_equivalents = total_bases / average_genome_size_bp (every base of the clean reads over "
              "MicrobeCensus' average genome size). Proportional to copies per genome, not an estimate of them: a "
              "single-copy gene recovered in full is about 1000 / read length (about 7 for 140 bp reads), and less "
@@ -806,7 +806,7 @@ UNITS = [
     ("TPM", "contig-level functional profile: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of "
             "RPK_j) * 1e6. The share of the sample's functional pool attributable to that gene; compositional, and "
             "relative to the reads on predicted genes only (assembly_read_use pct_reads_on_genes)"),
-    ("RPKG", "arg_*_rpkg: K-MARVEL / RGI supporting read pairs per kb of gene per MicrobeCensus genome equivalent "
+    ("RPKG", "arg_*_rpkg: K-MARVEL / RGI supporting read pairs per kb of gene per genome equivalent "
              "(RPKM x clean read pairs / 1e6 / genome equivalents): the CPGE scale with read pairs, so a single-copy "
              "gene found in full is about 500 / read length"),
     ("relative abundance", "taxonomy: % of the profiled (classified) community; each sample sums to 100. What is "

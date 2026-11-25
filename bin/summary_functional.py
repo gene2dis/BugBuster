@@ -7,7 +7,7 @@ reported on its own, never merged with the contig branch (function_*.tsv), as th
 
 Units: abundance_native is the backend's unit (Woltka and SUPER-FOCUS: reads, mates counted separately and
 fractional when a read hits several ORFs; HUMAnN: RPK). abundance_cpge (named copies per genome equivalent)
-is reads per kb per MicrobeCensus genome equivalent (RPK / GE; Woltka and HUMAnN only, blank for a sample without
+is reads per kb per genome equivalent (RPK / MicrobeCensus GE; Woltka and HUMAnN only, blank for a sample without
 MicrobeCensus): proportional to copies per genome, about 1000 / read length for a single-copy gene (roadmap Phase 24).
 A read's ORF can carry several terms of one ontology, so the terms of an ontology do not add up to the
 annotated reads: the tables are not compositional.

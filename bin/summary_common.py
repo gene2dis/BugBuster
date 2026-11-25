@@ -11,7 +11,9 @@ NA_NOT_RUN = "NA_not_run"
 NA_NO_AGS = "NA_no_ags"
 # the functional profiles' unit as the documents name it: the columns keep the name cpge (copies per genome
 # equivalent), but the value is reads per kb per genome equivalent, proportional to copies (roadmap Phase 24, RV22)
-CPGE_LABEL = "CPGE (reads per kb per MicrobeCensus genome equivalent)"
+CPGE_LABEL = "CPGE (reads per kb per genome equivalent)"
+# where the genome equivalents come from, said once next to CPGE_LABEL in the methods text
+CPGE_GE_SOURCE = "genome equivalents estimated with MicrobeCensus (bases sequenced / average genome size)"
 GTDB_SUFFIX = re.compile(r"_[A-Z]+$")
 ACCESSION = re.compile(r"(GC[AF]_\d+\.\d+)")
 

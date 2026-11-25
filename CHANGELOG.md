@@ -1540,8 +1540,8 @@ bold label names the full entry below (search for it).
     `NA_no_ags`, and a term not found stays `NA_low_depth`, as in the ARG RPKG
     tables.
   - **CPGE is described as what it is**: reads (mates counted separately) per
-    kb of gene per MicrobeCensus genome equivalent, proportional to copies per
-    genome. The README, LLM guide, report, manual and parameter text called it
+    kb of gene per genome equivalent (the genome equivalents estimated with
+    MicrobeCensus), proportional to copies per genome. The README, LLM guide, report, manual and parameter text called it
     "approximate average copies of that gene per community member"; measured on
     real samples, a single-copy gene is about 1000 / read length (0.5-0.7 ×
     1000 / read length where most reads reached a gene), not 1. Values and the
