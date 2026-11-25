@@ -1539,6 +1539,14 @@ bold label names the full entry below (search for it).
     `NA_low_depth` ("not detected in a low-depth sample"); it is now
     `NA_no_ags`, and a term not found stays `NA_low_depth`, as in the ARG RPKG
     tables.
+  - **CPGE is described as what it is**: reads (mates counted separately) per
+    kb of gene per MicrobeCensus genome equivalent, proportional to copies per
+    genome. The README, LLM guide, report, manual and parameter text called it
+    "approximate average copies of that gene per community member"; measured on
+    real samples, a single-copy gene is about 1000 / read length (0.5-0.7 ×
+    1000 / read length where most reads reached a gene), not 1. Values and the
+    `cpge` column names are unchanged. The ARG RPKG is described the same way,
+    with read pairs (about 500 / read length).
   - Report text: the "counts are read pairs" sentences list the columns that
     count single reads; the generated documents name the pipeline's parameters
     (`--summary_min_clean_pairs`, `--summary_group_by`, ...) and the script's

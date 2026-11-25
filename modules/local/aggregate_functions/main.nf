@@ -6,7 +6,7 @@
     Section 4.8, tasks T4+T5+T6): joins featureCounts gene counts,
     eggNOG-mapper v3 annotations, run_dbcan v5 CAZy calls and Pyrodigal gene
     coordinates into the canonical tables (Sections 5.1-5.3), computes TPM
-    (Section 6.1) and copies per genome equivalent (Section 6.2, from the
+    (Section 6.1) and CPGE, reads per kb per genome equivalent (Section 6.2, from the
     optional MicrobeCensus AGS tables - samples without one fall back to
     TPM-only with an 'unavailable' row in ags_and_ge.tsv), and reports the
     annotated fraction per sample. All the logic lives in

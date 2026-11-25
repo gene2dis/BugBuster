@@ -168,8 +168,10 @@ def reading_guide(ctx):
         units.append("ARGs-OAP abundance is copies per cell (SARG copies / ARGs-OAP cells), a different unit: do not "
                      "add it to RPKM.")
     if (ctx.get("functional") or {}).get("unit") == "cpge":
-        units.append("The read functional profile is in copies per genome equivalent (CPGE: reads per kb / "
-                     "MicrobeCensus genome equivalents).")
+        units.append("The read functional profile is in CPGE: reads per kb of gene per MicrobeCensus genome "
+                     "equivalent. It is proportional to copies per genome, not an estimate of them: a single-copy "
+                     "gene found in every genome is about 1000 / read length, less where the reference misses part "
+                     "of the community.")
     units.append(f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
                  f"found there is reported as {NA_LOW_DEPTH} (unknown), not as absent.")
     methods = []
@@ -495,7 +497,7 @@ def build(ctx, assets):
         fn = Section("functional", nums, records)
         f = ctx["functional"]
         fn.facts = {"backend": f["backend"], "n_samples": f["n_samples"], "ontologies": ", ".join(f["ontologies"]),
-                    "unit": "copies per genome equivalent (CPGE)" if f["unit"] == "cpge" else f["unit"]}
+                    "unit": CPGE_LABEL if f["unit"] == "cpge" else f["unit"]}
         fn.fig("function_cog_heatmap")
         cols = [c for c in ("sample", "func_reads_assigned", "func_fraction_annotated", "mc_avg_genome_size_bp",
                             "mc_genome_equivalents", "args_oap_ncell") if c in qc.columns]
@@ -611,7 +613,7 @@ def build(ctx, assets):
         cf = Section("contig_functional", nums, records)
         c = ctx["contig_functional"]
         cf.facts = {"n_samples": c["n_samples"], "ontologies": ", ".join(c["ontologies"]),
-                    "unit": "copies per genome equivalent (CPGE)" if c["unit"] == "cpge" else "TPM"}
+                    "unit": CPGE_LABEL if c["unit"] == "cpge" else "TPM"}
         cf.fig("function_contig_cog_heatmap")
         cols = [x for x in ("sample", "pct_reads_on_genes", "func_contig_genes_annotated_pct",
                             "func_contig_annotated_by_abundance_pct") if x in qc.columns]

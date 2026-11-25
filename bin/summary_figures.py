@@ -594,7 +594,7 @@ def fig_cog(fw, mat, unit, cols, groups, low, hatch, backend, key="function_cog_
     num = mat.reindex(columns=cols).apply(pd.to_numeric, errors="coerce")
     if num.fillna(0).le(0).all().all():
         return
-    unit_txt = "copies per genome equivalent (CPGE)" if unit == "cpge" else unit.upper() if unit == "tpm" else unit
+    unit_txt = CPGE_LABEL if unit == "cpge" else unit.upper() if unit == "tpm" else unit
     desc = mat["description"] if "description" in mat.columns else pd.Series("", index=mat.index)
     labels = [f"{a} {d}".strip() if isinstance(d, str) else str(a) for a, d in zip(mat.index, desc)]
     what = (f"the read-level profile ({backend})" if level == "read" else

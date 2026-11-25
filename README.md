@@ -46,7 +46,7 @@ Stages in the order they run; the default column says which run without any opti
 
 What each stage needs and costs: [manual, section 5](docs/manual.md#5-choosing-what-runs); every stage with the parameter that gates it: [docs/WORKFLOW_DIAGRAM.md](docs/WORKFLOW_DIAGRAM.md).
 
-Terms used throughout: **singleton reads** are reads whose mate was lost (for example in an earlier trimming step), given in the samplesheet's optional `s` column; a **MAG** (metagenome-assembled genome) is a genome bin recovered from an assembly; **CPGE** (copies per genome equivalent) is a function's read abundance divided by the sample's genome equivalents, the number of genomes its reads amount to (estimated by MicrobeCensus).
+Terms used throughout: **singleton reads** are reads whose mate was lost (for example in an earlier trimming step), given in the samplesheet's optional `s` column; a **MAG** (metagenome-assembled genome) is a genome bin recovered from an assembly; **CPGE** is a function's reads per kb of gene divided by the sample's genome equivalents, the number of genomes its reads amount to (estimated by MicrobeCensus); it is proportional to copies per genome, not a count of them (a single-copy gene is about 1000 / read length).
 
 ## Quick Start
 

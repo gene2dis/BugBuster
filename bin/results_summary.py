@@ -41,7 +41,9 @@ are absent; README.md and LLM_GUIDE.md list every pipeline stage and whether it 
 Units: Reads_report.csv counts single reads (both mates); the counts here are in read
 pairs (= reads / 2), the unit K-MARVEL and sylph use, except the columns the data dictionary
 marks 'mates counted separately' (RGI mapped reads, functional reads, reads on contigs and
-genes) and ARGs-OAP's read_count and ppm. ARG abundance is normalised to the
+genes) and ARGs-OAP's read_count and ppm. Functional profiles are in CPGE, reads per kb per
+MicrobeCensus genome equivalent (a single-copy gene is about 1000 / read length, not 1).
+ARG abundance is normalised to the
 sample's clean read pairs: RPM = supporting read pairs / clean pairs x 1e6, and
 RPKM = RPM / (reference gene length in kb), the length being the CARD reference
 protein x 3. Samples below --min-clean-pairs are flagged (never dropped): an ARG or
@@ -451,7 +453,7 @@ def method_notes(ctx):
     if ctx.get("functional"):
         f = ctx["functional"]
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
-                     f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if f['unit'] == 'cpge' else f['unit']}. "
+                     f"{CPGE_LABEL if f['unit'] == 'cpge' else f['unit']}. "
                      "Reported apart from any contig-level functional profile.")
     t = ctx["tables"]
     if "taxonomy_long" in t:
@@ -500,7 +502,7 @@ def method_notes(ctx):
         c = ctx["contig_functional"]
         notes.append(f"Contig functional profile: eggNOG-mapper and dbCAN on the predicted genes, featureCounts per "
                      f"sample ({', '.join(c['ontologies'])}), in "
-                     f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if c['unit'] == 'cpge' else 'TPM'}. "
+                     f"{CPGE_LABEL if c['unit'] == 'cpge' else 'TPM'}. "
                      "Reported apart from the read-level profile.")
     return notes, arg_notes
 
