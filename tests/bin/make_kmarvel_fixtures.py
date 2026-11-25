@@ -11,7 +11,7 @@
                                        model)
   kmarvel_sim_R{1,2}.fastq.gz          200 error-free 150 bp pairs from a
                                        back-translated copy of SynR-1 with
-                                       300 bp random flanks (~25x), plus 200
+                                       300 bp random flanks (~40x), plus 200
                                        random pairs
 
 No DB_VERSION and no BLAST index: the module indexes a copy of the FASTA in

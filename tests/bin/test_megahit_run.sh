@@ -15,7 +15,8 @@
 # and, with docker, that the real MEGAHIT (pinned image) runs through it and
 # logs the memory budget.
 #
-# Requirements: bash; docker for the last check (skipped without it).
+# Requirements: bash and docker. Without docker the suite fails: the real
+# MEGAHIT check is not skipped (roadmap Phase 25, RV26; review R8-10).
 #
 set -euo pipefail
 
