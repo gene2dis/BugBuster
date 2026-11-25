@@ -119,15 +119,12 @@ def sort_natural(df, by, ascending=True, natural=("assembly", "bin")):
     idx = list(range(len(df)))
     for col, up in reversed(list(zip(by, asc))):
         vals = df[col]
-        if col in natural:
-            def key(i):
-                return natural_key(vals.iat[i])
-        else:
-            na = (1, 0) if up else (-1, 0)  # missing values last in either direction, as sort_values puts them
+        na = (1, 0) if up else (-1, 0)  # missing values last in either direction, as sort_values puts them
+        conv = natural_key if col in natural else (lambda v: v)
 
-            def key(i, na=na):
-                v = vals.iat[i]
-                return na if pd.isna(v) else (0, v)
+        def key(i, na=na, conv=conv):
+            v = vals.iat[i]
+            return na if pd.isna(v) else (0, conv(v))
         idx = sorted(idx, key=key, reverse=not up)
     return df.loc[idx].reset_index(drop=True)
 

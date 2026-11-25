@@ -5,7 +5,7 @@
 == Reading this report
 #bullets(s.lists.units)
 #if s.lists.arg_methods.len() > 0 [
-  *ARG methods.* The ARG figures and matrices use #s.facts.primary.
+  *ARG methods.* #if s.facts.at("primary", default: "") != "" [The ARG figures and matrices use #s.facts.primary.]
   #list(..s.lists.arg_methods.map(m => [*#m.term* #m.text]))
 ]
 #datatable(s, "tiers", widths: (8%, 14%, 30%, 1fr))

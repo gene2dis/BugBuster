@@ -4,7 +4,7 @@
 <h2>Reading this report</h2>
 <ul>{% for u in s.lists.units %}<li>{{ u }}</li>{% endfor %}</ul>
 {% if s.lists.arg_methods %}
-<p><b>ARG methods.</b> The ARG figures and matrices use {{ s.facts.primary }}.</p>
+<p><b>ARG methods.</b>{% if s.facts.primary %} The ARG figures and matrices use {{ s.facts.primary }}.{% endif %}</p>
 <ul>{% for a in s.lists.arg_methods %}<li><b>{{ a.term }}</b> {{ a.text }}</li>{% endfor %}</ul>
 {% endif %}
 {{ m.table(s, "tiers") }}

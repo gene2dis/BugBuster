@@ -11,7 +11,7 @@
 </details>
 {% endif %}
 <h2>Pipeline stages</h2>
-<p>{{ m.tabref(s, "stages") or "The stage table" }} lists every stage, whether it ran and what this summary takes from it; a section of this report appears only when its stage ran.</p>
+{% if s.tables.get("stages") %}<p>{{ m.tabref(s, "stages") }} lists every stage, whether it ran and what this summary takes from it; a section of this report appears only when its stage ran.</p>{% endif %}
 {{ m.table(s, "stages") }}
 <h2 id="qc">Samples and sequencing depth</h2>
 <p>{{ f.n_low }} of {{ f.n_samples }} samples have fewer than {{ f.min_pairs }} clean read pairs{% if f.n_low %} ({{ f.low_samples }}){% endif %}; a gene or taxon missing from a low-depth sample is unknown, not absent{{ m.refs(s, figs=["qc_read_fate"], tabs=["samples"]) }}.</p>

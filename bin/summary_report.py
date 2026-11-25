@@ -250,12 +250,14 @@ def caveats(ctx):
                    "profiled community.")
     elif profiler:
         out.append("Taxonomic abundance is relative to the profiled community.")
+    # the watchlist is read only by the taxonomy section and RGI's host check, so its caveats need one of them
+    watch = ctx.get("watchlist") is not None and (bool(profiler) or "RGI" in am)
     editable = (["tier rules (assets/arg_priority_tiers.tsv)"] if am else []) + \
-        (["watchlist (assets/summary_watchlist.tsv)"] if ctx.get("watchlist") is not None else [])
+        (["watchlist (assets/summary_watchlist.tsv)"] if watch else [])
     if editable:
         verb = "are editable tables" if len(editable) > 1 else ("are an editable table" if am else "is an editable table")
         out.append(f"The {' and the '.join(editable)} {verb}.")
-    if ctx.get("watchlist") is not None:
+    if watch:
         out.append(f"Watchlist: the taxa in the watchlist table, from {ctx.get('watchlist_path', '')}. The default "
                    "list holds the ESKAPE pathogens, the bacteria of the WHO Bacterial Priority Pathogens List 2024 "
                    "and of the CDC Antibiotic Resistance Threats Report 2019, and a few other species of clinical "

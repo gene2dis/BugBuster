@@ -574,7 +574,7 @@ TABLE_DOCS = {
             ("gene_id", "Pyrodigal gene"),
             ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
             ("cluster_90, cluster_95, cluster_99, cluster_100", "cluster at each identity, as "
-                                                                "<assembly>:<bin>:<gene of the representative>"),
+                                                                "<assembly>:<bin>:<representative_gene>"),
         ],
     },
     "arg_cluster_sharing": {
@@ -1100,6 +1100,13 @@ def llm_guide(ctx):
             "`bin`, `mobile_class`), summarised in `tables/arg_contig_hosts.tsv`; ARGs shared between MAGs in "
             "`tables/arg_cluster_sharing.tsv`.",
             "- Software versions: `README.md`, section Software versions (per batch when several were merged).", ""]
+    # placeholders (<sample>, taxonomy_<rank>_wide) in backticks outside the fenced run facts, as in README (R5-12)
+    fenced = False
+    for i, line in enumerate(out):
+        if line.startswith("```"):
+            fenced = not fenced
+        elif not fenced:
+            out[i] = _md_inline(line)
     return "\n".join(out)
 
 

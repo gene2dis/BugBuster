@@ -434,7 +434,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
     axes[0].scatter(depth[ran], n_genes[ran], c=c, s=6, lw=0)
     axes[0].set_ylabel("distinct acquired genes")
     # a log axis has no 0: a sample without an acquired gene is drawn at 0.001, and the caption says so (R5-10)
-    zero = int((n_genes[ran] == 0).sum())  # samples without an acquired gene (a call without an RPKM is not one)
+    zero = int((load[ran].fillna(0) == 0).sum())  # every sample drawn at 0.001 (no acquired gene, or calls without an RPKM)
     axes[1].scatter(depth[ran], load[ran].fillna(0) + 1e-3, c=c, s=6, lw=0)
     axes[1].set_yscale("log")
     axes[1].set_ylabel("total acquired RPKM (log)")
@@ -453,7 +453,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
             "Acquired genes (tiers 1-2) per sample against its clean read pairs. If the number of genes found rises "
             "with depth (left), shallow samples under-report ARGs: compare presence and absence only between samples "
             "of similar depth. Total RPKM (right) is normalised to depth and plotted as RPKM + 0.001, so a sample "
-            "without an acquired gene (RPKM 0) sits at 0.001" + (f" ({zero} here)" if zero else "")
+            "with total RPKM 0 (no acquired gene, or calls without an RPKM) sits at 0.001" + (f" ({zero} here)" if zero else "")
             + "; the source data hold the unshifted values. Vermillion: below the low-depth threshold.",
             src, "args")
 

@@ -1771,15 +1771,26 @@ assert f"the {len(hosts)} {word} with the most genes" in cap, (len(hosts), cap[:
 assert ("plus contigs without a classification" in cap) == ("unclassified" in set(src["host"]))
 PYEOF
 
-check "README.md: no bare <placeholder> a Markdown viewer would hide (R5-12)" py - <<'PYEOF'
+check "README.md and LLM_GUIDE.md: no bare <placeholder> a Markdown viewer would hide (R5-12)" py - <<'PYEOF'
 import glob, re
-readmes = glob.glob("*/README.md")
-assert len(readmes) > 20, len(readmes)
-for p in readmes:
+docs = glob.glob("*/README.md") + glob.glob("*/LLM_GUIDE.md")
+assert len(docs) > 40, len(docs)
+for p in docs:
     outside = "".join(open(p).read().split("`")[0::2])  # text outside code spans
-    bare = re.findall(r"<[A-Za-z_]+>", outside)
+    bare = re.findall(r"<[A-Za-z_][^<>]*>", outside)
     assert not bare, (p, bare[:5])
-assert "`taxonomy_<rank>_wide`" in open("out/README.md").read()
+for doc in ("README.md", "LLM_GUIDE.md"):
+    assert "`taxonomy_<rank>_wide`" in open(f"out/{doc}").read(), doc
+PYEOF
+
+check "Methods: no ARG-method sentence without a CARD method; the stage table sentence only with the table" py - <<'PYEOF'
+import glob, re
+pages = glob.glob("*/report/methods.html") + glob.glob("*/report/index.html") + glob.glob("*_out/results_summary.txt")
+assert len(pages) > 20, len(pages)
+for p in pages:
+    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open(p).read()))
+    assert not re.search(r"matrices use \s*\.", t), p
+    assert "The stage table lists" not in t, p
 PYEOF
 check "assemblies and bins in natural order in every stage table (R5-14)" py - "${REPO_DIR}/bin" <<'PYEOF'
 import sys
@@ -1791,6 +1802,10 @@ df = pd.DataFrame({"batch": ["a"] * 4, "assembly": ["sample10", "sample2", "samp
 out = sort_natural(df, ["batch", "assembly", "bin"])
 assert list(zip(out["assembly"], out["bin"])) == [("sample1", "binette_bin3"), ("sample2", "binette_bin2"),
                                                   ("sample2", "binette_bin10"), ("sample10", "binette_bin1")]
+na = pd.DataFrame({"assembly": ["s10", "s2", None, "s1"]})
+for up, want in ((True, ["s1", "s2", "s10", "NA"]), (False, ["s10", "s2", "s1", "NA"])):
+    got = sort_natural(na, ["assembly"], ascending=up)["assembly"].fillna("NA").tolist()  # pandas 3: None is NaN
+    assert got == want, (up, got)  # missing values last
 for d in ("st_asm_out", "st_merge"):
     for name, keys in (("assembly_stats", ["batch", "assembly"]), ("mags", ["batch", "assembly", "bin"]),
                        ("arg_mag_long", ["batch", "assembly", "bin"]), ("arg_contig_long", ["batch", "assembly"]),
