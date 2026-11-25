@@ -736,20 +736,33 @@ def _md_cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
+_PLACEHOLDER = re.compile(r"[\w.\-]*<[A-Za-z_]+>[\w.\-<>]*")
+
+
+def _md_inline(text):
+    """Names with a <placeholder> (taxonomy_<rank>_wide, function_read_<ontology>) in backticks outside code spans:
+    a Markdown viewer takes a bare <rank> for an HTML tag and shows nothing (R5-12)."""
+    parts = str(text).split("`")
+    for i in range(0, len(parts), 2):  # even parts are outside code spans
+        parts[i] = _PLACEHOLDER.sub(lambda m: f"`{m.group(0)}`", parts[i])
+    return "`".join(parts)
+
+
 def render_markdown(blocks):
     out = []
     for b in blocks:
         kind = b[0]
         if kind == "h":
-            out.append("#" * b[1] + " " + b[2])
+            out.append("#" * b[1] + " " + _md_inline(b[2]))
         elif kind == "p":
-            out.append(b[1])
+            out.append(_md_inline(b[1]))
         elif kind == "ul":
-            out.append("\n".join(f"- {item}" for item in b[1]))
+            out.append("\n".join(f"- {_md_inline(item)}" for item in b[1]))
         elif kind == "table":
             head, rows = b[1], b[2]
-            lines = ["| " + " | ".join(_md_cell(h) for h in head) + " |", "|" + "---|" * len(head)]
-            lines += ["| " + " | ".join(_md_cell(c) for c in r) + " |" for r in rows]
+            cell = lambda c: _md_inline(_md_cell(c))  # noqa: E731
+            lines = ["| " + " | ".join(cell(h) for h in head) + " |", "|" + "---|" * len(head)]
+            lines += ["| " + " | ".join(cell(c) for c in r) + " |" for r in rows]
             out.append("\n".join(lines))
         elif kind == "code":
             out.append("```\n" + b[1].rstrip("\n") + "\n```")
@@ -936,7 +949,8 @@ def readme_blocks(ctx):
                    ("table", ["File", "Figure", "How to read it"],
                     [[f"`figures/{r['key']}.*`", r["title"], r["caption"]] for r in figs.records])]
     blocks += [("h", 2, "Units and missing values"), ("table", ["Term", "Meaning"], [list(u) for u in UNITS])]
-    if s.get("arg_methods") or ctx.get("sarg"):
+    # tiers exist only for the CARD methods; an ARGs-OAP-only run has none (R5-06)
+    if s.get("arg_methods"):
         tier_rows = []
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
@@ -982,7 +996,7 @@ def llm_guide(ctx):
                 f"low_coverage_samples: [{', '.join(s['low_coverage_samples'])}]"]
     out += [f"arg_primary_method: {s.get('arg_primary', 'none')}",
             f"arg_methods_card: [{', '.join(s.get('arg_methods', []))}]",
-            f"rgi_min_coverage_percent: {ctx['rgi_min_coverage']:g}",
+            *([f"rgi_min_coverage_percent: {ctx['rgi_min_coverage']:g}"] if "RGI" in s.get("arg_methods", []) else []),
             f"metadata_columns: [{', '.join(ctx['meta_cols'])}]",
             f"group_by: {ctx.get('group_by') or 'none'}",
             "```", "",

@@ -3,14 +3,14 @@
 #let f = s.facts
 
 = MAGs
-#f.n_mags refined MAGs: #f.high high, #f.medium medium and #f.low low quality by MIMAG (#figref(s, "mag_quality"), #tabref(s, "mags")). The High / Mid / Low classes of the run's binning plots are another, older scheme. #figref(s, "mag_abundance_heatmap") shows the share of each sample's sequenced bases on each MAG.
+#f.n_mags refined MAGs: #f.high high, #f.medium medium and #f.low low quality by MIMAG#refs(s, figs: ("mag_quality",), tabs: ("mags",)). The High / Mid / Low classes of the run's binning plots are another, older scheme.#if has(s, "figures", "mag_abundance_heatmap") [ #figref(s, "mag_abundance_heatmap") shows the share of each sample's sequenced bases on each MAG.]
 
 #if "gunc_fail" in f [
   GUNC flags #f.gunc_fail of #f.n_mags MAGs as likely chimeras of distant lineages (`gunc_pass` false#if f.gunc_fail > 0 and has(s, "figures", "mag_quality") [, circled in #figref(s, "mag_quality")]); #f.gunc_pass pass#if f.gunc_unscored > 0 [, and #f.gunc_unscored have no GUNC result (not scored, or from a results directory without GUNC)]. A fail does not change the MIMAG tier: check such a MAG before using it.
 ]
 
 #if "multisample" in f [
-  Multi-sample binning#if f.multisample_partial [ (in the results directories where it ran)]: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth#if has(s, "tables", "abundance") [ (#tabref(s, "abundance"))] is still each sample's own alignment.
+  Multi-sample binning#if f.multisample_partial [ (in the results directories where it ran)]: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth#if has(s, "tables", "abundance") [#refs(s, tabs: ("abundance",))] is still each sample's own alignment.
 ]
 
 #fig(s, "mag_quality")
@@ -19,7 +19,7 @@
 #datatable(s, "abundance")
 #if "n_clusters" in f [
   == Run-level clusters
-  #f.n_clustered MAGs fall into #f.n_clusters clusters at #f.derep_ani % ANI (galah; the representative of each has the highest completeness − 5 × contamination). #tabref(s, "cluster_abundance") gives each representative's share of every sample's reads (CoverM). The clusters cover this run's samples only.
+  #f.n_clustered MAGs fall into #f.n_clusters clusters at #f.derep_ani % ANI (galah; the representative of each has the highest completeness − 5 × contamination).#if has(s, "tables", "cluster_abundance") [ #tabref(s, "cluster_abundance") gives each representative's share of every sample's reads (CoverM).] The clusters cover this run's samples only.
 ] else if "derep_empty" in f [
   == Run-level clusters
   No refined MAG passed galah's quality filter (`--bin_min_completeness`, `--bin_max_contamination`), so the run has no clusters.

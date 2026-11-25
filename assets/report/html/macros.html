@@ -33,3 +33,11 @@
 
 {% macro figref(s, key) -%}{% if s.figures.get(key) %}<a href="#fig-{{ s.figures[key].no }}">Figure {{ s.figures[key].no }}</a>{% endif %}{%- endmacro %}
 {% macro tabref(s, slot) -%}{% if s.tables.get(slot) %}<a href="#tab-{{ s.tables[slot].no }}">Table {{ s.tables[slot].no }}</a>{% endif %}{%- endmacro %}
+{# " (Figure 2, Table 5)" for the figures and tables that are drawn; nothing when none is, so no sentence keeps an
+   empty parenthesis (R5-05) #}
+{% macro refs(s, figs=[], tabs=[]) -%}
+{%- set ns = namespace(out=[]) -%}
+{%- for k in figs if s.figures.get(k) %}{% set ns.out = ns.out + [figref(s, k)] %}{% endfor -%}
+{%- for k in tabs if s.tables.get(k) %}{% set ns.out = ns.out + [tabref(s, k)] %}{% endfor -%}
+{%- if ns.out %} ({{ ns.out | join(", ") }}){% endif -%}
+{%- endmacro %}

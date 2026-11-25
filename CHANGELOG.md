@@ -1498,6 +1498,47 @@ bold label names the full entry below (search for it).
     all three ("found by RGI (not every method ran)"), with a card of their own.
     A single pipeline run, where every sample gets every enabled method, is
     unchanged.
+- **Results summary tables and report text** (roadmap Phase 24):
+  - `samples_qc.taxonomy_db` was filled with the other directory's profiler
+    for samples of a merged results directory without a taxonomic profile;
+    it is now blank for them, as `n_species` already was.
+  - `taxonomy_species_prevalence` listed the pooled "unassigned species" row
+    (taxa without a species name) as a species; it is left out, as it is from
+    `n_species`, so the table has one row fewer when such taxa exist.
+  - `arg_drug_class_rpkm` / `arg_drug_class_rpkg` with no counted call that
+    has a drug class were written as a single `""` line; they now keep their
+    header (`tier_group`, `drug_class`, one column per sample).
+  - Rows of `assembly_stats`, `arg_contig_mobile`, `arg_contig_long`,
+    `arg_contig_hosts` and `arg_mag_long` are in natural order of the
+    assembly and bin (`sample2` before `sample10`, `binette_bin2` before
+    `binette_bin10`), as `mags` already was. Rows reorder; contents do not
+    change.
+  - Report sentences no longer keep an empty reference when a figure is not
+    drawn: the read functional page of SUPER-FOCUS and HUMAnN (no COG figure)
+    read "(, Table N)", and the MAG page without bin depth ended with a
+    sentence that had no subject.
+  - Statements about methods that did not run are gone: the RGI coverage
+    sentence and caveats, the sylph classified-fraction caveat, the hollow
+    "species call uncertain" dots of the watchlist figure (only sylph reports
+    an ANI interval), the ARG caveats when no CARD method ran, the README's
+    tier section when only ARGs-OAP ran, and `rgi_min_coverage_percent` in the
+    LLM guide when RGI did not run.
+  - Table cells from 999.5 to below 1000 were written as `1e+03`; they are
+    written as `1,000`.
+  - The `arg_vs_depth` caption says that total RPKM is plotted as RPKM +
+    0.001 (so samples without an acquired gene sit at 0.001), and the
+    `arg_contig_hosts` caption counts the hosts without the "unclassified" row
+    and mentions that row only when it is drawn.
+  - README.md wrote names such as `taxonomy_<rank>_wide` bare, so a Markdown
+    viewer hid `<rank>`; they are in backticks.
+  - Vermillion now marks only low-depth samples and thresholds: the watchlist
+    dots are dark grey and ARG tier 1 is reddish purple (`#CC79A7`) in the
+    UpSet and category figures.
+  - `function_read_<ontology>` / `function_contig_<ontology>`: in a low-depth
+    sample without a MicrobeCensus estimate, a term found there was written as
+    `NA_low_depth` ("not detected in a low-depth sample"); it is now
+    `NA_no_ags`, and a term not found stays `NA_low_depth`, as in the ARG RPKG
+    tables.
 - **Small failures** (roadmap Phase 21):
   - The launch warning about databases "in the layout of an earlier release"
     matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after

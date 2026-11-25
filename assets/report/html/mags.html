@@ -2,12 +2,12 @@
 {% set f = s.facts %}
 {% block body %}
 <h1>MAGs</h1>
-<p>{{ f.n_mags }} refined MAGs: {{ f.high }} high, {{ f.medium }} medium and {{ f.low }} low quality by MIMAG ({{ m.figref(s, "mag_quality") }}, {{ m.tabref(s, "mags") }}). The High / Mid / Low classes of the run's binning plots are another, older scheme. {{ m.figref(s, "mag_abundance_heatmap") }} shows the share of each sample's sequenced bases on each MAG.</p>
+<p>{{ f.n_mags }} refined MAGs: {{ f.high }} high, {{ f.medium }} medium and {{ f.low }} low quality by MIMAG{{ m.refs(s, figs=["mag_quality"], tabs=["mags"]) }}. The High / Mid / Low classes of the run's binning plots are another, older scheme.{% if s.figures.get("mag_abundance_heatmap") %} {{ m.figref(s, "mag_abundance_heatmap") }} shows the share of each sample's sequenced bases on each MAG.{% endif %}</p>
 {% if f.gunc_fail is defined %}
 <p>GUNC flags {{ f.gunc_fail }} of {{ f.n_mags }} MAGs as likely chimeras of distant lineages (<code>gunc_pass</code> false{% if f.gunc_fail and s.figures.get("mag_quality") %}, circled in {{ m.figref(s, "mag_quality") }}{% endif %}); {{ f.gunc_pass }} pass{% if f.gunc_unscored %}, and {{ f.gunc_unscored }} have no GUNC result (not scored, or from a results directory without GUNC){% endif %}. A fail does not change the MIMAG tier: check such a MAG before using it.</p>
 {% endif %}
 {% if f.multisample is defined %}
-<p>Multi-sample binning{% if f.multisample_partial %} (in the results directories where it ran){% endif %}: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth{% if s.tables.get("abundance") %} ({{ m.tabref(s, "abundance") }}){% endif %} is still each sample's own alignment.</p>
+<p>Multi-sample binning{% if f.multisample_partial %} (in the results directories where it ran){% endif %}: MetaBAT2 binned each assembly of a group of two or more samples with one depth column per sample of the group (every sample aligned to the concatenation of the group's assemblies), so its bins differ from those of a run without the option; the MAG depth{% if s.tables.get("abundance") %}{{ m.refs(s, tabs=["abundance"]) }}{% endif %} is still each sample's own alignment.</p>
 {% endif %}
 {{ m.figure(s, "mag_quality", specs) }}
 {{ m.figure(s, "mag_abundance_heatmap", specs) }}
@@ -15,7 +15,7 @@
 {{ m.table(s, "abundance") }}
 {% if f.n_clusters is defined %}
 <h2>Run-level clusters</h2>
-<p>{{ f.n_clustered }} MAGs fall into {{ f.n_clusters }} clusters at {{ f.derep_ani }} % ANI (galah; the representative of each has the highest completeness − 5 × contamination). {{ m.tabref(s, "cluster_abundance") }} gives each representative's share of every sample's reads (CoverM). The clusters cover this run's samples only.</p>
+<p>{{ f.n_clustered }} MAGs fall into {{ f.n_clusters }} clusters at {{ f.derep_ani }} % ANI (galah; the representative of each has the highest completeness − 5 × contamination).{% if s.tables.get("cluster_abundance") %} {{ m.tabref(s, "cluster_abundance") }} gives each representative's share of every sample's reads (CoverM).{% endif %} The clusters cover this run's samples only.</p>
 {% elif f.derep_empty is defined %}
 <h2>Run-level clusters</h2>
 <p>No refined MAG passed galah's quality filter (<code>--bin_min_completeness</code>, <code>--bin_max_contamination</code>), so the run has no clusters.</p>

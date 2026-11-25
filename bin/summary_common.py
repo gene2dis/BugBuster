@@ -9,6 +9,9 @@ from datetime import datetime, timezone
 NA_LOW_DEPTH = "NA_low_depth"
 NA_NOT_RUN = "NA_not_run"
 NA_NO_AGS = "NA_no_ags"
+# the functional profiles' unit as the documents name it: the columns keep the name cpge (copies per genome
+# equivalent), but the value is reads per kb per genome equivalent, proportional to copies (roadmap Phase 24, RV22)
+CPGE_LABEL = "CPGE (reads per kb per MicrobeCensus genome equivalent)"
 GTDB_SUFFIX = re.compile(r"_[A-Z]+$")
 ACCESSION = re.compile(r"(GC[AF]_\d+\.\d+)")
 
@@ -93,6 +96,36 @@ def coassembly_subdir(asm, groups):
 def natural_key(value):
     """Sort key that orders V2 before V10."""
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", str(value))]
+
+
+def first_value(frame, column):
+    """The first non-blank value of a column as text, '' when the column is missing or blank (samples_qc's
+    taxonomy_db is blank for samples of a merged results directory without a profile)."""
+    if column not in frame:
+        return ""
+    vals = frame[column].dropna().astype(str)
+    vals = vals[vals != ""]
+    return vals.iloc[0] if len(vals) else ""
+
+
+def sort_natural(df, by, ascending=True, natural=("assembly", "bin")):
+    """df sorted by the columns in `by` (stable), with the `natural` ones in natural order (sample2 before sample10,
+    binette_bin2 before binette_bin10), as the mags table sorts them (R5-14). Missing values sort last."""
+    import pandas as pd  # here, as in fill_columns
+    asc = [ascending] * len(by) if isinstance(ascending, bool) else list(ascending)
+    df = df.reset_index(drop=True)
+    idx = list(range(len(df)))
+    for col, up in reversed(list(zip(by, asc))):
+        vals = df[col]
+        if col in natural:
+            def key(i):
+                return natural_key(vals.iat[i])
+        else:
+            def key(i):
+                v = vals.iat[i]
+                return (1, 0) if pd.isna(v) else (0, v)
+        idx = sorted(idx, key=key, reverse=not up)
+    return df.loc[idx].reset_index(drop=True)
 
 
 def strip_gtdb(name):

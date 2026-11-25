@@ -3,7 +3,7 @@
 #let f = s.facts
 
 = Overview
-This summary covers #f.n_samples samples from #f.n_batches results director#if f.n_batches == 1 [y] else [ies] (#f.batches)#if f.at("median_clean", default: none) != none [, with a median of #f.median_clean clean read pairs]. #f.stages_ran of #f.stages_total pipeline stages ran (#tabref(s, "stages")).
+This summary covers #f.n_samples samples from #f.n_batches results director#if f.n_batches == 1 [y] else [ies] (#f.batches)#if f.at("median_clean", default: none) != none [, with a median of #f.median_clean clean read pairs]. #f.stages_ran of #f.stages_total pipeline stages ran#refs(s, tabs: ("stages",)).
 
 #if s.lists.attention.len() > 0 [
   == Attention
@@ -21,11 +21,11 @@ This summary covers #f.n_samples samples from #f.n_batches results director#if f
 } else { auto })
 
 == Samples and sequencing depth
-#f.n_low of #f.n_samples samples have fewer than #f.min_pairs clean read pairs#if f.n_low > 0 [ (#f.low_samples)]#[;] a gene or taxon missing from a low-depth sample is unknown, not absent (#figref(s, "qc_read_fate"), #tabref(s, "samples")).
+#f.n_low of #f.n_samples samples have fewer than #f.min_pairs clean read pairs#if f.n_low > 0 [ (#f.low_samples)]#[;] a gene or taxon missing from a low-depth sample is unknown, not absent#refs(s, figs: ("qc_read_fate",), tabs: ("samples",)).
 
 #fig(s, "qc_read_fate")
 #if has(s, "figures", "nonpareil_curves") [
-  Nonpareil estimates how much of each sample's community its reads cover, from the redundancy of its R1 reads (#figref(s, "nonpareil_curves")): #f.n_low_cov of #f.n_samples samples are below #f.min_cov#if f.n_low_cov > 0 [ (#f.low_cov_samples)]. The dashed model reaches the 95 % line at the read pairs a sample would need for 95 % coverage (samples_qc nonpareil_depth_95pct).
+  Nonpareil estimates how much of each sample's community its reads cover, from the redundancy of its R1 reads#refs(s, figs: ("nonpareil_curves",)): #f.n_low_cov of #f.n_samples samples are below #f.min_cov#if f.n_low_cov > 0 [ (#f.low_cov_samples)]. The dashed model reaches the 95 % line at the read pairs a sample would need for 95 % coverage (samples_qc nonpareil_depth_95pct).
 
   #fig(s, "nonpareil_curves")
 ]

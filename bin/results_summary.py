@@ -64,8 +64,8 @@ import pandas as pd
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from id_columns import read_table  # noqa: E402
-from summary_common import (NA_NOT_RUN, die, natural_key, norm_taxon, parse_versions, sample_status,  # noqa: E402
-                            strip_gtdb, warn)
+from summary_common import (CPGE_LABEL, NA_NOT_RUN, die, first_value, natural_key, norm_taxon,  # noqa: E402
+                            parse_versions, sample_status, strip_gtdb, warn)
 from summary_taxonomy import (build_taxonomy, load_taxonomy, load_watchlist, mark_low_depth,  # noqa: E402
                               prevalence_table, species_rank, watchlist_table)
 from summary_args import (METHOD_LABELS, annotate_args, annotate_rgi, arg_tables,  # noqa: E402
@@ -704,7 +704,8 @@ def main(argv=None):
         samples["n_species"] = (spw > 0).sum(axis=0).reindex(order)
         samples["shannon"] = shannon.reindex(order)
         no_tax = [s for s in order if s not in tx["rel"].columns]
-        samples.loc[no_tax, ["n_species", "shannon"]] = np.nan
+        # a merged results directory without a profile: no profiler label either
+        samples.loc[no_tax, ["taxonomy_db", "n_species", "shannon"]] = np.nan
         long = with_meta(tx["long"], samples, meta_cols, order, ["relative_abundance"], ascending=[False],
                          lead=["taxon_id"] + tx["ranks"])
         tables["taxonomy_long"] = (long, False)
@@ -712,8 +713,10 @@ def main(argv=None):
         for rank, wide in tx["wide"].items():
             tables[f"taxonomy_{rank.lower()}_wide"] = (mark_low_depth(wide[wide.sum(axis=1) > 0], low, tcols_all),
                                                        True)
+        # the pooled 'unassigned species' row is not a species: left out here as from n_species (R5-13)
         tables["taxonomy_species_prevalence"] = (
-            prevalence_table(tx["wide"][sp], samples, args.group_by, low).rename_axis(sp), True)
+            prevalence_table(tx["wide"][sp][~tx["wide"][sp].index.astype(str).str.startswith("unassigned ")],
+                             samples, args.group_by, low).rename_axis(sp), True)
         for s, sub in long.groupby("sample"):
             agg = sub.groupby(sp)["relative_abundance"].sum()
             species_by_sample[s] = {norm_taxon(n): (strip_gtdb(n), ab) for n, ab in agg.items() if n}
@@ -725,7 +728,8 @@ def main(argv=None):
         tcols = [s for s in fig_cols if s in tx["rel"].columns]
         tgroups = [g for s, g in zip(fig_cols, fig_groups) if s in tx["rel"].columns]
         fig_taxonomy(figs, tx, tcols, tgroups, low, args.taxa_per_sample, tx["label"])
-        fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name)
+        fig_watchlist(figs, wl_wide, wl_long, tcols, tgroups, low, Path(args.watchlist).name,
+                      ani_interval="species_call_uncertain" in tx["long"].columns)
 
     # ---- ARGs (read level): K-MARVEL calls, and RGI bwt genes at or above --rgi-min-coverage
     methods_ran = {}
