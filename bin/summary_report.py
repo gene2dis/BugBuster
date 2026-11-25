@@ -160,8 +160,9 @@ def reading_guide(ctx):
     """Units, ARG method notes and tier rows for the methods section."""
     s = ctx["summary"]
     units = ["Counts are read pairs, except the single-read columns the data dictionary marks 'mates counted "
-             "separately' (rgi_mapped_reads, func_reads_assigned, the read-level abundance_native, pct_reads_on_*, "
-             "arg_contig_abundance count) and ARGs-OAP's read_count and ppm. Reads_report.csv counts single reads.",
+             "separately' (rgi_mapped_reads, func_reads_assigned, the abundance_native of Woltka and SUPER-FOCUS, "
+             "pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's read_count and ppm. Reads_report.csv counts "
+             "single reads.",
              "K-MARVEL / RGI ARG abundance is RPKM: read pairs per kb of reference gene per million clean read pairs, "
              "comparable between samples of different depth."]
     if ctx.get("sarg"):
@@ -201,8 +202,8 @@ def reading_guide(ctx):
 
 
 def caveats(ctx):
-    """The fixed caveats, each only when the method it is about ran (R5-06), then the stage pitfalls and the
-    Methods notes."""
+    """The fixed caveats, each only when the method it is about ran (R5-06), then the stage pitfalls (the stage
+    methods are a list of their own, R5-23)."""
     s = ctx["summary"]
     am = s.get("arg_methods", [])
     qc = (ctx["tables"].get("samples_qc") or (None,))[0]
@@ -210,9 +211,9 @@ def caveats(ctx):
     arg_long = (ctx["tables"].get("arg_long") or (None,))[0]
     out = [
         "Counts are read pairs (Reads_report.csv counts single reads, so its numbers are twice those here), except "
-        "the columns marked 'mates counted separately' (rgi_mapped_reads, func_reads_assigned, abundance_native, "
-        "pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's read_count and ppm: do not divide those by "
-        "clean_pairs without halving them.",
+        "the columns marked 'mates counted separately' (rgi_mapped_reads, func_reads_assigned, the abundance_native "
+        "of Woltka and SUPER-FOCUS (HUMAnN's is RPK), pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's "
+        "read_count and ppm: do not divide those by clean_pairs without halving them.",
         f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are flagged as low depth. A gene or taxon not "
         f"found there is reported as unknown ({NA_LOW_DEPTH}), not as absent.",
     ]

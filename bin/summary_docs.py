@@ -749,7 +749,8 @@ def _md_cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
-_PLACEHOLDER = re.compile(r"[\w.\-]*<[A-Za-z_]+>[\w.\-<>]*")
+# a name with a <placeholder>; it does not end on '.' or '-' (a sentence's full stop stays outside the code span)
+_PLACEHOLDER = re.compile(r"[\w.\-]*<[A-Za-z_]+>(?:[\w<>]|[.\-](?=[\w<]))*")
 
 
 def _md_inline(text):

@@ -1844,6 +1844,9 @@ found = [(p, m.group(0)) for p, t in texts.items() for m in [bad.search(re.sub(r
 assert not found, found[:10]
 for d in ("nocog_out", "st_asm_nobd_out"):
     assert "Figure" in open(f"{d}/results_summary.txt").read()
+# Typst ends an embedded expression at a ';', which it then drops: the taxonomy sentence keeps it (escaped)
+pdf = re.sub(r"\s+", " ", open("nocog_out/results_summary.txt").read())
+assert re.search(r"log scale \(Figure \d+, Figure \d+\); the bars show", pdf), pdf[pdf.find("log scale"):][:120]
 fn = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open("nocog_out/report/functional.html").read()))
 assert re.search(r"reported apart from the contig-level one \(\s*Table \d+\s*\)", fn), fn[:600]
 mg = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open("st_asm_nobd_out/report/mags.html").read()))

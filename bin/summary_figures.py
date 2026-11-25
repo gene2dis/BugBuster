@@ -434,7 +434,7 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
     axes[0].scatter(depth[ran], n_genes[ran], c=c, s=6, lw=0)
     axes[0].set_ylabel("distinct acquired genes")
     # a log axis has no 0: a sample without an acquired gene is drawn at 0.001, and the caption says so (R5-10)
-    zero = int((load[ran].fillna(0) == 0).sum())
+    zero = int((n_genes[ran] == 0).sum())  # samples without an acquired gene (a call without an RPKM is not one)
     axes[1].scatter(depth[ran], load[ran].fillna(0) + 1e-3, c=c, s=6, lw=0)
     axes[1].set_yscale("log")
     axes[1].set_ylabel("total acquired RPKM (log)")
