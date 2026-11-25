@@ -10,6 +10,11 @@
 ]
 #datatable(s, "tiers", widths: (8%, 14%, 30%, 1fr))
 
+#if s.lists.stage_methods.len() > 0 [
+  == Stage methods
+  #bullets(s.lists.stage_methods)
+]
+
 == Caveats
 #bullets(s.lists.caveats)
 

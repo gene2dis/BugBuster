@@ -83,7 +83,8 @@ STAGES = [
         "params": "--multisample_binning (per-sample assembly, MetaBAT2 among the binners), --multisample_group_by",
         "processes": ["MULTISAMPLE_CONCAT", "MULTISAMPLE_BWAMEM3_SAMTOOLS", "MULTISAMPLE_CALCULATE_DEPTH",
                       "MULTISAMPLE_SPLIT_DEPTH"],
-        "summary": "no table of its own: MetaBAT2's bins, so the mags table; the MAG depth is unchanged",
+        "summary": "no table of its own: it changes MetaBAT2's bins, which are in the mags table; the MAG depth "
+                   "(mag_abundance) is computed as without it",
     },
     {
         "key": "dereplication", "title": "Run-level MAG dereplication and abundance (galah, CoverM)",
@@ -128,7 +129,7 @@ STAGES = [
         "needs": "contig_arg",
     },
     {
-        "key": "bin_arg", "title": "Bin-level ARG clustering (assembly DeepARG hits split by bin, MMseqs2)",
+        "key": "bin_arg", "title": "MAG-level ARG clustering (assembly DeepARG hits split by MAG, MMseqs2)",
         "params": "--arg_bin_clustering (needs binning)",
         "processes": ["BIN_ARG_SPLIT", "ARG_FASTA_FORMATTER", "CLUSTERING"],
         "summary": "arg_mag_long (ARG genes of MAGs and their clusters at 90-100 % identity), arg_cluster_sharing",

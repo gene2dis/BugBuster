@@ -520,7 +520,7 @@ def fig_method_upset(fw, comp, gene_sets, methods):
             "UpSet plot: each column is one combination of methods (filled dots), and its bar counts the distinct genes "
             "(alleles collapsed: KPC-2 and KPC-97 are both KPC) that exactly those methods detected in at least one "
             "sample, coloured by tier. Left: genes per method. RGI counts a gene when reads cover at least the "
-            "--rgi-min-coverage share of its best reference sequence; only samples every method ran on are compared.",
+            "--rgi_summary_min_coverage share of its best reference sequence; only samples every method ran on are compared.",
             pd.DataFrame(rows), "compare")
 
 

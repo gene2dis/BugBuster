@@ -1539,6 +1539,19 @@ bold label names the full entry below (search for it).
     `NA_low_depth` ("not detected in a low-depth sample"); it is now
     `NA_no_ags`, and a term not found stays `NA_low_depth`, as in the ARG RPKG
     tables.
+  - Report text: the "counts are read pairs" sentences list the columns that
+    count single reads; the generated documents name the pipeline's parameters
+    (`--summary_min_clean_pairs`, `--summary_group_by`, ...) and the script's
+    flags only where the standalone script is described; no reference to an
+    internal design document; `pct_reads_on_genes` worded the same way in both
+    tables; the `mags` description points to `mag_clusters` when
+    `--dereplicate_mags` ran and says a MAG is a refined bin (column `bin`);
+    the Nonpareil caveat states its rule without an internal measurement, and
+    counts of a billion or more are written `1.2B`, not `1.2G`; Methods lists
+    the stage methods under their own heading instead of under Caveats, and
+    the K-MARVEL, RGI and ARGs-OAP methods once; the multi-sample catalog entry
+    reads as a sentence and the bin ARG stage is called MAG-level ARG
+    clustering; `results_summary.py --help` lists every input it reads.
 - **Small failures** (roadmap Phase 21):
   - The launch warning about databases "in the layout of an earlier release"
     matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after

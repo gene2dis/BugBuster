@@ -20,12 +20,28 @@ rerunning any tool, and merges any number of results directories (one per batch)
   05_arg_prediction/read_level/args_oap_summary/args_oap_{long,cells}.tsv  ARGs-OAP SARG (ARGS_OAP_REPORT)
   07_functional_annotation/summary/read_*.tsv     read-level functional profile (AGGREGATE_READ_FUNCTIONS)
   07_functional_annotation/microbecensus/*/*.ags.tsv   MicrobeCensus average genome size
+  03_assembly/{per_sample/*,coassembly,coassembly/*}/*_contig.stats   BBMap contig statistics (+ BBNorm's
+                                                  *_read_reduction.tsv)
+  pipeline_info/contig_filtering_summary.txt      contigs kept by the length filter
+  07_functional_annotation/gene_abundance/*/*.featureCounts.txt.summary   reads on predicted genes
+  04_binning/{per_sample/*,coassembly,coassembly/*}/   MAGs: quality/checkm2/ (refined bins), taxonomy/gtdbtk/,
+                                                  quality/gunc/ (--gunc_prediction), coverage/*_bin_depth.tsv
+  07_functional_annotation/mags/                  Bakta per MAG (--mag_level_functional)
+  04_binning/dereplicated/                        mag_clusters.tsv and abundance/ (--dereplicate_mags)
+  05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv   contig ARGs, taxa, bins, geNomad
+                                                  and CheckV columns (+ deeparg/*/*.mapping.ARG for abundance)
+  05_arg_prediction/bin_level/clustering/Arg_cluster_*_cluster.tsv   MAG ARG clusters (MMseqs2)
+  07_functional_annotation/summary/{function_abundance,annotated_fraction,gene_abundance}.tsv   contig-level
+                                                  functional profile (AGGREGATE_FUNCTIONS)
+  pipeline_info/{coassembly_groups,multisample_groups}.tsv   co-assembly and multi-sample groups
   pipeline_info/software_versions.yml             tool and database versions; which stages ran
-Each section is skipped when its inputs are absent; README.md and LLM_GUIDE.md list every pipeline stage and
-whether it ran.
+The docstring of each summary_*.py module names the exact files it reads. Each section is skipped when its inputs
+are absent; README.md and LLM_GUIDE.md list every pipeline stage and whether it ran.
 
-Units: Reads_report.csv counts single reads (both mates); every count here is in read
-pairs (= reads / 2), the unit K-MARVEL and sylph use. ARG abundance is normalised to the
+Units: Reads_report.csv counts single reads (both mates); the counts here are in read
+pairs (= reads / 2), the unit K-MARVEL and sylph use, except the columns the data dictionary
+marks 'mates counted separately' (RGI mapped reads, functional reads, reads on contigs and
+genes) and ARGs-OAP's read_count and ppm. ARG abundance is normalised to the
 sample's clean read pairs: RPM = supporting read pairs / clean pairs x 1e6, and
 RPKM = RPM / (reference gene length in kb), the length being the CARD reference
 protein x 3. Samples below --min-clean-pairs are flagged (never dropped): an ARG or
@@ -403,8 +419,10 @@ def attention_flags(tier1, comparison, low_samples, calls_by=None, low_coverage_
 
 
 def method_notes(ctx):
-    """One line per read-level method that ran, for the README (the HTML has its own reading guide)."""
-    s, notes = ctx["summary"], []
+    """(notes, arg_notes): one line per method that ran, for the README's Methods and the report's stage methods.
+    arg_notes holds the K-MARVEL, RGI and ARGs-OAP lines: the report describes those methods in its ARG methods
+    list and leaves them out of the stage list (R5-23)."""
+    s, notes, arg_notes = ctx["summary"], [], []
     ran = ctx.get("stages_found", set())
     partial = ctx.get("partial", {})
 
@@ -417,17 +435,19 @@ def method_notes(ctx):
                      "Nonpareil R package's curve fit (samples_qc nonpareil_coverage, nonpareil_diversity and "
                      "nonpareil_depth_95pct, in read pairs).")
     if "K-MARVEL" in s.get("arg_methods", []):
-        notes.append("K-MARVEL assembles resistance genes from the reads and reports calls against CARD, with their "
-                     "supporting read pairs (RPKM in the summary).")
+        arg_notes.append("K-MARVEL assembles resistance genes from the reads and reports calls against CARD, with "
+                         "their supporting read pairs (RPKM in the summary).")
     if "RGI" in s.get("arg_methods", []):
-        notes.append(f"RGI bwt maps the reads to CARD and WildCARD and lists every gene with a mapped read; the summary "
-                     f"counts a gene when reads cover >= {ctx['rgi_min_coverage']:g}% of its best reference sequence. "
-                     "RGI k-mer assigns a gene's reads to species (pathogen of origin, rgi_kmer_hosts).")
+        arg_notes.append(f"RGI bwt maps the reads to CARD and WildCARD and lists every gene with a mapped read; the "
+                         f"summary counts a gene when reads cover >= {ctx['rgi_min_coverage']:g}% of its best "
+                         "reference sequence. RGI k-mer assigns a gene's reads to species (pathogen of origin, "
+                         "rgi_kmer_hosts).")
     if ctx.get("sarg"):
-        notes.append("ARGs-OAP searches ARG-like reads against SARG and divides their copies (reads weighted by the "
-                     "share of the reference they cover) by its own cell estimate (copies per cell, also per 16S copy "
-                     "and per million reads). SARG names differ from CARD's, so it is not compared gene by gene with "
-                     "K-MARVEL and RGI.")
+        arg_notes.append("ARGs-OAP searches ARG-like reads against SARG and divides their copies (reads weighted by "
+                         "the share of the reference they cover) by its own cell estimate (copies per cell, also per "
+                         "16S copy and per million reads). SARG names differ from CARD's, so it is not compared gene "
+                         "by gene with K-MARVEL and RGI.")
+    notes += arg_notes
     if ctx.get("functional"):
         f = ctx["functional"]
         notes.append(f"Read functional profile: {f['backend']} ({', '.join(f['ontologies'])}), in "
@@ -435,7 +455,7 @@ def method_notes(ctx):
                      "Reported apart from any contig-level functional profile.")
     t = ctx["tables"]
     if "taxonomy_long" in t:
-        db = str(t["samples_qc"][0]["taxonomy_db"].iloc[0]) if "taxonomy_db" in t["samples_qc"][0] else ""
+        db = first_value(t["samples_qc"][0], "taxonomy_db")
         what = {"kraken2": "Kraken2 read classification re-estimated at species level by Bracken (relative abundance "
                            "= Bracken species reads; reads Bracken leaves above species are outside it, and the "
                            "classified fraction is Kraken2's, before Bracken)",
@@ -482,7 +502,7 @@ def method_notes(ctx):
                      f"sample ({', '.join(c['ontologies'])}), in "
                      f"{'copies per genome equivalent (CPGE, MicrobeCensus)' if c['unit'] == 'cpge' else 'TPM'}. "
                      "Reported apart from the read-level profile.")
-    return notes
+    return notes, arg_notes
 
 
 def parse_args(argv=None):
@@ -1072,7 +1092,8 @@ def main(argv=None):
             "checkv": any("genomad" in b["found"] and "checkv" not in b["found"] for b in batches),
         },
     }
-    ctx["method_notes"] = method_notes(ctx)
+    ctx["method_notes"], arg_notes = method_notes(ctx)
+    ctx["stage_method_notes"] = [n for n in ctx["method_notes"] if n not in arg_notes]
     model = summary_report.build(ctx, args.report_assets)
     pdf = None if args.no_pdf else write_pdf(outdir, model, args.report_assets, figs.dir)
     ctx["pdf_written"] = model["run"]["pdf"] = pdf is not None

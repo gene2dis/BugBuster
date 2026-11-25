@@ -159,7 +159,9 @@ class Section:
 def reading_guide(ctx):
     """Units, ARG method notes and tier rows for the methods section."""
     s = ctx["summary"]
-    units = ["Counts are read pairs (Reads_report.csv counts single reads, both mates).",
+    units = ["Counts are read pairs, except the single-read columns the data dictionary marks 'mates counted "
+             "separately' (rgi_mapped_reads, func_reads_assigned, the read-level abundance_native, pct_reads_on_*, "
+             "arg_contig_abundance count) and ARGs-OAP's read_count and ppm. Reads_report.csv counts single reads.",
              "K-MARVEL / RGI ARG abundance is RPKM: read pairs per kb of reference gene per million clean read pairs, "
              "comparable between samples of different depth."]
     if ctx.get("sarg"):
@@ -198,15 +200,17 @@ def reading_guide(ctx):
 
 def caveats(ctx):
     """The fixed caveats, each only when the method it is about ran (R5-06), then the stage pitfalls and the
-    method notes."""
+    Methods notes."""
     s = ctx["summary"]
     am = s.get("arg_methods", [])
     qc = (ctx["tables"].get("samples_qc") or (None,))[0]
     profiler = first_value(qc, "taxonomy_db") if qc is not None else ""
     arg_long = (ctx["tables"].get("arg_long") or (None,))[0]
     out = [
-        "All counts are read pairs. Reads_report.csv counts single reads (both mates), so its numbers are twice "
-        "those here.",
+        "Counts are read pairs (Reads_report.csv counts single reads, so its numbers are twice those here), except "
+        "the columns marked 'mates counted separately' (rgi_mapped_reads, func_reads_assigned, abundance_native, "
+        "pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's read_count and ppm: do not divide those by "
+        "clean_pairs without halving them.",
         f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are flagged as low depth. A gene or taxon not "
         f"found there is reported as unknown ({NA_LOW_DEPTH}), not as absent.",
     ]
@@ -254,7 +258,8 @@ def caveats(ctx):
                    "and of the CDC Antibiotic Resistance Threats Report 2019, and a few other species of clinical "
                    "interest; each row names its source. A species row matches the species, a genus row every "
                    "species of the genus, GTDB suffixes removed.")
-    return out + stage_pitfalls(ctx) + [n for n in ctx.get("method_notes", [])]
+    # the stage methods have their own list in the report (stage_method_notes), not under Caveats (R5-23)
+    return out + stage_pitfalls(ctx)
 
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",
@@ -622,6 +627,7 @@ def build(ctx, assets):
     units, mnotes, tier_rows = reading_guide(ctx)
     me.lists["units"] = units
     me.lists["arg_methods"] = [{"term": a, "text": b} for a, b in mnotes]
+    me.lists["stage_methods"] = ctx.get("stage_method_notes", [])
     me.lists["caveats"] = caveats(ctx)
     me.lists["inputs"] = ctx["inputs"]
     me.facts = {"arg_priority": ctx.get("arg_priority_name", ""), "primary": s.get("arg_primary", ""),
