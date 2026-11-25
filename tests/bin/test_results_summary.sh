@@ -269,8 +269,10 @@ src = pd.read_csv(f"{fix}/functional/read_function_abundance.tsv", sep="\t")
 row = src[(src["sample_id"] == "sampleA") & (src["ontology"] == "ko") & (src["accession"] == "K00001")].iloc[0]
 assert abs(float(ko.at["K00001", "sampleA"]) - row["abundance_cpge"]) < 1e-9
 assert ko.at["K00001", "description"].startswith("E1.1.1.1")
-# sampleB is low depth and has no MicrobeCensus: no CPGE, absence unknown
-assert set(ko["sampleB"]) == {"NA_low_depth"}
+# sampleB is low depth and has no MicrobeCensus: a term found there has no CPGE (NA_no_ags), a term not found
+# is unknown (NA_low_depth), as in the ARG RPKG tables (R5-03)
+# (every fixture KO is found in sampleB; the not-found case is the nob fixture below)
+assert set(ko["sampleB"]) == {"NA_no_ags"}
 cog = pd.read_csv("out/tables/function_read_cog.tsv", sep="\t", index_col=0)
 assert cog.at["E", "description"] == "Amino acid transport and metabolism"
 long = pd.read_csv("out/tables/function_read_long.tsv", sep="\t")
@@ -282,6 +284,17 @@ assert qc.at["sampleA", "func_reads_assigned"] == 20 and qc.at["sampleA", "func_
 assert pd.isna(qc.at["sampleB", "mc_genome_equivalents"])
 PYEOF
 check "COG figure written" test -s out/figures/function_cog_heatmap.png
+make_results nob/results sampleA sampleB
+awk -F'\t' '!($1 == "sampleB" && $4 == "ko" && $5 == "K00002")' "${FIX}/functional/read_function_abundance.tsv" \
+    > nob/results/07_functional_annotation/summary/read_function_abundance.tsv
+check "a term not found in a low-depth sample without MicrobeCensus" \
+    py "${SUMMARY}" --results nob/results --outdir nob_out --min-clean-pairs 10000 --no-excel
+check "found there: NA_no_ags; not found: NA_low_depth (R5-03)" py - <<'PYEOF'
+import pandas as pd
+ko = pd.read_csv("nob_out/tables/function_read_ko.tsv", sep="\t", index_col=0)
+assert ko.at["K00002", "sampleB"] == "NA_low_depth", ko["sampleB"].to_dict()
+assert set(ko.drop(index="K00002")["sampleB"]) == {"NA_no_ags"}, ko["sampleB"].to_dict()
+PYEOF
 check "--min-clean-pairs 100: a sample without MicrobeCensus is NA_no_ags in the CPGE tables" \
     py "${SUMMARY}" --results run1/results --outdir lowmin --min-clean-pairs 100 --no-excel
 check "NA_no_ags" py - <<'PYEOF'
@@ -699,6 +712,9 @@ for name in ("arg_long", "arg_presence", "taxonomy_species_wide"):
     pd.testing.assert_frame_equal(a[cols].reset_index(drop=True), b[cols].reset_index(drop=True))
 qc = pd.read_csv("merged/tables/samples_qc.tsv", sep="\t").set_index("sample")
 assert qc.at["sampleA", "batch"] == "batchA" and qc.at["sampleB", "batch"] == "batchB"
+# sampleB's directory has no profile: no profiler label either (R5-04)
+assert qc.at["sampleA", "taxonomy_db"] == "sylph_gtdb", qc["taxonomy_db"].tolist()
+assert pd.isna(qc.at["sampleB", "taxonomy_db"]) and pd.isna(qc.at["sampleB", "n_species"])
 PYEOF
 check "--batch-labels names the batches" \
     py "${SUMMARY}" --results batchA/results batchB/results --batch-labels b1 b2 --outdir labelled \
@@ -928,6 +944,10 @@ assert qc.at["sampleA", "n_species"] == full.at["sampleA", "n_species"] - 1
 named = wide.loc[[i for i in wide.index if i != "unassigned species"], "sampleA"].astype(float)
 p = named[named > 0] / named.sum()
 assert abs(qc.at["sampleA", "shannon"] - float(-(p * np.log(p)).sum())) < 1e-9
+# ... and the prevalence table lists species only (R5-13): one row fewer than the full run, as n_species
+prev = pd.read_csv("unas_out/tables/taxonomy_species_prevalence.tsv", sep="\t", index_col=0)
+full_prev = pd.read_csv("out/tables/taxonomy_species_prevalence.tsv", sep="\t", index_col=0)
+assert "unassigned species" not in prev.index and len(prev) == len(full_prev) - 1, (len(prev), len(full_prev))
 PYEOF
 
 # A genome without a genus: its share is not a named genus, so the genus bars pool it into Other
@@ -993,6 +1013,82 @@ html = "".join(open(p).read() for p in sorted(__import__("glob").glob("mixed_out
 assert set(t1["gene"]) == {"KPC"}, set(t1["gene"])
 # KPC: RGI only in sampleA (both methods ran), K-MARVEL in sampleB (RGI did not run there)
 assert "KPC: 2 samples (sampleA, sampleB)" in html and "K-MARVEL (not every method ran) / RGI only" in html
+PYEOF
+# statements about a method only when it ran (R5-06): K-MARVEL alone (no RGI, no profile), ARGs-OAP alone
+make_results oaponly/results sampleA sampleB
+rm -rf oaponly/results/05_arg_prediction/read_level/{kmarvel,rgi,rgi_kmer}
+check "summary of a K-MARVEL-only directory" \
+    py "${SUMMARY}" --results kmonly/results --outdir kmonly_out --min-clean-pairs 10000 --no-excel
+check "summary of an ARGs-OAP-only directory" \
+    py "${SUMMARY}" --results oaponly/results --outdir oaponly_out --min-clean-pairs 10000 --no-excel
+check "no RGI, sylph or tier text where the method did not run; present where it did" py - <<'PYEOF'
+import glob, html
+def text(d):
+    return {p.split("/", 1)[1]: html.unescape(open(p).read())
+            for p in glob.glob(f"{d}/report/*.html") + [f"{d}/README.md", f"{d}/LLM_GUIDE.md"]}
+km, oap, mixed = text("kmonly_out"), text("oaponly_out"), text("mixed_out")
+for phrase in ("RGI genes count when reads cover", "RGI bwt maps reads to CARD", "rgi_min_coverage_percent",
+               "WildCARD includes resistance-gene sequences", "The sylph classified fraction"):
+    assert not any(phrase in t for t in km.values()), phrase
+assert any("RGI genes count when reads cover" in t for t in mixed.values())
+assert any("rgi_min_coverage_percent" in t for t in mixed.values())
+assert "ARG reporting tiers" in km["README.md"] and "ARG reporting tiers" not in oap["README.md"]
+assert not any("Tier 4 (variant-model) hits" in t for t in oap.values())
+assert any("The sylph classified fraction" in t for t in text("out").values())
+PYEOF
+# no counted call has a drug class: the drug-class tables are empty but keep their header (R5-09)
+make_results nodc/results sampleA
+rm -rf nodc/results/05_arg_prediction/read_level/{rgi,rgi_kmer}
+awk -F'\t' 'BEGIN{OFS="\t"} NR > 1 {$4 = ""; $18 = ""} {print}' "${KM}/sampleA_kmarvel.tsv" \
+    > nodc/results/05_arg_prediction/read_level/kmarvel/sampleA/sampleA_kmarvel.tsv
+check "summary of calls without a drug class" \
+    py "${SUMMARY}" --results nodc/results --outdir nodc_out --min-clean-pairs 10000 --no-excel
+check "empty drug-class tables keep their header" bash -c \
+    "head -1 nodc_out/tables/arg_drug_class_rpkm.tsv | grep -qx \$'tier_group\tdrug_class\tsampleA' &&
+     [ \$(wc -l < nodc_out/tables/arg_drug_class_rpkm.tsv) -eq 1 ]"
+check "Methods: stage methods in their own list, not under Caveats; ARG methods once (R5-23)" py - <<'PYEOF'
+import html, re
+page = html.unescape(open("out/report/methods.html").read())
+cav = page[page.index("<h2>Caveats</h2>"):page.index("<h2>Inputs</h2>")]
+stage = page[page.index("<h2>Stage methods</h2>"):page.index("<h2>Caveats</h2>")]
+assert "Taxonomy: sylph against genome sketches" in stage and "Taxonomy: sylph" not in cav
+for arg_line in ("K-MARVEL assembles resistance genes from the reads and reports calls against CARD",
+                 "ARGs-OAP searches ARG-like reads against SARG and divides"):
+    assert arg_line not in page, arg_line            # described once, in the ARG methods list
+    assert arg_line in open("out/README.md").read()   # the README has no ARG methods list: kept in its Methods
+assert page.count("<h2>Stage methods</h2>") == 1
+PYEOF
+check "CPGE described as reads per kb per genome equivalent, not copies per community member (RV22)" py - <<'PYEOF'
+import glob, html
+docs = [open("out/README.md").read(), open("out/LLM_GUIDE.md").read()]
+docs += [html.unescape(open(p).read()) for p in glob.glob("out/report/*.html")]
+assert not any("copies of that gene per community member" in t for t in docs)
+assert "a single-copy gene recovered in full is about 1000 / read length" in docs[1]
+assert any("CPGE (reads per kb per MicrobeCensus genome equivalent)" in t for t in docs[2:])
+PYEOF
+check "fmt() rounds before choosing the format (no 1e+03)" py - "${REPO_DIR}/bin" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+from summary_report import fmt
+assert [fmt(v) for v in (999.4, 999.6, 1000.0, 12.345, 0.0001234)] == ["999", "1,000", "1,000", "12.3", "0.000123"]
+PYEOF
+# the watchlist figure explains hollow dots only where the profile has sylph's ANI interval (R5-06): a watchlist
+# with a fixture species, and the same directory without sylph's per-sample tables (no ANI interval)
+printf 'taxon\trank\tnote\nBacillus subtilis\tspecies\ttest\n' > wl_bsub.tsv
+make_results wl_ani/results sampleA
+cp -r wl_ani wl_noani
+rm -f wl_noani/results/02_taxonomy/sylph/*.tsv
+check "watchlist figure with sylph's ANI interval" py "${SUMMARY}" --results wl_ani/results --outdir wl_ani_out \
+    --watchlist wl_bsub.tsv --min-clean-pairs 10000 --no-excel
+check "watchlist figure without it" py "${SUMMARY}" --results wl_noani/results --outdir wl_noani_out \
+    --watchlist wl_bsub.tsv --min-clean-pairs 10000 --no-excel
+check "hollow dots explained with sylph's ANI interval only" py - <<'PYEOF'
+import html, os
+for d, ani in (("wl_ani_out", True), ("wl_noani_out", False)):
+    assert os.path.exists(f"{d}/figures/watchlist.svg"), d
+    page = html.unescape(open(f"{d}/report/taxonomy.html").read())
+    assert ("Hollow dots: sylph's ANI interval" in page) == ani, d
+    assert ("species call uncertain" in open(f"{d}/figures/watchlist.svg").read()) == ani, d
 PYEOF
 
 # ---- stage tables: assembly, MAGs, contig ARGs, bin ARG clusters, contig functions (tests/data/summary/stages)
@@ -1658,6 +1754,100 @@ for d, line in (("bbn_merge_out", "BBNorm (in the results directories where it r
                 ("gunc_merge_out", "GUNC (in the results directories where it ran) checks each MAG")):
     for doc in ("README.md", "LLM_GUIDE.md"):
         assert line in open(f"{d}/{doc}").read(), (d, doc, line)
+PYEOF
+
+check "figure captions: the RPKM + 0.001 offset and the host count (R5-10, R5-11)" py - <<'PYEOF'
+import html, re
+import pandas as pd
+args = html.unescape(open("out/report/args.html").read())
+assert "plotted as RPKM + 0.001" in args and "the source data hold the unshifted values" in args
+src = pd.read_csv("st_asm_out/figures/arg_contig_hosts.csv")
+hosts = [h for h in src["host"].unique() if h != "unclassified"]
+cap = re.sub(r"\s+", " ", html.unescape(open("st_asm_out/report/contig_args.html").read()))
+word = "host" if len(hosts) == 1 else "hosts"
+assert f"the {len(hosts)} {word} with the most genes" in cap, (len(hosts), cap[:2000])
+assert ("plus contigs without a classification" in cap) == ("unclassified" in set(src["host"]))
+PYEOF
+
+check "README.md: no bare <placeholder> a Markdown viewer would hide (R5-12)" py - <<'PYEOF'
+import glob, re
+readmes = glob.glob("*/README.md")
+assert len(readmes) > 20, len(readmes)
+for p in readmes:
+    outside = "".join(open(p).read().split("`")[0::2])  # text outside code spans
+    bare = re.findall(r"<[A-Za-z_]+>", outside)
+    assert not bare, (p, bare[:5])
+assert "`taxonomy_<rank>_wide`" in open("out/README.md").read()
+PYEOF
+check "assemblies and bins in natural order in every stage table (R5-14)" py - "${REPO_DIR}/bin" <<'PYEOF'
+import sys
+import pandas as pd
+sys.path.insert(0, sys.argv[1])
+from summary_common import sort_natural
+df = pd.DataFrame({"batch": ["a"] * 4, "assembly": ["sample10", "sample2", "sample2", "sample1"],
+                   "bin": ["binette_bin1", "binette_bin10", "binette_bin2", "binette_bin3"], "n": [1, 2, 3, 4]})
+out = sort_natural(df, ["batch", "assembly", "bin"])
+assert list(zip(out["assembly"], out["bin"])) == [("sample1", "binette_bin3"), ("sample2", "binette_bin2"),
+                                                  ("sample2", "binette_bin10"), ("sample10", "binette_bin1")]
+for d in ("st_asm_out", "st_merge"):
+    for name, keys in (("assembly_stats", ["batch", "assembly"]), ("mags", ["batch", "assembly", "bin"]),
+                       ("arg_mag_long", ["batch", "assembly", "bin"]), ("arg_contig_long", ["batch", "assembly"]),
+                       ("arg_contig_hosts", ["batch", "assembly"])):
+        t = pd.read_csv(f"{d}/tables/{name}.tsv", sep="\t", dtype=str, keep_default_na=False)
+        # rows already in natural order of their leading keys: a stable natural sort leaves them in place
+        assert sort_natural(t[keys].reset_index(), keys)["index"].tolist() == list(range(len(t))), (d, name)
+PYEOF
+
+check "documents name the pipeline's params, the script's flags only in the Inputs block (R5-18)" py - <<'PYEOF'
+import glob, html, re
+flags = re.compile(r"(?<![\w-])--(min-clean-pairs|depth-marks|min-nonpareil-coverage|group-by|order-by|"
+                   r"rgi-min-coverage|metadata|watchlist|kmarvel-db|card-prevalence|top-n|taxa-per-sample)(?![\w-])")
+for d in ("out", "st_asm_out", "mixed_out"):
+    docs = [open(f"{d}/README.md").read(), open(f"{d}/LLM_GUIDE.md").read()]
+    docs += [html.unescape(open(p).read()) for p in glob.glob(f"{d}/report/*.html")]
+    for text in docs:
+        text = re.sub(r"```.*?```", "", text, flags=re.S)       # the Inputs block: the command as given
+        text = re.sub(r"<pre>.*?</pre>", "", text, flags=re.S)
+        found = flags.findall(text)
+        assert not found, (d, sorted(set(found)), text[:200])
+assert "--summary_min_clean_pairs" in open("out/LLM_GUIDE.md").read()
+PYEOF
+
+# ---- no sentence keeps an empty figure or table reference (R5-05): a read profile without a COG table
+# (SUPER-FOCUS's seed levels, HUMAnN's ko / ec / metacyc) and MAGs without bin depth (no abundance figure)
+make_results nocog/results sampleA sampleB
+awk -F'\t' '$4 != "cog"' "${FIX}/functional/read_function_abundance.tsv" \
+    > nocog/results/07_functional_annotation/summary/read_function_abundance.tsv
+cp -r st_asm st_asm_nobd
+# no bin depth and no contig table (the depth fallback of per-sample assemblies from older releases)
+find st_asm_nobd -name '*_bin_depth.tsv' -delete
+rm -rf st_asm_nobd/results/05_arg_prediction/contig_level
+check "summary of a read profile without a COG table" \
+    py "${SUMMARY}" --results nocog/results --outdir nocog_out --min-clean-pairs 10000 --no-excel
+check "summary of MAGs without bin depth" \
+    py "${SUMMARY}" --results st_asm_nobd/results --outdir st_asm_nobd_out --min-clean-pairs 10000 --no-excel
+check "the two fixtures lack the COG / MAG abundance figure" \
+    test ! -e nocog_out/figures/function_cog_heatmap.svg -a ! -e st_asm_nobd_out/figures/mag_abundance_heatmap.svg
+for d in nocog_out st_asm_nobd_out; do
+    poppler pdftotext -layout "${d}/results_summary.pdf" "${d}/results_summary.txt"
+done
+check "no empty figure or table reference in any report page or PDF" py - <<'PYEOF'
+import glob, html, re
+bad = re.compile(r"\(\s*[,;)]|,\s*\)|(^|[.:;]\s+)(shows|gives) ")
+def page_text(p):
+    t = re.sub(r"<script.*?</script>", " ", open(p).read(), flags=re.S)  # the inline Vega code is not prose
+    return re.sub(r"<[^>]+>", " ", html.unescape(t))
+texts = {p: page_text(p) for p in glob.glob("*/report/*.html")}
+texts.update({p: open(p).read() for p in glob.glob("*_out/results_summary.txt")})
+assert len(texts) > 100, len(texts)
+found = [(p, m.group(0)) for p, t in texts.items() for m in [bad.search(re.sub(r"\s+", " ", t))] if m]
+assert not found, found[:10]
+for d in ("nocog_out", "st_asm_nobd_out"):
+    assert "Figure" in open(f"{d}/results_summary.txt").read()
+fn = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open("nocog_out/report/functional.html").read()))
+assert re.search(r"reported apart from the contig-level one \(\s*Table \d+\s*\)", fn), fn[:600]
+mg = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", open("st_asm_nobd_out/report/mags.html").read()))
+assert "shows the share of each sample's sequenced bases" not in mg
 PYEOF
 
 echo
