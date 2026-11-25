@@ -6,8 +6,9 @@ read_annotated_fraction.tsv, read_sample_summary.tsv) and MicrobeCensus' <sample
 reported on its own, never merged with the contig branch (function_*.tsv), as the pipeline does.
 
 Units: abundance_native is the backend's unit (Woltka and SUPER-FOCUS: reads, mates counted separately and
-fractional when a read hits several ORFs; HUMAnN: RPK). abundance_cpge is copies per genome equivalent
-(RPK / MicrobeCensus genome equivalents; Woltka and HUMAnN only, blank for a sample without MicrobeCensus).
+fractional when a read hits several ORFs; HUMAnN: RPK). abundance_cpge (named copies per genome equivalent)
+is reads per kb per genome equivalent (RPK / MicrobeCensus GE; Woltka and HUMAnN only, blank for a sample without
+MicrobeCensus): proportional to copies per genome, about 1000 / read length for a single-copy gene (roadmap Phase 24).
 A read's ORF can carry several terms of one ontology, so the terms of an ontology do not add up to the
 annotated reads: the tables are not compositional.
 """
@@ -118,10 +119,17 @@ def function_tables(func, order, status):
         # sum(min_count=1): a missing CPGE stays missing (pivot_table's sum would make it 0)
         mat = sub.groupby(["accession", "sample_id"])[value].sum(min_count=1).unstack("sample_id")
         mat = mat.reindex(columns=order)
-        # a sample without a MicrobeCensus estimate has no CPGE at all: the whole column is NA_no_ags
-        no_cpge = [s for s in order if status[s] == "ok" and s in no_ags]
-        fills = {s: NA_NO_AGS if s in no_cpge else (0 if status[s] == "ok" else status[s]) for s in order}
+        # a sample without a MicrobeCensus estimate has no CPGE: a term found there is NA_no_ags, whatever the
+        # sample's depth; a term not found is NA_no_ags in a sample of normal depth and keeps NA_low_depth in a
+        # low-depth one (as rpkg_tables does; R5-03)
+        no_cpge = [s for s in order if s in no_ags]
+        found = sub.groupby(["accession", "sample_id"])["abundance_native"].sum(min_count=1).unstack("sample_id")
+        found = found.reindex(index=mat.index, columns=order).fillna(0) > 0
+        fills = {s: (NA_NO_AGS if status[s] == "ok" else status[s]) if s in no_cpge
+                 else (0 if status[s] == "ok" else status[s]) for s in order}
         mat = fill_columns(mat, fills, keep=mat.notna() & ~mat.columns.isin(no_cpge))
+        for s in no_cpge:
+            mat.loc[found[s], s] = NA_NO_AGS
         mat.insert(0, "description", desc.reindex(mat.index).fillna(""))
         num = mat[order].apply(pd.to_numeric, errors="coerce")
         mat = mat.loc[num.mean(axis=1).fillna(0).sort_values(ascending=False, kind="stable").index]

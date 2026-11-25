@@ -12,7 +12,7 @@ import re
 
 import pandas as pd
 
-from summary_common import NA_NOT_RUN, die, load_coassembly_groups
+from summary_common import NA_NOT_RUN, die, load_coassembly_groups, sort_natural
 
 UNITS = {"": 1, "b": 1, "bp": 1, "kb": 1e3, "kbp": 1e3, "mb": 1e6, "mbp": 1e6, "gb": 1e9, "gbp": 1e9}
 
@@ -139,7 +139,7 @@ def assembly_stats_table(parts):
     df = pd.DataFrame(rows)
     for c in ("contigs", "l50", "min_contig_length_bp", "contigs_kept"):
         df[c] = df[c].astype("Int64")
-    return df.sort_values(["batch", "assembly"], kind="stable").reset_index(drop=True)
+    return sort_natural(df, ["batch", "assembly"])
 
 
 def read_use_frame(parts, batch_samples):

@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from summary_args import METHOD_LABELS
-from summary_common import NA_LOW_DEPTH, die, generated_date, warn
+from summary_common import CPGE_LABEL, NA_LOW_DEPTH, die, first_value, generated_date, warn
 from summary_contigs import CHECKV_COUNTS, CHECKV_TIER_ORDER
 from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
 from summary_figures import short_count
@@ -55,7 +55,9 @@ def fmt(v):
             return ""
         if v == 0:
             return "0"
-        return f"{v:.3g}" if abs(v) < 1000 else f"{v:,.0f}"
+        # round to 3 significant digits first: 999.6 rounds to 1000 and is written as 1,000, not as 1e+03 (R5-08)
+        r = float(f"{v:.3g}")
+        return f"{r:.3g}" if abs(r) < 1000 else f"{v:,.0f}"
     if isinstance(v, (int, np.integer)):
         return f"{v:,}" if abs(v) >= 10000 else str(v)
     if v is pd.NA or v is pd.NaT:
@@ -157,15 +159,20 @@ class Section:
 def reading_guide(ctx):
     """Units, ARG method notes and tier rows for the methods section."""
     s = ctx["summary"]
-    units = ["Counts are read pairs (Reads_report.csv counts single reads, both mates).",
+    units = ["Counts are read pairs, except the single-read columns the data dictionary marks 'mates counted "
+             "separately' (rgi_mapped_reads, func_reads_assigned, the abundance_native of Woltka and SUPER-FOCUS, "
+             "pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's read_count and ppm. Reads_report.csv counts "
+             "single reads.",
              "K-MARVEL / RGI ARG abundance is RPKM: read pairs per kb of reference gene per million clean read pairs, "
              "comparable between samples of different depth."]
     if ctx.get("sarg"):
         units.append("ARGs-OAP abundance is copies per cell (SARG copies / ARGs-OAP cells), a different unit: do not "
                      "add it to RPKM.")
     if (ctx.get("functional") or {}).get("unit") == "cpge":
-        units.append("The read functional profile is in copies per genome equivalent (CPGE: reads per kb / "
-                     "MicrobeCensus genome equivalents).")
+        units.append("The read functional profile is in CPGE: reads per kb of gene per genome equivalent, "
+                     "the genome equivalents estimated with MicrobeCensus. It is proportional to copies per genome, not an estimate of them: a single-copy "
+                     "gene found in every genome is about 1000 / read length, less where the reference misses part "
+                     "of the community.")
     units.append(f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are low depth: a gene or taxon not "
                  f"found there is reported as {NA_LOW_DEPTH} (unknown), not as absent.")
     methods = []
@@ -195,42 +202,69 @@ def reading_guide(ctx):
 
 
 def caveats(ctx):
+    """The fixed caveats, each only when the method it is about ran (R5-06), then the stage pitfalls (the stage
+    methods are a list of their own, R5-23)."""
+    s = ctx["summary"]
+    am = s.get("arg_methods", [])
+    qc = (ctx["tables"].get("samples_qc") or (None,))[0]
+    profiler = first_value(qc, "taxonomy_db") if qc is not None else ""
+    arg_long = (ctx["tables"].get("arg_long") or (None,))[0]
     out = [
-        "All counts are read pairs. Reads_report.csv counts single reads (both mates), so its numbers are twice "
-        "those here.",
+        "Counts are read pairs (Reads_report.csv counts single reads, so its numbers are twice those here), except "
+        "the columns marked 'mates counted separately' (rgi_mapped_reads, func_reads_assigned, the abundance_native "
+        "of Woltka and SUPER-FOCUS (HUMAnN's is RPK), pct_reads_on_*, arg_contig_abundance count) and ARGs-OAP's "
+        "read_count and ppm: do not divide those by clean_pairs without halving them.",
         f"Samples with fewer than {ctx['min_pairs']:,} clean read pairs are flagged as low depth. A gene or taxon not "
         f"found there is reported as unknown ({NA_LOW_DEPTH}), not as absent.",
-        "ARG RPKM = supporting read pairs / (reference gene length in kb) / (clean read pairs in millions). It is "
-        "comparable between samples, but it is not copies per cell.",
-        "Read-level allele calls are unstable among close variants (TEM-1 vs TEM-117), so genes are summarised with "
-        "the allele number removed. ESBL status of TEM/SHV depends on the allele and is not called.",
-        "Tier 4 (variant-model) hits are detections of a gene that becomes resistant by mutation. Only rows with "
-        "resistance_snp_status 'card_snp_present' carry a mutation CARD lists for resistance, and CARD also lists "
-        "some common polymorphisms.",
-        "Alleles of one gene in one sample usually share their reads, so a gene is represented by its best-supported "
-        "allele; allele rows are never summed.",
-        "Candidate hosts are species that co-occur in the sample and are known CARD carriers of the ARO. They are "
-        "not linkage: confirming the host needs assembly or long reads.",
-        f"RGI bwt maps reads to CARD and WildCARD and reports every gene with at least one mapped read; the summary "
-        f"counts an RGI gene when reads cover at least {ctx.get('rgi_min_coverage', 80):g} % of its best-covered "
-        "reference sequence (--rgi_summary_min_coverage). RGI counts mates separately, so its read pairs are mapped "
-        "reads / 2; a gene's RGI abundance sums its AROs, because KMA assigns each read to one reference.",
-        "WildCARD includes resistance-gene sequences found in the genomes of many species, gut commensals among "
-        "them, so RGI can report a gene (poxtA, vanD-type, ...) from a related sequence of a commensal. RGI's k-mer "
-        "pathogen-of-origin call (rgi_kmer_hosts, from the reads themselves) helps: rgi_host_check says whether the "
-        "top host is a watchlist pathogen.",
-        "The sylph classified fraction is skewed upward when many reads come from genomes absent from the database "
-        "(BugBuster --sylph_read_seq_id corrects it). Taxonomic abundance is relative to the profiled community.",
-        "Tier rules and the watchlist are editable tables (assets/arg_priority_tiers.tsv, "
-        "assets/summary_watchlist.tsv).",
     ]
-    if ctx.get("watchlist") is not None:
+    if am:
+        out += [
+            "ARG RPKM = supporting read pairs / (reference gene length in kb) / (clean read pairs in millions). It is "
+            "comparable between samples, but it is not copies per cell.",
+            "Read-level allele calls are unstable among close variants (TEM-1 vs TEM-117), so genes are summarised "
+            "with the allele number removed. ESBL status of TEM/SHV depends on the allele and is not called.",
+            "Tier 4 (variant-model) hits are detections of a gene that becomes resistant by mutation. Only rows with "
+            "resistance_snp_status 'card_snp_present' carry a mutation CARD lists for resistance, and CARD also "
+            "lists some common polymorphisms.",
+            "Alleles of one gene in one sample usually share their reads, so a gene is represented by its "
+            "best-supported allele; allele rows are never summed.",
+        ]
+    if arg_long is not None and "candidate_hosts" in arg_long.columns:
+        out.append("Candidate hosts are species that co-occur in the sample and are known CARD carriers of the ARO. "
+                   "They are not linkage: confirming the host needs assembly or long reads.")
+    if "RGI" in am:
+        out += [
+            f"RGI bwt maps reads to CARD and WildCARD and reports every gene with at least one mapped read; the "
+            f"summary counts an RGI gene when reads cover at least {ctx.get('rgi_min_coverage', 80):g} % of its "
+            "best-covered reference sequence (--rgi_summary_min_coverage). RGI counts mates separately, so its read "
+            "pairs are mapped reads / 2; a gene's RGI abundance sums its AROs, because KMA assigns each read to one "
+            "reference.",
+            "WildCARD includes resistance-gene sequences found in the genomes of many species, gut commensals among "
+            "them, so RGI can report a gene (poxtA, vanD-type, ...) from a related sequence of a commensal. RGI's "
+            "k-mer pathogen-of-origin call (rgi_kmer_hosts, from the reads themselves) helps: rgi_host_check says "
+            "whether the top host is a watchlist pathogen.",
+        ]
+    if profiler.startswith("sylph"):
+        out.append("The sylph classified fraction is skewed upward when many reads come from genomes absent from the "
+                   "database (BugBuster --sylph_read_seq_id corrects it). Taxonomic abundance is relative to the "
+                   "profiled community.")
+    elif profiler:
+        out.append("Taxonomic abundance is relative to the profiled community.")
+    # the watchlist is read only by the taxonomy section and RGI's host check, so its caveats need one of them
+    watch = ctx.get("watchlist") is not None and (bool(profiler) or "RGI" in am)
+    editable = (["tier rules (assets/arg_priority_tiers.tsv)"] if am else []) + \
+        (["watchlist (assets/summary_watchlist.tsv)"] if watch else [])
+    if editable:
+        verb = "are editable tables" if len(editable) > 1 else ("are an editable table" if am else "is an editable table")
+        out.append(f"The {' and the '.join(editable)} {verb}.")
+    if watch:
         out.append(f"Watchlist: the taxa in the watchlist table, from {ctx.get('watchlist_path', '')}. The default "
                    "list holds the ESKAPE pathogens, the bacteria of the WHO Bacterial Priority Pathogens List 2024 "
                    "and of the CDC Antibiotic Resistance Threats Report 2019, and a few other species of clinical "
                    "interest; each row names its source. A species row matches the species, a genus row every "
                    "species of the genus, GTDB suffixes removed.")
-    return out + stage_pitfalls(ctx) + [n for n in ctx.get("method_notes", [])]
+    # the stage methods have their own list in the report (stage_method_notes), not under Caveats (R5-23)
+    return out + stage_pitfalls(ctx)
 
 
 FLAG_TITLES = {"tier1": "Tier 1 genes", "single": "Tier 1 genes found by one method only",
@@ -386,7 +420,7 @@ def build(ctx, assets):
 
     if "taxonomy_long" in t:
         tx = Section("taxonomy", nums, records)
-        tx.facts = {"db": str(qc["taxonomy_db"].iloc[0]) if "taxonomy_db" in qc else "",
+        tx.facts = {"db": first_value(qc, "taxonomy_db"),
                     "n_species": s.get("n_species")}
         for k in ("taxonomy_species_heatmap", "taxonomy_genus_heatmap", "taxonomy_genus_bars", "watchlist"):
             tx.fig(k)
@@ -404,7 +438,9 @@ def build(ctx, assets):
         primary = s.get("arg_primary", "")
         others = [m for m in s.get("arg_methods", []) if m != primary]
         ar.title = f"Antimicrobial resistance genes ({primary})"
-        ar.facts = {"primary": primary, "others": ", ".join(others), "rgi_cov": f"{ctx['rgi_min_coverage']:g}",
+        # the RGI cutoff sentence only when RGI ran (R5-06)
+        rgi_cov = f"{ctx['rgi_min_coverage']:g}" if "RGI" in s.get("arg_methods", []) else None
+        ar.facts = {"primary": primary, "others": ", ".join(others), "rgi_cov": rgi_cov,
                     "n_tier1_samples": s.get("n_tier1"), "n_tier1_genes": s.get("n_tier1_genes"),
                     "comparison": ctx.get("comparison") is not None,
                     # tier 1 calls of other methods where the primary one did not run (merged results directories)
@@ -464,7 +500,7 @@ def build(ctx, assets):
         fn = Section("functional", nums, records)
         f = ctx["functional"]
         fn.facts = {"backend": f["backend"], "n_samples": f["n_samples"], "ontologies": ", ".join(f["ontologies"]),
-                    "unit": "copies per genome equivalent (CPGE)" if f["unit"] == "cpge" else f["unit"]}
+                    "unit": CPGE_LABEL if f["unit"] == "cpge" else f["unit"]}
         fn.fig("function_cog_heatmap")
         cols = [c for c in ("sample", "func_reads_assigned", "func_fraction_annotated", "mc_avg_genome_size_bp",
                             "mc_genome_equivalents", "args_oap_ncell") if c in qc.columns]
@@ -580,7 +616,7 @@ def build(ctx, assets):
         cf = Section("contig_functional", nums, records)
         c = ctx["contig_functional"]
         cf.facts = {"n_samples": c["n_samples"], "ontologies": ", ".join(c["ontologies"]),
-                    "unit": "copies per genome equivalent (CPGE)" if c["unit"] == "cpge" else "TPM"}
+                    "unit": CPGE_LABEL if c["unit"] == "cpge" else "TPM"}
         cf.fig("function_contig_cog_heatmap")
         cols = [x for x in ("sample", "pct_reads_on_genes", "func_contig_genes_annotated_pct",
                             "func_contig_annotated_by_abundance_pct") if x in qc.columns]
@@ -596,6 +632,7 @@ def build(ctx, assets):
     units, mnotes, tier_rows = reading_guide(ctx)
     me.lists["units"] = units
     me.lists["arg_methods"] = [{"term": a, "text": b} for a, b in mnotes]
+    me.lists["stage_methods"] = ctx.get("stage_method_notes", [])
     me.lists["caveats"] = caveats(ctx)
     me.lists["inputs"] = ctx["inputs"]
     me.facts = {"arg_priority": ctx.get("arg_priority_name", ""), "primary": s.get("arg_primary", ""),

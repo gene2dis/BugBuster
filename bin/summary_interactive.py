@@ -16,6 +16,9 @@ SPEC_BUDGET = 1_000_000  # bytes of spec JSON (data inline) per figure
 SCALE = 1.8
 
 
+# count axes as figure_style.short_count writes them: 1B, not the SI 1G (a count, not gigabases)
+COUNT_LABEL = "replace(format(datum.value, '~s'), 'G', 'B')"
+
 def available():
     try:
         import altair  # noqa: F401 (availability check)
@@ -159,7 +162,7 @@ def read_fate(d):
     zoom = alt.selection_interval(bind="scales", encodings=["x"])
     bars = alt.Chart(f).mark_bar().encode(
         x=alt.X("clean_pairs:Q", scale=alt.Scale(type="log", domain=[lo, hi]), title="clean read pairs (log scale)",
-                axis=alt.Axis(format="~s")),
+                axis=alt.Axis(labelExpr=COUNT_LABEL)),
         x2=alt.X2(datum=lo),
         y=alt.Y("sample:O", sort=samples, axis=None),
         color=alt.condition("datum.low_depth", alt.value("#9A9A9A"), alt.value(fs.CATEGORY[0])),
@@ -195,7 +198,7 @@ def nonpareil(d):
     sel = _group_select(alt, d["groups"])
     zoom = alt.selection_interval(bind="scales", encodings=["x"])
     x = alt.X("read_pairs:Q", scale=alt.Scale(type="log"), title="read pairs (R1 reads, log scale)",
-              axis=alt.Axis(format="~s"))
+              axis=alt.Axis(labelExpr=COUNT_LABEL))
     y = alt.Y("coverage:Q", scale=alt.Scale(domain=[0, 1.02]), title="estimated average coverage")
     # as the static figure: a colour per sample (its colours) up to 7 samples, else per group
     if d.get("by_sample", True):

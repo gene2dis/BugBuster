@@ -1,7 +1,7 @@
 {% extends "base.html" %}{% import "macros.html" as m %}
 {% block body %}
 <h1>Assembly</h1>
-<p>{{ s.facts.n_assemblies }} MEGAHIT assembl{{ "y" if s.facts.n_assemblies == 1 else "ies" }} ({{ m.tabref(s, "stats") }}). Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table ({{ m.tabref(s, "read_use") }}).</p>
+<p>{{ s.facts.n_assemblies }} MEGAHIT assembl{{ "y" if s.facts.n_assemblies == 1 else "ies" }}{{ m.refs(s, tabs=["stats"]) }}. Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table{{ m.refs(s, tabs=["read_use"]) }}.</p>
 {% if s.facts.n_empty is defined %}
 <p class="note">{{ s.facts.n_empty }} assembl{{ "y" if s.facts.n_empty == 1 else "ies" }} kept no contig after the length filter ({{ s.facts.empty }}; <code>contigs_kept</code> 0 in {{ m.tabref(s, "stats") }}): the pipeline drops such an assembly before the contig stages, so it has no binning, contig taxonomy, contig ARG or contig functional results, and its samples keep only their read-level results.</p>
 {% endif %}

@@ -8,7 +8,7 @@ literal separators, and <assembly>_<bin> is resolved against the known assemblie
 
 import pandas as pd
 
-from summary_common import die
+from summary_common import die, sort_natural
 
 IDENTITIES = (90, 95, 99, 100)
 
@@ -74,8 +74,7 @@ def arg_mag_long_table(parts):
     if not frames:
         return None
     df = pd.concat(frames, ignore_index=True)
-    return df.sort_values(["batch", "assembly", "bin", "arg_class", "arg_gene", "gene_id"],
-                          kind="stable").reset_index(drop=True)
+    return sort_natural(df, ["batch", "assembly", "bin", "arg_class", "arg_gene", "gene_id"])
 
 
 def arg_cluster_sharing_table(long, identity=90):

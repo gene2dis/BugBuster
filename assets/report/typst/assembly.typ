@@ -2,7 +2,7 @@
 #let s = sec("assembly")
 
 = Assembly
-#s.facts.n_assemblies MEGAHIT assembl#if s.facts.n_assemblies == 1 [y] else [ies] (#tabref(s, "stats")). Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table (#tabref(s, "read_use")).
+#s.facts.n_assemblies MEGAHIT assembl#if s.facts.n_assemblies == 1 [y] else [ies]#refs(s, tabs: ("stats",)). Only contigs kept by the length filter go on to binning, contig taxonomy, ARGs and functions, and reads that are not on contigs are outside every contig-based table#refs(s, tabs: ("read_use",)).
 
 #if "n_empty" in s.facts [
   #s.facts.n_empty assembl#if s.facts.n_empty == 1 [y] else [ies] kept no contig after the length filter (#s.facts.empty\; `contigs_kept` 0 in #tabref(s, "stats")): the pipeline drops such an assembly before the contig stages, so it has no binning, contig taxonomy, contig ARG or contig functional results, and its samples keep only their read-level results.

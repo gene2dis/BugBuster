@@ -27,6 +27,13 @@
 // "Figure 3" / "Table 5" for the prose (numbers from Python, as in the HTML)
 #let figref(s, key) = if has(s, "figures", key) [Figure #s.figures.at(key).no] else []
 #let tabref(s, slot) = if has(s, "tables", slot) [Table #s.tables.at(slot).no] else []
+// " (Figure 2, Table 5)" for the figures and tables that are drawn; nothing when none is, so no sentence keeps an
+// empty parenthesis (R5-05)
+#let refs(s, figs: (), tabs: ()) = {
+  let items = figs.filter(k => has(s, "figures", k)).map(k => figref(s, k))
+  items += tabs.filter(k => has(s, "tables", k)).map(k => tabref(s, k))
+  if items.len() > 0 [ (#items.join[, ])] else []
+}
 
 #let isnum(x) = {
   let t = x.replace(",", "").replace("%", "").trim()

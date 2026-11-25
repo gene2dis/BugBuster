@@ -11,6 +11,11 @@ from summary_catalog import STAGES
 from summary_common import generated_date
 
 
+# The generated documents name the pipeline's parameters (--summary_min_clean_pairs, ...), the ones a pipeline
+# user set; the script's own flags (--min-clean-pairs, ...) appear only where the standalone script is described:
+# the README's Inputs block (the command it was given) and the batch label of a standalone merge (R5-18).
+BATCH_FLAG = "--summary_batch_label; in a standalone merge, the script's --batch-labels"
+
 # ---------------------------------------------------------------------------------------------------------------
 # Column dictionary. Per table: a description and its columns as (names, meaning). A name is a column name or a
 # token: <metadata> (columns from --metadata), <sample> (one column per sample, in wide tables), <rank> (a
@@ -19,21 +24,21 @@ from summary_common import generated_date
 # ---------------------------------------------------------------------------------------------------------------
 
 SAMPLE_KEY = [("sample", "sample name (the samplesheet's sample column)"),
-              ("batch", "results directory the sample came from (--batch-labels / --summary_batch_label)"),
-              ("<metadata>", "columns of the --metadata table (renamed meta_<name> when they clash with a summary "
+              ("batch", f"results directory the sample came from ({BATCH_FLAG})"),
+              ("<metadata>", "columns of the --sample_metadata table (renamed meta_<name> when they clash with a summary "
                              "column)")]
 
 WIDE_CELL = ("<sample>", "one column per sample. 0 = not detected in a sample of adequate depth; NA_low_depth = "
                          "not detected in a low-depth sample (unknown, not absent); NA_not_run = the method did not "
                          "run on the sample")
 
-WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 / MicrobeCensus genome equivalents. 0 = "
+WIDE_RPKG = ("<sample>", "one column per sample: RPKM x clean read pairs / 1e6 / genome equivalents. 0 = "
                              "not detected; blank = a call without an RPKM; NA_no_ags = no MicrobeCensus estimate for "
                              "the sample; NA_low_depth / NA_not_run as in the other wide tables")
 
 ASSEMBLY_KEY = [("assembly", "the assembly: a sample name (--assembly_mode assembly), coassembly, or a co-assembly "
                              "group's label (--coassembly_group_by)"),
-                ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with the "
+                ("batch", f"results directory the assembly came from ({BATCH_FLAG}); with the "
                           "assembly, the key: every ungrouped co-assembly is called coassembly, and two batches can "
                           "have groups of the same name")]
 
@@ -51,12 +56,14 @@ TABLE_DOCS = {
                                     "the database)"),
             ("pct_removed_qc, pct_removed_decontam, pct_clean", "% of raw read pairs removed by fastp, removed by "
                                                                 "host/contaminant filtering, and kept"),
-            ("low_depth", "clean_pairs below --min-clean-pairs: absence calls in this sample are not informative"),
-            ("depth_class", "clean read pairs binned at --min-clean-pairs and --depth-marks (<1M, 1M-10M, ...)"),
+            ("low_depth", "clean_pairs below --summary_min_clean_pairs: absence calls in this sample are not "
+                          "informative"),
+            ("depth_class", "clean read pairs binned at --summary_min_clean_pairs and --summary_depth_marks (<1M, "
+                            "1M-10M, ...)"),
             ("mean_read_length", "mean read length after fastp (mean of R1 and R2), bp"),
             ("nonpareil_coverage", "Nonpareil (--nonpareil): estimated average coverage (0-1) of the sample's "
                                    "community at its sequenced depth, from the redundancy of the k-mers of its R1 "
-                                   "reads; below --min-nonpareil-coverage the overview adds a note"),
+                                   "reads; below --summary_min_nonpareil_coverage the overview adds a note"),
             ("nonpareil_diversity", "Nonpareil's sequence diversity index Nd (the fitted curve's location on a log "
                                     "scale of sequencing effort; higher = more diverse); blank when the curve could "
                                     "not be fitted"),
@@ -125,14 +132,15 @@ TABLE_DOCS = {
         "title": "Species prevalence",
         "description": "Per species: in how many samples it is detected and how abundant it is, over the samples "
                        "with taxonomy output. Low-depth samples count only where the species is detected; they are "
-                       "left out of the denominator.",
+                       "left out of the denominator. Taxa without a species name (pooled as 'unassigned species' in "
+                       "taxonomy_species_wide) are not a species and are not listed, as in n_species.",
         "columns": [
             ("<rank>", "species name"),
             ("n_samples_detected", "samples where the species is detected"),
             ("n_samples_evaluable", "samples with taxonomy output where absence is informative (adequate depth), "
                                     "plus low-depth samples where the species is detected: the denominator of "
                                     "pct_samples_detected"),
-            ("re:^n_.+_detected$", "groups (--group-by) with at least one detection"),
+            ("re:^n_.+_detected$", "groups (--summary_group_by) with at least one detection"),
             ("pct_samples_detected", "n_samples_detected / n_samples_evaluable x 100"),
             ("mean_abundance", "mean relative abundance % over the evaluable samples"),
             ("median_abundance_when_detected, max_abundance", "median over the samples where detected, and maximum, "
@@ -142,7 +150,7 @@ TABLE_DOCS = {
     "watchlist": {
         "title": "Watchlist taxa",
         "description": "Relative abundance (%) of each watchlist taxon (assets/summary_watchlist.tsv or "
-                       "--watchlist): species rows match the species, genus rows every species of the genus, GTDB "
+                       "--summary_watchlist): species rows match the species, genus rows every species of the genus, GTDB "
                        "suffixes removed.",
         "columns": [("taxon, rank, note", "the watchlist entry and its source"),
                     ("matched_names", "profiler names that matched (GTDB names with suffixes)"),
@@ -177,9 +185,9 @@ TABLE_DOCS = {
                           "coverage cutoff included, see rgi_gene_read_pairs)"),
             ("resistance_snp_status", "tier 4 only: card_snp_present (a CARD snps.txt resistance mutation is among "
                                       "K-MARVEL's mutation_data), no_card_snp, no_snp_definition, not_checked (no "
-                                      "--kmarvel-db), not_checked_rgi (RGI bwt does not report mutations). CARD lists "
-                                      "some common polymorphisms (E. coli MarR Y137H), so card_snp_present is "
-                                      "necessary, not sufficient, evidence of resistance"),
+                                      "K-MARVEL database given), not_checked_rgi (RGI bwt does not report "
+                                      "mutations). CARD lists some common polymorphisms (E. coli MarR Y137H), so "
+                                      "card_snp_present is necessary, not sufficient, evidence of resistance"),
             ("resistance_snps_found", "the CARD resistance mutation(s) found"),
             ("kmer_blast_discordant", "K-MARVEL: its k-mer assignment and its BLAST best hit name different AROs "
                                       "(blank for RGI)"),
@@ -236,8 +244,8 @@ TABLE_DOCS = {
     },
     "group_arg_detection": {
         "title": "Tier 1-2 genes per group",
-        "description": "Per --group-by group and tier 1-2 gene of the primary method: detections and the pattern in "
-                       "--order-by order.",
+        "description": "Per --summary_group_by group and tier 1-2 gene of the primary method: detections and the pattern in "
+                       "--summary_order_by order.",
         "columns": [("re:.*", "")],  # replaced at run time: the first column is the --group-by column
     },
     "arg_method_comparison": {
@@ -304,7 +312,7 @@ TABLE_DOCS = {
         "columns": [
             ("assembly", "the assembly the contigs come from: a sample name, coassembly, or a co-assembly group's "
                          "label"),
-            ("batch", "results directory the assembly came from (--batch-labels / --summary_batch_label); with "
+            ("batch", f"results directory the assembly came from ({BATCH_FLAG}); with "
                       "the assembly, the key: every ungrouped co-assembly is called coassembly, and two batches can "
                       "have groups of the same name"),
             ("arg_class", "DeepARG predicted ARG class"),
@@ -336,16 +344,16 @@ TABLE_DOCS = {
                          "(SUPER-FOCUS); ko, ec, metacyc (HUMAnN)"),
             ("accession, term_description", "term and its name (blank where the backend gives none; COG "
                                              "categories named from NCBI COG)"),
-            ("abundance_cpge", "copies per genome equivalent: RPK / MicrobeCensus genome equivalents (blank without "
-                               "MicrobeCensus, or for SUPER-FOCUS)"),
+            ("abundance_cpge", "CPGE: reads per kb per genome equivalent (RPK / genome equivalents; "
+                               "see CPGE in the units list). Blank without MicrobeCensus, or for SUPER-FOCUS"),
             ("abundance_native, native_unit", "abundance in the backend's unit (Woltka, SUPER-FOCUS: reads, mates "
                                               "counted separately and fractional for multi-hit reads; HUMAnN: RPK)"),
         ],
     },
     "function_read_<ontology>": {
         "title": "Read-level functional profile per ontology, wide",
-        "description": "One row per term, one column per sample, in copies per genome equivalent (CPGE) when the "
-                       "backend computes it, else in its native unit (the README and the sheet's unit say which). "
+        "description": "One row per term, one column per sample, in CPGE (reads per kb per genome equivalent) "
+                       "when the backend computes it, else in its native unit (the README and the sheet's unit say which). "
                        "Rows sorted by mean abundance.",
         "columns": [("accession", "term"), ("description", "term name (COG categories named from NCBI COG)"),
                     ("<sample>", "abundance; 0 = term not found; NA_no_ags = no MicrobeCensus estimate for the "
@@ -353,7 +361,7 @@ TABLE_DOCS = {
     },
     "arg_gene_rpkg": {
         "title": "ARG genes x samples (RPKG)",
-        "description": "arg_gene_rpkm per MicrobeCensus genome equivalent: supporting read pairs per kb of gene per "
+        "description": "arg_gene_rpkm per genome equivalent: supporting read pairs per kb of gene per "
                        "genome equivalent (an estimate of cells), so samples of different average genome size compare. "
                        "Written when MicrobeCensus ran.",
         "columns": [("gene", "gene (allele numbers collapsed)"), ("tier, category", "tier and category (arg_long)"),
@@ -361,12 +369,12 @@ TABLE_DOCS = {
     },
     "arg_family_rpkg": {
         "title": "ARG gene families x samples (RPKG)",
-        "description": "arg_family_rpkm per MicrobeCensus genome equivalent.",
+        "description": "arg_family_rpkm per genome equivalent.",
         "columns": [("gene_family", "CARD AMR gene family"), WIDE_RPKG],
     },
     "arg_drug_class_rpkg": {
         "title": "ARG drug classes x samples (RPKG)",
-        "description": "arg_drug_class_rpkm per MicrobeCensus genome equivalent. A multi-class gene counts in each "
+        "description": "arg_drug_class_rpkm per genome equivalent. A multi-class gene counts in each "
                        "class, so the rows are not additive.",
         "columns": [("tier_group", "acquired (tiers 1-2), intrinsic/efflux (tier 3), or CARD mutation present "
                                    "(tier 4 rows with resistance_snp_status card_snp_present)"),
@@ -400,14 +408,17 @@ TABLE_DOCS = {
             ("assembly", "the assembly the sample's reads were aligned to: the sample itself, coassembly, or its "
                          "co-assembly group's label"),
             ("pct_reads_on_contigs", "% of the sample's reads (mates counted separately) aligned to a filtered contig"),
-            ("pct_reads_on_genes", "% of its reads assigned to a predicted gene: the denominator of contig-level TPM"),
+            ("pct_reads_on_genes", "% of its reads (mates counted separately) assigned to a predicted gene: the "
+                                   "reads the contig-level TPM describes"),
         ],
     },
     "mags": {
         "title": "MAGs (refined bins)",
         "description": "One row per refined MAG (Binette, or the single binner's bins): CheckM2 quality, MIMAG tier, "
-                       "GTDB-Tk lineage and, with --mag_level_functional, Bakta's rRNA, tRNA and gene counts. MAGs of "
-                       "different per-sample assemblies are not dereplicated: one species can appear once per sample.",
+                       "GTDB-Tk lineage and, with --mag_level_functional, Bakta's rRNA, tRNA and gene counts. A MAG "
+                       "here is a refined bin, whatever its quality tier; the column naming it is bin, in this and "
+                       "every other table. MAGs of different per-sample assemblies are not dereplicated here: one "
+                       "species can appear once per sample (see mag_clusters when --dereplicate_mags ran).",
         "columns": ASSEMBLY_KEY + [
             ("bin", "MAG name in its assembly (binette_binN)"),
             ("binner", "binette (refinement of >= 2 binners) or the single binner"),
@@ -450,10 +461,10 @@ TABLE_DOCS = {
         "columns": [
             ("assembly", "the assembly the MAG comes from: a sample name, coassembly, or a co-assembly group's "
                          "label"),
-            ("batch", "results directory (--batch-labels / --summary_batch_label)"),
+            ("batch", f"results directory ({BATCH_FLAG})"),
             ("bin", "MAG name (mags)"),
             ("sample", "sample whose reads give the depth"),
-            ("<metadata>", "columns of the --metadata table"),
+            ("<metadata>", "columns of the --sample_metadata table"),
             ("mean_depth_x", "mean read depth on the MAG's contigs (raw, not normalised)"),
             ("pct_sample_bases", "depth x MAG size / bases sequenced in the sample (MicrobeCensus total bases, all "
                                  "reads; else clean pairs x 2 x mean read length, without singletons) x 100: "
@@ -469,7 +480,7 @@ TABLE_DOCS = {
                        "this run's samples only: merged batches keep their own clusters, and the same species has "
                        "different cluster names in two batches.",
         "columns": [
-            ("batch", "results directory (--batch-labels / --summary_batch_label); clusters never span batches"),
+            ("batch", f"results directory ({BATCH_FLAG}); clusters never span batches"),
             ("cluster", "the cluster's representative, <assembly>_<bin> (the name of its FASTA in "
                         "04_binning/dereplicated/representatives/)"),
             ("assembly", "the assembly the MAG comes from: a sample name, coassembly, or a co-assembly group's "
@@ -490,11 +501,11 @@ TABLE_DOCS = {
                        "not extend to other batches.",
         "columns": [
             ("cluster", "the cluster's representative, <assembly>_<bin> (mag_clusters)"),
-            ("batch", "results directory (--batch-labels / --summary_batch_label)"),
+            ("batch", f"results directory ({BATCH_FLAG})"),
             ("assembly", "the representative's assembly"),
             ("bin", "the representative's MAG name (mags)"),
             ("sample", "sample whose reads were mapped"),
-            ("<metadata>", "columns of the --metadata table"),
+            ("<metadata>", "columns of the --sample_metadata table"),
             ("relative_abundance_pct", "CoverM relative abundance: % of the sample's reads on the representative "
                                        "(the reads on no representative are the rest)"),
             ("mean_depth_x", "CoverM mean read depth over the representative's bases"),
@@ -547,8 +558,10 @@ TABLE_DOCS = {
             ("gene_id, contig", "Pyrodigal gene and its contig"),
             ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
             ("count", "reads featureCounts assigned to the gene (mates counted separately)"),
-            ("tpm", "transcripts-per-million style share of the sample's reads on predicted genes (design doc 6.1)"),
-            ("cpge", "copies per genome equivalent: RPK / MicrobeCensus genome equivalents (blank without it)"),
+            ("tpm", "transcripts-per-million style share of the sample's reads on predicted genes (TPM in the "
+                    "units list)"),
+            ("cpge", "CPGE: reads per kb per genome equivalent (CPGE in the units list; blank "
+                     "without MicrobeCensus)"),
         ],
     },
     "arg_mag_long": {
@@ -561,7 +574,7 @@ TABLE_DOCS = {
             ("gene_id", "Pyrodigal gene"),
             ("arg_gene, arg_class", "DeepARG ARG and its predicted class"),
             ("cluster_90, cluster_95, cluster_99, cluster_100", "cluster at each identity, as "
-                                                                "<assembly>:<bin>:<gene of the representative>"),
+                                                                "<assembly>:<bin>:<representative_gene>"),
         ],
     },
     "arg_cluster_sharing": {
@@ -592,15 +605,15 @@ TABLE_DOCS = {
             ("abundance_tpm", "TPM: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of RPK_j) * "
                               "1e6, summed over the term's genes. The share of the sample's functional pool, relative "
                               "to reads on predicted genes (pct_reads_on_genes); compositional"),
-            ("abundance_cpge", "copies per genome equivalent: genome_equivalents = total_bases_sampled / "
-                               "average_genome_size_bp (MicrobeCensus); CPGE_i = RPK_i / genome_equivalents. Not "
-                               "compositional; blank without MicrobeCensus"),
+            ("abundance_cpge", "CPGE: reads per kb per genome equivalent, CPGE_i = RPK_i / "
+                               "genome_equivalents (CPGE in the units list). Not compositional; blank without "
+                               "MicrobeCensus"),
         ],
     },
     "function_contig_<ontology>": {
         "title": "Contig-level functional profile per ontology, wide",
-        "description": "One row per term, one column per sample, in copies per genome equivalent (CPGE) when "
-                       "MicrobeCensus ran, else in TPM (the README and the sheet's unit say which). Rows sorted by "
+        "description": "One row per term, one column per sample, in CPGE (reads per kb per genome equivalent) "
+                       "when MicrobeCensus ran, else in TPM (the README and the sheet's unit say which). Rows sorted by "
                        "mean abundance. Not comparable row by row with function_read_<ontology>: other genes, other "
                        "reads, other units.",
         "columns": [("accession", "term"), ("description", "term name (COG categories, eggNOG CAZy families; blank "
@@ -625,11 +638,11 @@ def table_doc(name, group_by=None):
         return None
     if name == "group_arg_detection":
         doc = dict(doc, columns=[
-            (group_by or "<group>", "the --group-by group"), ("gene, tier, category", "gene and its annotation"),
+            (group_by or "<group>", "the --summary_group_by group"), ("gene, tier, category", "gene and its annotation"),
             ("n_detected, n_evaluable, n_samples", "samples of the group with the gene; samples where absence is "
                                                    "informative (or the gene was found); all samples of the group"),
-            ("first_detected, last_detected", "first and last sample (by --order-by) with the gene"),
-            ("pattern", "detection per sample in --order-by order (+ detected, - not detected, NA unknown)")])
+            ("first_detected, last_detected", "first and last sample (by --summary_order_by) with the gene"),
+            ("pattern", "detection per sample in --summary_order_by order (+ detected, - not detected, NA unknown)")])
     return doc
 
 
@@ -736,20 +749,34 @@ def _md_cell(text):
     return str(text).replace("|", "\\|").replace("\n", " ")
 
 
+# a name with a <placeholder>; it does not end on '.' or '-' (a sentence's full stop stays outside the code span)
+_PLACEHOLDER = re.compile(r"[\w.\-]*<[A-Za-z_]+>(?:[\w<>]|[.\-](?=[\w<]))*")
+
+
+def _md_inline(text):
+    """Names with a <placeholder> (taxonomy_<rank>_wide, function_read_<ontology>) in backticks outside code spans:
+    a Markdown viewer takes a bare <rank> for an HTML tag and shows nothing (R5-12)."""
+    parts = str(text).split("`")
+    for i in range(0, len(parts), 2):  # even parts are outside code spans
+        parts[i] = _PLACEHOLDER.sub(lambda m: f"`{m.group(0)}`", parts[i])
+    return "`".join(parts)
+
+
 def render_markdown(blocks):
     out = []
     for b in blocks:
         kind = b[0]
         if kind == "h":
-            out.append("#" * b[1] + " " + b[2])
+            out.append("#" * b[1] + " " + _md_inline(b[2]))
         elif kind == "p":
-            out.append(b[1])
+            out.append(_md_inline(b[1]))
         elif kind == "ul":
-            out.append("\n".join(f"- {item}" for item in b[1]))
+            out.append("\n".join(f"- {_md_inline(item)}" for item in b[1]))
         elif kind == "table":
             head, rows = b[1], b[2]
-            lines = ["| " + " | ".join(_md_cell(h) for h in head) + " |", "|" + "---|" * len(head)]
-            lines += ["| " + " | ".join(_md_cell(c) for c in r) + " |" for r in rows]
+            cell = lambda c: _md_inline(_md_cell(c))  # noqa: E731
+            lines = ["| " + " | ".join(cell(h) for h in head) + " |", "|" + "---|" * len(head)]
+            lines += ["| " + " | ".join(cell(c) for c in r) + " |" for r in rows]
             out.append("\n".join(lines))
         elif kind == "code":
             out.append("```\n" + b[1].rstrip("\n") + "\n```")
@@ -761,19 +788,27 @@ def render_markdown(blocks):
 # ---------------------------------------------------------------------------------------------------------------
 
 UNITS = [
-    ("read pairs", "every count in the summary tables except ARGs-OAP's read_count and ppm (single reads, as ARGs-OAP "
-                   "counts them); Reads_report.csv and ARGs-OAP nRead count single reads (both mates), RGI and Woltka "
-                   "count mates separately"),
+    ("read pairs", "the counts of the summary tables (clean_pairs, supporting_reads, est_read_pairs, ...) except "
+                   "these, which count single reads (mates separately): ARGs-OAP's read_count and ppm, "
+                   "rgi_mapped_reads, func_reads_assigned, the functional abundance_native of Woltka and SUPER-FOCUS "
+                   "(HUMAnN's is RPK), arg_contig_abundance count and the pct_reads_on_* shares. Reads_report.csv "
+                   "and ARGs-OAP nRead count single reads too"),
     ("RPM, RPKM", "K-MARVEL / RGI: supporting read pairs per million clean read pairs; RPM per kb of reference gene. "
                   "Comparable between samples of different depth; not copies per cell"),
-    ("CPGE", "functional profiles: reads per kb per MicrobeCensus genome equivalent (RPK / GE). Contig level: "
-             "genome_equivalents = total_bases_sampled / average_genome_size_bp (MicrobeCensus); CPGE_i = RPK_i / "
-             "genome_equivalents. Approximate average copies of that gene per community member; not compositional"),
+    ("CPGE", "functional profiles: reads (mates counted separately) per kb of gene per genome equivalent, "
+             "the genome equivalents estimated with MicrobeCensus. CPGE_i = RPK_i / genome_equivalents, with RPK_i = count_i / (length_i / 1000) and "
+             "genome_equivalents = total_bases / average_genome_size_bp (every base of the clean reads over "
+             "MicrobeCensus' average genome size). Proportional to copies per genome, not an estimate of them: a "
+             "single-copy gene recovered in full is about 1000 / read length (about 7 for 140 bp reads), and less "
+             "where only part of the community is assembled (contig level) or in the reference (read level). "
+             "Compare samples and terms with it; not compositional. (The name, copies per genome equivalent, is "
+             "kept for the column names.)"),
     ("TPM", "contig-level functional profile: RPK_i = count_i / (length_i / 1000); TPM_i = RPK_i / (sum over all j of "
             "RPK_j) * 1e6. The share of the sample's functional pool attributable to that gene; compositional, and "
             "relative to the reads on predicted genes only (assembly_read_use pct_reads_on_genes)"),
-    ("RPKG", "arg_*_rpkg: K-MARVEL / RGI supporting read pairs per kb of gene per MicrobeCensus genome equivalent "
-             "(RPKM x clean read pairs / 1e6 / genome equivalents)"),
+    ("RPKG", "arg_*_rpkg: K-MARVEL / RGI supporting read pairs per kb of gene per genome equivalent "
+             "(RPKM x clean read pairs / 1e6 / genome equivalents): the CPGE scale with read pairs, so a single-copy "
+             "gene found in full is about 500 / read length"),
     ("relative abundance", "taxonomy: % of the profiled (classified) community; each sample sums to 100. What is "
                            "profiled differs by profiler: Kraken2 + Bracken species read estimates, sourmash's "
                            "abundance-weighted k-mer share of the matched genomes, sylph's taxonomic abundance; their "
@@ -782,7 +817,7 @@ UNITS = [
                    "rRNA / tRNA genes were checked (without them a MAG is at most medium)"),
     ("copies per cell", "ARGs-OAP: SARG copies (reads weighted by the share of the reference they cover) / "
                         "ARGs-OAP cell estimate (nCell)"),
-    ("NA_low_depth", "not detected in a sample below --min-clean-pairs: unknown, not absent"),
+    ("NA_low_depth", "not detected in a sample below --summary_min_clean_pairs: unknown, not absent"),
     ("NA_not_run", "the method did not run on the sample (its output is missing)"),
     ("NA_no_ags", "CPGE table: the sample has no MicrobeCensus estimate"),
 ]
@@ -790,8 +825,9 @@ UNITS = [
 PITFALLS = [
     "geNomad's plasmid class includes integrative conjugative elements and transposon cargo (arg_contig_mobile): "
     "an ARG 'on a plasmid' sits on a mobile-element contig, not necessarily a plasmid.",
-    "Single reads vs pairs: Reads_report.csv, ARGs-OAP nRead, RGI mapped reads and Woltka counts are single reads "
-    "(both mates); the summary's counts are read pairs (reads / 2), except ARGs-OAP's read_count and ppm.",
+    "Single reads vs pairs: the summary's counts are read pairs (reads / 2), except the single-read columns the "
+    "units list names (ARGs-OAP read_count and ppm, rgi_mapped_reads, func_reads_assigned, abundance_native, "
+    "arg_contig_abundance count, pct_reads_on_*); Reads_report.csv and ARGs-OAP nRead count single reads too.",
     "ARG units are not interchangeable: K-MARVEL / RGI RPKM (read pairs) and ARGs-OAP copies per cell (SARG copies "
     "over the ARGs-OAP cell estimate) measure different things. Compare samples within one unit only.",
     "Two cell estimates: ARGs-OAP nCell and MicrobeCensus genome equivalents (CPGE) come from different marker genes "
@@ -810,7 +846,7 @@ PITFALLS = [
     "Tier 1 calls of RGI from WildCARD sequences may come from commensal relatives of the clinical gene: check "
     "rgi_kmer_hosts / rgi_host_check.",
     "TPM and CPGE are not interchangeable (the most common error with these tables): TPM is a share of the reads on "
-    "predicted genes (compositional), CPGE is copies per genome equivalent (not compositional). Contig-level TPM "
+    "predicted genes (compositional), CPGE is reads per kb per genome equivalent (not compositional). Contig-level TPM "
     "describes only the reads on predicted genes, which can be well under half of a sample's reads (assembly_read_use).",
     "A gene with two terms of one ontology counts fully for each (intended): an ontology's terms add up to more than "
     "the gene total.",
@@ -838,9 +874,9 @@ STAGE_PITFALLS = {
                  "depends on the sample alone, so it is valid in any batch and comparable across batches. "
                  "nonpareil_depth_95pct is the read pairs the fitted model projects for 95 % coverage, and "
                  "nonpareil_diversity (Nd) the curve's position on the log effort axis; both are blank when Nonpareil "
-                 "could not fit the curve (too few reads). The 95 % depth is an extrapolation: from a low coverage it "
-                 "is uncertain (one sample at coverage 0.09 projected 2.7 G read pairs from 2 M pairs and 10-13 G from "
-                 "10 M pairs of the same reads), so read it as an order of magnitude. Nonpareil's k-mer mode has no "
+                 "could not fit the curve (too few reads). The 95 % depth is an extrapolation: below a coverage of about "
+                 "0.1 it can change several-fold with the depth it is projected from (billions of read pairs from a "
+                 "few million), so read it as an order of magnitude. Nonpareil's k-mer mode has no "
                  "random seed: values move slightly from run to run.",
     "gunc": "GUNC (mags gunc_pass and scores) finds chimeras across distant lineages that CheckM2's completeness and "
             "contamination can miss; a false gunc_pass flags a likely chimera and does not change the MIMAG "
@@ -936,7 +972,8 @@ def readme_blocks(ctx):
                    ("table", ["File", "Figure", "How to read it"],
                     [[f"`figures/{r['key']}.*`", r["title"], r["caption"]] for r in figs.records])]
     blocks += [("h", 2, "Units and missing values"), ("table", ["Term", "Meaning"], [list(u) for u in UNITS])]
-    if s.get("arg_methods") or ctx.get("sarg"):
+    # tiers exist only for the CARD methods; an ARGs-OAP-only run has none (R5-06)
+    if s.get("arg_methods"):
         tier_rows = []
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
@@ -982,7 +1019,7 @@ def llm_guide(ctx):
                 f"low_coverage_samples: [{', '.join(s['low_coverage_samples'])}]"]
     out += [f"arg_primary_method: {s.get('arg_primary', 'none')}",
             f"arg_methods_card: [{', '.join(s.get('arg_methods', []))}]",
-            f"rgi_min_coverage_percent: {ctx['rgi_min_coverage']:g}",
+            *([f"rgi_min_coverage_percent: {ctx['rgi_min_coverage']:g}"] if "RGI" in s.get("arg_methods", []) else []),
             f"metadata_columns: [{', '.join(ctx['meta_cols'])}]",
             f"group_by: {ctx.get('group_by') or 'none'}",
             "```", "",
@@ -1063,6 +1100,13 @@ def llm_guide(ctx):
             "`bin`, `mobile_class`), summarised in `tables/arg_contig_hosts.tsv`; ARGs shared between MAGs in "
             "`tables/arg_cluster_sharing.tsv`.",
             "- Software versions: `README.md`, section Software versions (per batch when several were merged).", ""]
+    # placeholders (<sample>, taxonomy_<rank>_wide) in backticks outside the fenced run facts, as in README (R5-12)
+    fenced = False
+    for i, line in enumerate(out):
+        if line.startswith("```"):
+            fenced = not fenced
+        elif not fenced:
+            out[i] = _md_inline(line)
     return "\n".join(out)
 
 

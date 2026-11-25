@@ -9,7 +9,7 @@ bin_tax_report.py) all draw with it.
   (pdf.fonttype 42) and every run picks the same files. SVG text stays text, with the faces it uses embedded as
   WOFF2 @font-face data, so the file renders the same without Inter installed and stays editable
 - colour: Okabe-Ito for categories, viridis (its brightest 5 % dropped) for quantities, light grey for 'not
-  detected', vermillion for low-depth samples and thresholds
+  detected', dark grey for detections drawn as dots, vermillion only for low-depth samples and thresholds
 - type: 7 pt base, 6 pt ticks and legends, 8 pt titles; sample labels 6 pt up to 60 samples, 5 pt up to 110
   (Nature's minimum), and above that no sample labels, only group labels (the interactive HTML version names them)
 - samples: natural order (V2 before V10) inside their group, group brackets; above 60 samples a heatmap has samples
@@ -36,6 +36,7 @@ CATEGORY = ["#0072B2", "#E69F00", "#009E73", "#CC79A7", "#56B4E9", "#D55E00", "#
 OTHER = "#BBBBBB"
 NOT_DETECTED = "#E8E8E8"
 LOW_DEPTH = "#D55E00"
+DETECTED = "#404040"  # dots of a detection (watchlist): not vermillion, which marks low depth and thresholds
 DAGGER = "†"
 BASE_PT, SMALL_PT, TITLE_PT = 7, 6, 8
 VERTICAL_ABOVE = 60   # samples as rows above this many samples
@@ -140,9 +141,10 @@ def category_colors(names, other=("Other", "other", "no-hit", "unassigned", "unc
 
 
 def short_count(n):
-    """10000000 -> '10M', 1500000 -> '1.5M', 250000 -> '250k': the form of samples_qc's depth classes, so figures,
-    report and tables write a count the same way."""
-    for div, suffix in ((1e9, "G"), (1e6, "M"), (1e3, "k")):
+    """10000000 -> '10M', 1500000 -> '1.5M', 250000 -> '250k', 2700000000 -> '2.7B' (billion; not 'G', which reads
+    as gigabases): the form of samples_qc's depth classes, so figures, report and tables write a count the same
+    way."""
+    for div, suffix in ((1e9, "B"), (1e6, "M"), (1e3, "k")):
         if abs(n) >= div:
             return f"{n / div:.3g}{suffix}"
     return f"{n:.0f}"

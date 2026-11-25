@@ -10,7 +10,7 @@ abundances."""
 import pandas as pd
 
 from id_columns import read_table
-from summary_common import die, load_coassembly_groups
+from summary_common import die, load_coassembly_groups, sort_natural
 
 CONTIG_TABLE = ("05_arg_prediction", "contig_level", "summary", "Contig_tax_and_arg_prediction.tsv")
 NEEDED = {"Sample", "contig_name", "ARG_gene", "predicted_ARG_class"}
@@ -104,8 +104,7 @@ def contig_mobile_table(parts):
     for col in CHECKV_COUNTS if with_checkv else []:
         out[col] = out.pop(col).astype("Int64").mask(no_checkv)
     out = out[["assembly", "batch"] + [c for c in out.columns if c not in ("assembly", "batch")]]
-    return out.sort_values(["batch", "assembly", "arg_genes"], ascending=[True, True, False],
-                           kind="stable").reset_index(drop=True)
+    return sort_natural(out, ["batch", "assembly", "arg_genes"], ascending=[True, True, False])
 
 
 def host(row):
@@ -153,8 +152,7 @@ def arg_contig_long_table(parts, mags=None):
     df.insert(df.columns.get_loc("bin") + 1, "mag_tier",
               [tier.get((b, a, x), "") if x else "" for b, a, x in zip(df["batch"], df["assembly"], df["bin"])])
     df["contig_length_bp"] = df["contig_length_bp"].astype("Int64")
-    df = df.sort_values(["batch", "assembly", "arg_class", "arg_gene", "contig"], kind="stable")
-    return df.reset_index(drop=True)
+    return sort_natural(df, ["batch", "assembly", "arg_class", "arg_gene", "contig"])
 
 
 def arg_contig_hosts_table(long):
@@ -175,8 +173,7 @@ def arg_contig_hosts_table(long):
              .reset_index())
     out = out[["assembly", "batch", "arg_class", "host_rank", "host_taxon", "arg_genes", "arg_contigs", "on_mag",
                "on_mobile"]]
-    return out.sort_values(["batch", "assembly", "arg_class", "arg_genes"], ascending=[True, True, True, False],
-                           kind="stable").reset_index(drop=True)
+    return sort_natural(out, ["batch", "assembly", "arg_class", "arg_genes"], ascending=[True, True, True, False])
 
 
 def load_arg_gene_abundance(root):

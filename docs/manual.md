@@ -496,7 +496,7 @@ download or point to.
 - **Does:** profiles the functions in the clean reads with one backend per run: Woltka
   (KO, EC, COG, Pfam and MetaCyc read counts against the Web of Life genomes), SUPER-FOCUS
   (SEED subsystem levels 1-3) or HUMAnN 4 (MetaCyc pathways, KO and EC in RPK). Woltka
-  and HUMAnN also give copies per genome equivalent, with MicrobeCensus.
+  and HUMAnN also give CPGE (reads per kb per genome equivalent), with MicrobeCensus.
 - **Switch:** `--read_level_functional woltka | superfocus | humann | none` (default
   `none`). Needs no assembly.
 - **Needs:** WoLr2 ~94 GB, SUPER-FOCUS DB_90 ~0.7-0.9 GB, or HUMAnN ~71 GB (~33 GB with
@@ -543,7 +543,7 @@ download or point to.
 > accessions are path-qualified — `L1`, `L1 | L2`, `L1 | L2 | L3` — because the
 > level-2 placeholder `-` occurs under many level-1 categories). SEED is never
 > mapped to KO or EC, and the read tables are never merged with the contig branch.
-> **No copies per genome equivalent are produced:** a SEED hit carries no gene
+> **No CPGE is produced:** a SEED hit carries no gene
 > length, so no RPK (and no CPGE) exists — `abundance_cpge` stays blank and
 > `cpge_status` is `not_applicable`; MicrobeCensus still runs and its AGS / genome
 > equivalents are reported in `read_sample_summary.tsv`. The cluster level is fixed
@@ -565,7 +565,7 @@ download or point to.
 > (ChocoPhlAn, nucleotide search), then searches the remaining reads against
 > UniRef90 (translated search; HUMAnN 4 offers only the EC-filtered UniRef90
 > database). It runs with `--count-normalization RPKs`, so **`abundance_native` is
-> RPK** (`native_unit = rpk`) and copies per genome equivalent are computed as for
+> RPK** (`native_unit = rpk`) and CPGE is computed as for
 > Woltka (`CPGE = RPK / genome_equivalents`, blank without MicrobeCensus). Three
 > ontologies are reported: `metacyc` (HUMAnN's MetaCyc pathway abundance), and
 > `ko` / `ec`, which the pipeline derives from HUMAnN's gene families with the
@@ -1423,12 +1423,12 @@ How the summary reports the results:
 - **ARGs-OAP (SARG).** With `--args_oap_prediction`, the summary reads `ARGS_OAP_REPORT`'s tables into `arg_sarg_long` (one row per sample and SARG subtype), `arg_sarg_type_cpc` and `arg_sarg_subtype_cpc` (copies per cell, samples as columns), `samples_qc` `args_oap_n16S`, `args_oap_ncell`, `sarg_n_subtypes` and `sarg_copies_per_cell`, and a heatmap by SARG type. SARG names its types and subtypes differently from CARD, so ARGs-OAP is reported in its own section, not in the K-MARVEL vs RGI comparison, and has no tiers. Copies per cell is not RPKM: compare samples within one unit only. A sample ARGs-OAP could not normalise (no 16S or cells) is blank, not 0.
 - **Watchlist.** The default `assets/summary_watchlist.tsv` lists the ESKAPE pathogens and the bacteria of the WHO Bacterial Priority Pathogens List 2024 and the CDC Antibiotic Resistance Threats Report 2019, plus a few other species; each row's note names its source. The report's Methods section shows the list.
 - **Sequencing coverage (Nonpareil).** With `--nonpareil`, `samples_qc` adds `nonpareil_coverage`, `nonpareil_diversity` and `nonpareil_depth_95pct` (read pairs for 95 % coverage), the overview shows the coverage curves (`nonpareil_curves`) and notes the samples below `--summary_min_nonpareil_coverage`. See 7.3.
-- **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in copies per genome equivalent (CPGE) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
+- **Read functional profile and MicrobeCensus.** With `--read_level_functional`, `function_read_long` holds AGGREGATE_READ_FUNCTIONS' table of every batch and `function_read_<ontology>` one wide table per ontology, in CPGE (reads per kb per genome equivalent) when the backend computes it (Woltka, HUMAnN), else in its native unit; a sample without a MicrobeCensus estimate is `NA_no_ags` there. `samples_qc` adds the reads assigned, the annotated fraction, the MicrobeCensus average genome size and genome equivalents. A COG-category heatmap gives an overview. An ORF can carry several terms, so the tables are not compositional.
 - **Assembly.** With an assembly, `assembly_stats` gives each assembly's contigs, length, N50 / L50, GC and the contigs the length filter kept, and `assembly_read_use` the share of each sample's reads on the contigs and on their predicted genes (with `--contig_level_functional`; `NA_not_run` otherwise). Reads not on contigs are outside every contig-based table.
 - **MAGs.** With binning, `mags` has one row per refined MAG: CheckM2 completeness and contamination, a MIMAG tier (`quality_tier`: high needs completeness > 90 %, contamination < 5 %, 23S + 16S + 5S rRNA and at least 18 tRNA amino acids; medium completeness >= 50 %, contamination < 10 %), the GTDB-Tk lineage and, with `--mag_level_functional`, Bakta's rRNA, tRNA, CDS and CRISPR counts. Without Bakta the rRNA/tRNA part is unchecked and a MAG is at most medium (`tier_basis checkm2_only`). The High/Mid/Low classes of `04_binning/` are an older, different scheme. `mag_abundance` gives each MAG's depth per sample and `pct_sample_bases` (depth x MAG size / bases sequenced): the length-weighted mean of its contigs' MetaBAT2 depths (alignments at >= 97 % identity), for every sample under co-assembly and for the MAG's own sample under per-sample assembly. With `--dereplicate_mags`, `mag_clusters` gives each MAG's run-level cluster and representative (galah) and `mag_cluster_abundance` each representative's share of every sample's reads (CoverM); both cover this run's samples only.
 - **Contig ARGs (linkage).** With `--contig_tax_and_arg`, `arg_contig_long` lists every DeepARG hit with its contig's Metabuli taxon (lowest rank reached), bin, MIMAG tier and geNomad class, and `arg_contig_hosts` the ARG genes per host genus. The ARG and the taxon are on one assembled contig, unlike the read-level candidate hosts; the counts are genes on contigs, not read abundance. With `--contig_level_functional`, `arg_contig_abundance` adds each gene's reads per sample (count, TPM, CPGE).
 - **Bin-level ARG clusters.** With `--arg_bin_clustering`, `arg_mag_long` lists the ARG genes of the MAGs and their MMseqs2 cluster at 90, 95, 99 and 100 % identity, and `arg_cluster_sharing` the 90 % clusters found in more than one MAG. A shared cluster is the same sequence in different genomes: consistent with transfer, not evidence of it alone.
-- **Contig functional profile.** With `--contig_level_functional`, `function_contig_long` and `function_contig_<ontology>` (ko, cog, ec, pfam, cazy from eggNOG, cazy_dbcan from dbCAN) hold AGGREGATE_FUNCTIONS' tables, in CPGE when MicrobeCensus ran, else in TPM. TPM_i = RPK_i / (sum of RPK_j) x 1e6 is a share of the reads on predicted genes (compositional); CPGE_i = RPK_i / genome equivalents is copies per genome equivalent (not compositional). A gene with two terms of one ontology counts for each. COG categories and eggNOG CAZy families are named; KO, EC and Pfam keep their identifiers only. These tables are never merged with the read-level `function_read_*`.
+- **Contig functional profile.** With `--contig_level_functional`, `function_contig_long` and `function_contig_<ontology>` (ko, cog, ec, pfam, cazy from eggNOG, cazy_dbcan from dbCAN) hold AGGREGATE_FUNCTIONS' tables, in CPGE when MicrobeCensus ran, else in TPM. TPM_i = RPK_i / (sum of RPK_j) x 1e6 is a share of the reads on predicted genes (compositional); CPGE_i = RPK_i / genome equivalents is reads per kb per genome equivalent (not compositional; a single-copy gene is about 1000 / read length). A gene with two terms of one ontology counts for each. COG categories and eggNOG CAZy families are named; KO, EC and Pfam keep their identifiers only. These tables are never merged with the read-level `function_read_*`.
 - **ARGs per genome equivalent.** When MicrobeCensus ran, `arg_gene_rpkg`, `arg_family_rpkg` and `arg_drug_class_rpkg` repeat the RPKM matrices per genome equivalent (RPKM x clean read pairs / 1e6 / genome equivalents).
 - **Report and figures.** The HTML report has an overview (facts, the attention list, the stages, read fate and the
   per-sample table), one page per section whose stage ran, a methods page (how to read the report, the ARG tiers, the
@@ -1683,17 +1683,25 @@ has one row per contig, or per ARG gene on a contig with several:
 > (`GH13`), CAZy subfamilies (`GH5_4`), and dbCAN-sub subfamily cluster ids
 > (`GH78_e118`) all occur.
 
-> **Copies per genome equivalent (`cpge` / `abundance_cpge` columns and the
-> `function_wide_*_cpge.tsv` matrices):**
+> **CPGE (`cpge` / `abundance_cpge` columns and the
+> `function_wide_*_cpge.tsv` matrices):** reads per kb of gene per genome
+> equivalent.
 >
 > ```
-> genome_equivalents = total_bases_sampled / average_genome_size_bp   (from MicrobeCensus)
+> RPK_i = count_i / (length_i / 1000)        (reads, mates counted separately)
+> genome_equivalents = total_bases / average_genome_size_bp   (from MicrobeCensus)
 > CPGE_i = RPK_i / genome_equivalents
 > ```
 >
-> Approximate average copies of that gene per community member. Not
-> compositional. Use when the question is whether an average cell carries the
-> function, and for comparing across communities of different composition.
+> `total_bases` counts every base of the clean reads. The name stands for
+> "copies per genome equivalent", but the value is proportional to copies per
+> genome, not an estimate of them: a gene present once in every genome and
+> recovered in full is about 1000 / read length (about 7 for 140 bp reads),
+> and less where only part of the community is assembled (contig branch) or
+> in the reference (read branch). Single-copy marker genes measured on real
+> samples sat at 0.5-0.7 × 1000 / read length where most reads reached a gene.
+> Not compositional. Use it to compare a function between samples and between
+> functions, and across communities of different composition.
 > TPM and CPGE answer different questions: they are not interchangeable and
 > neither replaces the other — the most common error in this kind of analysis
 > is treating one as the other.

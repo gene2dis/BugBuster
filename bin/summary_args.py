@@ -504,7 +504,9 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
     counted["drug_class"] = counted["drug_class"].str.strip()
     counted = counted[counted["drug_class"] != ""]
     if counted.empty:
-        out["arg_drug_class_rpkm"] = pd.DataFrame()
+        # no counted call with a drug class: an empty table that keeps its header (R5-09)
+        out["arg_drug_class_rpkm"] = pd.DataFrame(
+            columns=cols, index=pd.MultiIndex.from_arrays([[], []], names=["tier_group", "drug_class"]))
     else:
         out["arg_drug_class_rpkm"] = fill_missing(*wide(counted, ["tier_group", "drug_class"]))
 
@@ -656,7 +658,7 @@ def rpkg_tables(rpkm_tables, clean_pairs, genome_equivalents, order):
     for name, mat in rpkm_tables.items():
         new = name.replace("_rpkm", "_rpkg")
         if mat is None or mat.empty:
-            out[new] = pd.DataFrame()
+            out[new] = pd.DataFrame() if mat is None else mat.copy()  # an empty table keeps its header
             continue
         mat = mat.copy()
         for s in [c for c in order if c in mat.columns]:

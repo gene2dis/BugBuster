@@ -17,7 +17,7 @@ from matplotlib.lines import Line2D  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
 from summary_args import METHOD_LABELS  # noqa: E402
-from summary_common import NA_NOT_RUN, strip_gtdb  # noqa: E402
+from summary_common import CPGE_LABEL, NA_NOT_RUN, strip_gtdb  # noqa: E402
 from summary_taxonomy import genus_rank, species_rank  # noqa: E402
 
 
@@ -328,7 +328,7 @@ def fig_taxonomy(fw, tx, cols, groups, low, per_sample, label):
             "sample and how much of the community the named taxa cover.", src, "taxonomy")
 
 
-def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source=""):
+def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source="", ani_interval=True):
     if wl_wide is None or wl_wide.empty:
         return
     det = wl_wide[wl_wide["n_samples_detected"] > 0]
@@ -355,9 +355,9 @@ def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source=""):
         if not len(idx):
             continue
         sizes = 2 + 8 * (np.log10(vals[idx]) + 3).clip(0, 5)
-        face = ["none" if cols[j] in unc else fs.LOW_DEPTH for j in idx]
+        face = ["none" if cols[j] in unc else fs.DETECTED for j in idx]
         xs, ys = (np.full(len(idx), i), idx) if vertical else (idx, np.full(len(idx), i))
-        ax.scatter(xs, ys, s=sizes, facecolors=face, edgecolors=fs.LOW_DEPTH, linewidths=0.5)
+        ax.scatter(xs, ys, s=sizes, facecolors=face, edgecolors=fs.DETECTED, linewidths=0.5)
     feat_axis, samp_axis = ("x", "y") if vertical else ("y", "x")
     if vertical:
         ax.set_xticks(range(m), labels, rotation=90, fontsize=fs.SMALL_PT, fontstyle="italic")
@@ -373,15 +373,19 @@ def fig_watchlist(fw, wl_wide, wl_long, cols, groups, low, source=""):
     ax.tick_params(length=0)
     fs.group_brackets(ax, cols, groups, samp_axis, separator="#CCCCCC")
     handles = [Line2D([], [], ls="", marker="o", markersize=math.sqrt(2 + 8 * (math.log10(v) + 3)),
-                      color=fs.LOW_DEPTH, label=lab) for v, lab in ((0.01, "0.01 %"), (1, "1 %"), (50, "50 %"))]
-    handles.append(Line2D([], [], ls="", marker="o", markersize=3, markerfacecolor="none", color=fs.LOW_DEPTH,
-                          label="species call uncertain"))
+                      color=fs.DETECTED, label=lab) for v, lab in ((0.01, "0.01 %"), (1, "1 %"), (50, "50 %"))]
+    # hollow dots exist only where the profiler reports an ANI interval (sylph)
+    if ani_interval:
+        handles.append(Line2D([], [], ls="", marker="o", markersize=3, markerfacecolor="none", color=fs.DETECTED,
+                              label="species call uncertain"))
     fig.legend(handles=handles, title="relative abundance", loc="outside lower center", ncol=4, columnspacing=1.0)
     fw.save(fig, "watchlist", "Watchlist taxa",
             f"Watchlist taxa found in at least one sample ({len(det)} of the {len(wl_wide)} listed in "
             f"{source or 'the watchlist'}; the default list holds the ESKAPE pathogens and other WHO and CDC priority "
-            "bacteria, see Methods for each taxon's source). Dot area scales with log abundance. Hollow dots: sylph's "
-            "ANI interval reaches below 95 %, so the species-level call is uncertain. Detection is not culture: low "
+            "bacteria, see Methods for each taxon's source). Dot area scales with log abundance."
+            + (" Hollow dots: sylph's ANI interval reaches below 95 %, so the species-level call is uncertain."
+               if ani_interval else "")
+            + " Detection is not culture: low "
             "abundance can be index hopping or a related strain.", pd.DataFrame(rows), "taxonomy")
 
 
@@ -429,6 +433,8 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
     c = [fs.LOW_DEPTH if s in low else fs.CATEGORY[0] for s in ran]
     axes[0].scatter(depth[ran], n_genes[ran], c=c, s=6, lw=0)
     axes[0].set_ylabel("distinct acquired genes")
+    # a log axis has no 0: a sample without an acquired gene is drawn at 0.001, and the caption says so (R5-10)
+    zero = int((load[ran].fillna(0) == 0).sum())  # every sample drawn at 0.001 (no acquired gene, or calls without an RPKM)
     axes[1].scatter(depth[ran], load[ran].fillna(0) + 1e-3, c=c, s=6, lw=0)
     axes[1].set_yscale("log")
     axes[1].set_ylabel("total acquired RPKM (log)")
@@ -446,11 +452,14 @@ def fig_args(fw, arg, tables, samples, cols, groups, low, status, top_n, method=
     fw.save(fig, "arg_vs_depth", "ARG detection versus sequencing depth",
             "Acquired genes (tiers 1-2) per sample against its clean read pairs. If the number of genes found rises "
             "with depth (left), shallow samples under-report ARGs: compare presence and absence only between samples "
-            "of similar depth. Total RPKM (right) is normalised to depth. Vermillion: below the low-depth threshold.",
+            "of similar depth. Total RPKM (right) is normalised to depth and plotted as RPKM + 0.001, so a sample "
+            "with total RPKM 0 (no acquired gene, or calls without an RPKM) sits at 0.001" + (f" ({zero} here)" if zero else "")
+            + "; the source data hold the unshifted values. Vermillion: below the low-depth threshold.",
             src, "args")
 
 
-TIER_COLORS = {1: "#D55E00", 2: "#E69F00", 3: "#56B4E9", 4: "#9A9A9A"}
+# tier 1 is reddish purple, not vermillion (low depth and thresholds in every figure, R5-15)
+TIER_COLORS = {1: "#CC79A7", 2: "#E69F00", 3: "#56B4E9", 4: "#9A9A9A"}
 
 
 def fig_method_upset(fw, comp, gene_sets, methods):
@@ -511,7 +520,7 @@ def fig_method_upset(fw, comp, gene_sets, methods):
             "UpSet plot: each column is one combination of methods (filled dots), and its bar counts the distinct genes "
             "(alleles collapsed: KPC-2 and KPC-97 are both KPC) that exactly those methods detected in at least one "
             "sample, coloured by tier. Left: genes per method. RGI counts a gene when reads cover at least the "
-            "--rgi-min-coverage share of its best reference sequence; only samples every method ran on are compared.",
+            "--rgi_summary_min_coverage share of its best reference sequence; only samples every method ran on are compared.",
             pd.DataFrame(rows), "compare")
 
 
@@ -585,7 +594,7 @@ def fig_cog(fw, mat, unit, cols, groups, low, hatch, backend, key="function_cog_
     num = mat.reindex(columns=cols).apply(pd.to_numeric, errors="coerce")
     if num.fillna(0).le(0).all().all():
         return
-    unit_txt = "copies per genome equivalent (CPGE)" if unit == "cpge" else unit.upper() if unit == "tpm" else unit
+    unit_txt = CPGE_LABEL if unit == "cpge" else unit.upper() if unit == "tpm" else unit
     desc = mat["description"] if "description" in mat.columns else pd.Series("", index=mat.index)
     labels = [f"{a} {d}".strip() if isinstance(d, str) else str(a) for a, d in zip(mat.index, desc)]
     what = (f"the read-level profile ({backend})" if level == "read" else
@@ -699,7 +708,9 @@ def fig_arg_contig_hosts(fw, hosts, top=20, top_classes=8):
         h["host"] + " (" + h["host_rank"].astype(str) + ")"
     by_host = h.groupby("host")["arg_genes"].sum().sort_values(ascending=False, kind="stable")
     hosts_kept = [x for x in by_host.index if x != "unclassified"][:top]
-    if "unclassified" in by_host.index:
+    n_hosts = len(hosts_kept)  # counted before the 'unclassified' row is added (R5-11)
+    unclassified = "unclassified" in by_host.index
+    if unclassified:
         hosts_kept.append("unclassified")
     classes = h.groupby("arg_class")["arg_genes"].sum().sort_values(ascending=False, kind="stable").index
     keep_cls = list(classes[:top_classes])
@@ -726,8 +737,9 @@ def fig_arg_contig_hosts(fw, hosts, top=20, top_classes=8):
     src = mat.rename_axis("host").reset_index().melt(id_vars="host", var_name="arg_class", value_name="arg_genes")
     fw.save(fig, "arg_contig_hosts", "ARG genes on contigs by host",
             f"ARG genes (DeepARG) on assembled contigs per host genus (Metabuli, the contig's lowest rank at genus or "
-            f"above in brackets), summed over the assemblies: the {min(top, len(hosts_kept))} hosts with the most "
-            f"genes, plus contigs without a classification; colour: the {len(keep_cls)} most common ARG classes, "
+            f"above in brackets), summed over the assemblies: the {n_hosts} host{'' if n_hosts == 1 else 's'} with "
+            f"the most genes{', plus contigs without a classification' if unclassified else ''}; colour: the "
+            f"{len(keep_cls)} most common ARG classes, "
             "the rest as 'other'. Physical linkage on one contig, counted in genes, not reads.", src, "contig_args")
 
 
