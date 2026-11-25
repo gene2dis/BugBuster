@@ -171,9 +171,10 @@ feat(modules): add DIAMOND module for protein alignment
   install` and `update`, and a local change is kept as a `.diff` patch
   (`nf-core modules patch`), as for `pyrodigal` and `bakta/bakta`. `nf-core modules list
   local` lists what is installed (checked with the `nfcore/tools:3.5.1` image).
-  `nf-core modules lint` stops in that image on a prettier pre-commit error, and
-  `nf-core pipelines lint` is not used: this pipeline does not follow the nf-core
-  template, and CI runs no nf-core command. Import an nf-core module with an alias,
+  `nf-core modules lint <module>` runs but is not a CI gate: on `fastp` it reports 32
+  passed, 3 warnings and 1 failure in the upstream `meta.yml` (author citation style), and
+  prints a prettier pre-commit warning. `nf-core pipelines lint` is not used: this
+  pipeline does not follow the nf-core template, and CI runs no nf-core command. Import an nf-core module with an alias,
   `include { FASTP as NFCORE_FASTP } from '../../modules/nf-core/fastp/main'`, so a
   `withName:` selector and the trace show it is vendored; the two taxonomy modules keep
   their tool names (`KRAKEN2_KRAKEN2 as KRAKEN2`, `BRACKEN_BRACKEN as BRACKEN`)
