@@ -99,11 +99,20 @@ class TestData {
         def listFile = new File("${projectDir}/tests/data/stub_paths/${list}.txt")
         def published = publishedPaths(outputDir).collect { p -> p.toString() }
         def extra = added.collect { p -> p.toString() }
-        // rewritten only when the paths differ, so an unchanged list keeps its
-        // order (the committed lists are in the shell locale's sort order)
-        def current = (published - extra).sort()
-        if (System.getenv('BUGBUSTER_UPDATE_STUB_PATHS') == '1' && current != listFile.readLines().findAll { l -> l }.sort()) {
-            listFile.text = current.join('\n') + '\n'
+        // The update keeps the list's own order (the committed lists are in the
+        // shell locale's sort order): paths no longer published are removed and
+        // new ones inserted before the first line that collates after them, so
+        // the diff to review holds only the paths that changed
+        def current = published - extra
+        def existing = listFile.readLines().findAll { l -> l }
+        if (System.getenv('BUGBUSTER_UPDATE_STUB_PATHS') == '1' && current.toSet() != existing.toSet()) {
+            def collator = java.text.Collator.getInstance(Locale.US)
+            def kept = existing.findAll { l -> l in current }
+            (current - existing).toSorted(collator).each { p ->
+                def i = kept.findIndexOf { l -> collator.compare(l, p) > 0 }
+                kept.add(i < 0 ? kept.size() : i, p)
+            }
+            listFile.text = kept.join('\n') + '\n'
         }
         def expected = listFile.readLines().findAll { l -> l } + extra
         return [missing: (expected - published).sort(), unexpected: (published - expected).sort()]

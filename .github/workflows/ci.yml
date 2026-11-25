@@ -100,8 +100,9 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq python3-jsonschema > /dev/null
           tests/bin/test_schema_params.sh
 
-      - name: Check every tests/bin suite is run by this workflow (roadmap Phase 25, RV27)
+      - name: Check every tests/bin suite is run by this workflow, where its failure fails CI (roadmap Phase 25, RV27)
         run: |
+          sudo apt-get install -y -qq python3-yaml > /dev/null
           tests/bin/test_ci_wiring.sh
 
   nf-test:
