@@ -14,6 +14,8 @@
     Output:
         contigs_and_bam: tuple val(meta), path(contigs), path(bam)
         bam_only: tuple val(meta), path(bam)
+        empty_contig_report: path(<id>_empty_contig_report.txt) - only when
+            the contigs file is empty (an empty BAM is written instead)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */

@@ -1,16 +1,22 @@
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    TAXONOMY PROFILING SUBWORKFLOW - OPTIMIZED
+    TAXONOMY PROFILING SUBWORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Taxonomic classification at read level using Kraken2, Sourmash or Sylph
-    
-    Improvements:
-    - Unified Python-based reporting and phyloseq generation
-    - Phyloseq-compatible TSV tables for interoperability
-    - Optional R phyloseq object generation
-    - Removed R container dependencies
-    - Better parallelization and resource utilization
-    - Reduced from 6 modules to 2 core modules (+1 optional)
+    Read-level taxonomic profile with one of three profilers
+    (--taxonomic_profiler):
+        kraken2:  KRAKEN2 (nf-core kraken2/kraken2) -> BRACKEN (nf-core bracken/bracken)
+        sourmash: SOURMASH (sketch, gather, tax annotate)
+        sylph:    SYLPH_PROFILE -> SYLPH_TAXPROF (sylph-tax)
+    then TAXONOMY_REPORT (Python: Reads_report.csv with the classified
+    fraction, composition plots) and TAXONOMY_PHYLOSEQ (Python:
+    phyloseq-compatible OTU / taxonomy / read-count tables), and with
+    --create_phyloseq_rds PHYLOSEQ_CONVERTER (R: phyloseq RDS objects).
+
+    OUTPUTS (all read by main.nf):
+        reads_report:   Reads_report.csv with the classified fraction
+        tables:         <label>_{otu_table,tax_table,read_counts}.tsv
+        sylph_profiles: <sample>_sylph_<db>.tsv (sylph only)
+        versions:       Tool version information
 ----------------------------------------------------------------------------------------
 */
 

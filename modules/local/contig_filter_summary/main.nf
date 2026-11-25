@@ -6,12 +6,13 @@
     
     Generates a comprehensive summary report showing:
     - Samples where all contigs were filtered out by BBMAP
-    - Samples where empty contigs were detected by BOWTIE2_SAMTOOLS
+    - Samples where empty contigs were detected at the alignment stage
+      (BWAMEM3_SAMTOOLS, the default aligner, or BOWTIE2_SAMTOOLS)
     - Filtering statistics (contigs before/after, thresholds)
     
     Input:
         path(filter_reports) - Collection of BBMAP filter reports
-        path(empty_reports)  - Collection of BOWTIE2_SAMTOOLS empty contig reports
+        path(empty_reports)  - Collection of BWAMEM3_SAMTOOLS / BOWTIE2_SAMTOOLS empty contig reports
     
     Output:
         summary_report: path(contig_filtering_summary.txt)
@@ -81,7 +82,7 @@ process CONTIG_FILTER_SUMMARY {
     echo "" >> contig_filtering_summary.txt
     echo "" >> contig_filtering_summary.txt
     
-    # Section 2: Samples with Empty Contigs (caught by BOWTIE2_SAMTOOLS)
+    # Section 2: Samples with Empty Contigs (caught by BWAMEM3_SAMTOOLS or BOWTIE2_SAMTOOLS)
     echo "## Samples with Empty Contigs Detected at Alignment Stage" >> contig_filtering_summary.txt
     echo "" >> contig_filtering_summary.txt
     

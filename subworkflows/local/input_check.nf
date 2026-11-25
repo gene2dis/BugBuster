@@ -41,7 +41,7 @@ def validate_input(row) {
         error "Invalid samplesheet: 'r1' column is empty for sample: ${row.sample}"
     }
     if (!row.r2) {
-        error "Invalid samplesheet: 'r2' column is empty for sample: ${row.sample}"
+        error "Invalid samplesheet: 'r2' column is empty for sample: ${row.sample}. The pipeline needs paired-end reads (r1 and r2); the s column is only for singletons of a paired library"
     }
 
     // Create meta map
@@ -170,11 +170,32 @@ def unsafeIdReason(id) {
 }
 
 /**
+ * Check the samplesheet's header at launch: the sample, r1 and r2 columns must
+ * be there. Without this, a header such as sample_id,R1,R2 failed row by row
+ * with "'sample' column is empty", which names the symptom, not the header
+ * (review R3-08). An empty file is left to the "contains no samples" error
+ * @param samplesheet Path to samplesheet CSV
+ */
+def check_samplesheet_header(samplesheet) {
+    def lines = file(samplesheet).splitCsv(sep: ',', strip: true)
+    if (!lines) {
+        return
+    }
+    def header = lines[0].collect { c -> c.toString().trim() }
+    header[0] = header[0].replaceFirst(/^\uFEFF/, '').trim()
+    def missing = ['sample', 'r1', 'r2'].findAll { c -> !(c in header) }
+    if (missing) {
+        error "Invalid samplesheet header in ${samplesheet}: no ${missing.join(', ')} column${missing.size() > 1 ? 's' : ''} (header: ${header.join(',')}). The header must be sample,r1,r2,s (lower case): paired-end reads in r1 and r2, and an optional singleton FASTQ of the same library in s"
+    }
+}
+
+/**
  * Check the samplesheet's sample IDs at launch: no duplicates, and no id
  * that unsafeIdReason() rejects. One error lists every offending id
  * @param samplesheet Path to samplesheet CSV
  */
 def check_sample_ids(samplesheet) {
+    check_samplesheet_header(samplesheet)
     def ids = get_sample_ids(samplesheet)
     def duplicates = ids.groupBy { id -> id }.findAll { entry -> entry.value.size() > 1 }.keySet()
     if (duplicates) {

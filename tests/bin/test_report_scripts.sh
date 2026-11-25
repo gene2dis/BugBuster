@@ -738,6 +738,23 @@ check_grep "arg_contig_level_report: virus contig with its taxonomy" "Contig_tax
     "^test_sample2	k141_231	.*	virus	0.0100	0.9800		Viruses;Duplodnaviria;Heunggongvirae;Uroviricota;Caudoviricetes;;		BCRA	"
 check_grep "arg_contig_level_report: contig without a geNomad call is chromosome" "Contig_tax_and_arg_prediction.tsv" \
     "^test_sample2	k141_456	.*	chromosome						"
+# An ARG gene on a provirus contig with no GFF row (review R6-07): the run
+# goes on, the gene's provirus column stays empty, and stderr names it
+ACGM_WORK="${WORK}/arg_contig_level_report_genomad_gff_missing"
+mkdir -p "${ACGM_WORK}"
+cp "${ACG_WORK}"/test_sample2_* "${ACGM_WORK}/"
+rm -f "${ACGM_WORK}/Contig_tax_and_arg_prediction.tsv"
+printf "##gff-version  3\nk141_0\tpyrodigal_v3.7.1\tCDS\t1000\t1150\t50.0\t+\t0\tID=k141_0_2;partial=00;\n" \
+    | gzip > "${ACGM_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACGM_WORK}"
+expect_pass "arg_contig_level_report: an ARG gene missing from the GFF is reported" arg_contig_level_report.py
+if grep -qF "WARNING: test_sample2: 1 ARG gene(s) on provirus contigs have no row in test_sample2.gff.gz, so their provirus overlap is left empty: k141_0_1" "${ACGM_WORK}.log"; then
+    echo "✓ arg_contig_level_report: the missing gene is named on stderr"; PASS=$((PASS + 1))
+else
+    echo "✗ arg_contig_level_report: the missing gene is named on stderr"; tail -3 "${ACGM_WORK}.log" | sed 's/^/    /'; FAIL=$((FAIL + 1))
+fi
+check_grep "arg_contig_level_report: the missing gene has no provirus" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200				ACRA	"
 ACGE_WORK="${WORK}/arg_contig_level_report_genomad_empty"
 mkdir -p "${ACGE_WORK}"
 cp "${ACR_WORK}"/test_sample2_* "${ACGE_WORK}/"

@@ -18,24 +18,29 @@
                 sample into one co-assembly, or one co-assembly per
                 --coassembly_group_by group)
     
-    OUTPUTS:
-        contigs: [meta, reads, contigs] - Filtered contigs with reads for binning
-        contigs_meta: [meta, contigs] - Filtered contigs only for annotation
-        bam: [meta, contigs, bam] - BAM files with contigs for depth analysis
-        bam_meta: [meta, bam] - BAM files only for indexing
+    OUTPUTS (main.nf reads all of them except contigs):
+        contigs: [meta, reads, contigs] - Filtered contigs with the sample's
+                reads, per-sample mode only (empty under co-assembly); read
+                only by tests/subworkflows/assembly.nf.test
+        contigs_meta: [meta, contigs] - Filtered contigs (contig stages,
+                multi-sample coverage)
+        bam: [meta, contigs, bam] - Contigs with their BAM (BINNING's input)
+        bam_meta: [meta, bam] - BAM files only (indexing, BlobTools)
         counting_bam: [meta, bam] - One BAM per sample, for gene quantification
                 and co-assembly binning depths (assembly: the same BAM as
                 bam_meta; coassembly: each sample against its co-assembly, whose
                 samtools merge is bam/bam_meta - issue #28; meta.group names
                 the co-assembly)
+        stats: <id>_contig.stats - BBMap statistics of the MEGAHIT contigs
+        filter_summary: contig_filtering_summary.txt
         empty_assemblies: one TSV line per assembly with no contig left
                 after BBMAP's length filter; such an assembly is in none of
                 the outputs above (roadmap Phase 21, RV10)
+        versions: Tool version information
 
     CO-ASSEMBLY META:
         [id: 'coassembly' (or the group's label), coassembly: true,
          samples: [its sample ids, sorted]]
-        versions: Tool version information
     
     MODES:
         assembly: Per-sample assembly (default)
@@ -313,7 +318,7 @@ workflow ASSEMBLY {
     }
 
     emit:
-    contigs         = ch_contigs_with_reads  // channel: [ val(meta), path(reads), path(contigs) ] - for binning
+    contigs         = ch_contigs_with_reads  // channel: [ val(meta), path(reads), path(contigs) ] - per-sample mode only; not read by main.nf
     contigs_meta    = ch_contigs_only        // channel: [ val(meta), path(contigs) ] - for annotation
     bam             = ch_bam_with_contigs    // channel: [ val(meta), path(contigs), path(bam) ] - for depth analysis
     bam_meta        = ch_bam_only            // channel: [ val(meta), path(bam) ] - for indexing

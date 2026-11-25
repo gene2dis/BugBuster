@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """
-Report Unify - Python Migration
-Consolidates QC reports from fastp and bowtie2 filtering steps.
+Report Unify
+Consolidates the QC reports of fastp and the host-removal step (the
+decontamination aligner, bwa-mem3 by default or Bowtie2 with --read_aligner
+bowtie2; the variables are still named bowtie_* from the Bowtie2-only days).
 Generates CSV summary and high-quality scientific boxplot visualization.
 
-Python port of Report_unify.R
-Migrated to Python for QC subworkflow simplification.
+Python port of Report_unify.R.
 """
 
 import sys

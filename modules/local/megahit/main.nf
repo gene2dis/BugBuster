@@ -113,8 +113,9 @@ process MEGAHIT {
         # Move final contigs
         mv ${prefix}_assembly/final.contigs.fa ${prefix}_contigs.fa
         
-        # CLEANUP: Remove large intermediate assembly files to free disk space
-        # Keep only final contigs and essential log files
+        # CLEANUP: remove MEGAHIT's large intermediate files from the task
+        # directory to free disk space (only ${prefix}_contigs.fa is an output;
+        # nothing else in ${prefix}_assembly/ is kept or published)
         rm -rf ${prefix}_assembly/intermediate_contigs/ 2>/dev/null || true
         rm -rf ${prefix}_assembly/kmer_k*/ 2>/dev/null || true
         rm -f ${prefix}_assembly/*.tmp 2>/dev/null || true
@@ -163,8 +164,9 @@ process MEGAHIT {
         # Move final contigs
         mv ${prefix}_assembly/final.contigs.fa ${prefix}_contigs.fa
         
-        # CLEANUP: Remove large intermediate assembly files to free disk space
-        # Keep only final contigs and essential log files
+        # CLEANUP: remove MEGAHIT's large intermediate files from the task
+        # directory to free disk space (only ${prefix}_contigs.fa is an output;
+        # nothing else in ${prefix}_assembly/ is kept or published)
         rm -rf ${prefix}_assembly/intermediate_contigs/ 2>/dev/null || true
         rm -rf ${prefix}_assembly/kmer_k*/ 2>/dev/null || true
         rm -f ${prefix}_assembly/*.tmp 2>/dev/null || true

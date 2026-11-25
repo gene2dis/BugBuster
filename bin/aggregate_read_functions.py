@@ -37,14 +37,18 @@ through as-is (fraction_mode 'composer').
 
 Outputs (TSV with header, deterministic ordering):
   - read_function_abundance.tsv      Section 5.3 schema, source=reads,
-                                     backend=woltka; abundance_native = Woltka
-                                     read count (mates counted separately;
-                                     fractional under the default 1/k
-                                     multi-hit division), native_unit=reads;
+                                     backend=<the run's backend>;
+                                     abundance_native = the backend's native
+                                     value: Woltka read count (mates counted
+                                     separately; fractional under the default
+                                     1/k multi-hit division, native_unit=reads),
+                                     SUPER-FOCUS read count (native_unit=reads),
+                                     HUMAnN RPK (native_unit=rpk);
                                      abundance_cpge = RPK / genome equivalents
-                                     (Section 6.2, blank without AGS);
+                                     (Section 6.2; woltka and humann, blank
+                                     without AGS; always blank for superfocus);
                                      abundance_tpm blank (contig branch only)
-  - read_function_wide_<ont>_native.tsv  wide read-count matrix per ontology
+  - read_function_wide_<ont>_native.tsv  wide matrix of the native value per ontology
   - read_function_wide_<ont>_cpge.tsv    wide CPGE matrix (blank columns for
                                          samples without AGS; CPGE backends only)
   - read_annotated_fraction.tsv      per sample: 'any' + per-ontology share of
@@ -330,7 +334,7 @@ def main():
     # --- Wide matrices per ontology (every sample a column; missing -> 0 for
     #     read counts, blank CPGE columns for AGS-less samples). Every file of
     #     the backend's set is always written, header-only when an ontology has
-    #     no rows (woltka: 10; superfocus: 3, no CPGE) ---
+    #     no rows (woltka: 10; superfocus: 3, no CPGE; humann: 6) ---
     for ontology in ontologies:
         subset = long[long['ontology'] == ontology]
         native = subset.pivot_table(index='accession', columns='sample_id',

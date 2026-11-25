@@ -278,9 +278,15 @@ def main():
             coords = gene_coordinates(sample)
             rows = all_data.index[(all_data['Sample'] == sample) & all_data['read_id'].notna()
                                   & all_data['contig_name'].isin(list(proviruses))]
+            missing = []
             for i in rows:
                 gene = coords.get(all_data.at[i, 'read_id'])
                 if gene is None:
+                    # an ARG gene on a provirus contig without a GFF row: its
+                    # provirus overlap is unknown and left empty. Pyrodigal's
+                    # GFF ID is the same <contig>_<n> as DeepARG's gene id, so
+                    # this is not expected (review R6-07)
+                    missing.append(str(all_data.at[i, 'read_id']))
                     continue
                 hits = [(a, b, tax) for a, b, tax in proviruses[all_data.at[i, 'contig_name']]
                         if gene[0] <= b and gene[1] >= a]
@@ -290,6 +296,10 @@ def main():
                     current = all_data.at[i, 'virus_taxonomy']
                     if pd.isna(current) or current == '':
                         all_data.at[i, 'virus_taxonomy'] = ' | '.join(tax for _, _, tax in hits)
+            if missing:
+                print(f"WARNING: {sample}: {len(missing)} ARG gene(s) on provirus contigs have no row in "
+                      f"{sample}.gff.gz, so their provirus overlap is left empty: {', '.join(sorted(set(missing)))}",
+                      file=sys.stderr)
 
     # CheckV: a virus contig's own row, or the rows of the provirus regions an
     # ARG gene overlaps (';'-joined in the order of the provirus column)

@@ -1,0 +1,131 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    cloudWorkdirError(): the cloud profiles' work-directory launch check
+    (roadmap Phase 26, RV30)
+
+    A cloud Path's toString() has no scheme (s3://my-bucket/work gives
+    /my-bucket/work), so the check read with toString() rejected every
+    -work-dir s3:// / gs:// and accepted only the --*_workdir parameter. The
+    gs:// and s3:// cases use real cloud Paths (file() loads the nf-google /
+    nf-amazon plugin; no credentials are needed to build the path). An az://
+    Path needs AZURE_STORAGE_ACCOUNT_NAME to be built, so the azure case is
+    checked with its parameter and a local work directory only. A launch test
+    cannot show the gs:// case either: with -work-dir accepted the preview
+    stops later on the missing cloud credentials, and nf-test sets its own -w.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_function {
+
+    name "Cloud profile work directory check"
+    script "subworkflows/local/utils_params.nf"
+    function "cloudWorkdirError"
+
+    test("-profile gcp accepts -work-dir gs://") {
+        when {
+            function {
+                """
+                input[0] = 'gcp,docker'
+                input[1] = file('gs://my-bucket/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("-profile aws accepts -work-dir s3://") {
+        when {
+            function {
+                """
+                input[0] = 'aws'
+                input[1] = file('s3://my-bucket/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("-profile aws rejects a local work directory and names both ways to set one") {
+        when {
+            function {
+                """
+                input[0] = 'docker,aws'
+                input[1] = file('/tmp/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "-profile aws requires an object-storage work directory: pass --aws_workdir s3://my-bucket/work (or -work-dir s3://my-bucket/work)"
+        }
+    }
+
+    test("-profile gcp rejects an s3:// work directory") {
+        when {
+            function {
+                """
+                input[0] = 'gcp'
+                input[1] = file('s3://my-bucket/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.startsWith("-profile gcp requires an object-storage work directory: pass --gcp_workdir gs://")
+        }
+    }
+
+    test("-profile azure accepts --azure_workdir with a local work directory") {
+        when {
+            params {
+                azure_workdir = 'az://my-container/work'
+            }
+            function {
+                """
+                input[0] = 'azure'
+                input[1] = file('/tmp/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("-profile azure without --azure_workdir rejects a local work directory") {
+        when {
+            function {
+                """
+                input[0] = 'azure'
+                input[1] = file('/tmp/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result.startsWith("-profile azure requires an object-storage work directory: pass --azure_workdir az://")
+        }
+    }
+
+    test("No cloud profile: any work directory") {
+        when {
+            function {
+                """
+                input[0] = 'docker'
+                input[1] = file('/tmp/work')
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+}

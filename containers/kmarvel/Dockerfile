@@ -17,8 +17,9 @@
 # .tar.bz2).
 #
 # The CARD reference is not baked in: FORMAT_KMARVEL_DB builds it in this
-# image (bin/kmarvel_db_reformat.sh) and the KMARVEL module indexes it per
-# task.
+# image (bin/kmarvel_db_reformat.sh) together with its BLAST index, once per
+# database; the KMARVEL module links that index, and builds one per task only
+# for a --custom_kmarvel_db that has none.
 #
 # Built and pushed to ghcr.io/gene2dis/bugbuster-kmarvel by
 # .github/workflows/kmarvel-image.yml.
@@ -64,8 +65,8 @@ RUN apt-get update -qq \
     && apt-get install -y --no-install-recommends bzip2 ca-certificates curl libgomp1 procps wget \
     && rm -rf /var/lib/apt/lists/*
 
-# BLAST+: blastp (called by kmarvel) and makeblastdb (the KMARVEL module
-# indexes the CARD FASTA per task)
+# BLAST+: blastp (called by kmarvel) and makeblastdb (FORMAT_KMARVEL_DB
+# indexes the CARD FASTA; KMARVEL only for a custom database without an index)
 RUN curl -fsSL -o /tmp/blast.tar.gz \
         "https://ftp.ncbi.nlm.nih.gov/blast/executables/blast+/${BLAST_VERSION}/ncbi-blast-${BLAST_VERSION}+-x64-linux.tar.gz" \
     && echo "${BLAST_MD5}  /tmp/blast.tar.gz" | md5sum -c - \

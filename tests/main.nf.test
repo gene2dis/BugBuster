@@ -1130,6 +1130,61 @@ nextflow_pipeline {
         }
     }
 
+    test("Warns that the bwa-mem3 index build needs ~75 GB under a lower --max_memory") {
+        // Review R3-06 (roadmap Phase 26, RV30): the warning stays when the
+        // index is not yet in databases_dir (the next test stores it)
+        options "-preview"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                databases_dir      = "${outputDir}/store"
+                quality_control    = true
+                nonpareil          = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert path("${outputDir}/../meta/nextflow.log").text.contains("decontamination index with ~75 GB RAM")
+        }
+    }
+
+    test("No bwa-mem3 memory warning when the index is already stored in databases_dir") {
+        // Review R3-06: a stored index is reused, nothing is built. The path
+        // is BWAMEM3_BUILD_COMBINED's storeDir (config/modules.config) plus
+        // its output; -preview is not a stub run, so no stub/ level
+        options "-preview"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                databases_dir = {
+                    def store = new File("${outputDir}", "store")
+                    new File(store, "bwamem3_index/phiX174_human/contaminants_index").mkdirs()
+                    store.absolutePath
+                }()
+                quality_control    = true
+                nonpareil          = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert !path("${outputDir}/../meta/nextflow.log").text.contains("decontamination index with ~75 GB RAM")
+        }
+    }
+
     test("Stub run rebuilds a K-MARVEL store filled before it held the BLAST index") {
         // A store from before roadmap S2 (kmarvel/<key>/, no BLAST index) is
         // not reused: FORMAT_KMARVEL_DB runs again into <key>_blastdb
@@ -1365,6 +1420,52 @@ nextflow_pipeline {
             assert workflow.failed
             assert workflow.stdout.any { line -> line.contains("contains no samples") } ||
                    workflow.stderr.any { line -> line.contains("contains no samples") }
+        }
+    }
+
+    test("Rejects a samplesheet header without a sample column, naming the expected header") {
+        tag "samplesheet_validation"
+        // Review R3-08 (roadmap Phase 26, RV30): sample_id instead of sample
+        // failed row by row with "'sample' column is empty"
+        options "-preview"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['test_sample1'], "sample_id,r1,r2,s")
+                output = "${outputDir}"
+                quality_control    = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("Invalid samplesheet header")
+            assert console_out.contains("no sample column (header: sample_id,r1,r2,s)")
+            assert console_out.contains("The header must be sample,r1,r2,s")
+            assert !console_out.contains("column is empty")
+        }
+    }
+
+    test("Rejects a single-end samplesheet header, saying paired-end reads are required") {
+        tag "samplesheet_validation"
+        options "-preview"
+        when {
+            params {
+                input  = TestData.samplesheetWithIds(outputDir, projectDir, ['test_sample1'], "sample,r1,s")
+                output = "${outputDir}"
+                quality_control    = false
+                assembly_mode      = "none"
+                taxonomic_profiler = "none"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("no r2 column (header: sample,r1,s)")
+            assert console_out.contains("paired-end reads in r1 and r2")
         }
     }
 
@@ -2316,6 +2417,34 @@ nextflow_pipeline {
             assert !workflow.trace.tasks().any { task -> task.name.contains("RGI_LOAD_WILDCARD") }
             // log.warn reaches only the Nextflow log, not the captured console
             assert path("${outputDir}/../meta/nextflow.log").text.contains("--custom_rgi_wildcard is ignored without --custom_rgi_card_db")
+        }
+    }
+
+    test("Rejects a file for --custom_rgi_wildcard (a decompressed directory is required)") {
+        // Review R1-05 (roadmap Phase 26, RV30): the schema format is
+        // directory-path, so a downloaded archive (or any file) stops at
+        // parameter validation; the test above passes the fixture directory
+        options "-preview"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = false
+                assembly_mode       = "none"
+                taxonomic_profiler  = "none"
+                rgi_prediction      = true
+                custom_rgi_card_db  = "${projectDir}/tests/data/rgi"
+                custom_rgi_wildcard = "${projectDir}/tests/data/rgi/wildcard_mini/wildcard/index-for-model-sequences.txt"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("--custom_rgi_wildcard")
+            assert console_out.contains("is not a directory, but a file")
+            assert workflow.trace.tasks().size() == 0
         }
     }
 

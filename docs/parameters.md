@@ -1190,8 +1190,8 @@ available CPUs` (or `memory`); see manual §11.1. `-profile test` sets 2 CPUs / 
 
 ### `--version`
 - **Type**: Boolean
-- **Default**: `false`
-- **Description**: Display version and exit
+- **Default**: not set (off)
+- **Description**: Display version and exit (`--version false` does not)
 - **Example**: `--version`
 
 > **Note**: Parameters are validated against `nextflow_schema.json` at startup. Any parameter not declared by the pipeline — including misspelled or removed ones — aborts the run with an "unrecognised parameter" error.
@@ -1200,7 +1200,7 @@ available CPUs` (or `memory`); see manual §11.1. `-profile test` sets 2 CPUs / 
 
 ## Cloud & HPC Profile Parameters
 
-These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage, given with its `--*_workdir` parameter (`--aws_workdir s3://my-bucket/work`, `--gcp_workdir gs://…`, `--azure_workdir az://…`); without it the pipeline exits at launch with an error. Give the parameter even when you also pass Nextflow's `-work-dir`: the launch check does not yet recognise a cloud `-work-dir` on its own.
+These parameters are read by the execution profiles in `conf/` (`-profile aws`, `gcp`, `azure`, `slurm`) and are ignored elsewhere. The chosen cloud profile needs a work directory in its cloud storage, given with its `--*_workdir` parameter (`--aws_workdir s3://my-bucket/work`, `--gcp_workdir gs://…`, `--azure_workdir az://…`) or with Nextflow's `-work-dir` (`-work-dir s3://my-bucket/work`); without either the pipeline exits at launch with an error.
 
 ### AWS Batch (`-profile aws`)
 

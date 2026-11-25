@@ -6,14 +6,14 @@
     
     Processes all bins from all samples in a single GTDB-Tk run for improved performance.
     Database is loaded once instead of N times (N = number of samples).
-    Removes maxForks limitation for better parallelization.
     
     Input:
         tuple val(meta_list), path(all_bins, stageAs: 'bin_?/*'), path(gtdbtk_db)
     
     Output:
-        gtdb_tk: tuple val(meta_list), path(gtdbtk_files) - per sample
-        report: tuple val(meta_list), path(gtdbtk_files) - per sample
+        gtdb_tk, report: tuple val(meta_list), path(*_gtdbtk_*) - the same
+            files under two names: one <sample>_gtdbtk_{bac120,ar53} summary
+            per sample of the batch (split by bin/gtdbtk_split.py)
         versions: path(versions.yml)
 ----------------------------------------------------------------------------------------
 */

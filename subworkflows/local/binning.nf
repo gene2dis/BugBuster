@@ -20,9 +20,11 @@
                 column per sample of the group (MULTISAMPLE_COVERAGE, per-sample
                 mode with --multisample_binning; empty otherwise)
     
-    OUTPUTS:
+    OUTPUTS (all read by main.nf):
         refined_bins: [meta, bins] - Binette-refined bins (the binner's bins with one binner)
         gtdbtk: [meta, reports] - The sample's GTDB-Tk bac120/ar53 summaries
+        refined_quality: [meta, reports] - CheckM2 report(s) of the refined bins
+        bin_depth: <sample>_bin_depth.tsv - MAG depth per sample and assembly (BIN_DEPTH)
         versions: Tool version information
     
     WORKFLOW:
