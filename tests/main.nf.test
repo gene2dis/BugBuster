@@ -1132,7 +1132,7 @@ nextflow_pipeline {
 
     test("Warns that the bwa-mem3 index build needs ~75 GB under a lower --max_memory") {
         // Review R3-06 (roadmap Phase 26, RV30): the warning stays when the
-        // index is not yet in databases_dir (the next test stores it)
+        // index is not yet in databases_dir
         options "-preview"
 
         when {
@@ -1155,8 +1155,9 @@ nextflow_pipeline {
         }
     }
 
-    test("No bwa-mem3 memory warning when the index is already stored in databases_dir") {
-        // Review R3-06: a stored index is reused, nothing is built. The path
+    test("Only the bwa-mem3 mapping memory warning when the index is already stored in databases_dir") {
+        // Review R3-06: a stored index is reused, nothing is built, but
+        // mapping against it still needs ~17 GB. The path
         // is BWAMEM3_BUILD_COMBINED's storeDir (config/modules.config) plus
         // its output; -preview is not a stub run, so no stub/ level
         options "-preview"
@@ -1181,7 +1182,9 @@ nextflow_pipeline {
 
         then {
             assert workflow.success
-            assert !path("${outputDir}/../meta/nextflow.log").text.contains("decontamination index with ~75 GB RAM")
+            def log_text = path("${outputDir}/../meta/nextflow.log").text
+            assert !log_text.contains("decontamination index with ~75 GB RAM")
+            assert log_text.contains("decontamination index with up to ~17 GB RAM per task")
         }
     }
 

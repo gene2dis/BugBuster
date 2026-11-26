@@ -761,7 +761,7 @@ Examples:
         nargs='+',
         type=Path,
         help='Input files: kraken-style Bracken reports for kraken2, gather CSVs (with lineages) for sourmash, '
-             'the sylph-tax <id>_sylph_<db>.sylphmpa profiles plus the SYLPH_PROFILE <id>_report.tsv files for sylph'
+             'the sylph-tax <id>_sylph_<db>.sylphmpa profiles plus the SYLPH_PROFILE <id>_sylph_<db>_report.tsv files for sylph'
     )
     
     parser.add_argument(

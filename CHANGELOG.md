@@ -1575,7 +1575,9 @@ bold label names the full entry below (search for it).
     of "'sample' column is empty" for each row. An empty `r2` cell says that
     paired-end reads are required.
   - The bwa-mem3 memory warning (index build needs ~75 GB) is no longer shown
-    when the index is already stored in `--databases_dir`.
+    when the index is already stored in `--databases_dir`. With a stored index
+    and a `--max_memory` below 17 GB, a warning says that mapping against it
+    needs up to ~17 GB per task.
   - `--coassembly_group_by` / `--multisample_group_by` naming the sample id
     column of `--sample_metadata` says so ("every sample would be its own
     group") instead of "has no such column".
@@ -1587,7 +1589,12 @@ bold label names the full entry below (search for it).
   - The contig ARG report writes a warning when an ARG gene on a provirus
     contig has no row in the Pyrodigal GFF (its provirus overlap is left
     empty). It does not happen with the current gene caller; results are
-    unchanged.
+    unchanged. It also reads a Prodigal-style GFF ID (`<seqnum>_<n>`) as
+    `<contig>_<n>`, like the featureCounts and aggregation steps.
+  - `tests/bin/clean_test_artifacts.sh` removes `databases/stub/`, and no
+    longer removes, nor does `.gitignore` hide, a `null/` directory: earlier
+    releases could leave one in the launch directory when no `--output` was
+    given; delete it by hand.
 - **Small failures** (roadmap Phase 21):
   - The launch warning about databases "in the layout of an earlier release"
     matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after

@@ -144,7 +144,10 @@ def gene_coordinates(sample):
                     continue
                 gene = re.search(r'ID=([^;]+)', f[8])
                 if gene:
-                    coords[gene.group(1)] = (int(f[3]), int(f[4]))
+                    # <contig>_<n> from column 1 and the gene number, as in
+                    # gff2saf.sh and aggregate_functions.py: Pyrodigal's ID is
+                    # already that, Prodigal's is <seqnum>_<n>
+                    coords[f"{f[0]}_{gene.group(1).rsplit('_', 1)[-1]}"] = (int(f[3]), int(f[4]))
     except FileNotFoundError:
         sys.exit(f"ERROR: geNomad tables for {sample} but no Pyrodigal GFF ({path}) for the ARG gene coordinates")
     return coords
@@ -283,9 +286,9 @@ def main():
                 gene = coords.get(all_data.at[i, 'read_id'])
                 if gene is None:
                     # an ARG gene on a provirus contig without a GFF row: its
-                    # provirus overlap is unknown and left empty. Pyrodigal's
-                    # GFF ID is the same <contig>_<n> as DeepARG's gene id, so
-                    # this is not expected (review R6-07)
+                    # provirus overlap is unknown and left empty. The GFF key
+                    # is the same <contig>_<n> as DeepARG's gene id, so this
+                    # is not expected (review R6-07)
                     missing.append(str(all_data.at[i, 'read_id']))
                     continue
                 hits = [(a, b, tax) for a, b, tax in proviruses[all_data.at[i, 'contig_name']]
@@ -297,7 +300,7 @@ def main():
                     if pd.isna(current) or current == '':
                         all_data.at[i, 'virus_taxonomy'] = ' | '.join(tax for _, _, tax in hits)
             if missing:
-                print(f"WARNING: {sample}: {len(missing)} ARG gene(s) on provirus contigs have no row in "
+                print(f"WARNING: {sample}: {len(set(missing))} ARG gene(s) on provirus contigs have no row in "
                       f"{sample}.gff.gz, so their provirus overlap is left empty: {', '.join(sorted(set(missing)))}",
                       file=sys.stderr)
 

@@ -446,16 +446,22 @@ workflow {
 
     // bwa-mem3 (the default aligner) builds the human decontamination index
     // with ~57-75 GB RAM, bowtie2 with ~6 GB. Under a lower --max_memory the
-    // build stops with exit 3: say so before the downloads start, unless the
-    // index is already stored in --databases_dir, where nothing is built
-    // (review R3-06). The path is BWAMEM3_BUILD_COMBINED's storeDir in
-    // config/modules.config plus its output name (contaminants_index): keep
-    // the two in step
-    def bwamem3_store = params.databases_dir && !params.custom_phiX_fasta && !params.custom_host_fasta ?
-        file("${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}bwamem3_index/${params.phiX_index}_${params.host_db}${flagOn(params.bwamem3_dense_sa) ? '_dense' : ''}/contaminants_index") : null
-    def bwamem3_stored = bwamem3_store != null && bwamem3_store.exists()
-    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta && !bwamem3_stored && (params.max_memory as MemoryUnit) < 75.GB) {
-        log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+    // build stops with exit 3: say so before the downloads start. When the
+    // index is already stored in --databases_dir nothing is built (review
+    // R3-06), but mapping against it still peaked at ~17 GB per task
+    // (docs/benchmarks/bwamem3_vs_bowtie2.md). The path is
+    // BWAMEM3_BUILD_COMBINED's storeDir in config/modules.config plus its
+    // output name (contaminants_index): keep the two in step. Checked only
+    // when bwa-mem3 builds the index, so no other launch touches the store
+    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta) {
+        def max_memory = params.max_memory as MemoryUnit
+        def bwamem3_stored = params.databases_dir != null && !params.custom_phiX_fasta &&
+            file("${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}bwamem3_index/${params.phiX_index}_${params.host_db}${flagOn(params.bwamem3_dense_sa) ? '_dense' : ''}/contaminants_index").exists()
+        if (!bwamem3_stored && max_memory < 75.GB) {
+            log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+        } else if (bwamem3_stored && max_memory < 17.GB) {
+            log.warn "--read_aligner bwamem3 maps the reads against the stored ${params.host_db} decontamination index with up to ~17 GB RAM per task, but --max_memory is ${params.max_memory}: host removal will likely fail. Raise --max_memory or use --read_aligner bowtie2 (~4 GB to map)"
+        }
     }
 
     // A pre-built --custom_decontamination_index must match --read_aligner: a

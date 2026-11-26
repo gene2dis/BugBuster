@@ -755,6 +755,18 @@ else
 fi
 check_grep "arg_contig_level_report: the missing gene has no provirus" "Contig_tax_and_arg_prediction.tsv" \
     "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200				ACRA	"
+# A Prodigal-form GFF ID (<seqnum>_<n>, ID=1_1) gives the same gene key
+# (<contig>_<n>) as Pyrodigal's, as in gff2saf.sh and aggregate_functions.py
+ACGP_WORK="${WORK}/arg_contig_level_report_genomad_gff_prodigal"
+mkdir -p "${ACGP_WORK}"
+cp "${ACG_WORK}"/test_sample2_* "${ACGP_WORK}/"
+rm -f "${ACGP_WORK}/Contig_tax_and_arg_prediction.tsv"
+printf "##gff-version  3\nk141_0\tProdigal_v2.6.3\tCDS\t1\t397\t50.0\t+\t0\tID=1_1;partial=10;\nk141_0\tProdigal_v2.6.3\tCDS\t1000\t1150\t50.0\t+\t0\tID=1_2;partial=00;\nk141_820\tProdigal_v2.6.3\tCDS\t10\t300\t50.0\t+\t0\tID=2_1;\nk141_231\tProdigal_v2.6.3\tCDS\t10\t300\t50.0\t-\t0\tID=3_1;\n" \
+    | gzip > "${ACGP_WORK}/test_sample2.gff.gz"
+NEXT_WORKDIR="${ACGP_WORK}"
+expect_pass "arg_contig_level_report: Prodigal-form GFF IDs" arg_contig_level_report.py
+check_grep "arg_contig_level_report: Prodigal-form ID still finds the provirus overlap" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	.*	chromosome	0.0300	0.0200	200-900	Viruses;Duplodnaviria;;;;;		ACRA	"
 ACGE_WORK="${WORK}/arg_contig_level_report_genomad_empty"
 mkdir -p "${ACGE_WORK}"
 cp "${ACR_WORK}"/test_sample2_* "${ACGE_WORK}/"
