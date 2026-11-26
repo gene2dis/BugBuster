@@ -1337,7 +1337,7 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "ARG reporting tier rules (regular expressions on CARD names and gene families); copy and edit the default to change the tiers.",
+                    "description": "Pipeline-defined ARG reporting tier rules (regular expressions on CARD names and gene families, with an optional basis column per rule); copy and edit the default to change the tiers.",
                     "fa_icon": "fas fa-layer-group"
                 },
                 "summary_watchlist": {

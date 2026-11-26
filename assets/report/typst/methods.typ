@@ -8,7 +8,10 @@
   *ARG methods.* #if s.facts.at("primary", default: "") != "" [The ARG figures and matrices use #s.facts.primary.]
   #list(..s.lists.arg_methods.map(m => [*#m.term* #m.text]))
 ]
-#datatable(s, "tiers", widths: (8%, 14%, 30%, 1fr))
+#if "tier_refs" in s.facts [
+  *ARG reporting tiers.* The tiers are pipeline-defined reporting rules, not a published ranking. A tier 1 rule whose basis says "consistent with WHO BPPL 2024" covers genes that give a resistance of the WHO Bacterial Priority Pathogens List 2024#if "who2024bppl" in s.facts.tier_refs [ #cite(label("who2024bppl"))]; the others rest on the pipeline's judgement (resistance to a last-resort drug, usually on mobile elements). The omics-based risk rank of Zhang et al. (Rank I-IV, from human association, mobility and pathogen hosts)#if "zhang2021" in s.facts.tier_refs [ #cite(label("zhang2021"))] is a different scheme and is not used.
+]
+#datatable(s, "tiers", widths: (7%, 12%, 22%, 1fr, 22%))
 
 #if s.lists.stage_methods.len() > 0 [
   == Stage methods

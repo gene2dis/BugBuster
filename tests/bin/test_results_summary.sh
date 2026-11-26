@@ -383,6 +383,20 @@ for gone in ("taxonomy_diversity", "taxonomy_pcoa", "group_timeline", "arg_tier1
     assert not os.path.exists(f"out/figures/{gone}.png"), gone
 PYEOF
 check "method comparison figures written" test -s out/figures/arg_method_upset.svg -a -s out/figures/arg_method_by_category.png
+check "tiers presented as pipeline-defined, with a basis per tier 1 rule and the WHO / Zhang references" py - <<'PYEOF'
+import glob, html, re
+def text(p):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open(p).read())))
+me, readme = text("out/report/methods.html"), open("out/README.md").read()
+assert "pipeline-defined reporting rules, not a published ranking" in me
+assert "consistent with WHO BPPL 2024: carbapenem-resistant Enterobacterales" in me
+assert "WHO bacterial priority pathogens list, 2024" in me and "An omics-based framework" in me
+# the two are cited before the tools: references 1 and 2
+assert re.search(r"Pathogens List 2024 \[ 1 \]", me) and re.search(r"pathogen hosts\) \[ 2 \]", me), me[:300]
+assert "| Tier | Meaning | Categories (rule notes) | Basis |" in readme and "High-concern acquired" in readme
+for p in glob.glob("out/report/*.html") + ["out/README.md", "out/LLM_GUIDE.md"]:
+    assert "clinical priority" not in open(p).read().lower(), p
+PYEOF
 documented() {
     # documented <outdir> <args...>: a run whose every emitted column is in summary_docs.TABLE_DOCS
     local out="$1"
@@ -824,6 +838,29 @@ assert tier("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;v
 assert tier("vanR gene in vanA cluster", "glycopeptide resistance gene cluster;vanR") == 2
 assert rs.gene_name("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;vanR") \
     == "vanR gene in vanO cluster"
+# genes CARD files under a tier 1 family that the rule table takes out of tier 1 (roadmap Phase 27b): the NmcA
+# regulator, the MecC-type repressor, the producers' self-resistance 16S methyltransferases and two class D
+# enzymes CARD 4.0.1 files under the IMP / VIM families; the families' own genes stay tier 1
+assert tier("NmcR", "IMI beta-lactamase", "antibiotic inactivation") == 3
+assert tier("NmcA", "IMI beta-lactamase", "antibiotic inactivation") == 1
+assert tier("MecC-type methicillin resistance repressor MecI", "methicillin resistant PBP2",
+            "antibiotic target replacement") == 3
+assert tier("mecA", "methicillin resistant PBP2", "antibiotic target replacement") == 1
+assert tier("kamB", "16S rRNA methyltransferase (A1408)") == 3
+assert tier("sgm", "16S rRNA methyltransferase (G1405)") == 3
+assert tier("armA", "16S rRNA methyltransferase (G1405)") == 1
+assert tier("OXA-1262", "IMP beta-lactamase", "antibiotic inactivation") == 2
+assert tier("OXA-1263", "VIM beta-lactamase", "antibiotic inactivation") == 2
+assert tier("IMP-1", "IMP beta-lactamase", "antibiotic inactivation") == 1
+# CARD 4.0.1 names one MCR-10 allele in lower case: it collapses with the others
+assert rs.gene_name("mcr-10.1", "MCR phosphoethanolamine transferase") == "MCR-10"
+assert rs.gene_name("MCR-10.2", "MCR phosphoethanolamine transferase") == "MCR-10"
+# every tier 1 rule of the default table says its basis
+tiers = pd.read_csv(os.path.join(sys.argv[1], "..", "assets", "arg_priority_tiers.tsv"), sep="\t", comment="#",
+                    dtype=str, keep_default_na=False)
+t1 = tiers[tiers["tier"] == "1"]
+assert len(t1) == 9 and t1["basis"].str.match(r"^(consistent with WHO BPPL 2024|pipeline judgement): ").all(), t1
+assert (tiers.loc[tiers["tier"] != "1", "basis"] == "").all()
 # heatmap rows: grouped by phylum (largest first), alphabetical within each phylum, GTDB suffixes ignored
 tax = pd.DataFrame({"Phylum": ["Bacillota", "Bacillota", "Bacillota", "Bacteroidota"],
                     "Species": ["Zeta b", "alpha_A c", "Beta d", "Aaa e"]}, index=["g1", "g2", "g3", "g4"])

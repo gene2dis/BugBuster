@@ -621,6 +621,26 @@ bold label names the full entry below (search for it).
 
 ### Changed
 
+- **ARG tiers are presented as pipeline-defined reporting tiers** (roadmap
+  Phase 27b, AR1): tier 1 is now "High-concern acquired" (was "Clinical
+  priority") in the tables' documentation, README, LLM guide, report and
+  manual. `assets/arg_priority_tiers.tsv` gains an optional `basis` column:
+  each tier 1 rule says whether it is consistent with a resistance of the WHO
+  Bacterial Priority Pathogens List 2024 (carbapenemases, VRE van ligases,
+  mecA/mecC) or rests on the pipeline's judgement (last-resort drugs: mcr,
+  tet(X3+), optrA/poxtA, cfr, 16S rRNA methyltransferases). The report's Methods
+  shows the basis per tier and cites the WHO list and Zhang et al. 2021 (an
+  omics-based risk rank the tiers do not use). The manual now lists the van
+  rule as vanA/B/D/E/L/M/N, as the table has it.
+- **Tier rule changes** (`assets/arg_priority_tiers.tsv`): genes CARD files
+  under a tier 1 family leave tier 1: the NmcA regulator NmcR and the MecC-type
+  repressor MecI (tier 3, regulator), the self-resistance 16S rRNA
+  methyltransferases kamB and sgm of aminoglycoside-producing actinomycetes
+  (tier 3, intrinsic_producer), and OXA-1262 / OXA-1263, class D enzymes CARD
+  4.0.1 files under the IMP / VIM families (tier 2, OXA_other). The gene key of
+  CARD 4.0.1's lower-case allele mcr-10.1 is now MCR-10, as for MCR-10.2-10.5
+  (was mcr). Calls of these genes change tier or gene in the ARG tables.
+
 - **ARGs-OAP joins the read-level ARG method comparison** (roadmap Phase 27b),
   through argNorm's CARD mapping of its hits (detection only):
   `arg_method_comparison` gains `detected_args_oap` (`NA_not_run` where

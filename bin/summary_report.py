@@ -17,7 +17,7 @@ import pandas as pd
 from summary_args import METHOD_LABELS
 from summary_common import CPGE_LABEL, NA_LOW_DEPTH, die, first_value, generated_date, warn
 from summary_contigs import CHECKV_COUNTS, CHECKV_TIER_ORDER
-from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
+from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_basis, tier_categories
 from summary_figures import short_count
 
 PDF_MAX_ROWS = 60
@@ -204,10 +204,12 @@ def reading_guide(ctx):
                                         "estimate. SARG names differ from CARD's, so ARGs-OAP has its own section, "
                                         "without tiers."))
     tiers = []
-    if s.get("n_tier1") is not None:
+    # the CARD methods' tiers, and those argNorm's CARD mapping gives ARGs-OAP and DeepARG hits (Phase 27b)
+    if s.get("n_tier1") is not None or {"arg_sarg_card", "arg_deeparg_card"} & set(ctx.get("tables", {})):
+        bases = tier_basis(ctx.get("arg_priority", ""))
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
-            tiers.append([f"Tier {tier}", label, meaning, "; ".join(cats)])
+            tiers.append([f"Tier {tier}", label, meaning, "; ".join(cats), "; ".join(bases.get(tier, []))])
     return units, methods, tiers
 
 
@@ -329,9 +331,14 @@ def tools_rows(batches, tool_refs):
     return rows
 
 
+# cited by the methods' tiers paragraph: the WHO Bacterial Priority Pathogens List 2024 (the basis of some tier 1
+# rules) and Zhang et al. 2021 (a different, omics-based risk rank the tiers do not use; roadmap Phase 27a/27b)
+TIER_REFERENCES = ["who2024bppl", "zhang2021"]
+
+
 def format_reference(r):
     """'Authors. Title. Journal volume, pages (year). doi:...' as plain text (the HTML list)."""
-    authors = r.get("author", "")
+    authors = r.get("author", "").replace("{", "").replace("}", "")  # {Organisation}: one corporate author
     parts = [a.strip() for a in authors.split(" and ")] if authors else []
     if len(parts) > 5 or (parts and parts[-1] == "others"):
         names = ", ".join(p for p in parts[:3] if p != "others") + " et al."
@@ -461,7 +468,7 @@ def build(ctx, assets):
         al = al[al["method"].map(lambda m: METHOD_LABELS.get(m, m)) == primary]
         t1 = ctx.get("tier1_view")
         if t1 is not None and not t1.empty:
-            ar.table("tier1", t1, "arg_long", "Tier 1 (clinical priority) calls with the other method's evidence. "
+            ar.table("tier1", t1, "arg_long", "Tier 1 (high-concern acquired) calls with the other method's evidence. "
                      "rgi_host_check: watchlist_host = RGI's k-mer pathogen-of-origin call is a watchlist pathogen; "
                      "non_watchlist_host = another species (often a related gene of a commensal); genus_level_host = "
                      "the reads only resolve a genus.", tsv="arg_long")
@@ -672,13 +679,18 @@ def build(ctx, assets):
     me.lists["inputs"] = ctx["inputs"]
     me.facts = {"arg_priority": ctx.get("arg_priority_name", ""), "primary": s.get("arg_primary", ""),
                 "n_methods": len(s.get("arg_methods", []))}
-    if tier_rows:
-        me.table("tiers", pd.DataFrame(tier_rows, columns=["Tier", "Name", "Meaning", "Categories (rule notes)"]),
-                 "tiers", f"ARG reporting tiers, from {ctx.get('arg_priority_name', '')}: rules match CARD gene names "
-                 "or families, top to bottom, first match wins.", tsv="")
     refs, tool_refs = load_references(assets)
+    # the tiers paragraph cites the WHO list and Zhang et al. before the tools table, so they are numbered first
+    # (the PDF numbers references in order of first citation)
+    cited = [k for k in TIER_REFERENCES if k in refs] if tier_rows else []
+    if tier_rows:
+        me.facts["tier_refs"] = {k: cited.index(k) + 1 for k in cited}
+        me.table("tiers", pd.DataFrame(tier_rows, columns=["Tier", "Name", "Meaning", "Categories (rule notes)",
+                                                           "Basis"]),
+                 "tiers", f"Pipeline-defined ARG reporting tiers, from {ctx.get('arg_priority_name', '')}: rules match "
+                 "CARD gene names or families, top to bottom, first match wins; the basis says why each tier 1 rule "
+                 "is there.", tsv="")
     rows = tools_rows(ctx["batches"], tool_refs)
-    cited = []
     for r in rows:
         for k in r["keys"]:
             if k in refs and k not in cited:

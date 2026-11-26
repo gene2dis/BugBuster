@@ -722,7 +722,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--arg_priority_table`
 - **Type**: String (path)
 - **Default**: `assets/arg_priority_tiers.tsv`
-- **Description**: ARG reporting tier rules: regular expressions on CARD ARO names or gene families, first match wins. Copy and edit the default to change the tiers
+- **Description**: Pipeline-defined ARG reporting tier rules (1 high-concern acquired, 2 other acquired, 3 intrinsic, efflux or regulator, 4 mutation dependent): regular expressions on CARD ARO names or gene families, first match wins. Columns `match`, `pattern`, `tier`, `category`, an optional `note` and an optional `basis` (why a tier 1 rule is there; shown in the report's Methods). The tiers also apply to the ARGs-OAP and DeepARG hits argNorm maps to CARD. Copy and edit the default to change the tiers
 - **Example**: `--arg_priority_table my_tiers.tsv`
 
 ### `--summary_watchlist`

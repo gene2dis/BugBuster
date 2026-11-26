@@ -196,7 +196,8 @@ def _collapse(aro, family):
     if aro.startswith("OXA-"):
         m = re.search(r"(OXA-\d+-like)", family)
         return m.group(1) if m else aro
-    m = re.match(r"^MCR-(\d+)", aro)
+    # case-insensitive: CARD 4.0.1 names one allele mcr-10.1 (MCR-10.2 to 10.5 upper case)
+    m = re.match(r"^MCR-(\d+)", aro, re.IGNORECASE)
     if m:
         return f"MCR-{m.group(1)}"
     m = re.match(r"^(AAC\(6'\)-Ib-cr)\d*$", aro)

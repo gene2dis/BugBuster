@@ -7,6 +7,9 @@
 <p><b>ARG methods.</b>{% if s.facts.primary %} The ARG figures and matrices use {{ s.facts.primary }}.{% endif %}</p>
 <ul>{% for a in s.lists.arg_methods %}<li><b>{{ a.term }}</b> {{ a.text }}</li>{% endfor %}</ul>
 {% endif %}
+{% if s.facts.tier_refs is defined %}
+<p><b>ARG reporting tiers.</b> The tiers are pipeline-defined reporting rules, not a published ranking. A tier 1 rule whose basis says "consistent with WHO BPPL 2024" covers genes that give a resistance of the WHO Bacterial Priority Pathogens List 2024{% if s.facts.tier_refs.who2024bppl is defined %} [<a href="#ref-{{ s.facts.tier_refs.who2024bppl }}">{{ s.facts.tier_refs.who2024bppl }}</a>]{% endif %}; the others rest on the pipeline's judgement (resistance to a last-resort drug, usually on mobile elements). The omics-based risk rank of Zhang et al. (Rank I-IV, from human association, mobility and pathogen hosts){% if s.facts.tier_refs.zhang2021 is defined %} [<a href="#ref-{{ s.facts.tier_refs.zhang2021 }}">{{ s.facts.tier_refs.zhang2021 }}</a>]{% endif %} is a different scheme and is not used.</p>
+{% endif %}
 {{ m.table(s, "tiers") }}
 {% if s.lists.stage_methods %}
 <h2>Stage methods</h2>

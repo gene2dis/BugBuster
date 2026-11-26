@@ -471,6 +471,13 @@ wang2024:
   number: "1"
   pages: "585"
   doi: "10.1038/s41467-023-44290-z"
+who2024bppl:
+  type: "book"
+  author: "{World Health Organization}"
+  title: "WHO bacterial priority pathogens list, 2024: bacterial pathogens of public health importance to guide research, development and strategies to prevent and control antimicrobial resistance"
+  publisher: "World Health Organization"
+  year: 2024
+  url: "https://www.who.int/publications/i/item/9789240093461"
 wood2019:
   type: "article"
   author: "Wood, Derrick E and Lu, Jennifer and Langmead, Ben"
@@ -490,6 +497,16 @@ yin2023:
   volume: "27"
   pages: "234--241"
   doi: "10.1016/j.eng.2022.10.011"
+zhang2021:
+  type: "article"
+  author: "Zhang, An-Ni and Gaston, Jeffry M and Dai, Chengzhen L and Zhao, Shijie and Poyet, Mathilde and Groussin, Mathieu and Yin, Xiaole and Li, Li-Guan and van Loosdrecht, Mark C M and Topp, Edward and Gillings, Michael R and Hanage, William P and Tiedje, James M and Moniz, Katya and Alm, Eric J and Zhang, Tong"
+  title: "An omics-based framework for assessing the health risk of antimicrobial resistance genes"
+  journal: "Nature Communications"
+  year: 2021
+  volume: "12"
+  number: "1"
+  pages: "4765"
+  doi: "10.1038/s41467-021-25096-3"
 zheng2023:
   type: "article"
   author: "Zheng, Jinfang and Ge, Qiwei and Yan, Yuchen and Zhang, Xinpeng and Huang, Le and Yin, Yanbin"

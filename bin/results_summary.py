@@ -50,8 +50,9 @@ RPKM = RPM / (reference gene length in kb), the length being the CARD reference
 protein x 3. Samples below --min-clean-pairs are flagged (never dropped): an ARG or
 taxon not found there is reported as NA_low_depth, not as absent.
 
-ARGs are assigned a reporting tier from a user-editable rule table (assets/arg_priority_tiers.tsv):
-1 clinical priority, 2 other acquired, 3 intrinsic/efflux/regulator, 4 mutation dependent.
+ARGs are assigned a pipeline-defined reporting tier from a user-editable rule table
+(assets/arg_priority_tiers.tsv; its basis column says why each tier 1 rule is there):
+1 high-concern acquired, 2 other acquired, 3 intrinsic/efflux/regulator, 4 mutation dependent.
 Tier 4 calls are checked against CARD snps.txt (from --kmarvel-db): K-MARVEL's
 mutation_data lists every difference from the reference, so a variant-model hit is a
 resistance call only when a known resistance mutation is among them.
