@@ -155,7 +155,9 @@ nextflow_process {
                     file("${projectDir}/tests/data/kmarvel/sampleA_kmarvel.tsv", checkIfExists: true),
                     file("${projectDir}/tests/data/kmarvel/sampleB_kmarvel.tsv", checkIfExists: true)
                 ]
-                input[5]  = []
+                // the hand-written CARD metadata of tests/data/summary/argnorm (as the K-MARVEL database
+                // gives it) for argNorm's DeepARG mapping
+                input[5]  = [file("\${fix}/argnorm/card", checkIfExists: true)]
                 input[6]  = []
                 input[7]  = []
                 input[8]  = []
@@ -164,7 +166,10 @@ nextflow_process {
                 input[11] = file("${projectDir}/assets/arg_priority_tiers.tsv", checkIfExists: true)
                 input[12] = file("${projectDir}/assets/summary_watchlist.tsv", checkIfExists: true)
                 input[13] = [file("${projectDir}/assets/report", checkIfExists: true), "nf-test"]
-                input[14] = files("\${fix}/stages/assembly/**", type: 'file').sort { f -> f.name }
+                // plus ARGNORM_DEEPARG's tables, staged by name into deeparg/<assembly>/ (roadmap Phase 27b)
+                def staged = files("\${fix}/stages/assembly/**", type: 'file') +
+                    files("\${fix}/argnorm/deeparg/*.deeparg.argnorm.tsv")
+                input[14] = staged.sort { f -> f.name }
                 """
             }
         }
@@ -176,8 +181,14 @@ nextflow_process {
                 "assembly_stats.tsv", "assembly_read_use.tsv", "mags.tsv", "mag_abundance.tsv",
                 "arg_contig_long.tsv", "arg_contig_hosts.tsv", "arg_contig_abundance.tsv", "arg_mag_long.tsv",
                 "arg_cluster_sharing.tsv", "function_contig_long.tsv", "function_contig_ko.tsv",
-                "function_contig_cazy_dbcan.tsv", "arg_gene_rpkg.tsv"
+                "function_contig_cazy_dbcan.tsv", "arg_gene_rpkg.tsv", "arg_deeparg_card.tsv"
             ])
+            // argNorm's DeepARG mapping with the CARD tier and the contig's bin
+            def dc = tables["arg_deeparg_card.tsv"]
+            def dh = dc[0].split("\t") as List
+            def lnu = dc.find { line -> line.split("\t")[dh.indexOf("gene_id")] == "k141_38188_192" }.split("\t")
+            assert lnu[dh.indexOf("gene")] == "lnuA" && lnu[dh.indexOf("tier")] == "2"
+            assert lnu[dh.indexOf("bin")] == "binette_bin2"
             // the MIMAG tier needs Bakta, laid out under 07_functional_annotation/mags/<sample>/
             def mags = tables["mags.tsv"]
             def mh = mags[0].split("\t") as List

@@ -190,9 +190,19 @@ def reading_guide(ctx):
                         "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point "
                         "to a commensal may be a related gene, not the clinical one."))
     if ctx.get("sarg"):
-        methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads weighted "
-                                    "by the share of the reference they cover) by its own cell estimate. SARG names "
-                                    "differ from CARD's, so ARGs-OAP has its own section, without tiers."))
+        if "arg_sarg_card" in ctx["tables"]:
+            methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads "
+                                        "weighted by the share of the reference they cover) by its own cell "
+                                        "estimate. argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
+                                        "the hits a CARD gene and tier (arg_sarg_card) and puts ARGs-OAP in the "
+                                        "method comparison by detection (at least "
+                                        f"{ctx.get('args_oap_min_hits', 3)} hits with a Perfect, Strict or Manual "
+                                        "mapping; Loose mappings never count)."))
+        else:
+            methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads "
+                                        "weighted by the share of the reference they cover) by its own cell "
+                                        "estimate. SARG names differ from CARD's, so ARGs-OAP has its own section, "
+                                        "without tiers."))
     tiers = []
     if s.get("n_tier1") is not None:
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
@@ -475,13 +485,16 @@ def build(ctx, assets):
     if comp is not None:
         co = Section("compare", nums, records)
         co.facts = {"rgi_cov": f"{ctx['rgi_min_coverage']:g}",
-                    "methods": " + ".join(METHOD_LABELS.get(m, m) for m in comp["methods"])}
+                    "methods": " + ".join(METHOD_LABELS.get(m, m) for m in comp["methods"]),
+                    # ARGs-OAP through argNorm's CARD mapping (roadmap Phase 27b)
+                    "args_oap": "args_oap" in comp["methods"], "min_hits": ctx.get("args_oap_min_hits", 3)}
         co.fig("arg_method_upset")
         co.fig("arg_method_by_category")
         co.table("overlap", comp["overlap"], "arg_method_overlap", "Distinct genes by the methods that found them.")
         co.table("comparison", comp["comp"], "arg_method_comparison", "Every gene per sample and method.",
                  html_rows=2000, pdf_columns=[c for c in ("sample", "gene", "tier", "category", "detected_by",
-                                                          "kmarvel_read_pairs", "rgi_read_pairs", "rgi_gene_coverage")
+                                                          "kmarvel_read_pairs", "rgi_read_pairs", "rgi_gene_coverage",
+                                                          "args_oap_read_hits")
                                               if c in comp["comp"].columns])
         secs.append(co)
 
@@ -494,6 +507,18 @@ def build(ctx, assets):
         if "arg_sarg_type_cpc" in t:
             sg.table("types", t["arg_sarg_type_cpc"][0], "arg_sarg_type_cpc", "Copies per cell by SARG type.",
                      index=True)
+        if "arg_sarg_card" in t:
+            # argNorm's CARD mapping of the hits (roadmap Phase 27b): the CARD genes ARGs-OAP detects
+            sc = t["arg_sarg_card"][0]
+            det = sc[sc["in_comparison"].astype(str) == "True"]
+            t1 = det[det["tier"].astype(str) == "1"]
+            sg.facts.update({"card": True, "n_card_genes": int(det["gene"].nunique()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower)),
+                             "min_hits": ctx.get("args_oap_min_hits", 3),
+                             "n_loose": int((sc["cut_off"] == "Loose").sum())})
+            sg.table("card", det, "arg_sarg_card", "SARG subtypes and the CARD genes their hits map to (argNorm), "
+                     "for the sample x gene pairs ARGs-OAP detects.", html_rows=1000,
+                     pdf_columns=["sample", "sarg_subtype", "gene", "tier", "category", "cut_off", "read_hits"])
         secs.append(sg)
 
     if ctx.get("functional"):
@@ -596,6 +621,16 @@ def build(ctx, assets):
                 ca.facts["checkv_partial"] = bool(pd.to_numeric(mob[CHECKV_COUNTS[0]], errors="coerce").isna().any())
             ca.table("mobile", t["arg_contig_mobile"][0], "arg_contig_mobile", "ARG genes on plasmids, viruses and "
                      "proviruses (geNomad) per assembly and ARG class.")
+        if "arg_deeparg_card" in t:
+            # argNorm's CARD mapping of the DeepARG hits (roadmap Phase 27b)
+            dc = t["arg_deeparg_card"][0]
+            t1 = dc[dc["tier"].astype(str) == "1"]
+            ca.facts.update({"card": True, "n_card_mapped": int((dc["cut_off"] != "Loose").sum()),
+                             "n_card_loose": int((dc["cut_off"] == "Loose").sum()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower))})
+            ca.table("card", dc, "arg_deeparg_card", "DeepARG hits with the CARD gene and tier of argNorm's mapping.",
+                     html_rows=1000, pdf_columns=["assembly", "contig", "arg_gene", "gene", "tier", "category",
+                                                  "cut_off", "bin"])
         if cl is not None:
             ca.table("long", cl, "arg_contig_long", "Every ARG gene on a contig, with the contig's taxon, bin and "
                      "geNomad class.", html_rows=1000,

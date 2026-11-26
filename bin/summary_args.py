@@ -549,7 +549,16 @@ def arg_tables(arg, samples, order, status, group_by, order_by):
     return out
 
 
-METHOD_LABELS = {"kmarvel": "K-MARVEL", "rgi": "RGI"}
+METHOD_LABELS = {"kmarvel": "K-MARVEL", "rgi": "RGI", "args_oap": "ARGs-OAP"}
+# ARGs-OAP (SARG hits mapped to CARD by argNorm) is compared with the CARD methods but is not one of them: the
+# samples compared are those the CARD methods ran on, and its count is filtered read hits, not read pairs
+CARD_METHODS = ("kmarvel", "rgi")
+
+
+def count_column(method):
+    """The comparison's per-method read count column: read pairs for K-MARVEL and RGI, filtered BLAST hits
+    (single reads) for ARGs-OAP."""
+    return "args_oap_read_hits" if method == "args_oap" else f"{method}_read_pairs"
 
 
 def method_combo(methods):
@@ -559,14 +568,17 @@ def method_combo(methods):
 
 def compare_methods(calls, rgi_all, ran_by_method):
     """Read-level ARG methods side by side, per sample x gene (alleles collapsed), on the samples every
-    method ran on.
+    CARD method ran on (K-MARVEL, RGI; every method when none of them is compared). ARGs-OAP's calls (argNorm's
+    CARD mapping of its SARG hits) count as not detected on a compared sample it did not run on; the caller marks
+    those NA_not_run.
 
     calls: {method: annotated calls}, each method's detections only; rgi_all: every RGI ARO with reads
     (detected or not), so a gene RGI saw below the coverage cutoff is told apart from one it did not see.
     Returns (per sample x gene table, overlap counts table, {gene: methods} for the UpSet plot).
     """
     methods = [m for m in ("kmarvel", "rgi") if m in calls] + sorted(m for m in calls if m not in ("kmarvel", "rgi"))
-    common = set.intersection(*[set(ran_by_method[m]) for m in methods])
+    card = [m for m in methods if m in CARD_METHODS] or methods
+    common = set.intersection(*[set(ran_by_method[m]) for m in card])
     found = {}
     for m in methods:
         d = calls[m]
@@ -589,7 +601,7 @@ def compare_methods(calls, rgi_all, ran_by_method):
             pairs = None
             if m in hits:
                 pairs = hits[m]["rgi_gene_read_pairs"] if m == "rgi" else hits[m]["supporting_reads"]
-            row[f"{m}_read_pairs"] = pairs
+            row[count_column(m)] = pairs
         rg = rgi_gene.get((s, g))
         if "rgi" in methods:
             row["rgi_gene_coverage"] = rg["rgi_gene_coverage"] if rg else 0.0
