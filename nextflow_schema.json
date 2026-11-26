@@ -483,7 +483,7 @@
                 "custom_rgi_wildcard": {
                     "type": "string",
                     "description": "Path to a WildCARD directory (the variants download, decompressed: no .gz files) to combine with --custom_rgi_card_db.",
-                    "format": "path",
+                    "format": "directory-path",
                     "fa_icon": "fas fa-folder-open"
                 },
                 "kmarvel_db": {

@@ -2,8 +2,11 @@
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
     PREPARE DATABASES SUBWORKFLOW
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-    Handles database downloads and formatting for all pipeline components
-    Updated: 2026-01-29 - Single-pass decontamination optimization
+    Provides every database the enabled stages need: a --custom_* path as
+    given, or the registry entry of config/databases.config downloaded and
+    formatted once and stored under <databases_dir>/<database>/<key>/
+    (storeDir, config/modules.config). The decontamination index combines
+    phiX and the host genome(s) into one bwa-mem3 or Bowtie2 index
 ----------------------------------------------------------------------------------------
 */
 

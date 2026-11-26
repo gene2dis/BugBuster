@@ -155,7 +155,7 @@ include { BLOBTOOLS        } from './modules/local/blobtools/main'
 include { SAMTOOLS_INDEX as NFCORE_SAMTOOLS_INDEX } from './modules/nf-core/samtools/index/main'
 include { BLOBPLOT         } from './modules/local/blobplot/main'
 
-	// ORF PREDICTION IN CONTIGS AND BINS
+	// ORF PREDICTION IN CONTIGS (bins get no gene calling of their own: BIN_ARG_SPLIT splits the contig calls)
 	// NFCORE_PYRODIGAL (nf-core pyrodigal) is the shared contig gene-calling step (design doc Q9): one
 	// pass feeds both DeepARG (contig_tax_and_arg) and functional annotation
 	// (contig_level_functional)
@@ -188,7 +188,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -211,8 +211,11 @@ workflow {
         System.exit(0)
     }
 
-    // Show version
-    if (params.containsKey('version') && params.version) {
+    // Show version. --version is not declared in params (it is in
+    // defaultIgnoreParams, audit #25), hence containsKey: reading an
+    // undeclared param logs a warning on every launch. flagOn: on Nextflow
+    // >= 26.04 '--version false' is the truthy String "false" (review R3-10)
+    if (params.containsKey('version') && flagOn(params.version)) {
         printVersion()
         System.exit(0)
     }
@@ -232,19 +235,10 @@ workflow {
 
     // Cloud profiles need an object-storage work directory; there is no sane
     // default, so fail fast instead of falling back to a local ./work that the
-    // cloud executor cannot use (audit #24)
-    def cloud_workdir_requirements = [
-        aws  : ['aws_workdir', 's3://my-bucket/work', 's3://'],
-        gcp  : ['gcp_workdir', 'gs://my-bucket/work', 'gs://'],
-        azure: ['azure_workdir', 'az://my-container/work', 'az://'],
-    ]
-    def active_profiles = workflow.profile.tokenize(',')
-    cloud_workdir_requirements.each { profile_name, req ->
-        def (param_name, example, scheme) = req
-        def workdir_ok = params[param_name] || workflow.workDir.toString().startsWith(scheme)
-        if (active_profiles.contains(profile_name) && !workdir_ok) {
-            error("-profile ${profile_name} requires an object-storage work directory: pass --${param_name} ${example} (or -work-dir ${example})")
-        }
+    // cloud executor cannot use (audit #24). --*_workdir or -work-dir
+    def cloud_workdir_error = cloudWorkdirError(workflow.profile, workflow.workDir)
+    if (cloud_workdir_error) {
+        error(cloud_workdir_error)
     }
 
     // Parse and validate binners parameter
@@ -452,9 +446,22 @@ workflow {
 
     // bwa-mem3 (the default aligner) builds the human decontamination index
     // with ~57-75 GB RAM, bowtie2 with ~6 GB. Under a lower --max_memory the
-    // build stops with exit 3: say so before the downloads start
-    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta && (params.max_memory as MemoryUnit) < 75.GB) {
-        log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+    // build stops with exit 3: say so before the downloads start. When the
+    // index is already stored in --databases_dir nothing is built (review
+    // R3-06), but mapping against it still peaked at ~17 GB per task
+    // (docs/benchmarks/bwamem3_vs_bowtie2.md). The path is
+    // BWAMEM3_BUILD_COMBINED's storeDir in config/modules.config plus its
+    // output name (contaminants_index): keep the two in step. Checked only
+    // when bwa-mem3 builds the index, so no other launch touches the store
+    if (params.read_aligner == 'bwamem3' && flagOn(params.quality_control) && !params.custom_decontamination_index && !params.custom_host_fasta) {
+        def max_memory = params.max_memory as MemoryUnit
+        def bwamem3_stored = params.databases_dir != null && !params.custom_phiX_fasta &&
+            file("${params.databases_dir}/${workflow.stubRun ? 'stub/' : ''}bwamem3_index/${params.phiX_index}_${params.host_db}${flagOn(params.bwamem3_dense_sa) ? '_dense' : ''}/contaminants_index").exists()
+        if (!bwamem3_stored && max_memory < 75.GB) {
+            log.warn "--read_aligner bwamem3 builds the ${params.host_db} decontamination index with ~75 GB RAM, but --max_memory is ${params.max_memory}: the build will likely fail. Raise --max_memory, pass a pre-built bwa-mem3 index with --custom_decontamination_index, or use --read_aligner bowtie2 (~6 GB to build)"
+        } else if (bwamem3_stored && max_memory < 17.GB) {
+            log.warn "--read_aligner bwamem3 maps the reads against the stored ${params.host_db} decontamination index with up to ~17 GB RAM per task, but --max_memory is ${params.max_memory}: host removal will likely fail. Raise --max_memory or use --read_aligner bowtie2 (~4 GB to map)"
+        }
     }
 
     // A pre-built --custom_decontamination_index must match --read_aligner: a
@@ -602,7 +609,7 @@ workflow {
     if ( flagOn(params.rgi_prediction) ) {
         // Store rgi_card_db to allow reuse
         ch_rgi_db = PREPARE_DATABASES.out.rgi_card_db
-            .ifEmpty { error "ERROR: RGI database is empty. Ensure params.rgi_prediction is enabled and a valid CARD database is configured." }
+            .ifEmpty { error "ERROR: no RGI CARD database. --custom_rgi_card_db must be an RGI database directory (the one rgi load wrote, with localDB/); without it RGI_LOAD loads CARD (--rgi_card_version)." }
         
         // RGI bwt: Align reads to CARD AMR alleles
         ch_rgi_bwt = RGI_BWT(
@@ -629,7 +636,7 @@ workflow {
             }
             : []
         if ( missing_kmer_files ) {
-            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: ${params.custom_rgi_card_db}/localDB has no ${missing_kmer_files.join(' or ')} (load the WildCARD k-mer database with rgi load --kmer_database and --amr_kmers, see docs/RGI_WILDCARD_USAGE.md)"
+            log.warn "RGI pathogen of origin (rgi kmer_query) is skipped: ${params.custom_rgi_card_db}/localDB has no ${missing_kmer_files.join(' or ')} (load the WildCARD k-mer database with rgi load --kmer_database and --amr_kmers: docs/RGI_WILDCARD_USAGE.md, Manual CARD Database Preparation, step 4)"
         } else if ( params.custom_rgi_card_db || flagOn(params.rgi_include_wildcard) ) {
             ch_rgi_kmer = RGI_KMER(
                 ch_rgi_bwt.bam,
@@ -659,7 +666,7 @@ workflow {
     //
     if ( flagOn(params.kmarvel_prediction) ) {
         ch_kmarvel_db = PREPARE_DATABASES.out.kmarvel_db
-            .ifEmpty { error "ERROR: K-MARVEL database is empty. Ensure params.kmarvel_prediction is enabled and a valid CARD database is configured." }
+            .ifEmpty { error "ERROR: no K-MARVEL database. --custom_kmarvel_db must be a directory with CARD_protein_all.fasta, metadata.tsv and snps.txt; without it FORMAT_KMARVEL_DB prepares the --kmarvel_db release." }
 
         // Assemble CARD ARGs from each sample's reads
         KMARVEL(
@@ -749,9 +756,9 @@ workflow {
             BINNING(
                 ASSEMBLY.out.bam,
                 PREPARE_DATABASES.out.checkm2_db
-                    .ifEmpty { error "ERROR: CheckM2 database is empty. Ensure params.include_binning is enabled and a valid CheckM2 database is configured." },
+                    .ifEmpty { error "ERROR: no CheckM2 database. --custom_checkm2_db must be the CheckM2 DIAMOND file (uniref100.KO.1.dmnd); without it the --checkm2_db release is downloaded." },
                 PREPARE_DATABASES.out.gtdbtk_db
-                    .ifEmpty { error "ERROR: GTDB-Tk database is empty. Ensure params.include_binning is enabled and a valid GTDB-Tk database is configured." },
+                    .ifEmpty { error "ERROR: no GTDB-Tk database. --custom_gtdbtk_db must be an unpacked GTDB-Tk R232 data directory; without it the --gtdbtk_db release is downloaded." },
                 ch_counting_bam,
                 ch_multisample_depth
             )
@@ -781,7 +788,7 @@ workflow {
                         has_bins
                     },
                     PREPARE_DATABASES.out.gunc_db
-                        .ifEmpty { error "ERROR: GUNC database is empty. Ensure --gunc_prediction is enabled and a valid GUNC database is configured (--gunc_db, or --custom_gunc_db)." }
+                        .ifEmpty { error "ERROR: no GUNC database. --custom_gunc_db must be a GUNC DIAMOND file (.dmnd, under GUNC's own file name); without it the --gunc_db reference is downloaded." }
                         .first()
                 )
                 ch_summary_reports = ch_summary_reports.mix(GUNC_RUN.out.maxcss.map { _meta, table -> table })
@@ -887,19 +894,19 @@ workflow {
         def run_functional_cazy = flagOn(params.contig_level_functional) && flagOn(params.functional_cazy)
         ch_dbcan_db = run_functional_cazy
             ? PREPARE_DATABASES.out.dbcan_db
-                .ifEmpty { error "ERROR: dbCAN database is empty. Ensure params.functional_cazy is enabled and a valid dbCAN database is configured." }
+                .ifEmpty { error "ERROR: no dbCAN database. --custom_dbcan_db must be a run_dbcan v5 database directory (CAZy.dmnd, dbCAN.hmm, ...); without it the --dbcan_db release is downloaded." }
             : channel.empty()
         ch_eggnog_db = flagOn(params.contig_level_functional)
             ? PREPARE_DATABASES.out.eggnog_db
-                .ifEmpty { error "ERROR: eggNOG database is empty. Ensure params.contig_level_functional is enabled and a valid eggNOG database is configured." }
+                .ifEmpty { error "ERROR: no eggNOG database. --custom_eggnog_db must be an emapper-3.0 data directory (eggnog.db, eggnog_proteins.dmnd, ...); without it the --eggnog_db release is downloaded." }
             : channel.empty()
         ch_cog_def = flagOn(params.contig_level_functional)
             ? PREPARE_DATABASES.out.cog_def
-                .ifEmpty { error "ERROR: COG definitions table is empty. --contig_level_functional (and --read_level_functional woltka) need a valid COG table (--cog_db, or --custom_cog_db)." }
+                .ifEmpty { error "ERROR: no COG definitions table for --contig_level_functional. --custom_cog_db must be the COG definitions file (cog-24.def.tab layout); without it the --cog_db table is downloaded." }
             : channel.empty()
         ch_bakta_db = flagOn(params.mag_level_functional)
             ? PREPARE_DATABASES.out.bakta_db
-                .ifEmpty { error "ERROR: Bakta database is empty. Ensure params.mag_level_functional is enabled and a valid Bakta database is configured." }
+                .ifEmpty { error "ERROR: no Bakta database. --custom_bakta_db must be a Bakta database directory (schema 6: version.json, amrfinderplus-db/, ...); without it the --bakta_db release is downloaded." }
             : channel.empty()
         FUNCTIONAL_ANNOTATION(
             ch_contig_proteins,
@@ -935,17 +942,17 @@ workflow {
         // the selected backend's database (only that one is provisioned)
         def ch_read_db = params.read_level_functional == 'woltka' ?
             PREPARE_DATABASES.out.woltka_db
-                .ifEmpty { error "ERROR: Woltka (WoLr2) database is empty. Ensure --read_level_functional woltka is set and a valid WoLr2 database is configured (--custom_woltka_db)." } :
+                .ifEmpty { error "ERROR: no Woltka (WoLr2) database. --custom_woltka_db must be a WoLr2 mirror directory (databases/bowtie2/, proteins/, function/); without it the --woltka_db files are downloaded." } :
             params.read_level_functional == 'humann' ?
             PREPARE_DATABASES.out.humann_db
-                .ifEmpty { error "ERROR: HUMAnN database is empty. Ensure --read_level_functional humann is set and a valid HUMAnN database root is configured (--custom_humann_db: chocophlan/, uniref/, utility_mapping/, metaphlan/)." } :
+                .ifEmpty { error "ERROR: no HUMAnN database. --custom_humann_db must be a HUMAnN database root directory (chocophlan/, uniref/, utility_mapping/, metaphlan/); without it the --humann_db release is downloaded." } :
             PREPARE_DATABASES.out.superfocus_db
-                .ifEmpty { error "ERROR: SUPER-FOCUS database is empty. Ensure --read_level_functional superfocus is set and a valid SUPER-FOCUS database root is configured (--custom_superfocus_db, the directory containing db/)." }
+                .ifEmpty { error "ERROR: no SUPER-FOCUS database. --custom_superfocus_db must be the SUPER-FOCUS database root (the directory containing db/); without it the database is downloaded and built for --superfocus_aligner." }
         // the woltka backend maps WoLr2 COG ids to categories with the
         // contig branch's NCBI COG table (design doc Q14)
         def ch_read_cog_def = params.read_level_functional == 'woltka' ?
             PREPARE_DATABASES.out.cog_def
-                .ifEmpty { error "ERROR: COG definitions table is empty. --read_level_functional woltka needs a valid COG table (--cog_db, or --custom_cog_db)." } :
+                .ifEmpty { error "ERROR: no COG definitions table for --read_level_functional woltka. --custom_cog_db must be the COG definitions file (cog-24.def.tab layout); without it the --cog_db table is downloaded." } :
             channel.empty()
         READ_FUNCTIONAL(
             ch_clean_reads,
@@ -970,7 +977,7 @@ workflow {
     ch_contig_deeparg_only = channel.empty()   // DeepARG outputs, for the run-level report
     if ( run_contig_deeparg ) {
         DEEPARG_CONTIGS(ch_contig_proteins.combine(PREPARE_DATABASES.out.deeparg_db
-            .ifEmpty { error "ERROR: DeepARG database is empty. Ensure params.contig_tax_and_arg or params.arg_bin_clustering is enabled and a valid DeepARG database is configured." }))
+            .ifEmpty { error "ERROR: no DeepARG database. --custom_deeparg_db must be a DeepARG data directory (the one deeparg download_data writes); without it DOWNLOAD_DEEPARG_DB downloads it." }))
         ch_contig_deeparg      = DEEPARG_CONTIGS.out.deeparg
         ch_contig_deeparg_only = DEEPARG_CONTIGS.out.only_deeparg
         ch_versions = ch_versions.mix(DEEPARG_CONTIGS.out.versions.first())
@@ -1002,7 +1009,7 @@ workflow {
                 has_contigs
             },
             PREPARE_DATABASES.out.genomad_db
-                .ifEmpty { error "ERROR: geNomad database is empty. Ensure --genomad_prediction is enabled and a valid geNomad database is configured (--genomad_db, or --custom_genomad_db)." }
+                .ifEmpty { error "ERROR: no geNomad database. --custom_genomad_db must be a geNomad database directory (genomad_db, version.txt, ...); without it the --genomad_db release is downloaded." }
                 .map { db -> [[id: 'genomad_db'], db] }
                 .first()
         )
@@ -1019,7 +1026,7 @@ workflow {
             CHECKV_ENDTOEND(
                 NFCORE_GENOMAD_ENDTOEND.out.virus_fasta,
                 PREPARE_DATABASES.out.checkv_db
-                    .ifEmpty { error "ERROR: CheckV database is empty. Ensure --checkv_prediction is enabled and a valid CheckV database is configured (--checkv_db, or --custom_checkv_db)." }
+                    .ifEmpty { error "ERROR: no CheckV database. --custom_checkv_db must be a CheckV database directory (genome_db/, hmm_db/, README.txt); without it the --checkv_db release is downloaded." }
                     .first()
             )
             ch_genomad_tables = ch_genomad_tables.mix(CHECKV_ENDTOEND.out.quality_summary.map { _meta, table -> table })
@@ -1037,7 +1044,7 @@ workflow {
         METABULI_CLASSIFY(
             ch_contigs_meta,
             PREPARE_DATABASES.out.metabuli_db
-                .ifEmpty { error "ERROR: Metabuli database is empty. Ensure params.contig_tax_and_arg is enabled and a valid Metabuli database is configured (--metabuli_db, or --custom_metabuli_db)." }
+                .ifEmpty { error "ERROR: no Metabuli database. --custom_metabuli_db must be a Metabuli database directory (db.parameters, diffIdx, info, taxonomyDB, nodes.dmp, names.dmp); without it the --metabuli_db release is downloaded." }
                 .first()
         )
         //
@@ -1144,11 +1151,13 @@ workflow {
     ch_software_versions = SOFTWARE_VERSIONS.out.yml
 
     //
-    // MODULE: Run-level summary (00_summary/): QC, taxonomy, read-level ARG
-    // (K-MARVEL, RGI, ARGs-OAP), read functional and MicrobeCensus tables,
-    // Excel workbook, figures, HTML report and PDF, README and LLM guide.
-    // It reads the aggregated software_versions.yml, so its own versions.yml
-    // is not part of that file.
+    // MODULE: Run-level summary (00_summary/): tables, Excel workbook,
+    // figures, HTML and PDF reports, README and LLM guide of every stage that
+    // ran (QC, taxonomy, read-level ARG, read functional, MicrobeCensus,
+    // assembly, MAGs with GUNC and dereplication, contig ARGs, bin ARG
+    // clusters, contig functional; bin/summary_catalog.py lists them). It
+    // reads the aggregated software_versions.yml, so its own versions.yml is
+    // not part of that file.
     //
     if ( flagOn(params.results_summary) ) {
         // the profiler's Reads_report.csv adds the classified fraction

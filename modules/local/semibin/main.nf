@@ -85,7 +85,9 @@ process SEMIBIN {
             fi
         }
         
-        # Validate minimum contig length
+        # No contig of 1,000 bp at all: skip SemiBin2 without running it. A
+        # contig set with some >= 1,000 bp but none >= 4,000 bp runs and is
+        # caught from SemiBin2's log above (no must-link pairs)
         min_length=1000
         long_contigs=\$(awk -v min=\$min_length '/^>/ {if (seqlen >= min) count++; seqlen=0; next} {seqlen += length(\$0)} END {if (seqlen >= min) count++; print count+0}' ${contigs})
         
@@ -156,7 +158,9 @@ process SEMIBIN {
             fi
         }
         
-        # Validate minimum contig length
+        # No contig of 1,000 bp at all: skip SemiBin2 without running it. A
+        # contig set with some >= 1,000 bp but none >= 4,000 bp runs and is
+        # caught from SemiBin2's log above (no must-link pairs)
         min_length=1000
         long_contigs=\$(awk -v min=\$min_length '/^>/ {if (seqlen >= min) count++; seqlen=0; next} {seqlen += length(\$0)} END {if (seqlen >= min) count++; print count+0}' ${contigs})
         

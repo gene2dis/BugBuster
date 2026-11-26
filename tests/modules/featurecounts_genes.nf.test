@@ -50,7 +50,7 @@ nextflow_process {
             // Acceptance 10.2: features counted == predicted genes (2 CDS in the fixture GFF)
             assert data_rows.size() == 2
 
-            // GeneID rewrite: Prodigal ID=1_N becomes <contig>_N, matching the FAA headers
+            // GeneID = <contig>_N (Pyrodigal's own GFF ID form), matching the FAA headers
             def gene_ids = data_rows.collect { row -> row.split('\t')[0] }
             assert gene_ids == ['contig_1_1', 'contig_1_2']
 

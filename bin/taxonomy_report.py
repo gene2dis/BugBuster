@@ -309,12 +309,12 @@ def parse_arguments():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  # Kraken2 reports
-  taxonomy_report.py --profiler kraken2 --reports *.report.tsv \\
-      --reads-report Reads_report.csv --db-name silva --output-dir .
+  # Kraken2 reports (nf-core KRAKEN2: <id>.kraken2.report.txt)
+  taxonomy_report.py --profiler kraken2 --reports *.kraken2.report.txt \\
+      --reads-report Reads_report.csv --db-name k2_standard --output-dir .
 
-  # Sourmash reports
-  taxonomy_report.py --profiler sourmash --reports *.report.tsv \\
+  # Sourmash reports (SOURMASH *_report.tsv)
+  taxonomy_report.py --profiler sourmash --reports *_report.tsv \\
       --reads-report Reads_report.csv --db-name gtdb --output-dir .
 
   # Sylph reports (SYLPH_PROFILE *_report.tsv)

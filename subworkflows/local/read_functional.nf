@@ -130,6 +130,9 @@ workflow READ_FUNCTIONAL {
         ch_sample_summary      = channel.empty()
     }
 
+    // main.nf reads function_abundance, annotated_fraction, sample_summary
+    // and versions; sample_functions and function_wide are not read in the
+    // pipeline
     emit:
     sample_functions   = ch_sample_functions    // [ meta, <id>.<backend>_functions.tsv ] per sample
     function_abundance = ch_function_abundance  // read_function_abundance.tsv (Section 5.3, source=reads)

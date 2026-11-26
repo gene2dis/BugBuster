@@ -47,10 +47,10 @@ echo "=== gff2saf.sh test suite ==="
 check "gzipped GFF accepted, SAF has header + 2 data rows" \
     '[ "$(wc -l < "${TMP_DIR}/genes.saf")" -eq 3 ] && [ "$(head -1 "${TMP_DIR}/genes.saf")" = "$(printf "GeneID\tChr\tStart\tEnd\tStrand")" ]'
 
-check "GeneID rewritten from ID=1_1 to contig_1_1" \
+check "GeneID of Pyrodigal's ID=contig_1_1 is contig_1_1" \
     '[ "$(sed -n 2p "${TMP_DIR}/genes.saf" | cut -f1)" = "contig_1_1" ]'
 
-check "GeneID rewritten from ID=1_2 to contig_1_2" \
+check "GeneID of Pyrodigal's ID=contig_1_2 is contig_1_2" \
     '[ "$(sed -n 3p "${TMP_DIR}/genes.saf" | cut -f1)" = "contig_1_2" ]'
 
 check "Chr/Start/End/Strand carried through (row 1: contig_1 1 300 +)" \
@@ -67,6 +67,15 @@ gzip -cd "${FIXTURES}/test_contig1_genes.gff.gz" > "${TMP_DIR}/genes.gff"
 
 check "plain GFF input produces identical SAF" \
     'cmp -s "${TMP_DIR}/genes.saf" "${TMP_DIR}/genes_plain.saf"'
+
+#
+# 2b. Prodigal's <seqnum>_<genenum> ID form gives the same GeneIDs
+#
+gzip -cd "${FIXTURES}/test_contig1_genes.gff.gz" | sed 's/ID=contig_1_/ID=1_/' > "${TMP_DIR}/genes_prodigal.gff"
+"${GFF2SAF}" "${TMP_DIR}/genes_prodigal.gff" "${TMP_DIR}/genes_prodigal.saf"
+
+check "Prodigal ID=1_N rewritten to <contig>_N, as the Pyrodigal form gives" \
+    'grep -q "ID=1_1;" "${TMP_DIR}/genes_prodigal.gff" && cmp -s "${TMP_DIR}/genes.saf" "${TMP_DIR}/genes_prodigal.saf"'
 
 #
 # 3. Empty (header-only) GFF -> header-only SAF

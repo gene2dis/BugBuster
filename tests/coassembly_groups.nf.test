@@ -197,6 +197,28 @@ nextflow_pipeline {
         }
     }
 
+    test("Rejects --coassembly_group_by naming the sample id column, saying why") {
+        // Review R3-09 (roadmap Phase 26, RV30): the column exists, so "has no
+        // such column" (with the column left out of the list) was misleading
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                assembly_mode       = "coassembly"
+                sample_metadata     = TestData.metadataTable(outputDir, "m.csv", "sample,subject\ntest_sample1,a\ntest_sample2,b\n")
+                coassembly_group_by = "sample"
+            }
+        }
+
+        then {
+            assert workflow.failed
+            def console_out = (workflow.stdout + workflow.stderr).join('\n')
+            assert console_out.contains("'sample' is the sample id column of --sample_metadata")
+            assert console_out.contains("every sample would be its own group")
+            assert !console_out.contains("has no such column")
+        }
+    }
+
     test("Rejects samples without a metadata row") {
         when {
             params {

@@ -82,3 +82,26 @@ def hasFastaRecord(fasta) {
 def bbmapMinLength() {
     return (params.bbmap_length != null ? params.bbmap_length : 1000) as Integer
 }
+
+// The launch error for a cloud profile (aws, gcp, azure) run without an
+// object-storage work directory, or null when the work directory is fine. The
+// work directory may come from the profile's --*_workdir parameter or from
+// Nextflow's -work-dir. A cloud Path's toString() drops the scheme
+// (s3://my-bucket/work gives /my-bucket/work, gs://my-bucket/work gives
+// /work), so the scheme is read from toUriString(); comparing toString() made
+// -work-dir alone always fail (roadmap Phase 26, RV30)
+def cloudWorkdirError(profile, workDir) {
+    def requirements = [
+        aws  : ['aws_workdir', 's3://my-bucket/work', 's3://'],
+        gcp  : ['gcp_workdir', 'gs://my-bucket/work', 'gs://'],
+        azure: ['azure_workdir', 'az://my-container/work', 'az://'],
+    ]
+    def active = (profile ?: '').toString().tokenize(',')*.trim()
+    def uri = workDir == null ? '' : (workDir instanceof java.nio.file.Path ? workDir.toUriString() : workDir.toString())
+    def failing = requirements.find { name, req -> name in active && !params[req[0]] && !uri.startsWith(req[2]) }
+    if (!failing) {
+        return null
+    }
+    def (param_name, example, _scheme) = failing.value
+    return "-profile ${failing.key} requires an object-storage work directory: pass --${param_name} ${example} (or -work-dir ${example})"
+}

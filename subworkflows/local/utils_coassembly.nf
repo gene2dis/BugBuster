@@ -71,7 +71,12 @@ def metadataGroups(param_name, reserved, reserved_what) {
     header[0] = header[0].replaceFirst(/^\uFEFF/, '').trim()
     def rows = lines.drop(1).collect { fields -> [header, fields].transpose().collectEntries { name, value -> [(name): value] } }
     def key = 'sample' in header ? 'sample' : header[0]
-    if (!(column in header) || column == key) {
+    if (column == key) {
+        // review R3-09: the id column exists, but grouping by it puts every
+        // sample in a group of its own
+        error("${opt} ${column}: '${column}' is the sample id column of --sample_metadata ${params.sample_metadata}, so every sample would be its own group; name a metadata column (columns: ${header.findAll { c -> c != key }.join(', ')})")
+    }
+    if (!(column in header)) {
         error("${opt} ${column}: --sample_metadata ${params.sample_metadata} has no such column (columns: ${header.findAll { c -> c != key }.join(', ')})")
     }
 

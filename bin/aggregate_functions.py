@@ -302,8 +302,10 @@ def explode_dbcan(overview, consensus):
 def parse_gff(path):
     """Pyrodigal/Prodigal GFF3 -> one row per CDS with the FAA-matching gene id.
 
-    Prodigal's ID attribute is <seqnum>_<genenum>; the gene id used everywhere
-    downstream is <contig>_<genenum> (same rewrite as bin/gff2saf.sh).
+    The gene id used everywhere downstream is <contig>_<genenum>, built from
+    column 1 and the number after the ID attribute's last '_' (same rewrite as
+    bin/gff2saf.sh): Pyrodigal's GFF ID is already <contig>_<genenum>,
+    Prodigal's is <seqnum>_<genenum>, and both give the same id.
     """
     rows = []
     with open_text(path) as handle:

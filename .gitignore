@@ -10,12 +10,10 @@
 
 # Internal docs
 internal_docs
-internal_docs/*
 
 # claude files
 .claude
 CLAUDE.md
-.claude/worktrees/
 
 # Editor config
 .vscode/
@@ -25,7 +23,6 @@ work/
 .nf-test/
 .nf-test.log
 test_results/
-null/
 /databases/
 
 # Ad-hoc acceptance-run work dirs and outputs (e.g. work_t6_assembly/,

@@ -1560,6 +1560,41 @@ bold label names the full entry below (search for it).
     the K-MARVEL, RGI and ARGs-OAP methods once; the multi-sample catalog entry
     reads as a sentence and the bin ARG stage is called MAG-level ARG
     clustering; `results_summary.py --help` lists every input it reads.
+- **Launch checks and messages** (roadmap Phase 26):
+  - `-profile aws`, `gcp` or `azure` with Nextflow's `-work-dir s3://…` /
+    `gs://…` / `az://…` and no `--*_workdir` stopped at launch with "requires
+    an object-storage work directory", although the message offered
+    `-work-dir`: the check read the work directory without its scheme. Either
+    way of setting it is now accepted.
+  - `--custom_rgi_wildcard` must be a directory: a file (such as the
+    downloaded variants archive) stops at parameter validation, instead of
+    later in RGI_LOAD_WILDCARD.
+  - A samplesheet whose header lacks `sample`, `r1` or `r2` (for example
+    `sample_id,r1,r2,s`, or single-end `sample,r1,s`) stops with a message that
+    names the missing column and the expected header `sample,r1,r2,s`, instead
+    of "'sample' column is empty" for each row. An empty `r2` cell says that
+    paired-end reads are required.
+  - The bwa-mem3 memory warning (index build needs ~75 GB) is no longer shown
+    when the index is already stored in `--databases_dir`. With a stored index
+    and a `--max_memory` below 17 GB, a warning says that mapping against it
+    needs up to ~17 GB per task.
+  - `--coassembly_group_by` / `--multisample_group_by` naming the sample id
+    column of `--sample_metadata` says so ("every sample would be its own
+    group") instead of "has no such column".
+  - The "database is empty" errors name the `--custom_*` path and what it must
+    be (directory or file) and the registry option used without it; they no
+    longer ask to enable the option that is already on.
+  - `--version false` no longer prints the version and exits on Nextflow
+    26.04 or later (it was read as the String "false").
+  - The contig ARG report writes a warning when an ARG gene on a provirus
+    contig has no row in the Pyrodigal GFF (its provirus overlap is left
+    empty). It does not happen with the current gene caller; results are
+    unchanged. It also reads a Prodigal-style GFF ID (`<seqnum>_<n>`) as
+    `<contig>_<n>`, like the featureCounts and aggregation steps.
+  - `tests/bin/clean_test_artifacts.sh` removes `databases/stub/`, and no
+    longer removes, nor does `.gitignore` hide, a `null/` directory: earlier
+    releases could leave one in the launch directory when no `--output` was
+    given; delete it by hand.
 - **Small failures** (roadmap Phase 21):
   - The launch warning about databases "in the layout of an earlier release"
     matched the current GTDB-Tk store `gtdbtk/release_232/`, so every run after

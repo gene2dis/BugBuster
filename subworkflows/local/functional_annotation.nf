@@ -187,6 +187,9 @@ workflow FUNCTIONAL_ANNOTATION {
         ch_bakta_txt = channel.empty()
     }
 
+    // main.nf reads gene_counts_summary, gene_abundance, function_abundance,
+    // annotated_fraction, bakta_tsv, bakta_txt and versions; the other emits
+    // are not read in the pipeline
     emit:
     annotations         = ch_annotations                // [ meta, *.emapper.annotations ]
     seed_orthologs      = ch_seed_orthologs             // [ meta, *.emapper.seed_orthologs ]

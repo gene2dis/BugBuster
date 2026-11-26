@@ -66,17 +66,21 @@ sdk install java <version>
 
 **Error** (one of):
 ```
+Invalid samplesheet header in samplesheet.csv: no sample column (header: sample_id,r1,r2,s). The header must be sample,r1,r2,s (lower case): ...
 Invalid samplesheet: 'sample' column is empty for row: [...]
 Invalid samplesheet: 'r1' column is empty for sample: sample1
+Invalid samplesheet: 'r2' column is empty for sample: sample1. The pipeline needs paired-end reads (r1 and r2); ...
 Invalid samplesheet: r1 and r2 are the same file for sample 'sample1': /path/to/sample1_R1.fastq.gz
 ```
 
 **Solution:**
-1. Ensure CSV has header: `sample,r1,r2,s`
-2. Check for extra spaces or special characters
-3. Check every path (the path rules: [Samplesheet Format](manual.md#samplesheet-format) and
+1. Ensure CSV has header: `sample,r1,r2,s` (lower case)
+2. Give every sample both mates (`r1`, `r2`): single-end data is not supported; `s` is
+   only for the singleton reads of a paired library
+3. Check for extra spaces or special characters
+4. Check every path (the path rules: [Samplesheet Format](manual.md#samplesheet-format) and
    [Input Requirements](manual.md#input-requirements) in the manual)
-4. Validate with:
+5. Validate with:
    ```bash
    head -5 samplesheet.csv
    ```
