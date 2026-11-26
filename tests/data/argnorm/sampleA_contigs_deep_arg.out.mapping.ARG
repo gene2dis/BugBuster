@@ -1,0 +1,6 @@
+#ARG	query-start	query-end	read_id	predicted_ARG-class	best-hit	probability	identity	alignment-length	alignment-bitscore	alignment-evalue	counts
+CFXA2	1	321	contig_1_1	beta-lactam	AF472622.2.gene1.p01|FEATURES|CfxA2|beta-lactam|CfxA2	0.9999951554866056	100	321	628	2.81e-231	1
+VANB	21	342	contig_2_1	glycopeptide	gi:452996190:gb:AGG19379.1:|FEATURES|vanB|glycopeptide|vanB	0.9999999269856175	100	322	644	2.54e-237	1
+ACRA	1	397	contig_3_1	multidrug	ABG77965|FEATURES|acrA|multidrug|acrA	0.9999994289916859	98.7	397	733	5.15e-270	1
+AADE	1	288	contig_4_1	aminoglycoside	ZP_04556181|FEATURES|aadE|aminoglycoside|aadE	0.999999809185145	100	288	597	4.81e-220	1
+PENA	2	623	contig_5_1	beta-lactam	YP_002045964|FEATURES|penA|beta-lactam|penA	0.9999958171997693	58.1	623	720	1.90e-257	1

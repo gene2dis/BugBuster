@@ -11,6 +11,7 @@ Nothing here is real sample data. The CARD-layout and DeepARG-layout fixtures ar
 | Folder | How | Source / generator | Used by |
 | --- | --- | --- | --- |
 | `arg_clustering/` | generated | `make_arg_cluster_fixtures.py`: two samples' contig-to-bin tables, Pyrodigal-style proteins and DeepARG hits (identical, 93 % and unrelated proteins) | `modules/arg_fasta_formatter`, `modules/clustering` |
+| `argnorm/` | captured, edited / hand-written | `sampleA_contigs_deep_arg.out.mapping.ARG`: five rows of a real DeepARG 1.0.4 output (real DeepARG v2 best hits, contigs renamed `contig_<n>_1`; Perfect, Strict and Loose argNorm mappings); `header_only_blastout.filtered.txt`: the ARGs-OAP 4.0.0 header row alone | `modules/argnorm` |
 | `args_oap/` | captured, edited | rows of a real ARGs-OAP 4.0.0 stage two output, renamed (read names synthetic), metadata written for them (see the `make_summary_fixtures.sh` header) | `test_report_scripts.sh`, `make_summary_fixtures.sh` |
 | `bam/` | generated | `make_bam_fixtures.sh` | `modules/featurecounts_genes` |
 | `bins/real_bins/`, `marker_only_bins/` | generated | `make_bin_fixtures.py` (one 25 kb seeded contig; `marker_only_bins/` is no longer read by a test) | `modules/bin_depth`, `pyrodigal`, `bwamem3_*`, `eggnog_mapper_search` |

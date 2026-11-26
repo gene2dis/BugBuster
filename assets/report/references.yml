@@ -443,6 +443,16 @@ steinegger2017:
   number: "11"
   pages: "1026--1028"
   doi: "10.1038/nbt.3988"
+ugarcinaperovic2025:
+  type: "article"
+  author: "Ugarcina Perovic, Svetlana and Ramji, Vedanth and Chong, Hui and Duan, Yiqian and Maguire, Finlay and Coelho, Luis Pedro"
+  title: "argNorm: normalization of antibiotic resistance gene annotations to the Antibiotic Resistance Ontology (ARO)"
+  journal: "Bioinformatics"
+  year: 2025
+  volume: "41"
+  number: "5"
+  pages: "btaf173"
+  doi: "10.1093/bioinformatics/btaf173"
 vasimuddin2019:
   type: "article"
   author: "Vasimuddin, Md. and Misra, Sanchit and Li, Heng and Aluru, Srinivas"

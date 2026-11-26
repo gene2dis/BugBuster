@@ -111,6 +111,7 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `NONPAREIL` (in `QC`, on the clean reads) | `nonpareil` (default `true`) | — |
 | `TAXONOMY` | `taxonomic_profiler != 'none'` (default `sylph`) | `custom_sylph_db` and `custom_sylph_taxonomy` given together |
 | `ARGS_OAP`, `ARGS_OAP_REPORT` | `args_oap_prediction` or `read_arg_prediction` (deprecated alias, with a warning) | — |
+| `ARGNORM_SARG` | ARGs-OAP runs (samples whose stage two wrote `blastout.filtered.txt`) | — |
 | `RGI_BWT`, `RGI_REPORT` | `rgi_prediction` | — |
 | `RGI_KMER` | `rgi_prediction` and: with `custom_rgi_card_db`, its k-mer files for `rgi_kmer_size` present or `custom_rgi_wildcard` given; without, `rgi_include_wildcard` (default `true`) | — |
 | `KMARVEL`, `KMARVEL_REPORT` | `kmarvel_prediction` | — |
@@ -126,6 +127,8 @@ subworkflow) tests it. Launch checks stop a run whose switches contradict each o
 | `GALAH_CLUSTER`, `COVERM_GENOME` | `dereplicate_mags` and `include_binning` (assemblies without refined bins left out; no task without any); either assembly mode, with or without `multisample_binning` | `dereplicate_mags` needs `include_binning` and ≥ 2 `binners`; `dereplicate_ani` 80-100 |
 | `NFCORE_PYRODIGAL` | (`contig_tax_and_arg` or `arg_bin_clustering` or `contig_level_functional`) and an assembly | — |
 | `DEEPARG_CONTIGS` | (`contig_tax_and_arg` or `arg_bin_clustering`) and an assembly | — |
+| `ARGNORM_DEEPARG` | `DEEPARG_CONTIGS` runs | — |
+| K-MARVEL CARD database for the summary (`FORMAT_KMARVEL_DB` or `custom_kmarvel_db`) | `kmarvel_prediction`, or `results_summary` with `ARGNORM_SARG` or `ARGNORM_DEEPARG` (the CARD families and tiers of their hits) | — |
 | `BIN_CONTIG_LABELS` | `include_binning` and (`contig_tax_and_arg` or `arg_bin_clustering`) | — |
 | `NFCORE_GENOMAD_ENDTOEND` | `genomad_prediction` and an assembly (assemblies without contigs skipped) | needs an assembly |
 | `CHECKV_ENDTOEND` | `checkv_prediction` and `genomad_prediction` (on each assembly geNomad ran on) | `checkv_prediction` needs `genomad_prediction` |
@@ -251,13 +254,15 @@ flowchart TD
 ### 5. Read-level ARG prediction
 
 Three independent switches (no subworkflow; wired in `main.nf`). ARGs-OAP is reported against
-SARG, apart from the two CARD methods, which the summary compares.
+SARG; `ARGNORM_SARG` (argNorm) maps each of its hits to a CARD ARO, so the summary compares it with
+the two CARD methods by gene.
 
 ```mermaid
 flowchart TD
     Clean(["clean reads"])
     Clean -->|args_oap_prediction| ARGS_OAP["ARGS_OAP<br/>stage one (16S, cells)<br/>+ stage two (SARG)"]
     ARGS_OAP --> ARGS_OAP_REPORT["ARGS_OAP_REPORT<br/>args_oap_long.tsv, args_oap_cells.tsv"]
+    ARGS_OAP -->|blastout.filtered.txt| ARGNORM_SARG["ARGNORM_SARG<br/>argNorm: SARG hit → CARD ARO"]
 
     Clean -->|rgi_prediction| RGI_BWT["RGI_BWT<br/>KMA vs CARD (+ WildCARD)"]
     RGI_BWT -->|"rgi_include_wildcard (default);<br/>custom_rgi_card_db: its k-mer files<br/>or custom_rgi_wildcard"| RGI_KMER["RGI_KMER<br/>pathogen of origin"]
@@ -267,10 +272,10 @@ flowchart TD
     Clean -->|kmarvel_prediction| KMARVEL["KMARVEL<br/>CARD protein ARG assembly,<br/>blastp-confirmed"]
     KMARVEL --> KMARVEL_REPORT["KMARVEL_REPORT<br/>sample × ARG matrices"]
 
-    ARGS_OAP_REPORT & RGI_BWT & RGI_KMER & KMARVEL --> RESULTS_SUMMARY
+    ARGS_OAP_REPORT & ARGNORM_SARG & RGI_BWT & RGI_KMER & KMARVEL --> RESULTS_SUMMARY
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class ARGS_OAP,ARGS_OAP_REPORT,RGI_BWT,RGI_KMER,RGI_REPORT,KMARVEL,KMARVEL_REPORT opt
+    class ARGS_OAP,ARGS_OAP_REPORT,ARGNORM_SARG,RGI_BWT,RGI_KMER,RGI_REPORT,KMARVEL,KMARVEL_REPORT opt
 ```
 
 ### 6. ASSEMBLY
@@ -416,9 +421,11 @@ flowchart TD
     ARG_CONTIG_LEVEL_REPORT --> ARG_BLOBPLOT["ARG_BLOBPLOT<br/>ARG blob plot per assembly"]
     ARG_CONTIG_LEVEL_REPORT -.-> RESULTS_SUMMARY
     DEEPARG_CONTIGS -.->|"contig_level_functional:<br/>.mapping.ARG (ARG gene abundance)"| RESULTS_SUMMARY
+    DEEPARG_CONTIGS -->|.mapping.ARG| ARGNORM_DEEPARG["ARGNORM_DEEPARG<br/>argNorm: DeepARG hit → CARD ARO"]
+    ARGNORM_DEEPARG -.-> RESULTS_SUMMARY
 
     classDef opt fill:#F7F7F7,stroke:#777,stroke-width:1.5px,stroke-dasharray:5 4,color:#111
-    class NFCORE_PYRODIGAL,DEEPARG_CONTIGS,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
+    class NFCORE_PYRODIGAL,DEEPARG_CONTIGS,ARGNORM_DEEPARG,METABULI_CLASSIFY,NFCORE_SAMTOOLS_INDEX,BLOBTOOLS_NODESDB,BLOBTOOLS,BLOBPLOT,NFCORE_GENOMAD_ENDTOEND,CHECKV_ENDTOEND,BIN_CONTIG_LABELS,ARG_CONTIG_LEVEL_REPORT,ARG_BLOBPLOT opt
 ```
 
 `METABULI_CLASSIFY` through `ARG_BLOBPLOT` need `contig_tax_and_arg`; geNomad runs on its own
@@ -567,6 +574,7 @@ results directories outside the pipeline (manual, section 9, Merging Batches).
 | Module | Description |
 |--------|-------------|
 | `ARGS_OAP` / `ARGS_OAP_REPORT` | ARGs-OAP stage one + two against SARG (copies per cell, per 16S, ppm) and run-level tables |
+| `ARGNORM_SARG` | argNorm: each ARGs-OAP hit's SARG sequence mapped to a CARD ARO (with the RGI cut-off and drug classes) |
 | `RGI_BWT` / `RGI_KMER` / `RGI_REPORT` | RGI bwt (KMA) against CARD, pathogen-of-origin k-mers, summary report |
 | `KMARVEL` / `KMARVEL_REPORT` | K-MARVEL read-level CARD ARG assembly and its matrices |
 
@@ -606,6 +614,7 @@ results directories outside the pipeline (manual, section 9, Merging Batches).
 |--------|-------------|
 | `NFCORE_PYRODIGAL` | Shared gene calling on the contigs (nf-core; feeds DeepARG and the functional branch) |
 | `DEEPARG_CONTIGS` | DeepARG on an assembly's proteins, one run per assembly |
+| `ARGNORM_DEEPARG` | argNorm: each DeepARG hit's best hit mapped to a CARD ARO (with the RGI cut-off and drug classes) |
 | `METABULI_CLASSIFY` | Per-contig taxonomy with Metabuli |
 | `NFCORE_SAMTOOLS_INDEX` | BAM index for BlobTools |
 | `BLOBTOOLS_NODESDB` / `BLOBTOOLS` / `BLOBPLOT` | BlobTools nodesDB (once), tables from Metabuli's hits, phylum blob plot |

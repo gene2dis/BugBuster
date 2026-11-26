@@ -70,6 +70,19 @@ def parseBinners() {
     return names.collect { b -> b.toString().trim().toLowerCase() }.findAll { b -> b }.unique()
 }
 
+// true when the summary reads argNorm's CARD mapping of ARGs-OAP or DeepARG
+// hits: ARGNORM_SARG runs with ARGs-OAP, ARGNORM_DEEPARG with the contig
+// DeepARG step (--contig_tax_and_arg or --arg_bin_clustering with an
+// assembly). The summary then needs the CARD metadata of the K-MARVEL database
+// (metadata.tsv, snps.txt) for the gene families and tiers, so PREPARE_DATABASES
+// prepares it even without --kmarvel_prediction (roadmap Phase 27b, owner
+// 2026-11-26)
+def argNormCardNeeded() {
+    def args_oap = flagOn(params.args_oap_prediction) || flagOn(params.read_arg_prediction)
+    def deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != 'none'
+    return flagOn(params.results_summary) && (args_oap || deeparg)
+}
+
 // true when a (plain, uncompressed) FASTA holds at least one record. BBMAP
 // writes a FASTA without sequences when every contig of an assembly is below
 // --bbmap_length; ASSEMBLY drops such an assembly before the contig stages

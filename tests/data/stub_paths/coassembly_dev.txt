@@ -49,6 +49,7 @@
 05_arg_prediction/bin_level/deeparg/coassembly/coassembly_deeparg_results/coassembly_bin1_deep_arg.out.mapping.ARG
 05_arg_prediction/bin_level/proteins/coassembly/coassembly_bins_proteins/coassembly_bin1_proteins.faa
 05_arg_prediction/contig_level/deeparg/coassembly/coassembly_contigs_deep_arg.out.mapping.ARG
+05_arg_prediction/contig_level/deeparg/coassembly/coassembly.deeparg.argnorm.tsv
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.csv
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.pdf
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.png

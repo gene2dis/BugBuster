@@ -1,0 +1,1 @@
+qseqid	sseqid	pident	length	qlen	slen	evalue	bitscore	qcov	sample	scov	gene	subtype	type	count	copy	rpk	rpksum

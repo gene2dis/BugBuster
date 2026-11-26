@@ -14,6 +14,7 @@ kraken2_db	Kraken 2 (database)	database	wood2019	PMID 31779668; RefSeq standard 
 sourmash	sourmash	tool	irber2024	crossref; JOSS sourmash v4 paper named in README
 sourmash_db	GTDB (database)	database	parks2026	PMID 41123020 (GTDB R10 paper, newest; the registry database is GTDB R220)
 args_oap	ARGs-OAP	tool	yin2023	crossref; ARGs-OAP v3.0 paper (v4.0 adds no database or pipeline changes)
+argnorm	argNorm	tool	ugarcinaperovic2025	PMID 40238188
 rgi	RGI	tool	alcock2023	PMID 36263822 (README citation)
 card	CARD (database)	database	alcock2023	PMID 36263822
 kma	KMA	tool	clausen2025;clausen2018	PMID 40918069 (README please-cite); PMID 30157759
