@@ -843,7 +843,8 @@ workflow {
             // alone, so the split does not wait for the batched GTDB-Tk
             //
             if ( flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering) ) {
-                BIN_CONTIG_LABELS(ch_refined_bins.filter { _meta, bins -> bins != null })
+                // A bin set with no .fa (only SKIPPED.txt) gives a header-only table
+                BIN_CONTIG_LABELS(ch_refined_bins)
                 ch_contig_bins = BIN_CONTIG_LABELS.out.labels
                 ch_versions = ch_versions.mix(BIN_CONTIG_LABELS.out.versions.first())
             }
@@ -859,8 +860,9 @@ workflow {
     ch_contig_proteins  = channel.empty()
     ch_contig_genes_gff = channel.empty()
 
-    def run_contig_deeparg = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
-    if ( (run_contig_deeparg || flagOn(params.contig_level_functional)) && params.assembly_mode != "none" ) {
+    def run_contig_deeparg    = (flagOn(params.contig_tax_and_arg) || flagOn(params.arg_bin_clustering)) && params.assembly_mode != "none"
+    def run_contig_functional = flagOn(params.contig_level_functional) && params.assembly_mode != "none"
+    if ( run_contig_deeparg || run_contig_functional ) {
         //
         // Run nf-core pyrodigal (NFCORE_PYRODIGAL) for contig ORF prediction
         // nf-core pyrodigal signature:
@@ -886,7 +888,6 @@ workflow {
     // sample emits nothing here and falls back to TPM-only in aggregation.
     def run_microbecensus = flagOn(params.microbecensus)
     ch_ags = channel.empty()
-    def run_contig_functional = flagOn(params.contig_level_functional) && params.assembly_mode != "none"
     def run_read_functional   = params.read_level_functional != "none"
     if ( run_microbecensus && (run_contig_functional || run_read_functional) ) {
         MICROBECENSUS(ch_clean_reads)
