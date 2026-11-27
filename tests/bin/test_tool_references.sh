@@ -13,7 +13,11 @@
 #   - a key built at run time (it contains '$') must be listed in DYNAMIC below, with the
 #     names it can take;
 #   - every key has a row; every row's kind is tool, database or helper; every citekey a row
-#     names is an entry of assets/report/references.yml.
+#     names is an entry of assets/report/references.yml;
+#   - every tool and database key has a section (the pipeline step CITATIONS.md lists it
+#     under), a row with a section is a key some module still writes, and the committed
+#     CITATIONS.md is what tests/bin/make_citations.py writes from the two files (roadmap
+#     Phase 29, CL6).
 #
 # Runs on the host (python3, standard library only).
 #
@@ -125,9 +129,22 @@ for key in sorted(keys):
     if key not in rows:
         problems.append(f"version key '{key}' ({keys[key]}) has no row in assets/report/tool_references.tsv")
 
+# CITATIONS.md lists the rows with a section (roadmap Phase 29, CL6): every tool and database a
+# module reports has one, and a row with one is still reported (a tool no module runs any more
+# keeps its row, for the summary of older results, but leaves CITATIONS.md)
+for tool, row in sorted(rows.items()):
+    section = (row.get("section") or "").strip()
+    if row["kind"] != "helper" and tool in keys and not section:
+        problems.append(f"tool_references.tsv: {tool} ({row['kind']}) has no section, so CITATIONS.md leaves it out")
+    if section and tool not in keys:
+        problems.append(f"tool_references.tsv: {tool} has a section, but no module reports it: clear its section")
+
 print(f"{len(keys)} version keys, {len(rows)} tool_references.tsv rows, {len(refs)} references")
 if problems:
     print("\n".join(f"  FAIL: {p}" for p in problems))
     sys.exit(1)
 print("  ok: every version key has a tool reference row, and every citekey a references.yml entry")
 PYEOF
+
+echo "=== CITATIONS.md vs assets/report/tool_references.tsv + references.yml ==="
+python3 "${REPO_DIR}/tests/bin/make_citations.py" --check

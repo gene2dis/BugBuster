@@ -33,6 +33,11 @@ bold label names the full entry below (search for it).
 
 ### Added
 
+- `CITATIONS.md`: the references of every tool and database the pipeline can run, by
+  pipeline step, linked from the README and the manual (issue #25). It is written by
+  `tests/bin/make_citations.py` from the report's curated references
+  (`assets/report/tool_references.tsv`, which gains a `section` column, and
+  `references.yml`), and `tests/bin/test_tool_references.sh` fails when it differs.
 - **argNorm: ARGs-OAP and DeepARG hits mapped to CARD** (roadmap Phase 27b).
   argNorm 1.1.0 (`quay.io/biocontainers/argnorm:1.1.0--pyhdfd78af_0`, local
   module `ARGNORM`) maps every ARGs-OAP stage two hit (`ARGNORM_SARG`, on

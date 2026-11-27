@@ -290,7 +290,9 @@ Every tool name a module writes there needs a row in `assets/report/tool_referen
 name and cite tools from it. `tests/bin/test_tool_references.sh` (run in CI) fails on a key
 without a row (it reads versions.yml heredocs, `printf` and Python `f.write` lines, and
 nf-core topic tuples); a key built at run time (`${aligner}:`) is listed in that script with
-the names it can take.
+the names it can take. A `tool` or `database` row also names its `section`, the pipeline step
+`CITATIONS.md` lists it under: after changing either file, run `tests/bin/make_citations.py`
+and commit `CITATIONS.md`, which the same test checks against the two files.
 
 ### Databases
 
