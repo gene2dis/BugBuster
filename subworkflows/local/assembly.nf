@@ -66,7 +66,6 @@ workflow ASSEMBLY {
 
     main:
     ch_versions = channel.empty()
-    ch_contigs_with_reads = channel.empty()
     ch_contigs_only = channel.empty()
     ch_bam_with_contigs = channel.empty()
     ch_bam_only = channel.empty()
