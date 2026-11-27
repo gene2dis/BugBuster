@@ -1,0 +1,83 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    FUNCTIONAL_ANNOTATION Subworkflow Test
+
+    Roadmap Phase 29, CL5 (design doc Q24, option b): an assembly whose contigs
+    pass --bbmap_length but give Pyrodigal no gene. Pyrodigal (the shared gene
+    calling of main.nf, run here as the setup) writes an empty FAA and GFF;
+    EGGNOG_MAPPER_SEARCH / _ANNOTATE, RUN_DBCAN and FEATURECOUNTS_GENES write
+    header-only outputs without running their tools, and AGGREGATE_FUNCTIONS
+    aggregates them. Not a stub: every script runs in its image, so the
+    short-circuits and the aggregation's layout guards (the eggNOG-mapper
+    version, the v3 annotation header, the dbCAN overview header) are what is
+    tested. The databases are a directory that is not one, which no step may
+    open. Fixture: tests/data/functional/nogene_contigs.fa and nogene.bam
+    (tests/bin/make_nogene_fixtures.sh).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_workflow {
+
+    name "Test FUNCTIONAL_ANNOTATION Subworkflow"
+    script "../../subworkflows/local/functional_annotation.nf"
+    workflow "FUNCTIONAL_ANNOTATION"
+
+    test("an assembly without genes: header-only annotations, and the aggregation runs") {
+        setup {
+            run("PYRODIGAL") {
+                script "../../modules/nf-core/pyrodigal/main.nf"
+                process {
+                    """
+                    input[0] = channel.of([ [ id: 'nogenes' ], file("${projectDir}/tests/data/functional/nogene_contigs.fa", checkIfExists: true) ])
+                    input[1] = 'gff'
+                    """
+                }
+            }
+        }
+
+        when {
+            params {
+                output                  = "${outputDir}"
+                assembly_mode           = "assembly"
+                contig_level_functional = true
+                functional_cazy         = true
+                mag_level_functional    = false
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            workflow {
+                """
+                def data = "${projectDir}/tests/data/functional"
+                input[0] = PYRODIGAL.out.faa
+                input[1] = channel.value(file(data))
+                input[2] = channel.value(file(data))
+                input[3] = PYRODIGAL.out.annotations
+                input[4] = channel.of([ [ id: 'nogenes' ], file("\${data}/nogene.bam", checkIfExists: true) ])
+                input[5] = channel.empty()
+                input[6] = channel.empty()
+                input[7] = channel.empty()
+                input[8] = channel.value(file("\${data}/cog-fixture.def.tab", checkIfExists: true))
+                input[9] = channel.value([])
+                """
+            }
+        }
+
+        then {
+            assert workflow.success
+            // every step of the contig branch ran (none was left out)
+            ['EGGNOG_MAPPER_SEARCH', 'EGGNOG_MAPPER_ANNOTATE', 'RUN_DBCAN', 'FEATURECOUNTS_GENES', 'AGGREGATE_FUNCTIONS'].each { name ->
+                assert workflow.trace.tasks().count { task -> task.name.contains(name) } == 1
+            }
+            assert workflow.trace.failed().size() == 0
+
+            def summary = "${outputDir}/07_functional_annotation/summary"
+            // the gene tables: header only (no gene)
+            assert path("${summary}/gene_abundance.tsv").readLines().size() == 1
+            assert path("${summary}/function_abundance.tsv").readLines().size() == 1
+            // the sample keeps its row in the annotated-fraction report: 0 genes
+            assert path("${summary}/annotated_fraction.tsv").readLines().any { line -> line.startsWith("nogenes\tany\t0\t0\t") }
+            // the run's eggNOG-mapper version reached the aggregation
+            assert path("${outputDir}/07_functional_annotation/eggnog/nogenes/nogenes.emapper.annotations").readLines()[0] == "## emapper-3.0.0-beta6"
+        }
+    }
+}

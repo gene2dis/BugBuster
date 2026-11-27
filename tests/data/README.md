@@ -21,6 +21,7 @@ Nothing here is real sample data. The CARD-layout and DeepARG-layout fixtures ar
 | `decontamination/` | captured | phage lambda (NC_001416.1, the mock host) and phiX174 genomes (`.gz` and no-final-newline variants derived from them) | the QC and decontamination tests, `-profile test`, and as genomes in the sylph, metabuli, depth and BOWTIE2_SAMTOOLS fixtures |
 | `derep/` | generated | `make_derep_fixtures.py` | `modules/galah_cluster`, `coverm_genome` |
 | `functional/` | generated | `make_functional_fixtures.sh` | `modules/aggregate_functions`, `run_dbcan`, `test_aggregate_functions.sh`, `test_db_reformat_scripts.sh` |
+| `functional/nogene_contigs.fa`, `nogene.bam` | generated | `make_nogene_fixtures.sh`: one synthetic 1,500 bp contig (TTAGTTAA repeated) on which Pyrodigal calls no gene, and its header-only BAM | `subworkflows/functional_annotation` |
 | `gff/` | generated | `make_gff_fixtures.sh` | `modules/featurecounts_genes`, `test_gff2saf.sh` |
 | `gunc/` | generated | `make_gunc_fixtures.sh` | `modules/gunc_run` |
 | `humann/` | generated | `make_humann_fixtures.sh` (database, reads) and `make_humann_fixtures.py` (tables) | `modules/humann`, `test_humann_scripts.sh`, `test_db_reformat_scripts.sh` |

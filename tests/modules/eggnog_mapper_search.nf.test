@@ -9,6 +9,14 @@
     bugbuster-eggnog-mapper, design doc Q11 interim). The Section 10.2
     acceptance check (non-empty annotations on a test protein set) is a manual
     run against a real database.
+
+    Roadmap Phase 29, CL5 (design doc Q24, option b): an assembly whose contigs
+    give Pyrodigal no gene has an empty FAA, on which emapper stops (diamond:
+    "Input file seems to be empty"). The module then writes, without running
+    emapper and without the database, the seed orthologs file emapper writes
+    for a search without hits, marked "## search skipped". That case runs the
+    real script in the image on tests/data/functional/empty.faa.gz, with a
+    directory that is not an eggNOG database.
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -39,6 +47,34 @@ nextflow_process {
             assert process.out.seed_orthologs.get(0).get(1).endsWith('stubtest.emapper.seed_orthologs')
             assert process.out.versions.size() == 1
             assert path(process.out.versions.get(0)).text.contains('eggnog-mapper:')
+        }
+    }
+
+    test("empty FAA: header-only seed orthologs without running emapper") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'nogenes' ],
+                    file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/functional", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def seeds = path(process.out.seed_orthologs.get(0).get(1)).readLines()
+            assert seeds[0] == "## emapper-3.0.0-beta6"
+            assert seeds.contains("## search skipped: empty.faa.gz holds no protein")
+            assert seeds.contains("#qseqid\tsseqid\tevalue\tbitscore\tqstart\tqend\tsstart\tsend\tpident\tqcov\tscov")
+            assert seeds.every { line -> line.startsWith('#') }
+            assert path(process.out.versions.get(0)).text.contains("eggnog-mapper: 3.0.0-beta6")
         }
     }
 }

@@ -26,6 +26,25 @@ process DEEPARG_CONTIGS {
         # gzip -cdf also passes plain FASTA through unchanged.
         gzip -cdf ${prodigal_contigs} > ${prefix}_proteins_input.faa
 
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
+        END_VERSIONS
+
+        # An assembly whose contigs give Pyrodigal no gene (design doc Q24, option
+        # b; roadmap Phase 29, CL5): deeparg predict stops on an empty FASTA
+        # (IOError ... align.daa.tsv). Write the two tables a run without hits
+        # writes, DeepARG 1.0.4's header row alone, without running it
+        if ! grep -q '^>' ${prefix}_proteins_input.faa; then
+            echo "WARNING: ${prefix} has no predicted protein: DeepARG skipped, header-only ARG tables written" >&2
+            for table in mapping.ARG mapping.potential.ARG; do
+                printf '#ARG\\tquery-start\\tquery-end\\tread_id\\tpredicted_ARG-class\\tbest-hit\\tprobability\\tidentity\\talignment-length\\talignment-bitscore\\talignment-evalue\\tcounts\\n' \
+                    > ${prefix}_contigs_deep_arg.out.\${table}
+            done
+            rm ${prefix}_proteins_input.faa
+            exit 0
+        fi
+
         # deeparg predict runs `diamond blastp` with no thread count, so DIAMOND
         # starts one thread per host core whatever the task's CPUs, and the
         # image's OpenBLAS does the same in the classifier. A diamond wrapper
@@ -74,11 +93,6 @@ process DEEPARG_CONTIGS {
             exit \$(cat diamond_failed)
         fi
         [ \$deeparg_status -eq 0 ] || exit \$deeparg_status
-
-        cat <<-END_VERSIONS > versions.yml
-        "${task.process}":
-            deeparg: \$(v=\$(pip show deeparg 2>/dev/null | sed -n 's/Version: //p'); echo \${v:-1.0.4})
-        END_VERSIONS
         """
 
     stub:

@@ -1484,6 +1484,12 @@ bold label names the full entry below (search for it).
 
 ### Fixed
 
+- An assembly whose contigs pass `--bbmap_length` but give Pyrodigal no gene no longer
+  stops the run: EGGNOG_MAPPER_SEARCH, EGGNOG_MAPPER_ANNOTATE and DEEPARG_CONTIGS write
+  the header-only tables of a run without hits instead of running their tool on an empty
+  protein file, as RUN_DBCAN and FEATURECOUNTS_GENES already did, and the functional
+  aggregation, argNorm, the contig ARG report, the bin ARG split and the summary take
+  them (design doc Q24).
 - SEMIBIN no longer stops the run on an assembly where SemiBin2 2.6.0 finds no bins
   for want of long contigs: every contig of 1,000-2,500 bp ("all are shorter than 2500
   basepairs"), and, for a co-assembly with `--semibin_coassembly_mode train_self`, no

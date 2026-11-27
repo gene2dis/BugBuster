@@ -1,0 +1,72 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    DEEPARG_CONTIGS Module Test
+
+    Roadmap Phase 29, CL5 (design doc Q24, option b): an assembly whose contigs
+    give Pyrodigal no gene has an empty FAA, on which deeparg predict stops
+    (IOError ... align.daa.tsv). The module then writes the two tables a
+    DeepARG run without hits writes, the DeepARG 1.0.4 header row alone
+    (captured from a real run), without running deeparg and without the
+    database. The real script runs in the image on
+    tests/data/functional/empty.faa.gz, with a directory that is not a DeepARG
+    database. A real prediction needs the DeepARG database (not CI-feasible).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test DEEPARG_CONTIGS Process"
+    script "../../modules/local/deeparg/main.nf"
+    process "DEEPARG_CONTIGS"
+
+    test("empty FAA: header-only ARG tables without running deeparg") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'nogenes' ],
+                    file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/functional", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def tables = process.out.deeparg.get(0).get(1).collect { f -> file(f) }.sort { f -> f.name }
+            assert tables*.name == ['nogenes_contigs_deep_arg.out.mapping.ARG', 'nogenes_contigs_deep_arg.out.mapping.potential.ARG']
+            def header = "#ARG\tquery-start\tquery-end\tread_id\tpredicted_ARG-class\tbest-hit\tprobability\tidentity\talignment-length\talignment-bitscore\talignment-evalue\tcounts"
+            tables.each { f -> assert f.readLines() == [header] }
+            // the header of the real 1.0.4 output in the argNorm fixture
+            assert file("${projectDir}/tests/data/argnorm/sampleA_contigs_deep_arg.out.mapping.ARG").readLines()[0] == header
+            assert path(process.out.versions.get(0)).text.contains("deeparg: 1.0.4")
+        }
+    }
+
+    test("stub emits the ARG table and versions") {
+        options "-stub"
+
+        when {
+            process {
+                """
+                input[0] = [
+                    [ id: 'stubtest' ],
+                    file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                    file("${projectDir}/tests/data/functional", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.deeparg.get(0).get(1)).name == 'stubtest_contigs_deep_arg.out.mapping.ARG'
+            assert path(process.out.versions.get(0)).text.contains("deeparg: 1.0.4")
+        }
+    }
+}

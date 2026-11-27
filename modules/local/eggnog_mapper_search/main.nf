@@ -66,6 +66,30 @@ process EGGNOG_MAPPER_SEARCH {
     # through unchanged
     gzip -cdf ${proteins} > ${prefix}_proteins_input.faa
 
+    # Keep the full version string — beta suffixes like 3.0.0-beta6 matter for
+    # the version-aware parsing downstream (design doc Section 4.2)
+    cat <<-END_VERSIONS > versions.yml
+    "${task.process}":
+        eggnog-mapper: \$(emapper.py --version 2>&1 | grep -o 'emapper-[0-9][^ /]*' | head -1 | sed 's/emapper-//')
+    END_VERSIONS
+
+    # An assembly whose contigs give Pyrodigal no gene (design doc Q24, option
+    # b; roadmap Phase 29, CL5): emapper stops on an empty FASTA (diamond:
+    # "Input file seems to be empty"). Write the seed orthologs file emapper
+    # writes for a search without hits (its comment lines and header, 0 queries)
+    # without running it
+    if ! grep -q '^>' ${prefix}_proteins_input.faa; then
+        echo "WARNING: ${prefix} has no predicted protein: eggNOG-mapper search skipped, header-only seed orthologs written" >&2
+        {
+            echo "## emapper-\$(emapper.py --version 2>&1 | grep -o 'emapper-[0-9][^ /]*' | head -1 | sed 's/emapper-//')"
+            echo "## search skipped: ${proteins} holds no protein"
+            printf '#qseqid\\tsseqid\\tevalue\\tbitscore\\tqstart\\tqend\\tsstart\\tsend\\tpident\\tqcov\\tscov\\n'
+            echo "## 0 queries scanned"
+        } > ${prefix}.emapper.seed_orthologs
+        rm ${prefix}_proteins_input.faa
+        exit 0
+    fi
+
     # emapper exits 1 when the kernel kills diamond for running out of
     # memory, which the memory retry (exit 130-145) does not catch: report
     # such a failure as 137 instead. diamond peaks at ~80 GB against the
@@ -95,12 +119,6 @@ process EGGNOG_MAPPER_SEARCH {
 
     rm -f ${prefix}_proteins_input.faa emapper.stdout emapper.stderr
 
-    # Keep the full version string — beta suffixes like 3.0.0-beta6 matter for
-    # the version-aware parsing downstream (design doc Section 4.2)
-    cat <<-END_VERSIONS > versions.yml
-    "${task.process}":
-        eggnog-mapper: \$(emapper.py --version 2>&1 | grep -o 'emapper-[0-9][^ /]*' | head -1 | sed 's/emapper-//')
-    END_VERSIONS
     """
 
     stub:

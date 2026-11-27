@@ -116,4 +116,45 @@ nextflow_process {
             assert path(process.out.versions[0]).text.contains('argnorm: 1.1.0')
         }
     }
+
+    test("DeepARG tables of an assembly without genes: header-only output") {
+        // Roadmap Phase 29, CL5 (design doc Q24): DEEPARG_CONTIGS' header-only
+        // table (its short-circuit on an empty FAA, run in its image) passes
+        // through argNorm 1.1.0, which writes its header row alone
+        setup {
+            run("DEEPARG_CONTIGS") {
+                script "../../modules/local/deeparg/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id: 'nogenes' ],
+                        file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/functional", checkIfExists: true)
+                    ]
+                    """
+                }
+            }
+        }
+
+        when {
+            process {
+                """
+                input[0] = DEEPARG_CONTIGS.out.deeparg.map { meta, files ->
+                    [meta, [files].flatten().find { f -> f.name.endsWith('.out.mapping.ARG') }]
+                }
+                input[1] = 'deeparg'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.tsv[0][1]).readLines()
+            assert lines[0] == '# argNorm version: 1.1.0'
+            assert lines.size() == 2
+            def header = lines[1].split('\t') as List
+            assert header[0..3] == ['#ARG', 'query-start', 'query-end', 'read_id']
+            assert header[12..14] == ['ARO', 'ARO_name', 'Cut_Off']
+        }
+    }
 }
