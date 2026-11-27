@@ -33,6 +33,12 @@ bold label names the full entry below (search for it).
 
 ### Added
 
+- `pipeline_info/software_versions.yml` lists the tools that download and format each
+  database (`FORMAT_*` / `DOWNLOAD_*`: wget, tar, gzip, xz, bzip2, unzip, DIAMOND,
+  makeblastdb, amrfinder, as each process runs them; issue #24). The versions are stored
+  with the database and re-emitted when a later run reuses it. A database stored by an
+  earlier version is still reused (nothing downloads again); its process shows
+  `versions: not recorded (database stored by an earlier run)`.
 - `CITATIONS.md`: the references of every tool and database the pipeline can run, by
   pipeline step, linked from the README and the manual (issue #25). It is written by
   `tests/bin/make_citations.py` from the report's curated references

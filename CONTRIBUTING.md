@@ -329,7 +329,16 @@ withName: 'FORMAT_TOOL_DB' {
   declare them as their own output or change the key. Otherwise a store filled before
   the change still passes the check and is reused without them.
 - **A `versions.yml` output is stored with the database** and re-emitted when the process
-  is skipped, so `software_versions.yml` reports the versions that built it.
+  is skipped, so `software_versions.yml` reports the versions that built it. Declare it
+  `optional: true` when you add it to an existing database process (as the `FORMAT_*` /
+  `DOWNLOAD_*` processes of `modules/local/format_db/main.nf` do): a store filled before it
+  lacks the file, and a required output missing from the store would make every existing
+  `databases_dir` download the database again. `prepare_databases.nf` turns a missing file
+  into a "not recorded" line (`storedVersions()`). Write the file first in the script, with
+  `bin/db_tool_version.sh <tool>` (one version per tool, `busybox <version>` for a BusyBox
+  applet, never an error), so a version line cannot fail a finished download; two processes
+  that share a store need different file names (`versions_sylph_db.yml`,
+  `versions_sylph_taxonomy.yml`).
 - **A build from the user's own files** (`--custom_host_fasta`, `--custom_rgi_wildcard`,
   a `--custom_sourmash_db` lineages file) has no version to key on. It runs every time
   and keeps a `publishDir` copy in `databases_dir`, for reuse through the matching

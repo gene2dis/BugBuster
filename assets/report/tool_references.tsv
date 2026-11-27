@@ -96,3 +96,10 @@ jinja2	Jinja2	helper		helper
 altair	Altair	helper		helper	
 vl-convert	vl-convert	helper		helper	
 seaborn	seaborn	helper		helper	
+wget	GNU Wget	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+tar	tar	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+xz	XZ Utils	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+bzip2	bzip2	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+unzip	UnZip	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+amrfinder	AMRFinderPlus (database refresh)	helper		helper: FORMAT_BAKTA_DB refreshes the AMRFinderPlus database inside Bakta with amrfinder_update (Bakta cites it)	
+versions	versions not recorded	helper		placeholder: a database stored before its process recorded tool versions (roadmap Phase 29, CL1)	

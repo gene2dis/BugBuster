@@ -13,15 +13,33 @@ process FORMAT_KRAKEN_DB {
         val(db)
 
     output:
-        path("k2_ref_db")
+        path("k2_ref_db"), emit: kraken_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${params.kraken_ref_db[params.kraken2_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         mkdir k2_ref_db
         touch k2_ref_db/hash.k2d k2_ref_db/opts.k2d k2_ref_db/taxo.k2d
         """
@@ -40,14 +58,30 @@ process FORMAT_SYLPH_DB {
         // Fixed name (the URL's file name, as the script saves it): storeDir
         // checks only that declared outputs exist (CONTRIBUTING, Databases)
         path("sylph_db/${db.tokenize('/')[-1]}"), emit: db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions_sylph_db.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions_sylph_db.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+        END_VERSIONS
+
         ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} db $db '${params.sylph_ref_db[params.sylph_db]["bytes"] ?: ''}'
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions_sylph_db.yml
+        "${task.process}":
+            wget: 1.21.4
+        END_VERSIONS
+
         mkdir sylph_db
         touch sylph_db/${db.tokenize('/')[-1]}
         """
@@ -64,14 +98,32 @@ process FORMAT_SYLPH_TAXONOMY {
 
     output:
         path("sylph_db/${taxonomy.tokenize('/')[-1]}"), emit: taxonomy
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions_sylph_taxonomy.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions_sylph_taxonomy.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            gzip: \$(db_tool_version.sh gzip)
+        END_VERSIONS
+
         ${params.sylph_ref_db[params.sylph_db]["fmtscript"]} taxonomy $taxonomy
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions_sylph_taxonomy.yml
+        "${task.process}":
+            wget: 1.21.4
+            gzip: 1.12
+        END_VERSIONS
+
         mkdir sylph_db
         printf 'GCF_000000001.1\\td__Bacteria;p__P;c__C;o__O;f__F;g__G;s__G species\\n' | gzip > sylph_db/${taxonomy.tokenize('/')[-1]}
         """
@@ -89,14 +141,32 @@ process FORMAT_METABULI_DB {
 
     output:
         path("metabuli_db"), emit: metabuli_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${params.metabuli_ref_db[params.metabuli_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         mkdir -p metabuli_db/ncbi-taxdump
         touch metabuli_db/db.parameters metabuli_db/diffIdx metabuli_db/info metabuli_db/taxonomyDB \
             metabuli_db/ncbi-taxdump/nodes.dmp metabuli_db/ncbi-taxdump/names.dmp
@@ -114,10 +184,22 @@ process FORMAT_GENOMAD_DB {
 
     output:
         path("genomad_db"), emit: genomad_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.genomad_ref_db[key]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \
             '${entry["url"]}' \
             '${entry["md5"]}' \
@@ -126,6 +208,12 @@ process FORMAT_GENOMAD_DB {
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         mkdir genomad_db
         touch genomad_db/genomad_db genomad_db/genomad_db.dbtype genomad_db/genomad_marker_metadata.tsv
         echo 1.9 > genomad_db/version.txt
@@ -147,10 +235,23 @@ process FORMAT_CHECKV_DB {
 
     output:
         path("checkv_db"), emit: checkv_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.checkv_ref_db[key]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+            diamond: \$(db_tool_version.sh diamond)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \\
             '${entry["url"]}' \\
             '${entry["bytes"]}' \\
@@ -159,6 +260,13 @@ process FORMAT_CHECKV_DB {
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: busybox 1.36.1
+            diamond: 2.1.8
+        END_VERSIONS
+
         mkdir -p checkv_db/genome_db checkv_db/hmm_db/checkv_hmms
         touch checkv_db/genome_db/checkv_reps.dmnd checkv_db/genome_db/checkv_reps.tsv checkv_db/genome_db/checkv_error.tsv checkv_db/hmm_db/checkv_hmms.tsv
         echo '## Verion 1.5 (stub)' > checkv_db/README.txt
@@ -220,15 +328,33 @@ process FORMAT_CHECKM2_DB {
         val(db)
 
     output:
-        path("${params.checkm2_ref_db[params.checkm2_db]["file"]}")
+        path("${params.checkm2_ref_db[params.checkm2_db]["file"]}"), emit: checkm2_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${params.checkm2_ref_db[params.checkm2_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         touch ${params.checkm2_ref_db[params.checkm2_db]["file"]}
         """
 }
@@ -245,10 +371,22 @@ process FORMAT_GUNC_DB {
 
     output:
         path("${params.gunc_ref_db[key]["file"]}"), emit: gunc_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.gunc_ref_db[key]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            gzip: \$(db_tool_version.sh gzip)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \
             '${entry["url"]}' \
             '${entry["gz_md5"]}' \
@@ -258,6 +396,12 @@ process FORMAT_GUNC_DB {
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            gzip: 1.12
+        END_VERSIONS
+
         touch ${params.gunc_ref_db[key]["file"]}
         """
 }
@@ -272,15 +416,33 @@ process DOWNLOAD_GTDBTK_DB {
         val(db)
 
     output:
-        path("gtdbtk_db")
+        path("gtdbtk_db"), emit: gtdbtk_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${params.gtdbtk_ref_db[params.gtdbtk_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         mkdir gtdbtk_db
         touch gtdbtk_db/metadata.txt
         """
@@ -296,15 +458,31 @@ process FORMAT_EGGNOG_DB {
         val(db)
 
     output:
-        path("eggnog_db")
+        path("eggnog_db"), emit: eggnog_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+        END_VERSIONS
+
         ${params.eggnog_ref_db[params.eggnog_db]["fmtscript"]} $db '${params.eggnog_ref_db[params.eggnog_db]["bytes"] ?: ''}'
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+        END_VERSIONS
+
         mkdir eggnog_db
         touch eggnog_db/eggnog.db eggnog_db/eggnog.db.fieldpresence.bin \\
             eggnog_db/eggnog.db.taxids.bin eggnog_db/eggnog.taxa.db \\
@@ -323,15 +501,31 @@ process FORMAT_DBCAN_DB {
         val(db)
 
     output:
-        path("dbcan_db")
+        path("dbcan_db"), emit: dbcan_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+        END_VERSIONS
+
         ${params.dbcan_ref_db[params.dbcan_db]["fmtscript"]} $db '${params.dbcan_ref_db[params.dbcan_db]["bytes"] ?: ''}'
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+        END_VERSIONS
+
         mkdir dbcan_db
         touch dbcan_db/CAZy.dmnd dbcan_db/dbCAN.hmm dbcan_db/dbCAN-sub.hmm \\
             dbcan_db/fam-substrate-mapping.tsv dbcan_db/DB_VERSION
@@ -359,15 +553,37 @@ process FORMAT_BAKTA_DB {
         val(db)
 
     output:
-        path("bakta_db")
+        path("bakta_db"), emit: bakta_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+            xz: \$(db_tool_version.sh xz)
+            amrfinder: \$(db_tool_version.sh amrfinder)
+        END_VERSIONS
+
         ${params.bakta_ref_db[params.bakta_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.25.0
+            tar: busybox 1.36.1
+            xz: busybox 1.36.1
+            amrfinder: 4.2.7
+        END_VERSIONS
+
         mkdir -p bakta_db/amrfinderplus-db
         touch bakta_db/version.json bakta_db/DB_VERSION
         """
@@ -383,15 +599,31 @@ process FORMAT_COG_DB {
         val(db)
 
     output:
-        path("${db.tokenize('/')[-1]}")
+        path("${db.tokenize('/')[-1]}"), emit: cog_def
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+        END_VERSIONS
+
         ${params.cog_ref_db[params.cog_db]["fmtscript"]} $db
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+        END_VERSIONS
+
         touch ${db.tokenize('/')[-1]}
         """
 }
@@ -413,15 +645,33 @@ process FORMAT_WOLTKA_DB {
         val(db)
 
     output:
-        path("woltka_db")
+        path("woltka_db"), emit: woltka_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            xz: \$(db_tool_version.sh xz)
+        END_VERSIONS
+
         ${params.woltka_ref_db[params.woltka_db]["fmtscript"]} $db '${params.woltka_ref_db[params.woltka_db]["bytes"] ?: ''}'
         """
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: busybox 1.36.1
+            xz: 5.2.6
+        END_VERSIONS
+
         mkdir -p woltka_db/databases/bowtie2 woltka_db/proteins \
             woltka_db/function/kegg woltka_db/function/metacyc woltka_db/function/pfam
         touch woltka_db/databases/bowtie2/WoLr2.rev.1.bt2l woltka_db/proteins/coords.txt.xz \
@@ -443,11 +693,23 @@ process FORMAT_HUMANN_DB {
         val(key)
 
     output:
-        path("humann_db")
+        path("humann_db"), emit: humann_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.humann_ref_db[key]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \
             '${key}' \
             '${entry["chocophlan_url"]}' \
@@ -463,6 +725,12 @@ process FORMAT_HUMANN_DB {
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            tar: 1.35
+        END_VERSIONS
+
         mkdir -p humann_db/chocophlan humann_db/uniref humann_db/utility_mapping humann_db/metaphlan
         touch humann_db/DB_VERSION
         """
@@ -485,11 +753,23 @@ process FORMAT_SUPERFOCUS_DB {
         val(aligner)
 
     output:
-        path("superfocus_db")
+        path("superfocus_db"), emit: superfocus_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.superfocus_ref_db[params.superfocus_db]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            unzip: \$(db_tool_version.sh unzip)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \
             ${aligner} \
             '${entry[aligner]["url"]}' \
@@ -502,6 +782,12 @@ process FORMAT_SUPERFOCUS_DB {
     stub:
         def static_file = aligner == 'diamond' ? 'diamond/90_clusters.db.dmnd' : 'mmseqs2/90_clusters.db'
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.4
+            unzip: 6.00
+        END_VERSIONS
+
         mkdir -p superfocus_db/db/static/${aligner}
         touch superfocus_db/db/database_PKs.txt superfocus_db/db/static/${static_file} \
             superfocus_db/DB_VERSION
@@ -522,11 +808,25 @@ process FORMAT_KMARVEL_DB {
         val(key)
 
     output:
-        path("kmarvel_db")
+        path("kmarvel_db"), emit: kmarvel_db
+        // Tool versions, stored with the database and re-emitted when the store
+        // is reused; optional, so a store built before it is reused too (roadmap
+        // Phase 29, CL1)
+        path("versions.yml"), emit: versions, optional: true
 
     script:
         def entry = params.kmarvel_ref_db[key]
         """
+        # The versions first, so a version line can never fail a finished
+        # download (bin/db_tool_version.sh prints 'unknown' instead)
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: \$(db_tool_version.sh wget)
+            tar: \$(db_tool_version.sh tar)
+            bzip2: \$(db_tool_version.sh bzip2)
+            blast: \$(db_tool_version.sh makeblastdb)
+        END_VERSIONS
+
         ${entry["fmtscript"]} \
             '${entry["url"]}' \
             '${entry["md5"]}' \
@@ -535,6 +835,14 @@ process FORMAT_KMARVEL_DB {
 
     stub:
         """
+        cat <<-END_VERSIONS > versions.yml
+        "${task.process}":
+            wget: 1.21.3
+            tar: 1.34
+            bzip2: 1.0.8
+            blast: 2.17.0+
+        END_VERSIONS
+
         mkdir kmarvel_db
         touch kmarvel_db/CARD_protein_all.fasta kmarvel_db/metadata.tsv kmarvel_db/snps.txt \
             kmarvel_db/DB_VERSION

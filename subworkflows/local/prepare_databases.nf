@@ -35,6 +35,14 @@ include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_comb
 include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
 include { flagOn; sourmashCustomFiles; argNormCardNeeded; hostRefDb; phixRefDb } from './utils_params'
 
+// The versions file a database process stores with its database (re-emitted
+// when the store is reused), or, for a store built before the processes wrote
+// one (roadmap Phase 29, CL1; issue #24), a line in software_versions.yml that
+// says the versions were not recorded: the store is reused all the same
+def storedVersions(versions, process) {
+    return versions.ifEmpty { [ "PREPARE_DATABASES:${process}".toString(), 'versions', 'not recorded (database stored by an earlier run)' ] }
+}
+
 workflow PREPARE_DATABASES {
     
     main:
@@ -70,7 +78,9 @@ workflow PREPARE_DATABASES {
             ch_kraken_db = channel.fromPath(params.custom_kraken_db, checkIfExists: true)
         } else {
             ch_kraken_ref = channel.fromList(params.kraken_ref_db[params.kraken2_db]["url"])
-            ch_kraken_db = FORMAT_KRAKEN_DB(ch_kraken_ref)
+            ch_kraken_db = FORMAT_KRAKEN_DB(ch_kraken_ref).kraken_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_KRAKEN_DB.out.versions, 'FORMAT_KRAKEN_DB'))
         }
         // The database release, which no Kraken2 versions entry records
         // (review R2-08): the registry's dbversion, or the custom database's
@@ -129,6 +139,10 @@ workflow PREPARE_DATABASES {
             FORMAT_SYLPH_TAXONOMY(params.sylph_ref_db[params.sylph_db]["url"][1])
             ch_sylph_db       = FORMAT_SYLPH_DB.out.db
             ch_sylph_taxonomy = FORMAT_SYLPH_TAXONOMY.out.taxonomy
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_SYLPH_DB.out.versions, 'FORMAT_SYLPH_DB'))
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_SYLPH_TAXONOMY.out.versions, 'FORMAT_SYLPH_TAXONOMY'))
         }
     }
 
@@ -206,6 +220,8 @@ workflow PREPARE_DATABASES {
         } else {
             ch_metabuli_ref = channel.fromList(params.metabuli_ref_db[params.metabuli_db]["url"])
             ch_metabuli_db = FORMAT_METABULI_DB(ch_metabuli_ref).metabuli_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_METABULI_DB.out.versions, 'FORMAT_METABULI_DB'))
         }
         // Both files from one directory: the database's top level, else its
         // only subdirectory holding both (two candidates is an error, not a
@@ -237,6 +253,8 @@ workflow PREPARE_DATABASES {
             ch_genomad_db = channel.fromPath(params.custom_genomad_db, type: 'dir', checkIfExists: true)
         } else {
             ch_genomad_db = FORMAT_GENOMAD_DB(channel.of(params.genomad_db)).genomad_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_GENOMAD_DB.out.versions, 'FORMAT_GENOMAD_DB'))
         }
     }
 
@@ -249,6 +267,8 @@ workflow PREPARE_DATABASES {
             ch_checkv_db = channel.fromPath(params.custom_checkv_db, type: 'dir', checkIfExists: true)
         } else {
             ch_checkv_db = FORMAT_CHECKV_DB(channel.of(params.checkv_db)).checkv_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_CHECKV_DB.out.versions, 'FORMAT_CHECKV_DB'))
         }
     }
 
@@ -260,14 +280,18 @@ workflow PREPARE_DATABASES {
             ch_gtdbtk_db = channel.fromPath(params.custom_gtdbtk_db, checkIfExists: true)
         } else {
             ch_gtdbtk_ref = channel.fromList(params.gtdbtk_ref_db[params.gtdbtk_db]["url"])
-            ch_gtdbtk_db = DOWNLOAD_GTDBTK_DB(ch_gtdbtk_ref)
+            ch_gtdbtk_db = DOWNLOAD_GTDBTK_DB(ch_gtdbtk_ref).gtdbtk_db
+            ch_versions = ch_versions.mix(storedVersions(
+                DOWNLOAD_GTDBTK_DB.out.versions, 'DOWNLOAD_GTDBTK_DB'))
         }
 
         if ( params.custom_checkm2_db ) {
             ch_checkm2_db = channel.fromPath(params.custom_checkm2_db, checkIfExists: true)
         } else {
             ch_checkm2_ref = channel.fromList(params.checkm2_ref_db[params.checkm2_db]["url"])
-            ch_checkm2_db = FORMAT_CHECKM2_DB(ch_checkm2_ref)
+            ch_checkm2_db = FORMAT_CHECKM2_DB(ch_checkm2_ref).checkm2_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_CHECKM2_DB.out.versions, 'FORMAT_CHECKM2_DB'))
         }
         // GTDB-Tk and CheckM2 database releases, as for Kraken2 above
         ch_versions = ch_versions.mix(channel.of(
@@ -286,6 +310,8 @@ workflow PREPARE_DATABASES {
             ch_gunc_db = channel.fromPath(params.custom_gunc_db, type: 'file', checkIfExists: true)
         } else {
             ch_gunc_db = FORMAT_GUNC_DB(channel.of(params.gunc_db)).gunc_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_GUNC_DB.out.versions, 'FORMAT_GUNC_DB'))
         }
     }
 
@@ -297,7 +323,9 @@ workflow PREPARE_DATABASES {
             ch_eggnog_db = channel.fromPath(params.custom_eggnog_db, checkIfExists: true)
         } else {
             ch_eggnog_ref = channel.fromList(params.eggnog_ref_db[params.eggnog_db]["url"])
-            ch_eggnog_db = FORMAT_EGGNOG_DB(ch_eggnog_ref)
+            ch_eggnog_db = FORMAT_EGGNOG_DB(ch_eggnog_ref).eggnog_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_EGGNOG_DB.out.versions, 'FORMAT_EGGNOG_DB'))
         }
     }
 
@@ -311,7 +339,9 @@ workflow PREPARE_DATABASES {
             ch_cog_def = channel.fromPath(params.custom_cog_db, checkIfExists: true)
         } else {
             ch_cog_ref = channel.fromList(params.cog_ref_db[params.cog_db]["url"])
-            ch_cog_def = FORMAT_COG_DB(ch_cog_ref)
+            ch_cog_def = FORMAT_COG_DB(ch_cog_ref).cog_def
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_COG_DB.out.versions, 'FORMAT_COG_DB'))
         }
     }
 
@@ -323,7 +353,9 @@ workflow PREPARE_DATABASES {
             ch_dbcan_db = channel.fromPath(params.custom_dbcan_db, checkIfExists: true)
         } else {
             ch_dbcan_ref = channel.fromList(params.dbcan_ref_db[params.dbcan_db]["url"])
-            ch_dbcan_db = FORMAT_DBCAN_DB(ch_dbcan_ref)
+            ch_dbcan_db = FORMAT_DBCAN_DB(ch_dbcan_ref).dbcan_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_DBCAN_DB.out.versions, 'FORMAT_DBCAN_DB'))
         }
     }
 
@@ -338,7 +370,9 @@ workflow PREPARE_DATABASES {
             ch_bakta_db = channel.fromPath(params.custom_bakta_db, checkIfExists: true)
         } else {
             ch_bakta_ref = channel.fromList(params.bakta_ref_db[params.bakta_db]["url"])
-            ch_bakta_db = FORMAT_BAKTA_DB(ch_bakta_ref)
+            ch_bakta_db = FORMAT_BAKTA_DB(ch_bakta_ref).bakta_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_BAKTA_DB.out.versions, 'FORMAT_BAKTA_DB'))
         }
     }
 
@@ -352,7 +386,9 @@ workflow PREPARE_DATABASES {
             ch_woltka_db = channel.fromPath(params.custom_woltka_db, checkIfExists: true)
         } else {
             ch_woltka_ref = channel.fromList(params.woltka_ref_db[params.woltka_db]["url"])
-            ch_woltka_db = FORMAT_WOLTKA_DB(ch_woltka_ref)
+            ch_woltka_db = FORMAT_WOLTKA_DB(ch_woltka_ref).woltka_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_WOLTKA_DB.out.versions, 'FORMAT_WOLTKA_DB'))
         }
     }
 
@@ -367,7 +403,9 @@ workflow PREPARE_DATABASES {
         if ( params.custom_superfocus_db ) {
             ch_superfocus_db = channel.fromPath(params.custom_superfocus_db, checkIfExists: true)
         } else {
-            ch_superfocus_db = FORMAT_SUPERFOCUS_DB(channel.of(params.superfocus_aligner))
+            ch_superfocus_db = FORMAT_SUPERFOCUS_DB(channel.of(params.superfocus_aligner)).superfocus_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_SUPERFOCUS_DB.out.versions, 'FORMAT_SUPERFOCUS_DB'))
         }
     }
 
@@ -383,7 +421,9 @@ workflow PREPARE_DATABASES {
         if ( params.custom_humann_db ) {
             ch_humann_db = channel.fromPath(params.custom_humann_db, checkIfExists: true)
         } else {
-            ch_humann_db = FORMAT_HUMANN_DB(channel.of(params.humann_db))
+            ch_humann_db = FORMAT_HUMANN_DB(channel.of(params.humann_db)).humann_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_HUMANN_DB.out.versions, 'FORMAT_HUMANN_DB'))
         }
     }
 
@@ -420,7 +460,9 @@ workflow PREPARE_DATABASES {
         if ( params.custom_kmarvel_db ) {
             ch_kmarvel_db = channel.fromPath(params.custom_kmarvel_db, checkIfExists: true)
         } else {
-            ch_kmarvel_db = FORMAT_KMARVEL_DB(channel.of(params.kmarvel_db))
+            ch_kmarvel_db = FORMAT_KMARVEL_DB(channel.of(params.kmarvel_db)).kmarvel_db
+            ch_versions = ch_versions.mix(storedVersions(
+                FORMAT_KMARVEL_DB.out.versions, 'FORMAT_KMARVEL_DB'))
         }
     }
 
