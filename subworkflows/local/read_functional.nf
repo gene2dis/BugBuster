@@ -67,9 +67,7 @@ workflow READ_FUNCTIONAL {
             'woltka'
         )
 
-        ch_sample_functions    = WOLTKA_CLASSIFY.out.functions
         ch_function_abundance  = AGGREGATE_READ_FUNCTIONS.out.function_abundance
-        ch_function_wide       = AGGREGATE_READ_FUNCTIONS.out.function_wide
         ch_annotated_fraction  = AGGREGATE_READ_FUNCTIONS.out.annotated_fraction
         ch_sample_summary      = AGGREGATE_READ_FUNCTIONS.out.sample_summary
 
@@ -90,9 +88,7 @@ workflow READ_FUNCTIONAL {
             'superfocus'
         )
 
-        ch_sample_functions    = SUPERFOCUS.out.functions
         ch_function_abundance  = AGGREGATE_READ_FUNCTIONS.out.function_abundance
-        ch_function_wide       = AGGREGATE_READ_FUNCTIONS.out.function_wide
         ch_annotated_fraction  = AGGREGATE_READ_FUNCTIONS.out.annotated_fraction
         ch_sample_summary      = AGGREGATE_READ_FUNCTIONS.out.sample_summary
 
@@ -112,9 +108,7 @@ workflow READ_FUNCTIONAL {
             'humann'
         )
 
-        ch_sample_functions    = HUMANN.out.functions
         ch_function_abundance  = AGGREGATE_READ_FUNCTIONS.out.function_abundance
-        ch_function_wide       = AGGREGATE_READ_FUNCTIONS.out.function_wide
         ch_annotated_fraction  = AGGREGATE_READ_FUNCTIONS.out.annotated_fraction
         ch_sample_summary      = AGGREGATE_READ_FUNCTIONS.out.sample_summary
 
@@ -123,20 +117,15 @@ workflow READ_FUNCTIONAL {
             AGGREGATE_READ_FUNCTIONS.out.versions
         )
     } else {
-        ch_sample_functions    = channel.empty()
         ch_function_abundance  = channel.empty()
-        ch_function_wide       = channel.empty()
         ch_annotated_fraction  = channel.empty()
         ch_sample_summary      = channel.empty()
     }
 
-    // main.nf reads function_abundance, annotated_fraction, sample_summary
-    // and versions; sample_functions and function_wide are not read in the
-    // pipeline
+    // Only the channels main.nf reads are emitted (roadmap Phase 28, RV31);
+    // every file is still published by its process's publishDir rule
     emit:
-    sample_functions   = ch_sample_functions    // [ meta, <id>.<backend>_functions.tsv ] per sample
     function_abundance = ch_function_abundance  // read_function_abundance.tsv (Section 5.3, source=reads)
-    function_wide      = ch_function_wide       // read_function_wide_<ontology>_native.tsv (+ _cpge.tsv for woltka / humann)
     annotated_fraction = ch_annotated_fraction  // read_annotated_fraction.tsv
     sample_summary     = ch_sample_summary      // read_sample_summary.tsv
     versions           = ch_versions

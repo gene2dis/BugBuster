@@ -20,7 +20,6 @@ process COUNT_READS {
         task.ext.when == null || task.ext.when
 
     script:
-        def _args = task.ext.args ?: ''
         def prefix = "${meta.id}"
 
         """

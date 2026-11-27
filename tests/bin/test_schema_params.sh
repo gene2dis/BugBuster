@@ -91,26 +91,18 @@ check(not missing, "every allOf $ref names a $defs group", ", ".join(missing))
 unused = sorted(set(defs) - {r[len("#/$defs/"):] for r in refs})
 check(not unused, "every $defs group is referenced from allOf (its params are validated)", ", ".join(unused))
 
-# A param defined in two groups is validated against both entries: they must
-# not disagree on anything that validates (descriptions and icons may differ).
-# config_profile_name / _description are in generic_options and
-# cloud_hpc_profile_options today (both plain hidden strings; recorded in
-# roadmap Phase 25, not changed here: Phase 25 changes tests only)
-DOC_KEYS = {"description", "help_text", "fa_icon", "hidden"}
-props = {}
-dupes, conflicts = [], []
+# Every param is defined in one group only. A param in two groups is
+# validated against both entries, and copies drift apart (config_profile_name
+# / _description were in generic_options and cloud_hpc_profile_options until
+# roadmap Phase 28)
+props, dupes = {}, []
 entries = [p for g in defs.values() for p in g.get("properties", {}).items()]
 entries += list(schema.get("properties", {}).items())
 for name, prop in entries:
     if name in props:
         dupes.append(name)
-        strip = lambda d: {k: v for k, v in d.items() if k not in DOC_KEYS}
-        if strip(props[name]) != strip(prop):
-            conflicts.append(f"{name}: {strip(props[name])} vs {strip(prop)}")
     props[name] = prop
-if dupes:
-    print(f"  (defined in two groups, same validation: {', '.join(dupes)})")
-check(not conflicts, "a param defined twice has the same validation in both places", "; ".join(conflicts))
+check(not dupes, "no param is defined in two groups", ", ".join(dupes))
 
 flat, nested, ignore = {}, set(), []
 for line in open(flat_path):

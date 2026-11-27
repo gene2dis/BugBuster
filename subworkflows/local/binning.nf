@@ -215,10 +215,7 @@ workflow BINNING {
                 }
                 // Emit per-sample tuples
                 sample_reports.collect { sample_id, report_list ->
-                    def meta = meta_list.find { m ->
-                        def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
-                        mid == sample_id
-                    }
+                    def meta = meta_list.find { m -> m.id == sample_id }
                     // Every report is named <sample>_<binner>_...: an unmatched
                     // one is a naming bug, and dropping it would silently skip
                     // the bin reports
@@ -235,7 +232,6 @@ workflow BINNING {
 
     // Collect refined bins for batched GTDB-Tk (sorted, as for CHECKM2 above)
     ch_all_refined_bins = ch_refined_bins
-        .filter { _meta, bins -> bins != null }
         .toSortedList { a, b -> (a[0].id <=> b[0].id) ?: (a[1].name <=> b[1].name) }
         .filter { items -> items }  // as for CHECKM2 above
         .map { items ->
@@ -269,10 +265,7 @@ workflow BINNING {
             }
             // Emit per-sample tuples
             sample_reports.collect { sample_id, report_list ->
-                def meta = meta_list.find { m -> 
-                    def mid = m instanceof Map ? (m.id ?: m['id']) : m.toString()
-                    mid == sample_id
-                }
+                def meta = meta_list.find { m -> m.id == sample_id }
                 if (meta == null) {
                     error "GTDB-Tk: no sample matches the report(s) ${report_list*.name.join(', ')} (parsed sample id '${sample_id}')"
                 }

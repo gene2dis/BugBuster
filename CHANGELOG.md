@@ -698,6 +698,10 @@ bold label names the full entry below (search for it).
   options from `ext.args` in a `-c` config (`withName: 'SEMIBIN' { ext.args =
   '...' }`), as every other tool does; none is set by default, so command lines
   are unchanged (roadmap Phase 22).
+- `sourmash gather` takes extra options from SOURMASH's `ext.args` in a `-c`
+  config (`withName: 'SOURMASH' { ext.args = '--threshold-bp 50000' }`).
+  Before, the module read the value and ignored it. Nothing is set by default,
+  so the command line is unchanged (roadmap Phase 28).
 - `-profile slurm` no longer sets its own time limit per label (4 h ... 168 h):
   the labels' limits apply, and they grow with each retry. This is what was
   in force before on every Nextflow version; the `process_long`, `error_ignore`

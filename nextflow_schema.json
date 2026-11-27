@@ -1592,16 +1592,6 @@
                     "type": "string",
                     "description": "Extra singularity run options",
                     "hidden": true
-                },
-                "config_profile_name": {
-                    "type": "string",
-                    "description": "Institutional/profile config name (informational)",
-                    "hidden": true
-                },
-                "config_profile_description": {
-                    "type": "string",
-                    "description": "Institutional/profile config description (informational)",
-                    "hidden": true
                 }
             }
         }

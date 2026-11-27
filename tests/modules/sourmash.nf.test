@@ -10,6 +10,9 @@
         the report's classified fraction above zero
       - B. fragilis reads (tests/data/reads/test_sample1): no match, so the
         module's header-only CSV and a fully unclassified report
+      - the simulated reads with ext.args '--threshold-bp 1000000000'
+        (sourmash_ext_args.config): the option reaches sourmash gather, so
+        the match is dropped (roadmap Phase 28, RV31; review R4-19)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 */
 
@@ -103,6 +106,36 @@ nextflow_process {
             assert rows[0].endsWith(',lineage')
             def report = path(process.out.report.get(0)).readLines()
             assert report[1] == "nomatch\ttestdb\t1\t0"
+        }
+    }
+
+    test("ext.args reaches sourmash gather") {
+        config "./sourmash_ext_args.config"
+        when {
+            process {
+                """
+                input[0] = channel.of([
+                    [ id: 'sim' ],
+                    [
+                        file("${projectDir}/tests/data/sourmash/sm_test_R1.fastq.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/sourmash/sm_test_R2.fastq.gz", checkIfExists: true)
+                    ],
+                    file("${projectDir}/tests/data/sourmash/two_genome_k31.zip", checkIfExists: true)
+                ]).combine(SOURMASH_TAX_PREPARE.out.tax_db)
+                input[1] = 'testdb'
+                input[2] = 'species'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            // the reads the first test matches, with a minimum overlap no
+            // genome reaches: no match is kept
+            def rows = path(process.out.sourmash_gather.get(0)).readLines()
+            assert rows.size() == 1
+            def report = path(process.out.report.get(0)).readLines()
+            assert report[1] == "sim\ttestdb\t1\t0"
         }
     }
 }
