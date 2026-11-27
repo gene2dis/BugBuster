@@ -1473,6 +1473,12 @@ bold label names the full entry below (search for it).
 
 ### Fixed
 
+- SEMIBIN no longer stops the run on an assembly where SemiBin2 2.6.0 finds no bins
+  for want of long contigs: every contig of 1,000-2,500 bp ("all are shorter than 2500
+  basepairs"), and, for a co-assembly with `--semibin_coassembly_mode train_self`, no
+  contig of 4,000 bp (its first step stopped before the no-bins check). Both now give an
+  empty bin set with `SKIPPED.txt`, as the other no-bins cases did. The check is one
+  script for both modes, `bin/semibin_collect_bins.sh` (issue #30).
 - **Databases** (roadmap Phase 22):
   - A downloaded database was also copied into the results directory: the
     first run that downloaded one wrote it to `--databases_dir` and a second

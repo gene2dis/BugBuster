@@ -1,0 +1,152 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    SEMIBIN Module Test
+
+    Roadmap Phase 29, CL3 (issue #30): both script branches (single_easy_bin
+    with a pre-trained model; the co-assembly's self-trained model) hand
+    SemiBin2's exit status and log to bin/semibin_collect_bins.sh, which writes
+    an empty bin set with SKIPPED.txt when SemiBin2 found no bins. SemiBin2
+    2.6.0 runs here, in its image, on contig sets where it stops without bins
+    (tests/data/semibin/, tests/bin/make_semibin_fixtures.sh):
+      - short_contigs: no contig of 2,500 bp ("all are shorter than 2500
+        basepairs"; before Phase 29 this stopped the run);
+      - mid_contigs: none of 4,000 bp ("no must-link pairs can be generated";
+        before Phase 29 the self-trained branch stopped at its features step);
+    and on contigs below 1,000 bp, which the module skips without SemiBin2.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test SEMIBIN Process"
+    script "../../modules/local/semibin/main.nf"
+    process "SEMIBIN"
+
+    test("pre-trained model, no contig of 4,000 bp: SKIPPED.txt") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA' ],
+                    file("${projectDir}/tests/data/semibin/mid_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/semibin/mid_contigs.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.toFile().name == "sampleA_semibin_output_bins"
+            assert bins.resolve("SKIPPED.txt").text == "SemiBin found no bins\n"
+            assert bins.toFile().list() as List == ["SKIPPED.txt"]
+            assert path(process.out.versions.get(0)).text.contains("semibin: 2.6.0")
+        }
+    }
+
+    test("pre-trained model, no contig of 2,500 bp: SKIPPED.txt") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA' ],
+                    file("${projectDir}/tests/data/semibin/short_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/semibin/short_contigs.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.resolve("SKIPPED.txt").text == "SemiBin found no bins\n"
+            assert bins.toFile().list() as List == ["SKIPPED.txt"]
+        }
+    }
+
+    test("self-trained co-assembly model, no contig of 4,000 bp: SKIPPED.txt") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+                semibin_coassembly_mode = "train_self"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly', coassembly: true, samples: ['sampleA', 'sampleB'] ],
+                    file("${projectDir}/tests/data/semibin/mid_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/semibin/mid_contigs.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.toFile().name == "coassembly_semibin_output_bins"
+            assert bins.resolve("SKIPPED.txt").text == "SemiBin found no bins\n"
+            assert bins.toFile().list() as List == ["SKIPPED.txt"]
+        }
+    }
+
+    test("self-trained co-assembly model, no contig of 2,500 bp: SKIPPED.txt") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+                semibin_coassembly_mode = "train_self"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'coassembly', coassembly: true, samples: ['sampleA', 'sampleB'] ],
+                    file("${projectDir}/tests/data/semibin/short_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/semibin/short_contigs.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.resolve("SKIPPED.txt").text == "SemiBin found no bins\n"
+        }
+    }
+
+    test("every contig below 1,000 bp: skipped without SemiBin2") {
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = [
+                    [ id: 'sampleA' ],
+                    file("${projectDir}/tests/data/contigs/short_only_contigs.fa", checkIfExists: true),
+                    file("${projectDir}/tests/data/semibin/short_contigs.bam", checkIfExists: true)
+                ]
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def bins = path(process.out.bins.get(0)[1])
+            assert bins.resolve("SKIPPED.txt").text.contains("All contigs < 1000bp - SemiBin skipped")
+        }
+    }
+}

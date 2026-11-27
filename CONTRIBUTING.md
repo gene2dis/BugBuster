@@ -602,7 +602,7 @@ reverted) before relying on it.
   (`test_profile_config.sh`).
 - **Lint, config and schema checks**: the commands under [Linting](#linting).
 - **nf-test suite** on Nextflow 25.10.7 and the newest release.
-- **The `tests/bin` suites** (35 today), in two jobs: the database reformat scripts, and
+- **The `tests/bin` suites** (36 today), in two jobs: the database reformat scripts, and
   the taxonomy, report, summary and wrapper scripts. These include three repository
   consistency checks that a docs-only or metadata-only change can fail:
   `test_module_meta.sh` (every module's `meta.yml` against its process, a `tag` and a

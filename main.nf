@@ -190,7 +190,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError; argNormCardNeeded } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError; argNormCardNeeded; decontaminationIndexError } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -483,24 +483,9 @@ workflow {
     // INPUT_CHECK's samplesheet channel was starting, the error could be
     // reported as "Cannot find samplesheet file" instead
     if (flagOn(params.quality_control) && params.custom_decontamination_index) {
-        if ( params.read_aligner == 'bwamem3' ) {
-            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
-            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
-            if ( !index_files.any { name -> name.endsWith('.bwt.2bit.64') } ) {
-                def bowtie2_hint = index_files.any { name -> name ==~ /.*\.bt2l?$/ } ?
-                    " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta." : ""
-                error "--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64): ${params.custom_decontamination_index}.${bowtie2_hint}"
-            }
-        } else {
-            // The reverse mix-up: the index the pipeline publishes by
-            // default (bwamem3_index/) passed under the bowtie2 fallback
-            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
-            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
-            if ( !index_files.any { name -> name ==~ /.*\.[0-9]\.bt2l?$/ } ) {
-                def bwamem3_hint = index_files.any { name -> name.endsWith('.bwt.2bit.64') } ?
-                    " It holds a bwa-mem3/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index." : ""
-                error "--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index (*.bt2): ${params.custom_decontamination_index}.${bwamem3_hint}"
-            }
+        def index_error = decontaminationIndexError(params.read_aligner, params.custom_decontamination_index)
+        if ( index_error ) {
+            error index_error
         }
     }
 

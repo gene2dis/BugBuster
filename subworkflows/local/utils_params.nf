@@ -95,6 +95,39 @@ def phixRefDb() {
     return (params.phix_ref_db ?: [:]) + (params.bowtie_ref_genomes_for_build ?: [:])
 }
 
+// The launch error for a --custom_decontamination_index that does not hold an
+// index of --read_aligner, or null when it does: a Bowtie2 index cannot serve
+// bwa-mem3 (a bwa-mem2 index can), nor the reverse. One check for both
+// aligners (issue #29): the index each needs, the other's index (named in a
+// hint when that is what the directory holds) and the hint text
+def decontaminationIndexError(aligner, index_path) {
+    def bwamem3_index = { name -> name.endsWith('.bwt.2bit.64') }
+    def rules = [
+        bwamem3: [
+            expected: bwamem3_index,
+            other: { name -> name ==~ /.*\.bt2l?$/ },
+            hint: " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta.",
+            needs: "a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64)"
+        ],
+        bowtie2: [
+            // the reverse mix-up: the index the pipeline publishes by default
+            // (bwamem3_index/) passed under the bowtie2 fallback
+            expected: { name -> name ==~ /.*\.[0-9]\.bt2l?$/ },
+            other: bwamem3_index,
+            hint: " It holds a bwa-mem3/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index.",
+            needs: "a Bowtie2 index (*.bt2)"
+        ]
+    ]
+    def rule = rules[aligner.toString()]
+    def index_dir = file(index_path, checkIfExists: true)
+    def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
+    if ( index_files.any { name -> rule.expected(name) } ) {
+        return null
+    }
+    def hint = index_files.any { name -> rule.other(name) } ? rule.hint : ""
+    return "--read_aligner ${aligner} needs --custom_decontamination_index to be a directory with ${rule.needs}: ${index_path}.${hint}".toString()
+}
+
 // true when a (plain, uncompressed) FASTA holds at least one record. BBMAP
 // writes a FASTA without sequences when every contig of an assembly is below
 // --bbmap_length; ASSEMBLY drops such an assembly before the contig stages

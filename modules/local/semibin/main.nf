@@ -68,26 +68,11 @@ process SEMIBIN {
         """
         set -euo pipefail
         
-        # SemiBin2 fails when it finds no bins: the marker-gene search of its
-        # reclustering step gets an empty ORF file. SemiBin2 2.6.0 also stops
-        # when no contig reaches 4,000 bp, because it cannot build must-link
-        # pairs. An empty bin directory with a note lets Binette and the rest
-        # of the sample go on; any other failure keeps its exit status
-        no_bins_or_move() {
-            if [ "\$status" -eq 0 ]; then
-                mv "\$1" ${prefix}_semibin_output_bins
-            elif grep -q -e 'Number of bins prior to reclustering: 0' -e 'no must-link pairs can be generated' semibin.log; then
-                echo "WARNING: SemiBin found no bins for ${prefix}." >&2
-                mkdir -p ${prefix}_semibin_output_bins
-                echo "SemiBin found no bins" > ${prefix}_semibin_output_bins/SKIPPED.txt
-            else
-                exit "\$status"
-            fi
-        }
-        
         # No contig of 1,000 bp at all: skip SemiBin2 without running it. A
         # contig set with some >= 1,000 bp but none >= 4,000 bp runs and is
-        # caught from SemiBin2's log above (no must-link pairs)
+        # caught from SemiBin2's log (no must-link pairs) by
+        # bin/semibin_collect_bins.sh, which writes SKIPPED.txt when SemiBin2
+        # found no bins and keeps any other failure's exit status
         min_length=1000
         long_contigs=\$(awk -v min=\$min_length '/^>/ {if (seqlen >= min) count++; seqlen=0; next} {seqlen += length(\$0)} END {if (seqlen >= min) count++; print count+0}' ${contigs})
         
@@ -96,36 +81,45 @@ process SEMIBIN {
             mkdir -p ${prefix}_semibin_output_bins
             echo "All contigs < \${min_length}bp - SemiBin skipped" > ${prefix}_semibin_output_bins/SKIPPED.txt
         else
-            # Multi-sample co-assembly workflow
+            # Self-trained co-assembly workflow. Each step's output goes to
+            # semibin.log and a failure skips the later steps: SemiBin2 stops
+            # already at the features step when no contig reaches 2,500 or
+            # 4,000 bp, which semibin_collect_bins.sh then reports as no bins
+            status=0
             SemiBin2 generate_sequence_features_single \\
                      -i ${contigs} \\
                      -b ${bam} \\
                      -o contig_output \\
-                     --threads ${task.cpus}
-            
-            SemiBin2 train_self \\
-                     --data contig_output/data.csv \\
-                     --data-split contig_output/data_split.csv \\
-                     -o contig_output \\
-                     --random-seed ${seed} \\
-                     --threads ${task.cpus}
-            
-            # SemiBin2 2.6.0 saves the model as model.pt (2.1.0: model.h5)
-            model=contig_output/model.pt
-            [ -f "\$model" ] || model=contig_output/model.h5
-            status=0
-            SemiBin2 bin_short \\
-                     ${args} \\
-                     -i ${contigs} \\
-                     --model "\$model" \\
-                     --random-seed ${seed} \\
-                     --data contig_output/data.csv \\
-                     -o output \\
-                     --compression none \\
                      --threads ${task.cpus} \\
                      > semibin.log 2>&1 || status=\$?
+
+            if [ "\$status" -eq 0 ]; then
+                SemiBin2 train_self \\
+                         --data contig_output/data.csv \\
+                         --data-split contig_output/data_split.csv \\
+                         -o contig_output \\
+                         --random-seed ${seed} \\
+                         --threads ${task.cpus} \\
+                         >> semibin.log 2>&1 || status=\$?
+            fi
+
+            if [ "\$status" -eq 0 ]; then
+                # SemiBin2 2.6.0 saves the model as model.pt (2.1.0: model.h5)
+                model=contig_output/model.pt
+                [ -f "\$model" ] || model=contig_output/model.h5
+                SemiBin2 bin_short \\
+                         ${args} \\
+                         -i ${contigs} \\
+                         --model "\$model" \\
+                         --random-seed ${seed} \\
+                         --data contig_output/data.csv \\
+                         -o output \\
+                         --compression none \\
+                         --threads ${task.cpus} \\
+                         >> semibin.log 2>&1 || status=\$?
+            fi
             cat semibin.log >&2
-            no_bins_or_move output/output_bins
+            semibin_collect_bins.sh "\$status" output/output_bins ${prefix}_semibin_output_bins semibin.log ${prefix}
             rm -rf output contig_output semibin.log
         fi
         
@@ -141,26 +135,11 @@ process SEMIBIN {
         """
         set -euo pipefail
         
-        # SemiBin2 fails when it finds no bins: the marker-gene search of its
-        # reclustering step gets an empty ORF file. SemiBin2 2.6.0 also stops
-        # when no contig reaches 4,000 bp, because it cannot build must-link
-        # pairs. An empty bin directory with a note lets Binette and the rest
-        # of the sample go on; any other failure keeps its exit status
-        no_bins_or_move() {
-            if [ "\$status" -eq 0 ]; then
-                mv "\$1" ${prefix}_semibin_output_bins
-            elif grep -q -e 'Number of bins prior to reclustering: 0' -e 'no must-link pairs can be generated' semibin.log; then
-                echo "WARNING: SemiBin found no bins for ${prefix}." >&2
-                mkdir -p ${prefix}_semibin_output_bins
-                echo "SemiBin found no bins" > ${prefix}_semibin_output_bins/SKIPPED.txt
-            else
-                exit "\$status"
-            fi
-        }
-        
         # No contig of 1,000 bp at all: skip SemiBin2 without running it. A
         # contig set with some >= 1,000 bp but none >= 4,000 bp runs and is
-        # caught from SemiBin2's log above (no must-link pairs)
+        # caught from SemiBin2's log (no must-link pairs) by
+        # bin/semibin_collect_bins.sh, which writes SKIPPED.txt when SemiBin2
+        # found no bins and keeps any other failure's exit status
         min_length=1000
         long_contigs=\$(awk -v min=\$min_length '/^>/ {if (seqlen >= min) count++; seqlen=0; next} {seqlen += length(\$0)} END {if (seqlen >= min) count++; print count+0}' ${contigs})
         
@@ -181,7 +160,7 @@ process SEMIBIN {
                      --threads ${task.cpus} \\
                      > semibin.log 2>&1 || status=\$?
             cat semibin.log >&2
-            no_bins_or_move ${prefix}_semibin_bins/output_bins
+            semibin_collect_bins.sh "\$status" ${prefix}_semibin_bins/output_bins ${prefix}_semibin_output_bins semibin.log ${prefix}
             rm -rf ${prefix}_semibin_bins semibin.log
         fi
         
