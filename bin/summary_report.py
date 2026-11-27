@@ -17,7 +17,7 @@ import pandas as pd
 from summary_args import METHOD_LABELS
 from summary_common import CPGE_LABEL, NA_LOW_DEPTH, die, first_value, generated_date, warn
 from summary_contigs import CHECKV_COUNTS, CHECKV_TIER_ORDER
-from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_categories
+from summary_docs import TIER_MEANING, stage_pitfalls, table_doc, tier_basis, tier_categories
 from summary_figures import short_count
 
 PDF_MAX_ROWS = 60
@@ -190,14 +190,34 @@ def reading_guide(ctx):
                         "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point "
                         "to a commensal may be a related gene, not the clinical one."))
     if ctx.get("sarg"):
-        methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads weighted "
-                                    "by the share of the reference they cover) by its own cell estimate. SARG names "
-                                    "differ from CARD's, so ARGs-OAP has its own section, without tiers."))
+        base = ("searches ARG-like reads against SARG and divides their copies (reads weighted by the share of the "
+                "reference they cover) by its own cell estimate. ")
+        if ctx.get("args_oap_compared"):
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
+                                        "the hits a CARD gene and tier (arg_sarg_card) and puts ARGs-OAP in the "
+                                        "method comparison by detection (at least "
+                                        f"{ctx.get('args_oap_min_hits', 3)} hits with a Perfect, Strict or Manual "
+                                        "mapping; Loose mappings never count)."))
+        elif "arg_sarg_card" in ctx["tables"] and ctx.get("argnorm_card"):
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
+                                        "the hits a CARD gene and tier (arg_sarg_card); with no K-MARVEL or RGI run "
+                                        "there is no method comparison."))
+        elif "arg_sarg_card" in ctx["tables"]:
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO "
+                                        "(arg_sarg_card); without the K-MARVEL database's CARD metadata the hits "
+                                        "get no gene family or tier."))
+        else:
+            methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads "
+                                        "weighted by the share of the reference they cover) by its own cell "
+                                        "estimate. SARG names differ from CARD's, so ARGs-OAP has its own section, "
+                                        "without tiers."))
     tiers = []
-    if s.get("n_tier1") is not None:
+    # the CARD methods' tiers, and those argNorm's CARD mapping gives ARGs-OAP and DeepARG hits (Phase 27b)
+    if s.get("n_tier1") is not None or {"arg_sarg_card", "arg_deeparg_card"} & set(ctx.get("tables", {})):
+        bases = tier_basis(ctx.get("arg_priority", ""))
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
-            tiers.append([f"Tier {tier}", label, meaning, "; ".join(cats)])
+            tiers.append([f"Tier {tier}", label, meaning, "; ".join(cats), "; ".join(bases.get(tier, []))])
     return units, methods, tiers
 
 
@@ -319,9 +339,14 @@ def tools_rows(batches, tool_refs):
     return rows
 
 
+# cited by the methods' tiers paragraph: the WHO Bacterial Priority Pathogens List 2024 (the basis of some tier 1
+# rules) and Zhang et al. 2021 (a different, omics-based risk rank the tiers do not use; roadmap Phase 27a/27b)
+TIER_REFERENCES = ["who2024bppl", "zhang2021"]
+
+
 def format_reference(r):
     """'Authors. Title. Journal volume, pages (year). doi:...' as plain text (the HTML list)."""
-    authors = r.get("author", "")
+    authors = r.get("author", "").replace("{", "").replace("}", "")  # {Organisation}: one corporate author
     parts = [a.strip() for a in authors.split(" and ")] if authors else []
     if len(parts) > 5 or (parts and parts[-1] == "others"):
         names = ", ".join(p for p in parts[:3] if p != "others") + " et al."
@@ -330,7 +355,7 @@ def format_reference(r):
     venue = r.get("journal") or r.get("publisher") or ""
     vol = f" {r['volume']}" if r.get("volume") else ""
     pages = f", {str(r['pages']).replace('--', '-')}" if r.get("pages") else ""
-    doi = f" doi:{r['doi']}" if r.get("doi") else ""
+    doi = f" doi:{r['doi']}" if r.get("doi") else f" {r['url']}" if r.get("url") else ""  # a report: its URL
     return f"{names}. {r.get('title', '')}. {venue}{vol}{pages} ({r.get('year', '')}).{doi}"
 
 
@@ -451,7 +476,7 @@ def build(ctx, assets):
         al = al[al["method"].map(lambda m: METHOD_LABELS.get(m, m)) == primary]
         t1 = ctx.get("tier1_view")
         if t1 is not None and not t1.empty:
-            ar.table("tier1", t1, "arg_long", "Tier 1 (clinical priority) calls with the other method's evidence. "
+            ar.table("tier1", t1, "arg_long", "Tier 1 (high-concern acquired) calls with the other method's evidence. "
                      "rgi_host_check: watchlist_host = RGI's k-mer pathogen-of-origin call is a watchlist pathogen; "
                      "non_watchlist_host = another species (often a related gene of a commensal); genus_level_host = "
                      "the reads only resolve a genus.", tsv="arg_long")
@@ -475,13 +500,16 @@ def build(ctx, assets):
     if comp is not None:
         co = Section("compare", nums, records)
         co.facts = {"rgi_cov": f"{ctx['rgi_min_coverage']:g}",
-                    "methods": " + ".join(METHOD_LABELS.get(m, m) for m in comp["methods"])}
+                    "methods": " + ".join(METHOD_LABELS.get(m, m) for m in comp["methods"]),
+                    # ARGs-OAP through argNorm's CARD mapping (roadmap Phase 27b)
+                    "args_oap": "args_oap" in comp["methods"], "min_hits": ctx.get("args_oap_min_hits", 3)}
         co.fig("arg_method_upset")
         co.fig("arg_method_by_category")
         co.table("overlap", comp["overlap"], "arg_method_overlap", "Distinct genes by the methods that found them.")
-        co.table("comparison", comp["comp"], "arg_method_comparison", "Every gene per sample and method.",
+        co.table("comparison", comp.get("table", comp["comp"]), "arg_method_comparison", "Every gene per sample and method.",
                  html_rows=2000, pdf_columns=[c for c in ("sample", "gene", "tier", "category", "detected_by",
-                                                          "kmarvel_read_pairs", "rgi_read_pairs", "rgi_gene_coverage")
+                                                          "kmarvel_read_pairs", "rgi_read_pairs", "rgi_gene_coverage",
+                                                          "args_oap_read_hits")
                                               if c in comp["comp"].columns])
         secs.append(co)
 
@@ -494,6 +522,18 @@ def build(ctx, assets):
         if "arg_sarg_type_cpc" in t:
             sg.table("types", t["arg_sarg_type_cpc"][0], "arg_sarg_type_cpc", "Copies per cell by SARG type.",
                      index=True)
+        if "arg_sarg_card" in t:
+            # argNorm's CARD mapping of the hits (roadmap Phase 27b): the CARD genes ARGs-OAP detects
+            sc = t["arg_sarg_card"][0]
+            det = sc[sc["in_comparison"].astype(str) == "True"]
+            t1 = det[det["tier"].astype(str) == "1"]
+            sg.facts.update({"card": True, "n_card_genes": int(det["gene"].nunique()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower)),
+                             "min_hits": ctx.get("args_oap_min_hits", 3),
+                             "n_loose": int((sc["cut_off"] == "Loose").sum())})
+            sg.table("card", det, "arg_sarg_card", "SARG subtypes and the CARD genes their hits map to (argNorm), "
+                     "for the sample x gene pairs ARGs-OAP detects.", html_rows=1000,
+                     pdf_columns=["sample", "sarg_subtype", "gene", "tier", "category", "cut_off", "read_hits"])
         secs.append(sg)
 
     if ctx.get("functional"):
@@ -596,6 +636,17 @@ def build(ctx, assets):
                 ca.facts["checkv_partial"] = bool(pd.to_numeric(mob[CHECKV_COUNTS[0]], errors="coerce").isna().any())
             ca.table("mobile", t["arg_contig_mobile"][0], "arg_contig_mobile", "ARG genes on plasmids, viruses and "
                      "proviruses (geNomad) per assembly and ARG class.")
+        if "arg_deeparg_card" in t:
+            # argNorm's CARD mapping of the DeepARG hits (roadmap Phase 27b)
+            dc = t["arg_deeparg_card"][0]
+            t1 = dc[dc["tier"].astype(str) == "1"]
+            tiered = pd.to_numeric(dc["tier"], errors="coerce").notna()  # NA_* codes: no tier
+            ca.facts.update({"card": True, "n_card_mapped": int(tiered.sum()),
+                             "n_card_loose": int((dc["cut_off"] == "Loose").sum()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower))})
+            ca.table("card", dc, "arg_deeparg_card", "DeepARG hits with the CARD gene and tier of argNorm's mapping.",
+                     html_rows=1000, pdf_columns=["assembly", "contig", "arg_gene", "gene", "tier", "category",
+                                                  "cut_off", "bin"])
         if cl is not None:
             ca.table("long", cl, "arg_contig_long", "Every ARG gene on a contig, with the contig's taxon, bin and "
                      "geNomad class.", html_rows=1000,
@@ -606,6 +657,14 @@ def build(ctx, assets):
     if "arg_mag_long" in t:
         ba = Section("bin_args", nums, records)
         ba.facts = {"n_genes": len(t["arg_mag_long"][0]), "n_shared": len(t["arg_cluster_sharing"][0])}
+        if "arg_deeparg_card" in t:
+            # argNorm's CARD mapping of the binned DeepARG hits (roadmap Phase 27b)
+            dc = t["arg_deeparg_card"][0]
+            binned = dc[dc["bin"] != ""]
+            t1 = binned[binned["tier"].astype(str) == "1"]
+            ba.facts.update({"card": True, "n_card_binned": len(binned),
+                             "n_card_loose": int((binned["cut_off"] == "Loose").sum()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower))})
         ba.table("sharing", t["arg_cluster_sharing"][0], "arg_cluster_sharing", "ARG clusters (90 % identity) found "
                  "in more than one MAG.")
         ba.table("long", t["arg_mag_long"][0], "arg_mag_long", "ARG genes of the MAGs and their clusters at 90-100 % "
@@ -637,13 +696,18 @@ def build(ctx, assets):
     me.lists["inputs"] = ctx["inputs"]
     me.facts = {"arg_priority": ctx.get("arg_priority_name", ""), "primary": s.get("arg_primary", ""),
                 "n_methods": len(s.get("arg_methods", []))}
-    if tier_rows:
-        me.table("tiers", pd.DataFrame(tier_rows, columns=["Tier", "Name", "Meaning", "Categories (rule notes)"]),
-                 "tiers", f"ARG reporting tiers, from {ctx.get('arg_priority_name', '')}: rules match CARD gene names "
-                 "or families, top to bottom, first match wins.", tsv="")
     refs, tool_refs = load_references(assets)
+    # the tiers paragraph cites the WHO list and Zhang et al. before the tools table, so they are numbered first
+    # (the PDF numbers references in order of first citation)
+    cited = [k for k in TIER_REFERENCES if k in refs] if tier_rows else []
+    if tier_rows:
+        me.facts["tier_refs"] = {k: cited.index(k) + 1 for k in cited}
+        me.table("tiers", pd.DataFrame(tier_rows, columns=["Tier", "Name", "Meaning", "Categories (rule notes)",
+                                                           "Basis"]),
+                 "tiers", f"Pipeline-defined ARG reporting tiers, from {ctx.get('arg_priority_name', '')}: rules match "
+                 "CARD gene names or families, top to bottom, first match wins; the basis says why each tier 1 rule "
+                 "is there.", tsv="")
     rows = tools_rows(ctx["batches"], tool_refs)
-    cited = []
     for r in rows:
         for k in r["keys"]:
             if k in refs and k not in cited:

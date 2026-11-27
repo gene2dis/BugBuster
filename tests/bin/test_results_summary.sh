@@ -383,6 +383,21 @@ for gone in ("taxonomy_diversity", "taxonomy_pcoa", "group_timeline", "arg_tier1
     assert not os.path.exists(f"out/figures/{gone}.png"), gone
 PYEOF
 check "method comparison figures written" test -s out/figures/arg_method_upset.svg -a -s out/figures/arg_method_by_category.png
+check "tiers presented as pipeline-defined, with a basis per tier 1 rule and the WHO / Zhang references" py - <<'PYEOF'
+import glob, html, re
+def text(p):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open(p).read())))
+me, readme = text("out/report/methods.html"), open("out/README.md").read()
+assert "pipeline-defined reporting rules, not a published ranking" in me
+assert "consistent with WHO BPPL 2024: carbapenem-resistant Enterobacterales" in me
+assert "WHO bacterial priority pathogens list, 2024" in me and "An omics-based framework" in me
+assert "who.int" in me, "the WHO report has no DOI: its URL is printed"
+# the two are cited before the tools: references 1 and 2
+assert re.search(r"Pathogens List 2024 \[ 1 \]", me) and re.search(r"pathogen hosts\) \[ 2 \]", me), me[:300]
+assert "| Tier | Meaning | Categories (rule notes) | Basis |" in readme and "High-concern acquired" in readme
+for p in glob.glob("out/report/*.html") + ["out/README.md", "out/LLM_GUIDE.md"]:
+    assert "clinical priority" not in open(p).read().lower(), p
+PYEOF
 documented() {
     # documented <outdir> <args...>: a run whose every emitted column is in summary_docs.TABLE_DOCS
     local out="$1"
@@ -416,7 +431,10 @@ allowed = {("arg_long", "card_plasmid_associated"), ("arg_long", "candidate_host
            ("arg_contig_mobile", "arg_genes_viral_checkv_not_determined"),
            # Nonpareil's columns (tested on a copy of this fixture with Nonpareil tables below)
            ("samples_qc", "nonpareil_coverage"), ("samples_qc", "nonpareil_diversity"),
-           ("samples_qc", "nonpareil_depth_95pct")}
+           ("samples_qc", "nonpareil_depth_95pct"),
+           # ARGs-OAP through argNorm's CARD mapping (tested on tests/data/summary/argnorm below)
+           ("arg_method_comparison", "detected_args_oap"), ("arg_method_comparison", "args_oap_read_hits"),
+           ("samples_qc", "n_genes_args_oap")}
 assert unused <= allowed, sorted(unused - allowed)
 PYEOF
 
@@ -821,6 +839,29 @@ assert tier("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;v
 assert tier("vanR gene in vanA cluster", "glycopeptide resistance gene cluster;vanR") == 2
 assert rs.gene_name("vanR gene in vanO cluster", "glycopeptide resistance gene cluster;vanR") \
     == "vanR gene in vanO cluster"
+# genes CARD files under a tier 1 family that the rule table takes out of tier 1 (roadmap Phase 27b): the NmcA
+# regulator, the MecC-type repressor, the producers' self-resistance 16S methyltransferases and two class D
+# enzymes CARD 4.0.1 files under the IMP / VIM families; the families' own genes stay tier 1
+assert tier("NmcR", "IMI beta-lactamase", "antibiotic inactivation") == 3
+assert tier("NmcA", "IMI beta-lactamase", "antibiotic inactivation") == 1
+assert tier("MecC-type methicillin resistance repressor MecI", "methicillin resistant PBP2",
+            "antibiotic target replacement") == 3
+assert tier("mecA", "methicillin resistant PBP2", "antibiotic target replacement") == 1
+assert tier("kamB", "16S rRNA methyltransferase (A1408)") == 3
+assert tier("sgm", "16S rRNA methyltransferase (G1405)") == 3
+assert tier("armA", "16S rRNA methyltransferase (G1405)") == 1
+assert tier("OXA-1262", "IMP beta-lactamase", "antibiotic inactivation") == 2
+assert tier("OXA-1263", "VIM beta-lactamase", "antibiotic inactivation") == 2
+assert tier("IMP-1", "IMP beta-lactamase", "antibiotic inactivation") == 1
+# CARD 4.0.1 names one MCR-10 allele in lower case: it collapses with the others
+assert rs.gene_name("mcr-10.1", "MCR phosphoethanolamine transferase") == "MCR-10"
+assert rs.gene_name("MCR-10.2", "MCR phosphoethanolamine transferase") == "MCR-10"
+# every tier 1 rule of the default table says its basis
+tiers = pd.read_csv(os.path.join(sys.argv[1], "..", "assets", "arg_priority_tiers.tsv"), sep="\t", comment="#",
+                    dtype=str, keep_default_na=False)
+t1 = tiers[tiers["tier"] == "1"]
+assert len(t1) == 9 and t1["basis"].str.match(r"^(consistent with WHO BPPL 2024|pipeline judgement): ").all(), t1
+assert (tiers.loc[tiers["tier"] != "1", "basis"] == "").all()
 # heatmap rows: grouped by phylum (largest first), alphabetical within each phylum, GTDB suffixes ignored
 tax = pd.DataFrame({"Phylum": ["Bacillota", "Bacillota", "Bacillota", "Bacteroidota"],
                     "Species": ["Zeta b", "alpha_A c", "Beta d", "Aaa e"]}, index=["g1", "g2", "g3", "g4"])
@@ -1036,6 +1077,161 @@ assert "ARG reporting tiers" in km["README.md"] and "ARG reporting tiers" not in
 assert not any("Tier 4 (variant-model) hits" in t for t in oap.values())
 assert any("The sylph classified fraction" in t for t in text("out").values())
 PYEOF
+# argNorm's CARD mapping of the ARGs-OAP and DeepARG hits (roadmap Phase 27b; tests/data/summary/argnorm/, see
+# tests/bin/make_argnorm_summary_fixtures.sh). sampleA's SARG hits: KPC and TEM (also K-MARVEL / RGI calls), mecA
+# on 3 Strict hits (ARGs-OAP only, tier 1), vanA on 2 (under the minimum), rosB on 3 Loose hits, tetA(58) on 3 hits
+# whose ARO the CARD extract lacks; sampleB has no ARGs-OAP hit table (ARGs-OAP found no SARG hit: no_sarg_hit,
+# so it ran, with no gene). DeepARG: the assembly fixtures' hits
+AN="${FIX}/argnorm"
+make_results an_base/results sampleA sampleB
+mkdir -p an_base/results/05_arg_prediction/contig_level/summary
+cp "${FIX}/stages/assembly/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv" \
+    an_base/results/05_arg_prediction/contig_level/summary/
+mkdir -p an && cp -r an_base/results an/results
+mkdir -p an/results/05_arg_prediction/read_level/args_oap/argnorm
+cp "${AN}/args_oap/sampleA.args_oap.argnorm.tsv" an/results/05_arg_prediction/read_level/args_oap/argnorm/
+for s in sampleA sampleB; do
+    mkdir -p "an/results/05_arg_prediction/contig_level/deeparg/${s}"
+    cp "${AN}/deeparg/${s}.deeparg.argnorm.tsv" "an/results/05_arg_prediction/contig_level/deeparg/${s}/"
+done
+check "summary with the argNorm tables, every column documented" \
+    documented an_out --results an/results --batch-labels an --min-clean-pairs 10000 --kmarvel-db "${AN}/card"
+check "the same directory without them" \
+    py "${SUMMARY}" --results an_base/results --batch-labels an --outdir an_base_out --min-clean-pairs 10000 \
+        --no-excel --kmarvel-db "${AN}/card"
+check "argNorm: only the comparison, its overlap and samples_qc change; two CARD tables are added" py - <<'PYEOF'
+import filecmp, os
+base, new = set(os.listdir("an_base_out/tables")), set(os.listdir("an_out/tables"))
+assert new - base == {"arg_sarg_card.tsv", "arg_deeparg_card.tsv"}, new - base
+changed = sorted(f for f in base if not filecmp.cmp(f"an_base_out/tables/{f}", f"an_out/tables/{f}", shallow=False))
+assert changed == ["arg_method_comparison.tsv", "arg_method_overlap.tsv", "samples_qc.tsv"], changed
+PYEOF
+check "argNorm: ARGs-OAP in the comparison by strong hits >= the minimum, CARD tiers, NA codes" py - <<'PYEOF'
+import pandas as pd
+c = pd.read_csv("an_out/tables/arg_method_comparison.tsv", sep="\t", dtype=str, keep_default_na=False)
+b = pd.read_csv("an_base_out/tables/arg_method_comparison.tsv", sep="\t", dtype=str, keep_default_na=False)
+a = c[c["sample"] == "sampleA"].set_index("gene")
+# shared genes, the ARGs-OAP-only tier 1 gene, and what never counts
+assert a.at["KPC", "detected_args_oap"] == "True" and a.at["KPC", "args_oap_read_hits"] == "3"
+assert a.at["mecA", "args_oap_read_hits"] == "3"  # the Loose hit does not count
+assert a.at["TEM", "detected_args_oap"] == "True" and a.at["TEM", "args_oap_read_hits"] == "4"
+assert a.at["mecA", "detected_by"] == "ARGs-OAP only" and a.at["mecA", "tier"] == "1", a.loc["mecA"]
+for g in ("vanA", "rosB", "tetA(58)"):
+    assert g not in a.index, g
+# the K-MARVEL / RGI rows keep every column they had
+m = b.merge(c, on=["sample", "gene"], suffixes=("_b", "_n"))
+assert len(m) == len(b)
+for col in b.columns:
+    if col not in ("sample", "gene", "detected_by"):
+        assert (m[f"{col}_b"] == m[f"{col}_n"]).all(), col
+# sampleB has no ARGs-OAP table: blank count, NA_not_run in any comparison row
+q = pd.read_csv("an_out/tables/samples_qc.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("sample")
+# sampleB: ARGs-OAP ran and found no SARG hit (no argNorm table): 0 genes and not detected, not NA_not_run
+assert q.at["sampleA", "n_genes_args_oap"] == "3" and q.at["sampleB", "n_genes_args_oap"] == "0", q["n_genes_args_oap"]
+assert set(c.loc[c["sample"] == "sampleB", "detected_args_oap"]) <= {"False"}  # no CARD gene in sampleB's fixtures
+sc = pd.read_csv("an_out/tables/arg_sarg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
+# one row per cut-off: mecA's subtype has 3 Strict hits (a detection, tier 1) and 1 Loose hit (neither)
+mec = sc[sc["aro_name"] == "mecA"].set_index("cut_off")
+assert mec.at["Strict", "read_hits"] == "3" and mec.at["Strict", "tier"] == "1" and mec.at["Strict", "in_comparison"] == "True"
+assert mec.at["Loose", "read_hits"] == "1" and mec.at["Loose", "tier"] == "NA_loose_mapping"
+assert mec.at["Loose", "in_comparison"] == "False"
+s = sc[sc["aro_name"] != "mecA"].set_index("aro_name")
+assert s.at["vanA", "tier"] == "1" and s.at["vanA", "in_comparison"] == "False"
+assert s.at["rosB", "tier"] == "NA_loose_mapping" and s.at["rosB", "cut_off"] == "Loose"
+assert s.at["tetA(58)", "tier"] == "NA_aro_not_in_card_metadata" and s.at["tetA(58)", "gene"] == "tetA(58)"
+assert s.at["KPC-2", "gene"] == "KPC" and s.at["KPC-2", "drug_classes"] == "beta-lactam antibiotic"
+d = pd.read_csv("an_out/tables/arg_deeparg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
+lnu = d[d["gene_id"] == "k141_38188_192"].iloc[0]
+assert lnu["gene"] == "lnuA" and lnu["cut_off"] == "Strict" and lnu["tier"] == "2" and lnu["bin"] == "binette_bin2"
+assert set(d.loc[d["cut_off"] == "Loose", "tier"]) == {"NA_loose_mapping"}
+assert set(d["assembly"]) == {"sampleA", "sampleB"}
+PYEOF
+check "argNorm: an ARGs-OAP-only tier 1 gene is on the comparison page, not in Attention or the tier 1 table" py - <<'PYEOF'
+import html, re
+def text(p):
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open(p).read())))
+assert "mecA" in text("an_out/report/compare.html") and "argNorm" in text("an_out/report/compare.html")
+# the overview (Attention, cards) and the ARG page (tier 1 table) follow K-MARVEL and RGI only
+for page in ("index.html", "args.html"):
+    assert "mecA" not in text(f"an_out/report/{page}"), page
+assert text("an_base_out/report/args.html") == text("an_out/report/args.html")
+assert "argNorm maps each hit" in text("an_out/report/sarg.html")
+PYEOF
+# --arg_bin_clustering without --contig_tax_and_arg: no contig table, so a DeepARG hit's bin comes from the bin
+# ARG clusters (arg_mag_long, keyed by assembly and gene id)
+mkdir -p an_bin && cp -r an/results an_bin/results
+rm -r an_bin/results/05_arg_prediction/contig_level/summary
+mkdir -p an_bin/results/05_arg_prediction/bin_level
+cp -r "${FIX}/stages/assembly/05_arg_prediction/bin_level/clustering" an_bin/results/05_arg_prediction/bin_level/
+check "summary of argNorm's DeepARG table with bin ARG clusters and no contig table" \
+    py "${SUMMARY}" --results an_bin/results --outdir an_bin_out --min-clean-pairs 10000 --no-excel \
+        --kmarvel-db "${AN}/card"
+check "argNorm: a DeepARG hit's bin from the bin ARG clusters, and the bin page's CARD sentence" py - <<'PYEOF'
+import html, re
+import pandas as pd
+d = pd.read_csv("an_bin_out/tables/arg_deeparg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
+lsa = d[d["gene_id"] == "k141_66351_32"].iloc[0]
+assert lsa["gene"] == "lsaE" and lsa["bin"] == "binette_bin10", lsa.to_dict()
+assert set(d.loc[d["gene_id"] == "k141_38358_1", "bin"]) == {""}  # not in a cluster file: not on a MAG
+page = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open("an_bin_out/report/bin_args.html").read())))
+assert "argNorm maps the MAGs' DeepARG hits to CARD" in page, page[:400]
+PYEOF
+py "${SUMMARY}" --results an/results --outdir an_min2_out --min-clean-pairs 10000 --no-excel \
+    --kmarvel-db "${AN}/card" --args-oap-min-hits 2 > an_min2_out.log 2>&1 || true
+check "argNorm: --args-oap-min-hits 2 lets vanA in" bash -c \
+    "awk -F'\t' 'NR == 1 { for (i = 1; i <= NF; i++) h[\$i] = i } NR > 1 && \$h[\"gene\"] == \"vanA\" && \$h[\"detected_args_oap\"] == \"True\"' \
+         an_min2_out/tables/arg_method_comparison.tsv | grep -q ."
+py "${SUMMARY}" --results an/results --outdir an_nocard_out --min-clean-pairs 10000 --no-excel \
+    > an_nocard_out.log 2>&1 || true
+check "argNorm without CARD metadata: no tier, ARGs-OAP left out of the comparison, a warning" bash -c \
+    "grep -q 'no --kmarvel-db (CARD metadata)' an_nocard_out.log &&
+     ! head -1 an_nocard_out/tables/arg_method_comparison.tsv | grep -q detected_args_oap &&
+     cut -f\$(head -1 an_nocard_out/tables/arg_sarg_card.tsv | tr '\t' '\n' | grep -nx tier | cut -d: -f1) \
+         an_nocard_out/tables/arg_sarg_card.tsv | tail -n +2 | sort -u | grep -qx NA_no_card_metadata"
+check "argNorm: --args-oap-min-hits 0 is refused" \
+    fails py "${SUMMARY}" --results an/results --outdir an_bad_out --no-excel --args-oap-min-hits 0
+py "${SUMMARY}" --results an/results --outdir an_bad_out --no-excel --args-oap-min-hits 0 > an_bad.log 2>&1 || true
+check "argNorm: the refusal says why" grep -q 'must be at least 1' an_bad.log
+# a not_normalised sample has no hit table either: it stays NA_not_run in the comparison
+mkdir -p an_nn && cp -r an/results an_nn/results
+sed -i 's/\tno_sarg_hit$/\tnot_normalised/' an_nn/results/05_arg_prediction/read_level/args_oap_summary/args_oap_cells.tsv
+check "summary with a not_normalised ARGs-OAP sample" \
+    py "${SUMMARY}" --results an_nn/results --outdir an_nn_out --min-clean-pairs 10000 --no-excel --kmarvel-db "${AN}/card"
+check "argNorm: a not_normalised sample (no hit table) is NA_not_run, a no_sarg_hit sample is not" py - <<'PYEOF'
+import pandas as pd
+q = pd.read_csv("an_nn_out/tables/samples_qc.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("sample")
+assert q.at["sampleB", "n_genes_args_oap"] == "" and q.at["sampleA", "n_genes_args_oap"] == "3", q["n_genes_args_oap"]
+PYEOF
+# ARGs-OAP and contig DeepARG with neither K-MARVEL nor RGI: CARD tables, no comparison, and no text claiming one
+mkdir -p an_only && cp -r an/results an_only/results
+rm -rf an_only/results/05_arg_prediction/read_level/{kmarvel,rgi,rgi_kmer,kmarvel_summary,rgi_summary}
+check "summary of argNorm tables without K-MARVEL or RGI" \
+    py "${SUMMARY}" --results an_only/results --outdir an_only_out --min-clean-pairs 10000 --no-excel \
+        --kmarvel-db "${AN}/card"
+check "argNorm without a CARD method: no comparison, and the methods text does not claim one" py - <<'PYEOF'
+import html, os, re
+assert os.path.exists("an_only_out/tables/arg_sarg_card.tsv")
+assert not os.path.exists("an_only_out/tables/arg_method_comparison.tsv")
+for f in ("an_only_out/README.md", "an_only_out/report/methods.html"):
+    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open(f).read())))
+    assert "method comparison by detection" not in t and "compared with the CARD-based methods by" not in t, f
+    if f.endswith(".html"):
+        assert "there is no method comparison" in t, t[:300]
+PYEOF
+check "argNorm: one tier per gene, from K-MARVEL / RGI first, then argNorm's lowest" py - "${REPO_DIR}/bin" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+import pandas as pd
+from summary_argnorm import align_tiers
+card = pd.DataFrame({"gene": ["KPC"], "tier": [1], "category": ["carbapenemase"], "tier_note": ["k"]})
+hits = pd.DataFrame({"gene": ["KPC", "KPC", "X", "X", "Y"], "tier": [2, "NA_loose_mapping", 3, 2, "NA_no_aro_mapping"],
+                     "category": ["a", "", "c3", "c2", ""], "tier_note": ["", "", "n3", "n2", ""]})
+hits["tier"] = hits["tier"].astype(object)
+align_tiers([hits], [card])
+assert list(hits["tier"]) == [1, "NA_loose_mapping", 2, 2, "NA_no_aro_mapping"], list(hits["tier"])
+assert list(hits["category"]) == ["carbapenemase", "", "c2", "c2", ""], list(hits["category"])
+PYEOF
+
 # no counted call has a drug class: the drug-class tables are empty but keep their header (R5-09)
 make_results nodc/results sampleA
 rm -rf nodc/results/05_arg_prediction/read_level/{rgi,rgi_kmer}

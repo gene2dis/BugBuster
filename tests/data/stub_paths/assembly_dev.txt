@@ -79,7 +79,9 @@
 05_arg_prediction/bin_level/proteins/test_sample1/test_sample1_bins_proteins/test_sample1_bin1_proteins.faa
 05_arg_prediction/bin_level/proteins/test_sample2/test_sample2_bins_proteins/test_sample2_bin1_proteins.faa
 05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1_contigs_deep_arg.out.mapping.ARG
+05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1.deeparg.argnorm.tsv
 05_arg_prediction/contig_level/deeparg/test_sample2/test_sample2_contigs_deep_arg.out.mapping.ARG
+05_arg_prediction/contig_level/deeparg/test_sample2/test_sample2.deeparg.argnorm.tsv
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.csv
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.pdf
 05_arg_prediction/contig_level/figures/stub_ARG_blob_plot.png

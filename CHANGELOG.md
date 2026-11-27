@@ -33,6 +33,26 @@ bold label names the full entry below (search for it).
 
 ### Added
 
+- **argNorm: ARGs-OAP and DeepARG hits mapped to CARD** (roadmap Phase 27b).
+  argNorm 1.1.0 (`quay.io/biocontainers/argnorm:1.1.0--pyhdfd78af_0`, local
+  module `ARGNORM`) maps every ARGs-OAP stage two hit (`ARGNORM_SARG`, on
+  `blastout.filtered.txt`; the ARGs-OAP 4.0.0 header row is dropped first) and
+  every DeepARG contig hit (`ARGNORM_DEEPARG`, on `.mapping.ARG`) to a CARD ARO,
+  with the RGI cut-off of the mapping and the drug classes. Its mapping tables
+  ship in the package: no database. They run whenever ARGs-OAP or the contig
+  DeepARG step runs; outputs in
+  `05_arg_prediction/read_level/args_oap/argnorm/<sample>.args_oap.argnorm.tsv`
+  and `05_arg_prediction/contig_level/deeparg/<assembly>/<assembly>.deeparg.argnorm.tsv`.
+  The run summary gains `arg_sarg_card` (per sample, SARG subtype and CARD ARO:
+  read hits, CARD gene and gene family, tier, drug classes, and whether the
+  sample x gene counts as a detection) and `arg_deeparg_card` (every DeepARG hit
+  with its CARD ARO, gene, tier, drug classes and bin), with a sentence each on
+  the SARG and contig ARG pages. Loose mappings, which often name a homolog, are
+  kept and flagged (`NA_loose_mapping`) and get no tier.
+- **`--summary_args_oap_min_hits`** (default 3): the strong (Perfect, Strict or
+  Manual) argNorm hits a sample x CARD gene needs to count as an ARGs-OAP
+  detection in the method comparison.
+
 - **Run-level MAG dereplication** (`--dereplicate_mags`, off by default; needs
   `--include_binning` and at least two `--binners`). galah 0.6.2 (skani
   0.4.0; `quay.io/biocontainers/galah:0.6.2--hfa8f182_0` and its depot sif)
@@ -600,6 +620,48 @@ bold label names the full entry below (search for it).
     memory and 11 % less CPU time, for 5 % less sequence)
 
 ### Changed
+
+- **ARG tiers are presented as pipeline-defined reporting tiers** (roadmap
+  Phase 27b, AR1): tier 1 is now "High-concern acquired" (was "Clinical
+  priority") in the tables' documentation, README, LLM guide, report and
+  manual. `assets/arg_priority_tiers.tsv` gains an optional `basis` column:
+  each tier 1 rule says whether it is consistent with a resistance of the WHO
+  Bacterial Priority Pathogens List 2024 (carbapenemases, VRE van ligases,
+  mecA/mecC) or rests on the pipeline's judgement (last-resort drugs: mcr,
+  tet(X3+), optrA/poxtA, cfr, 16S rRNA methyltransferases). The report's Methods
+  shows the basis per tier and cites the WHO list and Zhang et al. 2021 (an
+  omics-based risk rank the tiers do not use). The manual now lists the van
+  rule as vanA/B/D/E/L/M/N, as the table has it.
+- **Tier rule changes** (`assets/arg_priority_tiers.tsv`): genes CARD files
+  under a tier 1 family leave tier 1: the NmcA regulator NmcR and the MecC-type
+  repressor MecI (tier 3, regulator), the self-resistance 16S rRNA
+  methyltransferases kamB and sgm of aminoglycoside-producing actinomycetes
+  (tier 3, intrinsic_producer), and OXA-1262 / OXA-1263, class D enzymes CARD
+  4.0.1 files under the IMP / VIM families (tier 2, OXA_other). The gene key of
+  CARD 4.0.1's lower-case allele mcr-10.1 is now MCR-10, as for MCR-10.2-10.5
+  (was mcr). Calls of these genes change tier or gene in the ARG tables.
+
+- **ARGs-OAP joins the read-level ARG method comparison** (roadmap Phase 27b),
+  through argNorm's CARD mapping of its hits (detection only):
+  `arg_method_comparison` gains `detected_args_oap` (`NA_not_run` where
+  ARGs-OAP did not run) and `args_oap_read_hits`, and rows for genes only
+  ARGs-OAP detected; `arg_method_overlap`, the UpSet and by-category figures
+  gain the three-method combinations; `samples_qc` gains `n_genes_args_oap`.
+  The compared samples are those the CARD methods ran on, and a K-MARVEL + ARGs-OAP
+  or RGI + ARGs-OAP run now has a comparison. The existing comparison rows and
+  every other table are unchanged; the Attention list, the tier 1 table and
+  `n_genes_all_methods` still follow K-MARVEL and RGI only.
+- **The K-MARVEL CARD database is prepared for the summary** whenever argNorm's
+  output goes to it, even without `--kmarvel_prediction` (`FORMAT_KMARVEL_DB`,
+  a 4.6 MB CARD download stored in `--databases_dir`, or `--custom_kmarvel_db`):
+  its CARD metadata gives the ARGs-OAP and DeepARG hits their gene family and
+  tier. K-MARVEL itself does not run. In an RGI run with ARGs-OAP or contig
+  DeepARG, RGI's calls now get the same CARD input as in a run with K-MARVEL:
+  allele names collapse against CARD's family list (an allele keeps its own
+  name where the collapsed name is another CARD gene), and an ARO with CARD
+  SNP definitions is tier 4. RGI-only tables of the Phase 27a fixture are
+  unchanged by it. argNorm's hits of a gene K-MARVEL or RGI also called take
+  that gene's tier, as the CARD methods do between themselves.
 
 - **User documentation reorganised, one home per kind of content**: the README
   keeps what the pipeline is, the stages and their switches, installation, the

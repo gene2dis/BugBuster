@@ -45,9 +45,11 @@ STAGES = [
     {
         "key": "args_oap", "title": "Read-level ARGs: ARGs-OAP (SARG)",
         "params": "--args_oap_prediction (deprecated alias --read_arg_prediction)",
-        "processes": ["ARGS_OAP", "ARGS_OAP_REPORT"],
+        "processes": ["ARGS_OAP", "ARGS_OAP_REPORT", "ARGNORM_SARG"],
         "summary": "arg_sarg_long, arg_sarg_type_cpc, arg_sarg_subtype_cpc; samples_qc args_oap_n16S / "
-                   "args_oap_ncell / sarg_*; figure arg_sarg_type_heatmap",
+                   "args_oap_ncell / sarg_*; figure arg_sarg_type_heatmap; argNorm's CARD mapping of the hits "
+                   "(ARGNORM_SARG): arg_sarg_card, and ARGs-OAP in arg_method_comparison (with a CARD method; "
+                   "--summary_args_oap_min_hits) and samples_qc n_genes_args_oap",
     },
     {
         "key": "read_functional", "title": "Read-level functional profile",
@@ -105,10 +107,11 @@ STAGES = [
     {
         "key": "contig_arg", "title": "Contig taxonomy and ARGs (Metabuli, BlobTools, DeepARG)",
         "params": "--contig_tax_and_arg (needs an assembly), --metabuli_min_score, --metabuli_min_sp_score",
-        # not DEEPARG_CONTIGS: it also runs for the bin ARGs alone
+        # not DEEPARG_CONTIGS or ARGNORM_DEEPARG: they also run for the bin ARGs alone
         "processes": ["METABULI_CLASSIFY", "BLOBTOOLS", "ARG_CONTIG_LEVEL_REPORT"],
         "summary": "arg_contig_long (each contig ARG with its taxon, bin and geNomad class), arg_contig_hosts; "
-                   "arg_contig_abundance (with --contig_level_functional)",
+                   "arg_contig_abundance (with --contig_level_functional); arg_deeparg_card (every DeepARG hit "
+                   "with argNorm's CARD ARO, gene and tier, ARGNORM_DEEPARG; also with --arg_bin_clustering alone)",
     },
     {
         "key": "genomad", "title": "Plasmid / virus classification of contigs (geNomad)",
@@ -132,7 +135,8 @@ STAGES = [
         "key": "bin_arg", "title": "MAG-level ARG clustering (assembly DeepARG hits split by MAG, MMseqs2)",
         "params": "--arg_bin_clustering (needs binning)",
         "processes": ["BIN_ARG_SPLIT", "ARG_FASTA_FORMATTER", "CLUSTERING"],
-        "summary": "arg_mag_long (ARG genes of MAGs and their clusters at 90-100 % identity), arg_cluster_sharing",
+        "summary": "arg_mag_long (ARG genes of MAGs and their clusters at 90-100 % identity), arg_cluster_sharing; "
+                   "the CARD tier of each MAG ARG gene in arg_deeparg_card (bin set)",
     },
     {
         "key": "contig_functional", "title": "Contig-level functional (Pyrodigal, eggNOG-mapper, dbCAN, featureCounts)",

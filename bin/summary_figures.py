@@ -520,8 +520,14 @@ def fig_method_upset(fw, comp, gene_sets, methods):
             "UpSet plot: each column is one combination of methods (filled dots), and its bar counts the distinct genes "
             "(alleles collapsed: KPC-2 and KPC-97 are both KPC) that exactly those methods detected in at least one "
             "sample, coloured by tier. Left: genes per method. RGI counts a gene when reads cover at least the "
-            "--rgi_summary_min_coverage share of its best reference sequence; only samples every method ran on are compared.",
-            pd.DataFrame(rows), "compare")
+            "--rgi_summary_min_coverage share of its best reference sequence; only samples every method ran on are compared."
+            + ARGS_OAP_NOTE * ("args_oap" in methods), pd.DataFrame(rows), "compare")
+
+
+# the comparison figures' caption note when ARGs-OAP is compared (roadmap Phase 27b)
+ARGS_OAP_NOTE = (" ARGs-OAP's SARG hits are mapped to CARD genes by argNorm: a gene counts when at least "
+                 "--summary_args_oap_min_hits hits map to it with a Perfect, Strict or Manual mapping (Loose mappings "
+                 "never count), on the samples the CARD methods ran on.")
 
 
 def fig_method_by_category(fw, comp, methods):
@@ -535,6 +541,10 @@ def fig_method_by_category(fw, comp, methods):
     flags["label"] = "T" + flags["tier"].astype(str) + " " + flags["category"]
     allm = flags[methods].all(axis=1)
     parts = [(" + ".join(METHOD_LABELS.get(m, m) for m in methods), allm, "#333333", None)]
+    if len(methods) > 2:
+        # with ARGs-OAP beside the two CARD methods: genes two of the three found
+        some = (flags[methods].sum(axis=1) > 1) & ~allm
+        parts.append(("two of the methods", some, "#999999", None))
     colors = [fs.CATEGORY[0], fs.CATEGORY[1], fs.CATEGORY[2], fs.CATEGORY[3]]
     for i, m in enumerate(methods):
         only = flags[m] & ~flags[[x for x in methods if x != m]].any(axis=1)
@@ -566,7 +576,8 @@ def fig_method_by_category(fw, comp, methods):
     fw.save(fig, "arg_method_by_category", "ARG method agreement by tier and category",
             "Distinct genes per reporting tier and category, split by which methods found them in at least one "
             "sample. Hatched: K-MARVEL calls where RGI had reads below the coverage cutoff (partial coverage, not "
-            "absence). Category labels are coloured by tier.", pd.DataFrame(rows), "compare")
+            "absence). Category labels are coloured by tier." + ARGS_OAP_NOTE * ("args_oap" in methods),
+            pd.DataFrame(rows), "compare")
 
 
 def fig_sarg(fw, mat, cols, groups, low, hatch):

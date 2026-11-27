@@ -164,6 +164,8 @@ include { PYRODIGAL as NFCORE_PYRODIGAL } from './modules/nf-core/pyrodigal/main
 	// ARG PREDICTION IN READS
 include { ARGS_OAP         } from './modules/local/args_oap/main'
 include { ARGS_OAP_REPORT  } from './modules/local/args_oap_report/main'
+include { ARGNORM as ARGNORM_SARG    } from './modules/local/argnorm/main'
+include { ARGNORM as ARGNORM_DEEPARG } from './modules/local/argnorm/main'
 
 	// RGI AMR PREDICTION
 include { RGI_BWT          } from './modules/local/rgi_bwt/main'
@@ -188,7 +190,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError; argNormCardNeeded } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -601,6 +603,17 @@ workflow {
         )
         // args_oap_long.tsv and args_oap_cells.tsv
         ch_summary_reports = ch_summary_reports.mix(ARGS_OAP_REPORT.out.reports.flatten())
+
+        // every SARG hit mapped to its CARD ARO (argNorm); stage two writes no
+        // blastout.filtered.txt for a sample without a SARG hit or without 16S
+        ARGNORM_SARG(
+            ARGS_OAP.out.args_oap
+                .map { meta, dir -> [meta, dir.resolve('blastout.filtered.txt')] }
+                .filter { _meta, hits -> hits.exists() },
+            'argsoap'
+        )
+        ch_versions = ch_versions.mix(ARGNORM_SARG.out.versions.first())
+        ch_summary_reports = ch_summary_reports.mix(ARGNORM_SARG.out.tsv.map { _meta, tsv -> tsv })
     }
 
     //
@@ -981,6 +994,16 @@ workflow {
         ch_contig_deeparg      = DEEPARG_CONTIGS.out.deeparg
         ch_contig_deeparg_only = DEEPARG_CONTIGS.out.only_deeparg
         ch_versions = ch_versions.mix(DEEPARG_CONTIGS.out.versions.first())
+        // every DeepARG hit mapped to its CARD ARO (argNorm); the bin hits are
+        // rows of the same table, joined by gene id in the summary
+        ARGNORM_DEEPARG(
+            DEEPARG_CONTIGS.out.deeparg.map { meta, files ->
+                [meta, [files].flatten().find { f -> f.name.endsWith('.out.mapping.ARG') }]
+            },
+            'deeparg'
+        )
+        ch_versions = ch_versions.mix(ARGNORM_DEEPARG.out.versions.first())
+        ch_summary_reports = ch_summary_reports.mix(ARGNORM_DEEPARG.out.tsv.map { _meta, tsv -> tsv })
         // the hits' gene ids give each ARG gene's abundance per sample (gene_abundance.tsv)
         if ( flagOn(params.contig_level_functional) ) {
             ch_summary_reports = ch_summary_reports.mix(
@@ -1160,6 +1183,11 @@ workflow {
     // not part of that file.
     //
     if ( flagOn(params.results_summary) ) {
+        // the CARD metadata (K-MARVEL database) for argNorm's ARGs-OAP / DeepARG
+        // mapping when K-MARVEL itself did not run
+        if ( !flagOn(params.kmarvel_prediction) && argNormCardNeeded() ) {
+            ch_summary_kmarvel_db = PREPARE_DATABASES.out.kmarvel_db
+        }
         // the profiler's Reads_report.csv adds the classified fraction
         // (TAXONOMY_REPORT's output is already a value channel)
         ch_summary_reads_report = params.taxonomic_profiler != 'none'

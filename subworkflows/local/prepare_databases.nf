@@ -33,7 +33,7 @@ include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
 include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
-include { flagOn; sourmashCustomFiles } from './utils_params'
+include { flagOn; sourmashCustomFiles; argNormCardNeeded } from './utils_params'
 
 workflow PREPARE_DATABASES {
     
@@ -413,9 +413,10 @@ workflow PREPARE_DATABASES {
     //
     // CARD protein models for K-MARVEL (~4.6 MB download): a directory with
     // CARD_protein_all.fasta, metadata.tsv and snps.txt is passed with
-    // --custom_kmarvel_db
+    // --custom_kmarvel_db. Also prepared for the summary's CARD families and
+    // tiers of argNorm's ARGs-OAP / DeepARG mapping (argNormCardNeeded())
     //
-    if ( flagOn(params.kmarvel_prediction) ) {
+    if ( flagOn(params.kmarvel_prediction) || argNormCardNeeded() ) {
         if ( params.custom_kmarvel_db ) {
             ch_kmarvel_db = channel.fromPath(params.custom_kmarvel_db, checkIfExists: true)
         } else {

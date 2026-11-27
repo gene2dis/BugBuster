@@ -5,8 +5,8 @@ ARGS_OAP_REPORT (bin/args_oap_report.py) sums each sample's ARGs-OAP rows (pairs
 stage two's normalisation over them: copies_per_cell = SARG copies / nCell (ARGs-OAP's cell estimate from
 essential single-copy genes), copies_per_16S = copies / n16S, ppm = reads per million single reads. A copy is a
 read weighted by the share of the reference it covers, so copies per cell is not RPKM and not comparable to the
-K-MARVEL / RGI figures. SARG names its types and subtypes differently from CARD: ARGs-OAP is reported in its own
-section, not matched gene by gene with the CARD methods, and has no tiers.
+K-MARVEL / RGI figures. SARG names its types and subtypes differently from CARD: these tables stay in SARG's terms;
+the CARD view of the same hits (argNorm's mapping: CARD gene, tier, the method comparison) is bin/summary_argnorm.py.
 """
 
 import numpy as np

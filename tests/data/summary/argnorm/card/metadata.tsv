@@ -1,0 +1,23 @@
+ARO Accession	ARO Name	AMR Gene Family	Resistance Mechanism
+ARO:3000010	vanA	Van ligase;glycopeptide resistance gene cluster	antibiotic target alteration
+ARO:3000194	tet(W)	tetracycline-resistant ribosomal protection protein	antibiotic target protection
+ARO:3000501	rpoB2	rifamycin-resistant beta-subunit of RNA polymerase (rpoB)	antibiotic target replacement
+ARO:3000617	mecA	methicillin resistant PBP2	antibiotic target replacement
+ARO:3000838	arlR	major facilitator superfamily (MFS) antibiotic efflux pump	antibiotic efflux
+ARO:3000873	TEM-1	TEM beta-lactamase	antibiotic inactivation
+ARO:3000980	TEM-117	TEM beta-lactamase	antibiotic inactivation
+ARO:3001878	CTX-M-15	CTX-M beta-lactamase	antibiotic inactivation
+ARO:3001967	CTX-M-107	CTX-M beta-lactamase	antibiotic inactivation
+ARO:3002312	KPC-2	KPC beta-lactamase	antibiotic inactivation
+ARO:3002313	KPC-3	KPC beta-lactamase	antibiotic inactivation
+ARO:3002724	QnrB10	quinolone resistance protein (qnr)	antibiotic target protection
+ARO:3002835	lnuA	lincosamide nucleotidyltransferase (LNU)	antibiotic inactivation
+ARO:3003003	CfxA3	CfxA beta-lactamase	antibiotic inactivation
+ARO:3003048	rosA	major facilitator superfamily (MFS) antibiotic efflux pump	antibiotic efflux
+ARO:3003049	rosB	major facilitator superfamily (MFS) antibiotic efflux pump	antibiotic efflux
+ARO:3003206	lsaE	lsa-type ABC-F protein	antibiotic target protection
+ARO:3003577	ugd	pmr phosphoethanolamine transferase	antibiotic target alteration
+ARO:3003982	LlmA 23S ribosomal RNA methyltransferase	Llm 23S ribosomal RNA methyltransferase	antibiotic target alteration
+ARO:3005023	cfrE	Cfr 23S ribosomal RNA methyltransferase	antibiotic target alteration
+ARO:3005098	qacL	small multidrug resistance (SMR) antibiotic efflux pump	antibiotic efflux
+ARO:3006225	CepA-44	CepA beta-lactamase	antibiotic inactivation

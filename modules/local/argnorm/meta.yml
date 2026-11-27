@@ -1,0 +1,41 @@
+name: argnorm
+description: argNorm maps every hit of an ARG table to the CARD Antibiotic Resistance Ontology (ARO term, its name, the RGI cut-off of the mapping - Perfect, Strict, Loose or Manual - and the drug and drug-class AROs it confers resistance to). Run on ARGs-OAP stage two's blastout.filtered.txt (tool argsoap; the 4.0.0 header row is dropped first) and on DEEPARG_CONTIGS' .mapping.ARG (tool deeparg). The mapping tables ship inside the argNorm package, so no database is staged
+keywords:
+  - antimicrobial resistance
+  - aro
+  - card
+  - args-oap
+  - deeparg
+  - normalisation
+tools:
+  - argnorm:
+      description: Normalises ARG annotations of several tools and databases to the Antibiotic Resistance Ontology (ARO) of CARD
+      homepage: https://github.com/BigDataBiology/argNorm
+      documentation: https://argnorm.readthedocs.io/
+      doi: "10.1093/bioinformatics/btaf173"
+      licence: ["MIT"]
+
+input:
+  - meta:
+      type: map
+      description: Sample (ARGs-OAP) or assembly (DeepARG) metadata; id is the sample or assembly name
+  - hits:
+      type: file
+      description: ARGs-OAP 4.0.0 blastout.filtered.txt (header row and 18 columns, column 2 the SARG sequence id) or a DeepARG .mapping.ARG table (#ARG, ..., best-hit, ...)
+      pattern: "{blastout.filtered.txt,*.mapping.ARG}"
+  - tool:
+      type: string
+      description: argNorm tool name, argsoap or deeparg
+
+output:
+  - tsv:
+      type: file
+      description: <prefix>.argnorm.tsv, a '# argNorm version' line, then the input columns (named 0-17 for ARGs-OAP) followed by ARO, ARO_name, Cut_Off, confers_resistance_to(_names) and resistance_to_drug_classes(_names); an ARGs-OAP table with no hit gives the header only
+      pattern: "*.argnorm.tsv"
+  - versions:
+      type: file
+      description: Software versions (argnorm)
+      pattern: "versions.yml"
+
+authors:
+  - "@juanu"

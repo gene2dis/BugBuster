@@ -1319,6 +1319,13 @@
                     "description": "Comma-separated clean read-pair depths drawn as reference lines in the summary QC figure and counted in the report header ('' for none).",
                     "fa_icon": "fas fa-ruler-vertical"
                 },
+                "summary_args_oap_min_hits": {
+                    "type": "integer",
+                    "default": 3,
+                    "minimum": 1,
+                    "description": "ARGs-OAP in the summary's read-level method comparison: a sample x CARD gene counts as an ARGs-OAP detection when at least this many filtered read hits map to the gene through argNorm with a Perfect, Strict or Manual mapping (Loose mappings never count). ARGs-OAP counts any read hit, so a lower value lets a gene in on one or two reads.",
+                    "fa_icon": "fas fa-filter"
+                },
                 "card_prevalence": {
                     "type": "string",
                     "format": "file-path",
@@ -1330,7 +1337,7 @@
                     "type": "string",
                     "format": "file-path",
                     "exists": true,
-                    "description": "ARG reporting tier rules (regular expressions on CARD names and gene families); copy and edit the default to change the tiers.",
+                    "description": "Pipeline-defined ARG reporting tier rules (regular expressions on CARD names and gene families, with an optional basis column per rule); copy and edit the default to change the tiers.",
                     "fa_icon": "fas fa-layer-group"
                 },
                 "summary_watchlist": {

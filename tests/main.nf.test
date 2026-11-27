@@ -625,6 +625,13 @@ nextflow_pipeline {
             // DeepARG contig predictions published to the documented layout (audit #23)
             assert path("${outputDir}/05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1_contigs_deep_arg.out.mapping.ARG").exists()
             assert path("${outputDir}/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv").exists()
+            // argNorm maps each assembly's DeepARG hits to CARD AROs, published
+            // beside them; the summary gets the K-MARVEL CARD database for their
+            // families and tiers without running K-MARVEL (roadmap Phase 27b)
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("ARGNORM_DEEPARG") } == 2
+            assert path("${outputDir}/05_arg_prediction/contig_level/deeparg/test_sample1/test_sample1.deeparg.argnorm.tsv").exists()
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("KMARVEL") } == 0
 
             // Shared PYRODIGAL gene calling ran and its ORFs are published to
             // the documented layout (design doc Q6/Q9: gene calling moved from
@@ -906,11 +913,47 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP (") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
+            // FORMAT_KMARVEL_DB runs for the summary's argNorm tiers (roadmap Phase 27b), K-MARVEL itself does not
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || (task.name.contains("KMARVEL") && !task.name.contains("FORMAT_KMARVEL_DB")) } == 0
             assert path("${outputDir}/05_arg_prediction/read_level/args_oap/test_sample1_args_oap/metadata.txt").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/args_oap_summary/args_oap_long.tsv").exists()
             assert path("${outputDir}/05_arg_prediction/read_level/args_oap_summary/args_oap_cells.tsv").exists()
             assert !path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
+            // argNorm on each sample's SARG hits (roadmap Phase 27b), and the
+            // K-MARVEL CARD database for the summary, with K-MARVEL itself off
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("ARGNORM_SARG") } == 2
+            assert path("${outputDir}/05_arg_prediction/read_level/args_oap/argnorm/test_sample1.args_oap.argnorm.tsv").exists()
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 1
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("KMARVEL") } == 0
+        }
+    }
+
+    test("Stub run: ARGs-OAP without the summary prepares no CARD database") {
+        // the K-MARVEL CARD database serves argNorm's tiers in the summary
+        // only (argNormCardNeeded()): off with --results_summary false
+        options "-stub"
+
+        when {
+            params {
+                input  = TestData.localSamplesheet(outputDir, projectDir)
+                output = "${outputDir}"
+                quality_control     = true
+                assembly_mode       = "none"
+                taxonomic_profiler  = "none"
+                args_oap_prediction = true
+                results_summary     = false
+                custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
+                custom_host_fasta = "${projectDir}/tests/data/decontamination/host_mock.fasta"
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+        }
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().count { task -> task.name.startsWith("ARGNORM_SARG") } == 2
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_KMARVEL_DB") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("RESULTS_SUMMARY") } == 0
         }
     }
 
@@ -935,7 +978,8 @@ nextflow_pipeline {
         then {
             assert workflow.success
             assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP (") } == 2
-            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || task.name.contains("KMARVEL") } == 0
+            // FORMAT_KMARVEL_DB runs for the summary's argNorm tiers (roadmap Phase 27b), K-MARVEL itself does not
+            assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") || (task.name.contains("KMARVEL") && !task.name.contains("FORMAT_KMARVEL_DB")) } == 0
             assert path("${outputDir}/../meta/nextflow.log").text.contains("--read_arg_prediction is deprecated")
         }
     }
@@ -1657,7 +1701,9 @@ nextflow_pipeline {
             // "false": every disabled branch stays off
             assert workflow.trace.tasks().count { task -> task.name.contains("MICROBECENSUS") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("ARGS_OAP") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("ARGNORM") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_") } == 0
+            // also FORMAT_KMARVEL_DB: argNormCardNeeded() reads the String toggles through flagOn
             assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_CHECKM2_DB") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_EGGNOG_DB") } == 0

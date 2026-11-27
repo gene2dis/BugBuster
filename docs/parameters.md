@@ -706,6 +706,13 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 - **Description**: Clean read-pair depths drawn as dotted reference lines in the summary QC figure, counted in the report header ("samples with >=10M clean pairs") and used for the `depth_class` column. `''` for none. The low-depth threshold (`--summary_min_clean_pairs`) is always drawn
 - **Example**: `--summary_depth_marks 5000000,10000000,20000000`
 
+### `--summary_args_oap_min_hits`
+- **Type**: Integer
+- **Default**: `3`
+- **Minimum**: `1`
+- **Description**: ARGs-OAP in the summary's read-level method comparison (`arg_method_comparison`, with K-MARVEL or RGI). argNorm maps each ARGs-OAP read hit to a CARD gene; a sample x gene counts as an ARGs-OAP detection when at least this many hits map to it with a Perfect, Strict or Manual mapping. Loose mappings, which often name a homolog, never count. ARGs-OAP reports any read with a filtered hit, so with `1` a gene can enter on a single read
+- **Example**: `--summary_args_oap_min_hits 5`
+
 ### `--card_prevalence`
 - **Type**: String (path)
 - **Default**: none
@@ -715,7 +722,7 @@ clean read pairs, and ARG calls carry a reporting tier. See the manual, section 
 ### `--arg_priority_table`
 - **Type**: String (path)
 - **Default**: `assets/arg_priority_tiers.tsv`
-- **Description**: ARG reporting tier rules: regular expressions on CARD ARO names or gene families, first match wins. Copy and edit the default to change the tiers
+- **Description**: Pipeline-defined ARG reporting tier rules (1 high-concern acquired, 2 other acquired, 3 intrinsic, efflux or regulator, 4 mutation dependent): regular expressions on CARD ARO names or gene families, first match wins. Columns `match`, `pattern`, `tier`, `category`, an optional `note` and an optional `basis` (why a tier 1 rule is there; shown in the report's Methods). The tiers also apply to the ARGs-OAP and DeepARG hits argNorm maps to CARD. Copy and edit the default to change the tiers
 - **Example**: `--arg_priority_table my_tiers.tsv`
 
 ### `--summary_watchlist`

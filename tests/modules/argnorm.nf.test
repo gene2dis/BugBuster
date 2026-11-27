@@ -1,0 +1,119 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    ARGNORM Module Test (roadmap Phase 27b, AR4)
+
+    argNorm 1.1.0 on the committed fixtures, no database: the ARGs-OAP 4.0.0
+    stage two table of tests/data/args_oap/ (header row and 18 columns; real
+    SARG ids, synthetic reads) and a DeepARG .mapping.ARG with real DeepARG v2
+    feature ids (tests/data/argnorm/). The ARGs-OAP header must not be read as
+    a hit, every hit gets its ARO and RGI cut-off, and an ARGs-OAP table with
+    no hit gives a header-only output instead of argNorm's pandas error.
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_process {
+
+    name "Test ARGNORM Process"
+    script "../../modules/local/argnorm/main.nf"
+    process "ARGNORM"
+
+    test("ARGs-OAP 4.0.0 table: header dropped, every SARG hit mapped") {
+        when {
+            process {
+                """
+                input[0] = [ [ id: 'sampleA' ], file("${projectDir}/tests/data/args_oap/sampleA_args_oap/blastout.filtered.txt", checkIfExists: true) ]
+                input[1] = 'argsoap'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def out = process.out.tsv[0][1]
+            assert file(out).name == 'sampleA.argnorm.tsv'
+            def lines = path(out).readLines()
+            assert lines[0] == '# argNorm version: 1.1.0'
+            def header = lines[1].split('\t') as List
+            assert header[0..2] == ['0', '1', '2']
+            assert header[18..20] == ['ARO', 'ARO_name', 'Cut_Off']
+            def rows = lines.drop(2).collect { l -> l.split('\t', -1) as List }
+            // 12 hits, none of them the header row
+            assert rows.size() == 12
+            assert !rows.any { r -> r[1] == 'sseqid' }
+            def by_id = rows.collectEntries { r -> [r[1], [r[18], r[19], r[20]]] }
+            assert by_id['gb|APB03214.1|ARO:3003980|tetA(48)'] == ['ARO:3003980', 'tetA(58)', 'Perfect']
+            assert by_id['gb|CAJ77856.1|ARO:3000777|adeF'] == ['ARO:3000777', 'adeF', 'Perfect']
+            assert by_id['ZP_04612557'] == ['ARO:3003049', 'rosB', 'Loose']
+            assert rows.every { r -> r[18].startsWith('ARO:') }
+            assert path(process.out.versions[0]).text.contains('argnorm: 1.1.0')
+        }
+    }
+
+    test("DeepARG table: each best hit mapped, Loose cut-offs kept") {
+        when {
+            process {
+                """
+                input[0] = [ [ id: 'sampleA' ], file("${projectDir}/tests/data/argnorm/sampleA_contigs_deep_arg.out.mapping.ARG", checkIfExists: true) ]
+                input[1] = 'deeparg'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.tsv[0][1]).readLines()
+            def header = lines[1].split('\t') as List
+            assert header[0] == '#ARG' && header[12..14] == ['ARO', 'ARO_name', 'Cut_Off']
+            def by_gene = lines.drop(2).collect { l -> l.split('\t', -1) as List }
+                .collectEntries { r -> [r[0], [r[12], r[14]]] }
+            assert by_gene == [
+                CFXA2: ['ARO:3003003', 'Perfect'],
+                VANB : ['ARO:3000013', 'Strict'],
+                ACRA : ['ARO:3004042', 'Perfect'],
+                AADE : ['ARO:3002629', 'Loose'],
+                // penA's Loose mapping is to mecA: the summary leaves Loose
+                // mappings out of the tiers and the comparison
+                PENA : ['ARO:3000617', 'Loose']
+            ]
+        }
+    }
+
+    test("ARGs-OAP table with no hit: header-only output") {
+        when {
+            process {
+                """
+                input[0] = [ [ id: 'sampleB' ], file("${projectDir}/tests/data/argnorm/header_only_blastout.filtered.txt", checkIfExists: true) ]
+                input[1] = 'argsoap'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.tsv[0][1]).readLines()
+            assert lines.size() == 2
+            assert lines[0] == '# argNorm version: 1.1.0'
+            def header = lines[1].split('\t') as List
+            assert header.size() == 25 && header[0] == '0' && header[17] == '17' && header[18] == 'ARO'
+            assert header.last() == 'resistance_to_drug_classes_names'
+        }
+    }
+
+    test("stub writes the output names") {
+        options "-stub"
+        when {
+            process {
+                """
+                input[0] = [ [ id: 'sampleA' ], file("${projectDir}/tests/data/argnorm/header_only_blastout.filtered.txt", checkIfExists: true) ]
+                input[1] = 'argsoap'
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert file(process.out.tsv[0][1]).name == 'sampleA.argnorm.tsv'
+            assert path(process.out.versions[0]).text.contains('argnorm: 1.1.0')
+        }
+    }
+}

@@ -81,6 +81,9 @@ TABLE_DOCS = {
                                               "gene RPKM"),
             ("n_genes_kmarvel, n_genes_rgi, n_genes_all_methods", "distinct genes per CARD-based ARG method (K-MARVEL, "
                                                                   "RGI at the coverage cutoff) and found by both"),
+            ("n_genes_args_oap", "distinct CARD genes ARGs-OAP detected (argNorm's mapping of its SARG hits, at "
+                                 "least --summary_args_oap_min_hits strong hits; arg_method_comparison); blank where "
+                                 "ARGs-OAP or a CARD method did not run"),
             ("args_oap_n16S, args_oap_ncell", "ARGs-OAP stage one estimates of 16S copies and of cells (from "
                                               "essential single-copy genes), pairs and singletons summed; nCell is "
                                               "the copies_per_cell denominator of the SARG tables"),
@@ -164,8 +167,8 @@ TABLE_DOCS = {
                        "and ARO (allele). The primary method's rows come first.",
         "columns": SAMPLE_KEY + [
             ("method", "kmarvel or rgi; the ARG matrices use the primary method only"),
-            ("tier, category, tier_note", "reporting tier from the tier rule table (1 clinical priority, 2 other "
-                                          "acquired, 3 intrinsic/efflux/regulator, 4 mutation dependent), the rule's "
+            ("tier, category, tier_note", "pipeline-defined reporting tier from the tier rule table (1 high-concern "
+                                          "acquired, 2 other acquired, 3 intrinsic/efflux/regulator, 4 mutation dependent), the rule's "
                                           "category and note"),
             ("gene", "allele numbers collapsed (KPC-2 -> KPC; OXA alleles -> their CARD OXA subgroup)"),
             ("aro_full_name, aro_id, gene_family, drug_class, resistance_mechanism, model",
@@ -237,7 +240,7 @@ TABLE_DOCS = {
     },
     "arg_priority_panel": {
         "title": "Tier 1 genes x samples (RPKM)",
-        "description": "Primary ARG method: the tier 1 (clinical priority) rows of arg_gene_rpkm. Header only when the "
+        "description": "Primary ARG method: the tier 1 (high-concern acquired) rows of arg_gene_rpkm. Header only when the "
                        "primary method found no tier 1 gene; tier 1 genes found only by another method are in "
                        "arg_method_comparison.",
         "columns": [("gene", "gene"), ("category", "tier 1 category"), WIDE_CELL],
@@ -249,12 +252,18 @@ TABLE_DOCS = {
         "columns": [("re:.*", "")],  # replaced at run time: the first column is the --group-by column
     },
     "arg_method_comparison": {
-        "title": "K-MARVEL vs RGI, per sample and gene",
-        "description": "Genes (alleles collapsed) detected by either CARD-based method on the samples both ran on.",
+        "title": "Read-level ARG methods, per sample and gene",
+        "description": "Genes (alleles collapsed) detected by any read-level method on the samples the CARD-based "
+                       "methods (K-MARVEL, RGI) ran on. ARGs-OAP is compared through argNorm's mapping of its SARG "
+                       "hits to CARD AROs (detection only: its copies per cell are not comparable with read pairs).",
         "columns": SAMPLE_KEY + [
             ("gene, tier, category, gene_family", "gene and its annotation"),
-            ("detected_by", "K-MARVEL + RGI, K-MARVEL only or RGI only"),
+            ("detected_by", "the methods that detected the gene, e.g. K-MARVEL + RGI, RGI + ARGs-OAP, K-MARVEL only"),
             ("detected_kmarvel, detected_rgi", "True when the method detected the gene (RGI: >= the coverage cutoff)"),
+            ("detected_args_oap", "True when at least --summary_args_oap_min_hits ARGs-OAP read hits map to the gene "
+                                  "with a Perfect, Strict or Manual argNorm mapping (Loose mappings never count); "
+                                  "NA_not_run where ARGs-OAP did not run"),
+            ("args_oap_read_hits", "ARGs-OAP filtered read hits (single reads) with a strong mapping to the gene"),
             ("kmarvel_read_pairs", "K-MARVEL supporting read pairs of the gene's best-supported allele"),
             ("rgi_read_pairs", "RGI read pairs of the gene, summed over its AROs (rgi_gene_read_pairs)"),
             ("rgi_gene_coverage", "best coverage of any RGI ARO of the gene (0 = RGI mapped no read to it)"),
@@ -264,7 +273,7 @@ TABLE_DOCS = {
         ],
     },
     "arg_method_overlap": {
-        "title": "K-MARVEL vs RGI overlap counts",
+        "title": "Read-level ARG method overlap counts",
         "description": "Distinct genes, and sample x gene detections, by the methods that found them: overall, per "
                        "tier and per category.",
         "columns": [("unit", "genes, or detections (sample x gene)"), ("level", "all, tier or category"),
@@ -287,6 +296,28 @@ TABLE_DOCS = {
                                 "nCell (samples_qc args_oap_ncell); blank when nCell is 0"),
             ("copies_per_16S", "SARG copies / ARGs-OAP 16S copies (args_oap_n16S)"),
             ("ppm", "read_count per million single reads (ARGs-OAP nRead)"),
+        ],
+    },
+    "arg_sarg_card": {
+        "title": "ARGs-OAP hits mapped to CARD (argNorm)",
+        "description": "One row per sample, SARG subtype, the CARD ARO argNorm maps its hits to and the cut-off of "
+                       "that mapping (argNorm mapped every SARG sequence with RGI; one subtype's sequences can reach "
+                       "an ARO by different cut-offs). Detection only: the abundance units are in arg_sarg_long.",
+        "columns": SAMPLE_KEY + [
+            ("sarg_type, sarg_subtype", "SARG type and subtype, as in arg_sarg_long"),
+            ("aro_id, aro_name", "the CARD ARO and its name in the K-MARVEL database's CARD release (argNorm's "
+                                 "name when that release lacks the ARO)"),
+            ("gene, gene_family", "the CARD gene (allele numbers collapsed, as in arg_long) and AMR gene family"),
+            ("cut_off", "RGI cut-off of argNorm's mapping: Perfect, Strict, Loose (often a homolog: no tier, never "
+                        "a detection) or Manual (argNorm's curation)"),
+            ("read_hits", "ARGs-OAP filtered read hits of the subtype mapped to the ARO (single reads)"),
+            ("tier, category", "reporting tier and category of the CARD gene, by the same rule table as arg_long; "
+                               "NA_loose_mapping for a Loose mapping, NA_aro_not_in_card_metadata for an ARO the "
+                               "CARD release lacks, NA_no_card_metadata without the K-MARVEL database, "
+                               "NA_no_aro_mapping for a hit argNorm maps to no ARO"),
+            ("drug_classes", "CARD drug classes the ARO confers resistance to (argNorm), ';'-separated"),
+            ("in_comparison", "True when the sample x gene counts as an ARGs-OAP detection in "
+                              "arg_method_comparison (>= --summary_args_oap_min_hits strong hits)"),
         ],
     },
     "arg_sarg_type_cpc": {
@@ -564,6 +595,23 @@ TABLE_DOCS = {
                      "without MicrobeCensus)"),
         ],
     },
+    "arg_deeparg_card": {
+        "title": "DeepARG contig hits mapped to CARD (argNorm)",
+        "description": "One row per DeepARG hit on an assembly's genes (contig- and bin-level ARGs come from the "
+                       "same hits), with the CARD ARO argNorm maps its best hit to, the CARD gene and tier. A bin "
+                       "hit is a row whose bin is set.",
+        "columns": ASSEMBLY_KEY + [
+            ("contig, gene_id", "contig and Pyrodigal gene"),
+            ("arg_gene, arg_class", "DeepARG ARG and its predicted class, as in arg_contig_long"),
+            ("best_hit", "DeepARG's best database hit, the sequence argNorm maps"),
+            ("aro_id, aro_name", "the CARD ARO and its name, as in arg_sarg_card"),
+            ("gene, gene_family", "the CARD gene (allele numbers collapsed) and AMR gene family"),
+            ("cut_off", "RGI cut-off of argNorm's mapping, as in arg_sarg_card"),
+            ("tier, category", "reporting tier and category, as in arg_sarg_card"),
+            ("drug_classes", "CARD drug classes the ARO confers resistance to (argNorm), ';'-separated"),
+            ("bin", "the contig's MAG when the assembly was binned (arg_contig_long, arg_mag_long); blank otherwise"),
+        ],
+    },
     "arg_mag_long": {
         "title": "ARG genes of MAGs and their clusters",
         "description": "One row per ARG gene on a MAG (--arg_bin_clustering: DeepARG hits of the assembly split by "
@@ -710,13 +758,31 @@ def unused_doc_columns(tables, group_by=None):
 # ---------------------------------------------------------------------------------------------------------------
 
 TIER_MEANING = {
-    1: ("Clinical priority", "last-line or highly transmissible resistance, usually on mobile elements"),
+    1: ("High-concern acquired", "acquired resistance to carbapenems, vancomycin (VRE), methicillin (mecA/mecC), the "
+                                 "last-resort drugs colistin, tigecycline and linezolid, or all aminoglycosides, usually "
+                                 "on mobile elements; the pipeline's own rules, with a basis per rule"),
     2: ("Other acquired", "acquired genes of common resistance (ESBL, AmpC, aminoglycoside-modifying enzymes, "
                           "tetracycline, macrolide, sulfonamide/trimethoprim genes, ...)"),
     3: ("Intrinsic, efflux or regulator", "chromosomal or housekeeping genes that most strains of a species carry; "
                                           "they say little about acquired resistance"),
     4: ("Mutation dependent", "genes that confer resistance only with a specific mutation (gyrA, parC, rpoB, ...)"),
 }
+
+
+def tier_basis(rules_path):
+    """{tier: ['category: basis', ...]} from the tier rule file's optional basis column, in rule order (a category's
+    rules with the same basis once)."""
+    try:
+        rules = pd.read_csv(rules_path, sep="\t", comment="#", dtype=str, keep_default_na=False)
+    except (OSError, ValueError):
+        return {}
+    out = {}
+    for tier, cat, basis in zip(rules.get("tier", []), rules.get("category", []),
+                                rules.get("basis", [""] * len(rules))):
+        item = f"{cat}: {basis}"
+        if basis and item not in out.setdefault(int(tier), []):
+            out[int(tier)].append(item)
+    return out
 
 
 def tier_categories(rules_path):
@@ -832,8 +898,10 @@ PITFALLS = [
     "over the ARGs-OAP cell estimate) measure different things. Compare samples within one unit only.",
     "Two cell estimates: ARGs-OAP nCell and MicrobeCensus genome equivalents (CPGE) come from different marker genes "
     "and differ by tens of percent; they are not interchangeable denominators.",
-    "SARG (ARGs-OAP) and CARD (K-MARVEL/RGI) name genes differently; their calls are reported separately, not "
-    "matched gene by gene.",
+    "SARG (ARGs-OAP) and CARD (K-MARVEL/RGI) name genes differently: ARGs-OAP's hits are matched to CARD genes "
+    "through argNorm's mapping of their SARG sequences (arg_sarg_card; Loose mappings, often a homolog, left out), "
+    "for detection only (arg_method_comparison): its copies per cell are not comparable with read pairs. ARGs-OAP "
+    "counts any read with a hit, so it lists genes the CARD methods miss at their thresholds.",
     "Alleles share reads (K-MARVEL): a gene is represented by one allele (gene_representative); never sum allele "
     "rows.",
     "RGI bwt lists every reference with at least one mapped read: the summary counts an RGI gene only at >= "
@@ -949,7 +1017,7 @@ def readme_blocks(ctx):
         m = [f"CARD-based ARG methods: {', '.join(s['arg_methods'])}; the ARG matrices and figures use "
              f"**{s.get('arg_primary', '')}**."]
         if s.get("n_tier1") is not None:
-            m.append(f"{s['n_tier1']} samples with a tier 1 (clinical priority) gene of {s.get('arg_primary', '')}; "
+            m.append(f"{s['n_tier1']} samples with a tier 1 (high-concern acquired) gene of {s.get('arg_primary', '')}; "
                      f"{s.get('n_tier1_genes', 0)} distinct tier 1 genes.")
         if s.get("n_tier1_genes_all_methods") is not None:
             m.append(f"{s['n_tier1_genes_all_methods']} tier 1 genes found by both CARD-based methods.")
@@ -972,17 +1040,26 @@ def readme_blocks(ctx):
                    ("table", ["File", "Figure", "How to read it"],
                     [[f"`figures/{r['key']}.*`", r["title"], r["caption"]] for r in figs.records])]
     blocks += [("h", 2, "Units and missing values"), ("table", ["Term", "Meaning"], [list(u) for u in UNITS])]
-    # tiers exist only for the CARD methods; an ARGs-OAP-only run has none (R5-06)
-    if s.get("arg_methods"):
+    # tiers exist for the CARD methods and for argNorm's CARD mapping of the ARGs-OAP and DeepARG hits (Phase 27b);
+    # an ARGs-OAP-only run without that mapping has none (R5-06)
+    tabs = ctx.get("tables", {})
+    if s.get("arg_methods") or "arg_sarg_card" in tabs or "arg_deeparg_card" in tabs:
         tier_rows = []
+        bases = tier_basis(ctx.get("arg_priority", ""))
         for tier, cats in tier_categories(ctx.get("arg_priority", "")).items():
             label, meaning = TIER_MEANING[tier]
-            tier_rows.append([f"Tier {tier}: {label}", meaning, "; ".join(cats)])
+            tier_rows.append([f"Tier {tier}: {label}", meaning, "; ".join(cats), "; ".join(bases.get(tier, []))])
         blocks += [("h", 2, "ARG reporting tiers"),
-                   ("p", "CARD-based calls (K-MARVEL, RGI) get a tier from an editable rule table "
+                   ("p", "The tiers are pipeline-defined reporting tiers, not a published ranking. Each tier 1 rule "
+                         "says its basis: consistent with a resistance of the WHO Bacterial Priority Pathogens List "
+                         "2024 (BPPL), or the pipeline's judgement (a last-resort drug, usually on mobile elements). "
+                         "The omics-based risk rank of Zhang et al. 2021 (Rank I-IV) is a different scheme and is not "
+                         "used. CARD-based calls (K-MARVEL, RGI) get a tier from an editable rule table "
                          f"(`{ctx.get('arg_priority_name', 'arg_priority_tiers.tsv')}`): rules match CARD gene names or "
-                         "families, top to bottom, first match wins. ARGs-OAP (SARG) has no tiers."),
-                   ("table", ["Tier", "Meaning", "Categories (rule notes)"], tier_rows)]
+                         "families, top to bottom, first match wins. ARGs-OAP and DeepARG hits get the tier of the "
+                         "CARD gene argNorm maps them to (arg_sarg_card, arg_deeparg_card; none for a Loose "
+                         "mapping)."),
+                   ("table", ["Tier", "Meaning", "Categories (rule notes)", "Basis"], tier_rows)]
     methods = ctx.get("method_notes", [])
     if methods:
         blocks += [("h", 2, "Methods"), ("ul", methods)]
@@ -1083,7 +1160,7 @@ def llm_guide(ctx):
     out += ["## Recipes", "",
             "- Which samples are reliable? `tables/samples_qc.tsv`: `low_depth == False`; `depth_class` for depth strata.",
             "- Most abundant species of a sample: `tables/taxonomy_long.tsv`, filter `sample`, sort `relative_abundance`.",
-            "- Clinically relevant ARGs: `tables/arg_long.tsv` with `tier == 1` and `gene_representative == True`; check "
+            "- High-concern ARGs (tier 1, a pipeline-defined tier): `tables/arg_long.tsv` with `tier == 1` and `gene_representative == True`; check "
             "`tables/arg_method_comparison.tsv` (`detected_by`) for agreement between K-MARVEL and RGI, and "
             "`rgi_host_check` for the likely host.",
             "- ARG load per sample in one unit: `tables/samples_qc.tsv` `acquired_rpkm` (CARD methods) or "

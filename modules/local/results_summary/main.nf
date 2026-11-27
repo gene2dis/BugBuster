@@ -113,6 +113,10 @@ process RESULTS_SUMMARY {
         case "\$name" in
             args_oap_long.tsv|args_oap_cells.tsv)
                 dest=${run_dir}/05_arg_prediction/read_level/args_oap_summary ;;
+            *.args_oap.argnorm.tsv)
+                dest=${run_dir}/05_arg_prediction/read_level/args_oap/argnorm ;;
+            *.deeparg.argnorm.tsv)
+                dest=${run_dir}/05_arg_prediction/contig_level/deeparg/\$(id_dir "\${name%.deeparg.argnorm.tsv}") ;;
             read_function_abundance.tsv|read_annotated_fraction.tsv|read_sample_summary.tsv)
                 dest=${run_dir}/07_functional_annotation/summary ;;
             function_abundance.tsv|annotated_fraction.tsv|gene_abundance.tsv)

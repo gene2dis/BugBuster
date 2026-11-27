@@ -2,6 +2,9 @@
 {% block body %}
 <h1>ARGs of MAGs</h1>
 <p>The {{ s.facts.n_genes }} ARG genes of the MAGs were clustered at 90-100 % identity; {{ s.facts.n_shared }} clusters at 90 % are found in more than one MAG{{ m.refs(s, tabs=["sharing"]) }}. A cluster in several MAGs is the same sequence in different genomes: consistent with transfer, not evidence of it alone.</p>
+{% if s.facts.card is defined %}
+<p>argNorm maps the MAGs' DeepARG hits to CARD: of the {{ s.facts.n_card_binned }} hits on a MAG, {{ s.facts.n_card_loose }} rest on a Loose mapping (often a homolog) and get no tier{% if s.facts.tier1_genes %}; tier 1: {{ s.facts.tier1_genes }}{% endif %}. Each hit's CARD gene, tier and drug classes are in arg_deeparg_card.tsv (the rows with a bin).</p>
+{% endif %}
 {{ m.table(s, "sharing") }}
 {{ m.table(s, "long") }}
 {% endblock %}

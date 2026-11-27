@@ -75,8 +75,12 @@ ARGS_OAP runs ARGs-OAP 4.0.0 stages one and two; `bin/args_oap_report.py` (ARGS_
   `stage_two_status.txt` (`ok`, `no_sarg_hit`, `not_normalised`), which the report carries, and the summary leaves a
   not-normalised sample blank rather than 0. A file stage one drops after an error (logged only as a warning) fails
   the task (retried with more memory when a process was killed for memory); an empty singleton file is skipped.
-- **Not compared with CARD methods.** SARG names differ from CARD's; ARGs-OAP has its own section without tiers, as
-  KARGA had. A SARG-to-tier map remains possible later.
+- **Compared with the CARD methods through argNorm** (roadmap Phase 27b; was: its own section without tiers).
+  SARG names differ from CARD's: ARGNORM_SARG maps each hit's SARG sequence to a CARD ARO, so the summary gives the
+  hits a CARD gene and tier (`arg_sarg_card`) and adds ARGs-OAP to `arg_method_comparison` by detection (at least
+  `--summary_args_oap_min_hits` hits with a Perfect, Strict or Manual mapping; Loose mappings never count). The SARG
+  tables keep their units and stay in SARG's terms. Verified on a three-sample fixture run (Phase 27a):
+  ARGs-OAP shares 29 / 6 / 46 of the 41 / 7 / 75 genes K-MARVEL or RGI detect.
 - **Fixture numbers.** 14-17 SARG types and 64-74 subtypes per sample, 0.21-0.31 copies per cell in total; cell and
   16S estimates identical to the stage-one-only runs before Phase 8.
 - **Open: `extracted.fa` and `blastout.txt`** (the stage-one candidate reads and the raw BLASTX hits, ~90 MB per
