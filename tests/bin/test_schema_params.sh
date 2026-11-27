@@ -93,9 +93,8 @@ check(not unused, "every $defs group is referenced from allOf (its params are va
 
 # A param defined in two groups is validated against both entries: they must
 # not disagree on anything that validates (descriptions and icons may differ).
-# config_profile_name / _description are in generic_options and
-# cloud_hpc_profile_options today (both plain hidden strings; recorded in
-# roadmap Phase 25, not changed here: Phase 25 changes tests only)
+# No param is defined twice today (config_profile_name / _description were in
+# generic_options and cloud_hpc_profile_options until roadmap Phase 28)
 DOC_KEYS = {"description", "help_text", "fa_icon", "hidden"}
 props = {}
 dupes, conflicts = [], []
