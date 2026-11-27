@@ -18,10 +18,7 @@
                 sample into one co-assembly, or one co-assembly per
                 --coassembly_group_by group)
     
-    OUTPUTS (main.nf reads all of them except contigs):
-        contigs: [meta, reads, contigs] - Filtered contigs with the sample's
-                reads, per-sample mode only (empty under co-assembly); read
-                only by tests/subworkflows/assembly.nf.test
+    OUTPUTS (main.nf reads all of them):
         contigs_meta: [meta, contigs] - Filtered contigs (contig stages,
                 multi-sample coverage)
         bam: [meta, contigs, bam] - Contigs with their BAM (BINNING's input)
@@ -318,7 +315,6 @@ workflow ASSEMBLY {
     }
 
     emit:
-    contigs         = ch_contigs_with_reads  // channel: [ val(meta), path(reads), path(contigs) ] - per-sample mode only; not read by main.nf
     contigs_meta    = ch_contigs_only        // channel: [ val(meta), path(contigs) ] - for annotation
     bam             = ch_bam_with_contigs    // channel: [ val(meta), path(contigs), path(bam) ] - for depth analysis
     bam_meta        = ch_bam_only            // channel: [ val(meta), path(bam) ] - for indexing

@@ -4,8 +4,8 @@
 
     Roadmap A1: --assembly_read_reduction normalize reduces the reads MEGAHIT
     gets, and only those. Every alignment (the pooled or per-sample BAM for
-    binning and coverage, the per-sample counting BAMs) and the reads passed
-    on with the contigs must be the full input reads. nf-test sees outputs,
+    binning and coverage, the per-sample counting BAMs) must get the full
+    input reads. nf-test sees outputs,
     not inputs, so the tests read the staged links in each task's work
     directory (tests/lib/TaskInputs.groovy); MEGAHIT's own task, reached
     through BBMAP's staged contigs, must hold the normalized reads.
@@ -52,8 +52,6 @@ nextflow_workflow {
                 assert TaskInputs.stagedReads(bam[2]) == full
                 def counting = workflow.out.counting_bam.find { item -> item[0].id == id }
                 assert TaskInputs.stagedReads(counting[1]) == full
-                def contigs = workflow.out.contigs.find { item -> item[0].id == id }
-                assert contigs[1].collect { f -> new File(f.toString()).name } == full
                 // MEGAHIT (reached through BBMAP's staged contigs) got the normalized reads
                 def filtered = workflow.out.contigs_meta.find { item -> item[0].id == id }
                 assert TaskInputs.upstreamStagedReads(filtered[1], "${id}_contigs.fa") ==

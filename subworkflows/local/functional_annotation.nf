@@ -76,14 +76,10 @@ workflow FUNCTIONAL_ANNOTATION {
         ch_dbcan_module_versions = channel.empty()
         if ( run_dbcan_branch ) {
             RUN_DBCAN(ch_proteins.combine(ch_dbcan_db))
-            ch_dbcan_overview   = RUN_DBCAN.out.overview
-            ch_dbcan_substrates = RUN_DBCAN.out.substrates
             ch_dbcan_overviews_agg = RUN_DBCAN.out.overview.map { _meta, overview -> overview }.collect(sort: true)
             ch_dbcan_versions_agg  = RUN_DBCAN.out.versions.collect(sort: true).map { vs -> vs[0] }
             ch_dbcan_module_versions = RUN_DBCAN.out.versions.first()
         } else {
-            ch_dbcan_overview   = channel.empty()
-            ch_dbcan_substrates = channel.empty()
             ch_dbcan_overviews_agg = channel.value([])
             ch_dbcan_versions_agg  = channel.value([])
         }
@@ -129,16 +125,10 @@ workflow FUNCTIONAL_ANNOTATION {
             ch_coassembly_groups
         )
 
-        ch_annotations         = EGGNOG_MAPPER_ANNOTATE.out.annotations
-        ch_seed_orthologs      = EGGNOG_MAPPER_SEARCH.out.seed_orthologs
-        ch_gene_counts         = FEATURECOUNTS_GENES.out.counts
         ch_gene_counts_summary = FEATURECOUNTS_GENES.out.summary
-        ch_gene_annotations    = AGGREGATE_FUNCTIONS.out.gene_annotations
         ch_gene_abundance      = AGGREGATE_FUNCTIONS.out.gene_abundance
         ch_function_abundance  = AGGREGATE_FUNCTIONS.out.function_abundance
-        ch_function_wide       = AGGREGATE_FUNCTIONS.out.function_wide
         ch_annotated_fraction  = AGGREGATE_FUNCTIONS.out.annotated_fraction
-        ch_ags_summary         = AGGREGATE_FUNCTIONS.out.ags_summary
 
         ch_versions = ch_versions.mix(
             EGGNOG_MAPPER_SEARCH.out.versions.first(),
@@ -148,18 +138,10 @@ workflow FUNCTIONAL_ANNOTATION {
             AGGREGATE_FUNCTIONS.out.versions
         )
     } else {
-        ch_annotations         = channel.empty()
-        ch_seed_orthologs      = channel.empty()
-        ch_dbcan_overview      = channel.empty()
-        ch_dbcan_substrates    = channel.empty()
-        ch_gene_counts         = channel.empty()
         ch_gene_counts_summary = channel.empty()
-        ch_gene_annotations    = channel.empty()
         ch_gene_abundance      = channel.empty()
         ch_function_abundance  = channel.empty()
-        ch_function_wide       = channel.empty()
         ch_annotated_fraction  = channel.empty()
-        ch_ags_summary         = channel.empty()
     }
 
     //
@@ -177,34 +159,22 @@ workflow FUNCTIONAL_ANNOTATION {
                 .collect { f -> [ meta + [bin: f.baseName], f ] }
         }
         NFCORE_BAKTA_BAKTA(ch_bins, ch_bakta_db.first(), [], [], [], [])
-        ch_bakta_gff = NFCORE_BAKTA_BAKTA.out.gff
         ch_bakta_tsv = NFCORE_BAKTA_BAKTA.out.tsv
         ch_bakta_txt = NFCORE_BAKTA_BAKTA.out.txt
         ch_versions  = ch_versions.mix(NFCORE_BAKTA_BAKTA.out.versions.first())
     } else {
-        ch_bakta_gff = channel.empty()
         ch_bakta_tsv = channel.empty()
         ch_bakta_txt = channel.empty()
     }
 
-    // main.nf reads gene_counts_summary, gene_abundance, function_abundance,
-    // annotated_fraction, bakta_tsv, bakta_txt and versions; the other emits
-    // are not read in the pipeline
+    // Only the channels main.nf reads are emitted (roadmap Phase 28, RV31);
+    // every file is still published by its process's publishDir rule
     emit:
-    annotations         = ch_annotations                // [ meta, *.emapper.annotations ]
-    seed_orthologs      = ch_seed_orthologs             // [ meta, *.emapper.seed_orthologs ]
-    dbcan_overview      = ch_dbcan_overview             // [ meta, *.overview.tsv ] (empty when --functional_cazy false)
-    dbcan_substrates    = ch_dbcan_substrates           // [ meta, *.dbCANsub_hmm_results.tsv ]
-    gene_counts         = ch_gene_counts                // [ meta, *.featureCounts.txt ] - per sample in both modes
     gene_counts_summary = ch_gene_counts_summary        // [ meta, *.featureCounts.txt.summary ]
-    gene_annotations    = ch_gene_annotations           // gene_annotations.tsv (Section 5.1)
     gene_abundance      = ch_gene_abundance             // gene_abundance.tsv (Section 5.2)
     function_abundance  = ch_function_abundance         // function_abundance.tsv (Section 5.3)
-    function_wide       = ch_function_wide              // function_wide_<ontology>_{tpm,cpge}.tsv
     annotated_fraction  = ch_annotated_fraction         // annotated_fraction.tsv
-    ags_summary         = ch_ags_summary                // ags_and_ge.tsv
-    bakta_gff           = ch_bakta_gff                  // [ meta(+bin), *.gff3 ] per bin (empty when --mag_level_functional false)
-    bakta_tsv           = ch_bakta_tsv                  // [ meta(+bin), *.tsv ] per bin
+    bakta_tsv           = ch_bakta_tsv                  // [ meta(+bin), *.tsv ] per bin (empty when --mag_level_functional false)
     bakta_txt           = ch_bakta_txt                  // [ meta(+bin), *.txt ] per bin (Bakta's summary)
     versions            = ch_versions
 }
