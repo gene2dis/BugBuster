@@ -50,8 +50,8 @@ for line in open(config_path):
 
 # database-key parameter -> its registry map in config/databases.config
 PAIRS = {
-    "phiX_index": "bowtie_ref_genomes_for_build",
-    "host_db": "bowtie_ref_host_index",
+    "phiX_index": "phix_ref_db",
+    "host_db": "host_ref_db",
     "kraken2_db": "kraken_ref_db",
     "sourmash_db": "sourmash_ref_db",
     "sylph_db": "sylph_ref_db",
@@ -78,7 +78,7 @@ for group in schema["$defs"].values():
 
 failures = []
 missing = {}
-registry_maps = sorted(k for k in params if k.endswith("_ref_db") or k.startswith("bowtie_ref_"))
+registry_maps = sorted(k for k in params if k.endswith("_ref_db"))
 unpaired = sorted(set(registry_maps) - set(PAIRS.values()))
 if unpaired:
     failures.append(f"registry maps with no parameter in this test: {', '.join(unpaired)}")

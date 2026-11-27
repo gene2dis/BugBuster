@@ -50,7 +50,9 @@ workflow SOFTWARE_VERSIONS {
         .groupTuple()
         .map { name, tools -> ( "\"${name}\":\n" + tools.sort().join('\n') + '\n' ).toString() }
 
-    ch_yml = ch_versions_in.file
+    emit:
+    // channel: software_versions.yml (the one emit, unnamed: SOFTWARE_VERSIONS.out)
+    ch_versions_in.file
         .map { yml -> yml.text.stripIndent() }
         .mix( ch_topic_yml )
         .mix( channel.of(
@@ -65,7 +67,4 @@ workflow SOFTWARE_VERSIONS {
             sort: true,
             newLine: false
         )
-
-    emit:
-    yml = ch_yml   // channel: software_versions.yml
 }

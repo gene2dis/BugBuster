@@ -33,7 +33,7 @@ include { RGI_LOAD                } from '../../modules/local/rgi_load/main'
 include { RGI_LOAD_WILDCARD       } from '../../modules/local/rgi_load_wildcard/main'
 include { BOWTIE2_BUILD_COMBINED  } from '../../modules/local/bowtie2_build_combined/main'
 include { BWAMEM3_BUILD_COMBINED  } from '../../modules/local/bwamem3_build_combined/main'
-include { flagOn; sourmashCustomFiles; argNormCardNeeded } from './utils_params'
+include { flagOn; sourmashCustomFiles; argNormCardNeeded; hostRefDb; phixRefDb } from './utils_params'
 
 workflow PREPARE_DATABASES {
     
@@ -144,13 +144,13 @@ workflow PREPARE_DATABASES {
             // Collect FASTA file paths into lists
             def phix_files = params.custom_phiX_fasta ? 
                 [params.custom_phiX_fasta] : 
-                params.bowtie_ref_genomes_for_build[params.phiX_index]["url"]
+                phixRefDb()[params.phiX_index]["url"]
             
             // --custom_host_fasta takes one FASTA or a comma-separated list
             // (several host genomes go into the one combined index)
             def host_files = params.custom_host_fasta ?
                 params.custom_host_fasta.toString().tokenize(',')*.trim().findAll { f -> f } :
-                params.bowtie_ref_host_index[params.host_db]["url"]
+                hostRefDb()[params.host_db]["url"]
             
             // Combine lists and create single channel
             def all_fasta_files = phix_files + host_files

@@ -83,6 +83,18 @@ def argNormCardNeeded() {
     return flagOn(params.results_summary) && (args_oap || deeparg)
 }
 
+// The decontamination genome registries (config/databases.config), with the
+// entries a -c file still sets under their names before 2.0.0
+// (bowtie_ref_host_index, bowtie_ref_genomes_for_build) merged over them, so
+// such a config keeps working (main.nf warns at launch; roadmap Phase 29, CL2)
+def hostRefDb() {
+    return (params.host_ref_db ?: [:]) + (params.bowtie_ref_host_index ?: [:])
+}
+
+def phixRefDb() {
+    return (params.phix_ref_db ?: [:]) + (params.bowtie_ref_genomes_for_build ?: [:])
+}
+
 // true when a (plain, uncompressed) FASTA holds at least one record. BBMAP
 // writes a FASTA without sequences when every contig of an assembly is below
 // --bbmap_length; ASSEMBLY drops such an assembly before the contig stages

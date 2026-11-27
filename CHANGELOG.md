@@ -621,6 +621,11 @@ bold label names the full entry below (search for it).
 
 ### Changed
 
+- The decontamination genome registries of `config/databases.config` are renamed
+  `host_ref_db` (was `bowtie_ref_host_index`) and `phix_ref_db` (was
+  `bowtie_ref_genomes_for_build`): both aligners build their index from them (issue
+  #27). A `-c` config that sets an old name keeps working: its entries are used, with a
+  launch warning to rename it.
 - **ARG tiers are presented as pipeline-defined reporting tiers** (roadmap
   Phase 27b, AR1): tier 1 is now "High-concern acquired" (was "Clinical
   priority") in the tables' documentation, README, LLM guide, report and

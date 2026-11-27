@@ -163,7 +163,7 @@ process CONTIG_FILTER_SUMMARY {
 
     Sample_ID	Stage	Timestamp	Action_Taken
     ------------------------------------------------------------------------
-    sample2	BOWTIE2_SAMTOOLS	2026-01-22 21:15:00 UTC	Created empty BAM file
+    sample2	BWAMEM3_SAMTOOLS	2026-01-22 21:15:00 UTC	Created empty BAM file
 
     ## Summary Statistics
 

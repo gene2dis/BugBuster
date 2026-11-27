@@ -39,7 +39,7 @@ nextflow_workflow {
 
         then {
             assert workflow.success
-            def text = path(workflow.out.yml.get(0)).text
+            def text = path(workflow.out[0].get(0)).text
             assert text == path("${outputDir}/pipeline_info/software_versions.yml").text
             // one block for the process: tools sorted, the stray tuple not repeated,
             // a multi-line version on one line

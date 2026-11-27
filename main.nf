@@ -277,6 +277,17 @@ workflow {
         }
     }
 
+    // The decontamination genome registries were renamed (roadmap Phase 29,
+    // CL2): an old name set in a -c file is still read (hostRefDb() / phixRefDb())
+    [
+        [params.bowtie_ref_host_index, 'bowtie_ref_host_index', 'host_ref_db'],
+        [params.bowtie_ref_genomes_for_build, 'bowtie_ref_genomes_for_build', 'phix_ref_db'],
+    ].each { old_value, old_name, new_name ->
+        if (old_value != null) {
+            log.warn "params.${old_name} is deprecated (it serves both aligners): its entries are used as params.${new_name}. Rename it to ${new_name} in your config"
+        }
+    }
+
     // --read_arg_prediction switched on KARGA, KARGVA and ARGs-OAP together; KARGA
     // and KARGVA were removed, so it is now a deprecated alias of
     // --args_oap_prediction (a false boolean default cannot be told apart from an
@@ -532,7 +543,7 @@ workflow {
     // SUBWORKFLOW: Validate and parse input samplesheet
     //
     INPUT_CHECK(file(params.input, checkIfExists: true))
-    ch_reads = INPUT_CHECK.out.reads
+    ch_reads = INPUT_CHECK.out
 
     //
     // SUBWORKFLOW: Prepare all databases
@@ -1172,7 +1183,7 @@ workflow {
     // that emits the topic is not also mixed into ch_versions)
     //
     SOFTWARE_VERSIONS( ch_versions, channel.topic('versions') )
-    ch_software_versions = SOFTWARE_VERSIONS.out.yml
+    ch_software_versions = SOFTWARE_VERSIONS.out
 
     //
     // MODULE: Run-level summary (00_summary/): tables, Excel workbook,

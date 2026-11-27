@@ -39,5 +39,5 @@ workflow TOPIC_VERSIONS_TEST {
     SOFTWARE_VERSIONS( ch_versions_yml, channel.topic('versions') )
 
     emit:
-    yml = SOFTWARE_VERSIONS.out.yml
+    SOFTWARE_VERSIONS.out
 }
