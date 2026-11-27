@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Regenerate tests/data/summary/argnorm/ (roadmap Phase 27b): argNorm 1.1.0 (the image ARGNORM pins) on
 #  - a hand-written ARGs-OAP 4.0.0 stage two table of sampleA (header row, 18 columns; real SARG ids, synthetic
-#    reads): KPC and TEM, which the K-MARVEL / RGI fixtures of sampleA also call; mecA on 3 hits (ARGs-OAP only,
-#    tier 1); vanA on 2 hits (under the default --summary_args_oap_min_hits 3); rosB on 3 Loose hits; tetA(58) on
+#    reads): KPC and TEM, which the K-MARVEL / RGI fixtures of sampleA also call; mecA on 3 Strict hits (ARGs-OAP
+#    only, tier 1) and 1 Loose hit of the same subtype; vanA on 2 hits (under the default --summary_args_oap_min_hits 3); rosB on 3 Loose hits; tetA(58) on
 #    3 Strict hits, whose ARO card/metadata.tsv leaves out on purpose;
 #  - the DeepARG tables of tests/data/summary/stages/assembly/ (sampleA, sampleB; Strict, Perfect and Loose
 #    mappings, some on binned contigs);
@@ -29,6 +29,7 @@ hit() {  # hit <read> <sseqid> <subtype> <type>
     for spec in "AAG13410 beta_lactam__KPC-2 beta_lactam 3" \
                 "HQ451074.1.gene4.p01 beta_lactam__TEM-1 beta_lactam 4" \
                 "AAX14397 beta_lactam__mecA beta_lactam 3" \
+                "AAX35723 beta_lactam__mecA beta_lactam 1" \
                 "AAX19284 vancomycin__vanA vancomycin 2" \
                 "ZP_04612557 polymyxin__rosB polymyxin 3" \
                 "gb|APB03214.1|ARO:3003980|tetA(48) tetracycline__tetA(48) tetracycline 3"; do

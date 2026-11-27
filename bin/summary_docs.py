@@ -300,9 +300,9 @@ TABLE_DOCS = {
     },
     "arg_sarg_card": {
         "title": "ARGs-OAP hits mapped to CARD (argNorm)",
-        "description": "One row per sample, SARG subtype and the CARD ARO argNorm maps its hits to (every SARG "
-                       "sequence is mapped by RGI on argNorm's side; the cut-off is that mapping's). Detection only: "
-                       "the abundance units are in arg_sarg_long.",
+        "description": "One row per sample, SARG subtype, the CARD ARO argNorm maps its hits to and the cut-off of "
+                       "that mapping (argNorm mapped every SARG sequence with RGI; one subtype's sequences can reach "
+                       "an ARO by different cut-offs). Detection only: the abundance units are in arg_sarg_long.",
         "columns": SAMPLE_KEY + [
             ("sarg_type, sarg_subtype", "SARG type and subtype, as in arg_sarg_long"),
             ("aro_id, aro_name", "the CARD ARO and its name in the K-MARVEL database's CARD release (argNorm's "
@@ -313,7 +313,8 @@ TABLE_DOCS = {
             ("read_hits", "ARGs-OAP filtered read hits of the subtype mapped to the ARO (single reads)"),
             ("tier, category", "reporting tier and category of the CARD gene, by the same rule table as arg_long; "
                                "NA_loose_mapping for a Loose mapping, NA_aro_not_in_card_metadata for an ARO the "
-                               "CARD release lacks, NA_no_card_metadata without the K-MARVEL database"),
+                               "CARD release lacks, NA_no_card_metadata without the K-MARVEL database, "
+                               "NA_no_aro_mapping for a hit argNorm maps to no ARO"),
             ("drug_classes", "CARD drug classes the ARO confers resistance to (argNorm), ';'-separated"),
             ("in_comparison", "True when the sample x gene counts as an ARGs-OAP detection in "
                               "arg_method_comparison (>= --summary_args_oap_min_hits strong hits)"),

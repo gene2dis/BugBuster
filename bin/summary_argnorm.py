@@ -22,6 +22,7 @@ DEEPARG_SUFFIX = ".deeparg.argnorm.tsv"
 NA_LOOSE = "NA_loose_mapping"
 NA_NO_CARD = "NA_no_card_metadata"
 NA_NOT_IN_CARD = "NA_aro_not_in_card_metadata"
+NA_NO_ARO = "NA_no_aro_mapping"
 ARGNORM_COLUMNS = ["ARO", "ARO_name", "Cut_Off", "resistance_to_drug_classes_names"]
 # ARGs-OAP 4.0.0 blastout.filtered.txt, read by argNorm without its header: columns named 0-17
 SARG_ID, SARG_SUBTYPE, SARG_TYPE = "1", "12", "13"
@@ -123,6 +124,7 @@ def annotate_card(hits, catalog, families, rules, snps):
     df["category"], df["tier_note"] = "", ""
     if catalog is None:
         df["tier"] = NA_NO_CARD
+        df.loc[df["aro_id"] == "", "tier"] = NA_NO_ARO
         return df
     tierable = df["strong"] & known.notna()
     if tierable.any():
@@ -134,6 +136,7 @@ def annotate_card(hits, catalog, families, rules, snps):
         df.loc[tierable, "category"] = t["category"]
         df.loc[tierable, "tier_note"] = t["tier_note"]
     df.loc[~df["strong"], "tier"] = NA_LOOSE
+    df.loc[df["aro_id"] == "", "tier"] = NA_NO_ARO
     df.loc[df["strong"] & known.isna(), "tier"] = NA_NOT_IN_CARD
     return df
 
@@ -164,16 +167,19 @@ def sarg_calls(sarg, min_hits):
 
 
 def arg_sarg_card_table(sarg, min_hits):
-    """arg_sarg_card: one row per sample x SARG subtype x ARO, with the hits, the CARD gene and tier, and whether
-    the sample x gene counts as an ARGs-OAP detection in the method comparison."""
+    """arg_sarg_card: one row per sample x SARG subtype x ARO x cut-off (one subtype's sequences can reach an ARO by
+    different cut-offs: a Loose hit is never a detection), with the hits, the CARD gene and tier, and whether the
+    sample x gene counts as an ARGs-OAP detection in the method comparison."""
     if sarg is None or sarg.empty:
         return None
-    keys = ["sample", "sarg_type", "sarg_subtype", "aro_id"]
+    keys = ["sample", "sarg_type", "sarg_subtype", "aro_id", "cut_off"]
     out = (sarg.groupby(keys, sort=False)
                .agg(aro_name=("aro_name", "first"), gene=("gene", "first"), gene_family=("gene_family", "first"),
-                    cut_off=("cut_off", "first"), read_hits=("sarg_id", "size"), tier=("tier", "first"),
+                    read_hits=("sarg_id", "size"), tier=("tier", "first"),
                     category=("category", "first"), drug_classes=("drug_classes", "first"))
                .reset_index())
+    out = out[["sample", "sarg_type", "sarg_subtype", "aro_id", "aro_name", "gene", "gene_family", "cut_off",
+               "read_hits", "tier", "category", "drug_classes"]]
     n = _countable(sarg).groupby(["sample", "gene"]).size()
     detected = set(n[n >= min_hits].index)
     out["in_comparison"] = [(s, g) in detected and isinstance(t, int) for s, g, t in

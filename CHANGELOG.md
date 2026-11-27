@@ -655,7 +655,11 @@ bold label names the full entry below (search for it).
   output goes to it, even without `--kmarvel_prediction` (`FORMAT_KMARVEL_DB`,
   a 4.6 MB CARD download stored in `--databases_dir`, or `--custom_kmarvel_db`):
   its CARD metadata gives the ARGs-OAP and DeepARG hits their gene family and
-  tier. K-MARVEL itself does not run.
+  tier. K-MARVEL itself does not run. In an RGI run with ARGs-OAP or contig
+  DeepARG, RGI's allele names now also collapse against CARD's family list (as
+  in a run with K-MARVEL), which keeps an allele's own name where the collapsed
+  name is another CARD gene; RGI-only tables of the Phase 27a fixture are
+  unchanged by it.
 
 - **User documentation reorganised, one home per kind of content**: the README
   keeps what the pipeline is, the stages and their switches, installation, the

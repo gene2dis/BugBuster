@@ -1111,6 +1111,7 @@ b = pd.read_csv("an_base_out/tables/arg_method_comparison.tsv", sep="\t", dtype=
 a = c[c["sample"] == "sampleA"].set_index("gene")
 # shared genes, the ARGs-OAP-only tier 1 gene, and what never counts
 assert a.at["KPC", "detected_args_oap"] == "True" and a.at["KPC", "args_oap_read_hits"] == "3"
+assert a.at["mecA", "args_oap_read_hits"] == "3"  # the Loose hit does not count
 assert a.at["TEM", "detected_args_oap"] == "True" and a.at["TEM", "args_oap_read_hits"] == "4"
 assert a.at["mecA", "detected_by"] == "ARGs-OAP only" and a.at["mecA", "tier"] == "1", a.loc["mecA"]
 for g in ("vanA", "rosB", "tetA(58)"):
@@ -1125,8 +1126,13 @@ for col in b.columns:
 q = pd.read_csv("an_out/tables/samples_qc.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("sample")
 assert q.at["sampleA", "n_genes_args_oap"] == "3" and q.at["sampleB", "n_genes_args_oap"] == "", q["n_genes_args_oap"]
 assert set(c.loc[c["sample"] == "sampleB", "detected_args_oap"]) <= {"NA_not_run"}
-s = pd.read_csv("an_out/tables/arg_sarg_card.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("aro_name")
-assert s.at["mecA", "tier"] == "1" and s.at["mecA", "in_comparison"] == "True" and s.at["mecA", "read_hits"] == "3"
+sc = pd.read_csv("an_out/tables/arg_sarg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
+# one row per cut-off: mecA's subtype has 3 Strict hits (a detection, tier 1) and 1 Loose hit (neither)
+mec = sc[sc["aro_name"] == "mecA"].set_index("cut_off")
+assert mec.at["Strict", "read_hits"] == "3" and mec.at["Strict", "tier"] == "1" and mec.at["Strict", "in_comparison"] == "True"
+assert mec.at["Loose", "read_hits"] == "1" and mec.at["Loose", "tier"] == "NA_loose_mapping"
+assert mec.at["Loose", "in_comparison"] == "False"
+s = sc[sc["aro_name"] != "mecA"].set_index("aro_name")
 assert s.at["vanA", "tier"] == "1" and s.at["vanA", "in_comparison"] == "False"
 assert s.at["rosB", "tier"] == "NA_loose_mapping" and s.at["rosB", "cut_off"] == "Loose"
 assert s.at["tetA(58)", "tier"] == "NA_aro_not_in_card_metadata" and s.at["tetA(58)", "gene"] == "tetA(58)"
@@ -1147,6 +1153,25 @@ for page in ("index.html", "args.html"):
     assert "mecA" not in text(f"an_out/report/{page}"), page
 assert text("an_base_out/report/args.html") == text("an_out/report/args.html")
 assert "argNorm maps each hit" in text("an_out/report/sarg.html")
+PYEOF
+# --arg_bin_clustering without --contig_tax_and_arg: no contig table, so a DeepARG hit's bin comes from the bin
+# ARG clusters (arg_mag_long, keyed by assembly and gene id)
+mkdir -p an_bin && cp -r an/results an_bin/results
+rm -r an_bin/results/05_arg_prediction/contig_level/summary
+mkdir -p an_bin/results/05_arg_prediction/bin_level
+cp -r "${FIX}/stages/assembly/05_arg_prediction/bin_level/clustering" an_bin/results/05_arg_prediction/bin_level/
+check "summary of argNorm's DeepARG table with bin ARG clusters and no contig table" \
+    py "${SUMMARY}" --results an_bin/results --outdir an_bin_out --min-clean-pairs 10000 --no-excel \
+        --kmarvel-db "${AN}/card"
+check "argNorm: a DeepARG hit's bin from the bin ARG clusters, and the bin page's CARD sentence" py - <<'PYEOF'
+import html, re
+import pandas as pd
+d = pd.read_csv("an_bin_out/tables/arg_deeparg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
+lsa = d[d["gene_id"] == "k141_66351_32"].iloc[0]
+assert lsa["gene"] == "lsaE" and lsa["bin"] == "binette_bin10", lsa.to_dict()
+assert set(d.loc[d["gene_id"] == "k141_38358_1", "bin"]) == {""}  # not in a cluster file: not on a MAG
+page = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open("an_bin_out/report/bin_args.html").read())))
+assert "argNorm maps the MAGs' DeepARG hits to CARD" in page, page[:400]
 PYEOF
 py "${SUMMARY}" --results an/results --outdir an_min2_out --min-clean-pairs 10000 --no-excel \
     --kmarvel-db "${AN}/card" --args-oap-min-hits 2 > an_min2_out.log 2>&1 || true

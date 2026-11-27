@@ -648,6 +648,14 @@ def build(ctx, assets):
     if "arg_mag_long" in t:
         ba = Section("bin_args", nums, records)
         ba.facts = {"n_genes": len(t["arg_mag_long"][0]), "n_shared": len(t["arg_cluster_sharing"][0])}
+        if "arg_deeparg_card" in t:
+            # argNorm's CARD mapping of the binned DeepARG hits (roadmap Phase 27b)
+            dc = t["arg_deeparg_card"][0]
+            binned = dc[dc["bin"] != ""]
+            t1 = binned[binned["tier"].astype(str) == "1"]
+            ba.facts.update({"card": True, "n_card_binned": len(binned),
+                             "n_card_loose": int((binned["cut_off"] == "Loose").sum()),
+                             "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower))})
         ba.table("sharing", t["arg_cluster_sharing"][0], "arg_cluster_sharing", "ARG clusters (90 % identity) found "
                  "in more than one MAG.")
         ba.table("long", t["arg_mag_long"][0], "arg_mag_long", "ARG genes of the MAGs and their clusters at 90-100 % "

@@ -2135,7 +2135,9 @@ python /path/to/BugBuster/bin/results_summary.py \
 `--metadata`, `--group-by` and `--order-by` are optional. The `batch` column is each directory's name, or its
 parent's when it is called `results` (`batch1` above); `--batch-labels` sets the labels instead, one per
 `--results` directory in the same order. Without `--kmarvel-db`, mutation-dependent ARG hits
-are reported as `not_checked`. RGI results (`05_arg_prediction/read_level/rgi/` and `rgi_kmer/`) are read when
+are reported as `not_checked`, and argNorm's ARGs-OAP and DeepARG tables (`args_oap/argnorm/`,
+`deeparg/<assembly>/*.deeparg.argnorm.tsv`, read when present) get no CARD gene family or tier, so ARGs-OAP is left
+out of the method comparison. RGI results (`05_arg_prediction/read_level/rgi/` and `rgi_kmer/`) are read when
 present; `--rgi-min-coverage` sets their cutoff (default 80). ARGs-OAP (`05_arg_prediction/read_level/args_oap_summary/`),
 the read functional profile (`07_functional_annotation/summary/read_*.tsv`) and MicrobeCensus
 (`07_functional_annotation/microbecensus/`) are read when present; batches without them get `NA_not_run`. The

@@ -533,7 +533,9 @@ def parse_args(argv=None):
                    help="flag samples below this many clean read pairs as low depth (default 1,000,000)")
     p.add_argument("--min-nonpareil-coverage", type=float, default=0.6,
                    help="note samples whose Nonpareil coverage (0-1) is below this (default 0.6)")
-    p.add_argument("--kmarvel-db", help="K-MARVEL database directory (for CARD snps.txt)")
+    p.add_argument("--kmarvel-db", help="K-MARVEL database directory: its CARD snps.txt checks tier 4 calls, and its "
+                                        "CARD metadata.tsv gives argNorm's ARGs-OAP / DeepARG hits their gene family "
+                                        "and tier")
     p.add_argument("--card-prevalence", help="WildCARD card_prevalence.txt, for candidate ARG hosts")
     p.add_argument("--arg-priority", default=str(DEFAULT_ASSETS / "arg_priority_tiers.tsv"),
                    help="ARG tier rule table (default: assets/arg_priority_tiers.tsv)")
@@ -928,7 +930,7 @@ def main(argv=None):
             fig_method_upset(figs, comp, comparison_all["gene_sets"], comparison_all["methods"])
             fig_method_by_category(figs, comp, comparison_all["methods"])
 
-    # ---- ARGs-OAP (SARG): its own tables, not matched to CARD genes
+    # ---- ARGs-OAP (SARG): its own tables in SARG's terms (the CARD view of its hits is arg_sarg_card)
     table_units = {}
     sarg_ctx = None
     sarg_ran = set().union(*[b["sarg_ran"] for b in batches])
