@@ -85,14 +85,16 @@ def argNormCardNeeded() {
 
 // The decontamination genome registries (config/databases.config), with the
 // entries a -c file still sets under their names before 2.0.0
-// (bowtie_ref_host_index, bowtie_ref_genomes_for_build) merged over them, so
-// such a config keeps working (main.nf warns at launch; roadmap Phase 29, CL2)
+// (bowtie_ref_host_index, bowtie_ref_genomes_for_build) added, so such a
+// config keeps working (main.nf warns at launch; roadmap Phase 29, CL2). For
+// a key under both names the new name's entry is used: a config being renamed
+// gets what its new block says
 def hostRefDb() {
-    return (params.host_ref_db ?: [:]) + (params.bowtie_ref_host_index ?: [:])
+    return (params.bowtie_ref_host_index ?: [:]) + (params.host_ref_db ?: [:])
 }
 
 def phixRefDb() {
-    return (params.phix_ref_db ?: [:]) + (params.bowtie_ref_genomes_for_build ?: [:])
+    return (params.bowtie_ref_genomes_for_build ?: [:]) + (params.phix_ref_db ?: [:])
 }
 
 // The launch error for a --custom_decontamination_index that does not hold an
@@ -119,6 +121,9 @@ def decontaminationIndexError(aligner, index_path) {
         ]
     ]
     def rule = rules[aligner.toString()]
+    if ( rule == null ) {
+        return "--read_aligner ${aligner} has no decontamination index check (known: ${rules.keySet().join(', ')})".toString()
+    }
     def index_dir = file(index_path, checkIfExists: true)
     def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
     if ( index_files.any { name -> rule.expected(name) } ) {

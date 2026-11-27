@@ -59,7 +59,7 @@ process EGGNOG_MAPPER_ANNOTATE {
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         eggnog-mapper: \$(emapper.py --version 2>&1 | grep -o 'emapper-[0-9][^ /]*' | head -1 | sed 's/emapper-//')
-        eggnog_db: \$(python3 -c "import sqlite3; print(sqlite3.connect('file:${eggnog_db}/eggnog.db?mode=ro', uri=True).execute('SELECT version FROM version').fetchone()[0])" 2>/dev/null || echo unknown)
+        eggnog_db: \$(python3 -c "import sqlite3, sys, urllib.parse; print(sqlite3.connect('file:' + urllib.parse.quote(sys.argv[1]) + '?mode=ro', uri=True).execute('SELECT version FROM version').fetchone()[0])" '${eggnog_db}/eggnog.db' 2>/dev/null || echo unknown)
     END_VERSIONS
 
     # EGGNOG_MAPPER_SEARCH found no protein to search (an assembly whose contigs

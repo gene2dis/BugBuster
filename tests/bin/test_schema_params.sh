@@ -121,10 +121,11 @@ for line in open(flat_path):
         flat[key] = value(text)
 
 check(bool(flat), f"config has top-level params ({len(flat)})")
-# a param in validation.defaultIgnoreParams needs no entry: the deprecated
-# registry names (bowtie_ref_*, null unless a -c file sets them) are such params
-check(sorted(set(flat) - set(props) - set(ignore)) == [], "every config param has a schema entry (or is in validation.defaultIgnoreParams)",
-      ", ".join(sorted(set(flat) - set(props) - set(ignore))))
+# an ignored param with no value needs no entry: the deprecated registry names
+# (bowtie_ref_*, null unless a -c file sets them; validation.defaultIgnoreParams)
+exempt = {name for name in ignore if flat.get(name) is None}
+check(sorted(set(flat) - set(props) - exempt) == [], "every config param has a schema entry (a null one in validation.defaultIgnoreParams excepted)",
+      ", ".join(sorted(set(flat) - set(props) - exempt)))
 check(sorted(set(props) - set(flat)) == [], "every schema entry is a config param",
       ", ".join(sorted(set(props) - set(flat))))
 check(isinstance(ignore, list) and bool(ignore), "validation.defaultIgnoreParams read from the config", repr(ignore))

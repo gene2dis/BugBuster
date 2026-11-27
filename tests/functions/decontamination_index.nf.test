@@ -116,4 +116,19 @@ nextflow_function {
             assert function.result ==~ /--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index \(\*\.bt2\): \/.*index[0-9]+\.1\.bt2\./
         }
     }
+
+    test("an aligner without a check gives a readable error, not an exception") {
+        when {
+            function {
+                """
+                input[0] = 'minimap2'
+                input[1] = '/nonexistent'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "--read_aligner minimap2 has no decontamination index check (known: bwamem3, bowtie2)"
+        }
+    }
 }

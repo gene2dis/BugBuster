@@ -45,7 +45,7 @@ processes:
           description: Kraken2 database tarball URL (params.kraken_ref_db[params.kraken2_db].url)
     output:
       - kraken_db:
-          type: file
+          type: directory
           description: Kraken2 database directory
           pattern: "k2_ref_db"
       - versions:
@@ -186,7 +186,7 @@ processes:
           description: GTDB-Tk data package URL (params.gtdbtk_ref_db[params.gtdbtk_db].url)
     output:
       - gtdbtk_db:
-          type: file
+          type: directory
           description: GTDB-Tk reference data directory
           pattern: "gtdbtk_db"
       - versions:
@@ -202,7 +202,7 @@ processes:
           description: eggNOG-mapper 3.0 data base URL (params.eggnog_ref_db[params.eggnog_db].url)
     output:
       - eggnog_db:
-          type: file
+          type: directory
           description: eggNOG 7 data directory (emapper-3.0 layout)
           pattern: "eggnog_db"
       - versions:
@@ -218,7 +218,7 @@ processes:
           description: dbCAN release base URL (params.dbcan_ref_db[params.dbcan_db].url)
     output:
       - dbcan_db:
-          type: file
+          type: directory
           description: dbCAN database directory
           pattern: "dbcan_db"
       - versions:
@@ -234,7 +234,7 @@ processes:
           description: Bakta database tarball URL (params.bakta_ref_db[params.bakta_db].url)
     output:
       - bakta_db:
-          type: file
+          type: directory
           description: Bakta database directory
           pattern: "bakta_db"
       - versions:
@@ -266,7 +266,7 @@ processes:
           description: WoLr2 base URL (params.woltka_ref_db[params.woltka_db].url)
     output:
       - woltka_db:
-          type: file
+          type: directory
           description: WoLr2 database directory (FTP layout)
           pattern: "woltka_db"
       - versions:
@@ -282,7 +282,7 @@ processes:
           description: HUMAnN database key (params.humann_db); selects the params.humann_ref_db entry whose URLs, MetaPhlAn index name and provenance are passed to the script
     output:
       - humann_db:
-          type: file
+          type: directory
           description: HUMAnN database root
           pattern: "humann_db"
       - versions:
@@ -298,7 +298,7 @@ processes:
           description: SUPER-FOCUS aligner (diamond or mmseqs2; params.superfocus_aligner); only that aligner's archive is downloaded
     output:
       - superfocus_db:
-          type: file
+          type: directory
           description: SUPER-FOCUS database root
           pattern: "superfocus_db"
       - versions:
@@ -314,7 +314,7 @@ processes:
           description: K-MARVEL database registry key (params.kmarvel_db)
     output:
       - kmarvel_db:
-          type: file
+          type: directory
           description: K-MARVEL CARD database with its BLAST index
           pattern: "kmarvel_db"
       - versions:

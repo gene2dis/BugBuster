@@ -96,7 +96,7 @@ jinja2	Jinja2	helper		helper
 altair	Altair	helper		helper	
 vl-convert	vl-convert	helper		helper	
 seaborn	seaborn	helper		helper	
-wget	GNU Wget	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
+wget	Wget (GNU or BusyBox)	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
 tar	tar	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
 xz	XZ Utils	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
 bzip2	bzip2	helper		helper: database download and formatting (roadmap Phase 29, CL1)	
