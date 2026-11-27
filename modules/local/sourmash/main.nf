@@ -20,7 +20,9 @@ process SOURMASH {
         task.ext.when == null || task.ext.when
 
     script:
-        def _args = task.ext.args ?: ''
+        // Extra sourmash gather options from a -c config (withName ... ext.args),
+        // as in every other tool module (review R2-14, R4-19); none set by default
+        def args = task.ext.args ?: ''
         def prefix = "${meta.id}"
         
         // Determine k-mer size based on taxonomic rank
@@ -44,7 +46,7 @@ process SOURMASH {
         # Gather matches against database. No match exits 0 and writes no CSV;
         # an error (e.g. no signature of this k-mer size in the database, an
         # empty sketch) exits non-zero and fails the task
-        sourmash gather ${prefix}_k${kmer}_renamed.sig ${db} -k ${kmer} -o ${prefix}_smgather_${db_name}.csv
+        sourmash gather ${args} ${prefix}_k${kmer}_renamed.sig ${db} -k ${kmer} -o ${prefix}_smgather_${db_name}.csv
         
         # Check if gather produced results
         if [ -f "${prefix}_smgather_${db_name}.csv" ] && [ -s "${prefix}_smgather_${db_name}.csv" ]; then
