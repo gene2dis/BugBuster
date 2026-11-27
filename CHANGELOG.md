@@ -656,10 +656,12 @@ bold label names the full entry below (search for it).
   a 4.6 MB CARD download stored in `--databases_dir`, or `--custom_kmarvel_db`):
   its CARD metadata gives the ARGs-OAP and DeepARG hits their gene family and
   tier. K-MARVEL itself does not run. In an RGI run with ARGs-OAP or contig
-  DeepARG, RGI's allele names now also collapse against CARD's family list (as
-  in a run with K-MARVEL), which keeps an allele's own name where the collapsed
-  name is another CARD gene; RGI-only tables of the Phase 27a fixture are
-  unchanged by it.
+  DeepARG, RGI's calls now get the same CARD input as in a run with K-MARVEL:
+  allele names collapse against CARD's family list (an allele keeps its own
+  name where the collapsed name is another CARD gene), and an ARO with CARD
+  SNP definitions is tier 4. RGI-only tables of the Phase 27a fixture are
+  unchanged by it. argNorm's hits of a gene K-MARVEL or RGI also called take
+  that gene's tier, as the CARD methods do between themselves.
 
 - **User documentation reorganised, one home per kind of content**: the README
   keeps what the pipeline is, the stages and their switches, installation, the

@@ -391,6 +391,7 @@ me, readme = text("out/report/methods.html"), open("out/README.md").read()
 assert "pipeline-defined reporting rules, not a published ranking" in me
 assert "consistent with WHO BPPL 2024: carbapenem-resistant Enterobacterales" in me
 assert "WHO bacterial priority pathogens list, 2024" in me and "An omics-based framework" in me
+assert "who.int" in me, "the WHO report has no DOI: its URL is printed"
 # the two are cited before the tools: references 1 and 2
 assert re.search(r"Pathogens List 2024 \[ 1 \]", me) and re.search(r"pathogen hosts\) \[ 2 \]", me), me[:300]
 assert "| Tier | Meaning | Categories (rule notes) | Basis |" in readme and "High-concern acquired" in readme
@@ -1079,7 +1080,8 @@ PYEOF
 # argNorm's CARD mapping of the ARGs-OAP and DeepARG hits (roadmap Phase 27b; tests/data/summary/argnorm/, see
 # tests/bin/make_argnorm_summary_fixtures.sh). sampleA's SARG hits: KPC and TEM (also K-MARVEL / RGI calls), mecA
 # on 3 Strict hits (ARGs-OAP only, tier 1), vanA on 2 (under the minimum), rosB on 3 Loose hits, tetA(58) on 3 hits
-# whose ARO the CARD extract lacks; sampleB has no ARGs-OAP table. DeepARG: the assembly fixtures' hits
+# whose ARO the CARD extract lacks; sampleB has no ARGs-OAP hit table (ARGs-OAP found no SARG hit: no_sarg_hit,
+# so it ran, with no gene). DeepARG: the assembly fixtures' hits
 AN="${FIX}/argnorm"
 make_results an_base/results sampleA sampleB
 mkdir -p an_base/results/05_arg_prediction/contig_level/summary
@@ -1124,8 +1126,9 @@ for col in b.columns:
         assert (m[f"{col}_b"] == m[f"{col}_n"]).all(), col
 # sampleB has no ARGs-OAP table: blank count, NA_not_run in any comparison row
 q = pd.read_csv("an_out/tables/samples_qc.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("sample")
-assert q.at["sampleA", "n_genes_args_oap"] == "3" and q.at["sampleB", "n_genes_args_oap"] == "", q["n_genes_args_oap"]
-assert set(c.loc[c["sample"] == "sampleB", "detected_args_oap"]) <= {"NA_not_run"}
+# sampleB: ARGs-OAP ran and found no SARG hit (no argNorm table): 0 genes and not detected, not NA_not_run
+assert q.at["sampleA", "n_genes_args_oap"] == "3" and q.at["sampleB", "n_genes_args_oap"] == "0", q["n_genes_args_oap"]
+assert set(c.loc[c["sample"] == "sampleB", "detected_args_oap"]) <= {"False"}  # no CARD gene in sampleB's fixtures
 sc = pd.read_csv("an_out/tables/arg_sarg_card.tsv", sep="\t", dtype=str, keep_default_na=False)
 # one row per cut-off: mecA's subtype has 3 Strict hits (a detection, tier 1) and 1 Loose hit (neither)
 mec = sc[sc["aro_name"] == "mecA"].set_index("cut_off")
@@ -1189,6 +1192,45 @@ check "argNorm: --args-oap-min-hits 0 is refused" \
     fails py "${SUMMARY}" --results an/results --outdir an_bad_out --no-excel --args-oap-min-hits 0
 py "${SUMMARY}" --results an/results --outdir an_bad_out --no-excel --args-oap-min-hits 0 > an_bad.log 2>&1 || true
 check "argNorm: the refusal says why" grep -q 'must be at least 1' an_bad.log
+# a not_normalised sample has no hit table either: it stays NA_not_run in the comparison
+mkdir -p an_nn && cp -r an/results an_nn/results
+sed -i 's/\tno_sarg_hit$/\tnot_normalised/' an_nn/results/05_arg_prediction/read_level/args_oap_summary/args_oap_cells.tsv
+check "summary with a not_normalised ARGs-OAP sample" \
+    py "${SUMMARY}" --results an_nn/results --outdir an_nn_out --min-clean-pairs 10000 --no-excel --kmarvel-db "${AN}/card"
+check "argNorm: a not_normalised sample (no hit table) is NA_not_run, a no_sarg_hit sample is not" py - <<'PYEOF'
+import pandas as pd
+q = pd.read_csv("an_nn_out/tables/samples_qc.tsv", sep="\t", dtype=str, keep_default_na=False).set_index("sample")
+assert q.at["sampleB", "n_genes_args_oap"] == "" and q.at["sampleA", "n_genes_args_oap"] == "3", q["n_genes_args_oap"]
+PYEOF
+# ARGs-OAP and contig DeepARG with neither K-MARVEL nor RGI: CARD tables, no comparison, and no text claiming one
+mkdir -p an_only && cp -r an/results an_only/results
+rm -rf an_only/results/05_arg_prediction/read_level/{kmarvel,rgi,rgi_kmer,kmarvel_summary,rgi_summary}
+check "summary of argNorm tables without K-MARVEL or RGI" \
+    py "${SUMMARY}" --results an_only/results --outdir an_only_out --min-clean-pairs 10000 --no-excel \
+        --kmarvel-db "${AN}/card"
+check "argNorm without a CARD method: no comparison, and the methods text does not claim one" py - <<'PYEOF'
+import html, os, re
+assert os.path.exists("an_only_out/tables/arg_sarg_card.tsv")
+assert not os.path.exists("an_only_out/tables/arg_method_comparison.tsv")
+for f in ("an_only_out/README.md", "an_only_out/report/methods.html"):
+    t = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html.unescape(open(f).read())))
+    assert "method comparison by detection" not in t and "compared with the CARD-based methods by" not in t, f
+    if f.endswith(".html"):
+        assert "there is no method comparison" in t, t[:300]
+PYEOF
+check "argNorm: one tier per gene, from K-MARVEL / RGI first, then argNorm's lowest" py - "${REPO_DIR}/bin" <<'PYEOF'
+import sys
+sys.path.insert(0, sys.argv[1])
+import pandas as pd
+from summary_argnorm import align_tiers
+card = pd.DataFrame({"gene": ["KPC"], "tier": [1], "category": ["carbapenemase"], "tier_note": ["k"]})
+hits = pd.DataFrame({"gene": ["KPC", "KPC", "X", "X", "Y"], "tier": [2, "NA_loose_mapping", 3, 2, "NA_no_aro_mapping"],
+                     "category": ["a", "", "c3", "c2", ""], "tier_note": ["", "", "n3", "n2", ""]})
+hits["tier"] = hits["tier"].astype(object)
+align_tiers([hits], [card])
+assert list(hits["tier"]) == [1, "NA_loose_mapping", 2, 2, "NA_no_aro_mapping"], list(hits["tier"])
+assert list(hits["category"]) == ["carbapenemase", "", "c2", "c2", ""], list(hits["category"])
+PYEOF
 
 # no counted call has a drug class: the drug-class tables are empty but keep their header (R5-09)
 make_results nodc/results sampleA

@@ -101,7 +101,7 @@ from summary_mags import (load_dereplication, load_mags, mag_abundance_frame, ma
 from summary_bin_args import arg_cluster_sharing_table, arg_mag_long_table, load_bin_clusters  # noqa: E402
 from summary_catalog import stage_status  # noqa: E402
 from summary_sarg import load_args_oap, sarg_sample_counts, sarg_status, sarg_tables  # noqa: E402
-from summary_argnorm import (NA_NO_CARD, annotate_card, arg_deeparg_card_table, arg_sarg_card_table,  # noqa: E402
+from summary_argnorm import (NA_NO_CARD, align_tiers, annotate_card, arg_deeparg_card_table, arg_sarg_card_table,  # noqa: E402
                              card_catalog, load_argnorm, sarg_calls, unmapped_warning)
 from summary_nonpareil import load_nonpareil, low_coverage, merge_nonpareil, sample_columns  # noqa: E402
 from summary_contigs import (arg_contig_hosts_table, arg_contig_long_table, arg_rows,  # noqa: E402
@@ -456,9 +456,15 @@ def method_notes(ctx):
                          "the share of the reference they cover) by its own cell estimate (copies per cell, also per "
                          "16S copy and per million reads)."
                          + (" argNorm maps each hit's SARG sequence to a CARD ARO: arg_sarg_card gives the hits a "
-                            "CARD gene and tier, and ARGs-OAP is compared with K-MARVEL and RGI by detection (at least "
-                            f"{ctx['args_oap_min_hits']} hits with a Perfect, Strict or Manual mapping; Loose mappings "
-                            "never count)." if "arg_sarg_card" in ctx["tables"] else
+                            "CARD gene and tier, and ARGs-OAP is compared with the CARD-based methods by detection (at "
+                            f"least {ctx['args_oap_min_hits']} hits with a Perfect, Strict or Manual mapping; Loose "
+                            "mappings never count)." if ctx.get("args_oap_compared") else
+                            " argNorm maps each hit's SARG sequence to a CARD ARO, which gives the hits a CARD gene and "
+                            "tier (arg_sarg_card); with no K-MARVEL or RGI run there is no method comparison."
+                            if "arg_sarg_card" in ctx["tables"] and ctx.get("argnorm_card") else
+                            " argNorm maps each hit's SARG sequence to a CARD ARO (arg_sarg_card); without the CARD "
+                            "metadata of the K-MARVEL database the hits get no gene family or tier, and ARGs-OAP is "
+                            "not compared with the CARD-based methods." if "arg_sarg_card" in ctx["tables"] else
                             " SARG names differ from CARD's, so it is not compared gene by gene with K-MARVEL and "
                             "RGI."))
     notes += arg_notes
@@ -605,6 +611,10 @@ def main(argv=None):
         rgi, rgi_kmer, rgi_ran, rgi_kmer_ran = load_rgi(root)
         sarg, sarg_cells, sarg_ran = load_args_oap(root)
         an_sarg, an_sran, an_deep, an_dran = load_argnorm(root)
+        if an_sarg is not None and sarg_cells is not None:
+            # a sample where ARGs-OAP found no SARG hit has no blastout.filtered.txt, so no argNorm table: it ran,
+            # with no gene (a not_normalised sample has no hit table either, and stays NA_not_run)
+            an_sran = an_sran | set(sarg_cells.loc[sarg_cells["status"] == "no_sarg_hit", "sample"])
         func = load_read_functional(root)
         mc = load_microbecensus(root)
         contig_table = load_contig_table(root)
@@ -803,6 +813,8 @@ def main(argv=None):
     if rgi_ran:
         methods_ran["rgi"] = rgi_ran
     comparison, comparison_all, rgi_all, calls_by = None, None, None, {}
+    if not methods_ran:
+        align_tiers([an_sarg, *an_deep.values()], [])  # one tier per gene among argNorm's hits
     if methods_ran:
         primary = args.arg_primary
         if primary == "auto":
@@ -838,6 +850,8 @@ def main(argv=None):
         if conflicts:
             warn(f"{len(conflicts)} genes had different tiers in different ARG methods; each takes the "
                  f"{METHOD_LABELS[primary]} tier: {', '.join(conflicts[:10])}")
+        # argNorm's hits of the same genes take those tiers too (arg_sarg_card, arg_deeparg_card, the comparison)
+        align_tiers([an_sarg, *an_deep.values()], list(frames.values()))
         if rgi_all is not None:
             calls_by["rgi"] = rgi_all[rgi_all["rgi_detected"]].copy() if not rgi_all.empty else rgi_all
         summary["arg_primary"] = METHOD_LABELS[primary]
@@ -926,6 +940,7 @@ def main(argv=None):
                 out.loc[gone, "detected_args_oap"] = NA_NOT_RUN
                 out["args_oap_read_hits"] = out["args_oap_read_hits"].astype("Int64")  # blank where not detected
             tables["arg_method_comparison"] = (with_meta(out, samples, meta_cols, order, ["tier", "gene"]), False)
+            comparison_all["table"] = out  # the report shows the table as written (NA_not_run, integer hits)
             tables["arg_method_overlap"] = (comparison_all["overlap"], False)
             fig_method_upset(figs, comp, comparison_all["gene_sets"], comparison_all["methods"])
             fig_method_by_category(figs, comp, comparison_all["methods"])
@@ -1163,7 +1178,10 @@ def main(argv=None):
         "figures": figs, "tables": tables, "summary": summary, "versions": versions, "inputs": inputs,
         "min_pairs": args.min_clean_pairs, "meta_cols": meta_cols, "key_meta": key_meta,
         "group_by": args.group_by, "comparison": comparison_all, "tier1_view": tier1_view,
-        "rgi_min_coverage": args.rgi_min_coverage, "args_oap_min_hits": args.args_oap_min_hits, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
+        "rgi_min_coverage": args.rgi_min_coverage, "args_oap_min_hits": args.args_oap_min_hits,
+        # ARGs-OAP in the method comparison, and argNorm's hits with CARD metadata (gene family, tier)
+        "args_oap_compared": bool(comparison_all and "args_oap" in comparison_all["methods"]),
+        "argnorm_card": an_catalog is not None, "watchlist": watch, "watchlist_path": Path(args.watchlist).name if args.watchlist else "",
         "arg_priority": args.arg_priority, "arg_priority_name": Path(args.arg_priority).name,
         "sarg": sarg_ctx, "functional": func_ctx, "contig_functional": cfunc_ctx, "table_units": table_units,
         "title": args.title,

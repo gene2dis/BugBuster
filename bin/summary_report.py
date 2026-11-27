@@ -190,14 +190,22 @@ def reading_guide(ctx):
                         "WildCARD holds resistance genes of gut commensals too, so a tier 1 gene whose reads point "
                         "to a commensal may be a related gene, not the clinical one."))
     if ctx.get("sarg"):
-        if "arg_sarg_card" in ctx["tables"]:
-            methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads "
-                                        "weighted by the share of the reference they cover) by its own cell "
-                                        "estimate. argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
+        base = ("searches ARG-like reads against SARG and divides their copies (reads weighted by the share of the "
+                "reference they cover) by its own cell estimate. ")
+        if ctx.get("args_oap_compared"):
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
                                         "the hits a CARD gene and tier (arg_sarg_card) and puts ARGs-OAP in the "
                                         "method comparison by detection (at least "
                                         f"{ctx.get('args_oap_min_hits', 3)} hits with a Perfect, Strict or Manual "
                                         "mapping; Loose mappings never count)."))
+        elif "arg_sarg_card" in ctx["tables"] and ctx.get("argnorm_card"):
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO, which gives "
+                                        "the hits a CARD gene and tier (arg_sarg_card); with no K-MARVEL or RGI run "
+                                        "there is no method comparison."))
+        elif "arg_sarg_card" in ctx["tables"]:
+            methods.append(("ARGs-OAP", base + "argNorm maps each hit's SARG sequence to a CARD ARO "
+                                        "(arg_sarg_card); without the K-MARVEL database's CARD metadata the hits "
+                                        "get no gene family or tier."))
         else:
             methods.append(("ARGs-OAP", "searches ARG-like reads against SARG and divides their copies (reads "
                                         "weighted by the share of the reference they cover) by its own cell "
@@ -347,7 +355,7 @@ def format_reference(r):
     venue = r.get("journal") or r.get("publisher") or ""
     vol = f" {r['volume']}" if r.get("volume") else ""
     pages = f", {str(r['pages']).replace('--', '-')}" if r.get("pages") else ""
-    doi = f" doi:{r['doi']}" if r.get("doi") else ""
+    doi = f" doi:{r['doi']}" if r.get("doi") else f" {r['url']}" if r.get("url") else ""  # a report: its URL
     return f"{names}. {r.get('title', '')}. {venue}{vol}{pages} ({r.get('year', '')}).{doi}"
 
 
@@ -498,7 +506,7 @@ def build(ctx, assets):
         co.fig("arg_method_upset")
         co.fig("arg_method_by_category")
         co.table("overlap", comp["overlap"], "arg_method_overlap", "Distinct genes by the methods that found them.")
-        co.table("comparison", comp["comp"], "arg_method_comparison", "Every gene per sample and method.",
+        co.table("comparison", comp.get("table", comp["comp"]), "arg_method_comparison", "Every gene per sample and method.",
                  html_rows=2000, pdf_columns=[c for c in ("sample", "gene", "tier", "category", "detected_by",
                                                           "kmarvel_read_pairs", "rgi_read_pairs", "rgi_gene_coverage",
                                                           "args_oap_read_hits")
@@ -632,7 +640,8 @@ def build(ctx, assets):
             # argNorm's CARD mapping of the DeepARG hits (roadmap Phase 27b)
             dc = t["arg_deeparg_card"][0]
             t1 = dc[dc["tier"].astype(str) == "1"]
-            ca.facts.update({"card": True, "n_card_mapped": int((dc["cut_off"] != "Loose").sum()),
+            tiered = pd.to_numeric(dc["tier"], errors="coerce").notna()  # NA_* codes: no tier
+            ca.facts.update({"card": True, "n_card_mapped": int(tiered.sum()),
                              "n_card_loose": int((dc["cut_off"] == "Loose").sum()),
                              "tier1_genes": ", ".join(sorted(set(t1["gene"]), key=str.lower))})
             ca.table("card", dc, "arg_deeparg_card", "DeepARG hits with the CARD gene and tier of argNorm's mapping.",

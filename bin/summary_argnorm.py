@@ -11,6 +11,7 @@ key (allele numbers collapsed) and tier as the K-MARVEL / RGI calls. Loose mappi
 
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from summary_args import gene_name, norm_list, tiers_for
@@ -96,7 +97,10 @@ def card_catalog(kmarvel_db):
     meta = pd.read_csv(Path(kmarvel_db) / "metadata.tsv", sep="\t", dtype=str, keep_default_na=False)
     need = {"ARO Accession", "ARO Name", "AMR Gene Family", "Resistance Mechanism"}
     if not need <= set(meta.columns):
-        die(f"{kmarvel_db}/metadata.tsv lacks {', '.join(sorted(need - set(meta.columns)))}")
+        # a custom K-MARVEL database without these columns: the hits keep their ARO, with no family or tier
+        warn(f"{kmarvel_db}/metadata.tsv lacks {', '.join(sorted(need - set(meta.columns)))}: argNorm's hits get "
+             "no CARD gene family or tier")
+        return None
     meta = meta.drop_duplicates("ARO Accession")
     return {a: (n, norm_list(f), norm_list(m)) for a, n, f, m in
             zip(meta["ARO Accession"], meta["ARO Name"], meta["AMR Gene Family"], meta["Resistance Mechanism"])}
@@ -207,6 +211,39 @@ def arg_deeparg_card_table(parts):
     return df[cols]
 
 
+def _tiered(d):
+    return d["tier"].map(lambda t: isinstance(t, (int, np.integer)) and not isinstance(t, bool))
+
+
+def align_tiers(hit_frames, card_frames):
+    """One tier per gene, in place: argNorm's tiered hits (ARGs-OAP, DeepARG) of a gene K-MARVEL or RGI also
+    called take that gene's tier, category and note from them (card_frames, already one tier per gene by
+    unify_gene_tiers); a gene only argNorm's hits have takes its lowest tier among them."""
+    ref = {}
+    for d in card_frames:
+        if d is None or d.empty:
+            continue
+        best = d.sort_values("tier", kind="stable").drop_duplicates("gene")
+        for g, t, c, n in zip(best["gene"], best["tier"], best["category"], best["tier_note"]):
+            ref.setdefault(g, (int(t), c, n))
+    own = [d[_tiered(d)] for d in hit_frames if d is not None and not d.empty]
+    own = [d for d in own if not d.empty]
+    if own:
+        best = (pd.concat(own, ignore_index=True).assign(_t=lambda x: x["tier"].astype(int))
+                  .sort_values("_t", kind="stable").drop_duplicates("gene"))
+        for g, t, c, n in zip(best["gene"], best["_t"], best["category"], best["tier_note"]):
+            ref.setdefault(g, (int(t), c, n))
+    for d in hit_frames:
+        if d is None or d.empty:
+            continue
+        rows = _tiered(d) & d["gene"].isin(ref)
+        if rows.any():
+            want = d.loc[rows, "gene"].map(ref)
+            d.loc[rows, "tier"] = [w[0] for w in want]
+            d.loc[rows, "category"] = [w[1] for w in want]
+            d.loc[rows, "tier_note"] = [w[2] for w in want]
+
+
 def unmapped_warning(sarg, deep):
     """A warning when argNorm left hits without an ARO (argNorm 1.1.0 mapped every SARG 4.0.0 sequence but capO
     and every DeepARG v2 feature, Phase 27a)."""
@@ -214,4 +251,4 @@ def unmapped_warning(sarg, deep):
         if df is not None and not df.empty:
             n = int((df["aro_id"] == "").sum())
             if n:
-                warn(f"argNorm mapped {n} of {len(df)} {name} hits to no ARO; they are left out of the CARD tables")
+                warn(f"argNorm mapped {n} of {len(df)} {name} hits to no ARO; they are kept with tier {NA_NO_ARO} and never count as a detection")
