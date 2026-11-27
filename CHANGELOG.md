@@ -1413,6 +1413,10 @@ bold label names the full entry below (search for it).
 
 ### Removed
 
+- `assets/schema_input.json`, the samplesheet schema no parameter referenced (issue #33):
+  nothing validated against it, and its sample-name rule was looser than the checks
+  that run. `subworkflows/local/input_check.nf` is the samplesheet check, and the
+  manual (section 4) and `docs/parameters.md` describe its rules.
 - `bin/r_scripts_temp/`: the legacy R report scripts (and the Dockerfile of
   the old `r_reports` image), kept as the reference for the R→Python port.
   Where their inputs still exist, they were run against their Python
