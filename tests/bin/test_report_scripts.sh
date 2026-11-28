@@ -605,6 +605,21 @@ cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.t
    "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" "${ACR_NOTAX}/"
 NEXT_WORKDIR="${ACR_NOTAX}"
 expect_err "arg_contig_level_report: no Metabuli file fails" "ERROR: No Metabuli files found (*_classifications.tsv)" arg_contig_level_report.py
+# An assembly whose contigs give Pyrodigal no gene (roadmap Phase 29, CL5;
+# design doc Q24): DEEPARG_CONTIGS writes DeepARG's header row alone, and the
+# report still lists the contigs, with empty ARG columns
+ACR_NOARG="${WORK}/arg_contig_level_report_noarg"
+mkdir -p "${ACR_NOARG}"
+cp "${REPO_DIR}/tests/data/reports/test_sample2_Blob_table.test_sample2.blobDB.table.txt" \
+   "${REPO_DIR}/tests/data/reports/test_sample2_classifications.tsv" "${ACR_NOARG}/"
+head -1 "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" \
+    > "${ACR_NOARG}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+NEXT_WORKDIR="${ACR_NOARG}"
+expect_pass "arg_contig_level_report: header-only DeepARG table (no gene called)" arg_contig_level_report.py
+check_grep "arg_contig_level_report: header-only DeepARG table keeps the header" "Contig_tax_and_arg_prediction.tsv" \
+    "^Sample	contig_name	contig_length	GC	coverage	superkingdom	.*	ARG_gene	.*	counts$"
+check_grep "arg_contig_level_report: header-only DeepARG table keeps the contigs, ARG columns empty" "Contig_tax_and_arg_prediction.tsv" \
+    "^test_sample2	k141_0	1196	0.4005	3.7229	Bacteria	.*	species	0.95811							$"
 
 #
 # bin_contig_labels.py + the report's bin columns (Phase 9b, L5 a): contig ->
@@ -696,6 +711,25 @@ fi
 NEXT_WORKDIR="${BAS_WORK}"
 expect_err "bin_arg_split: a file that is not a DeepARG table fails" "has no read_id column (not a DeepARG .mapping.ARG file)" bin_arg_split.py test_sampleX \
     test_sample2_contig_bins.tsv test_sample2.faa.gz test_sample2_contig_bins.tsv
+# An assembly whose contigs give Pyrodigal no gene (roadmap Phase 29, CL5;
+# design doc Q24): an empty FAA and DeepARG's header row alone give every bin
+# an empty protein file and a header-only table
+BAS_NOGENE="${WORK}/bin_arg_split_nogene"
+mkdir -p "${BAS_NOGENE}"
+cp "${BCL_WORK}/test_sample2_contig_bins.tsv" "${BAS_NOGENE}/"
+printf "" | gzip > "${BAS_NOGENE}/test_sample2.faa.gz"
+head -1 "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG" \
+    > "${BAS_NOGENE}/test_sample2_contigs_deep_arg.out.mapping.ARG"
+NEXT_WORKDIR="${BAS_NOGENE}"
+expect_pass "bin_arg_split: empty FAA and header-only DeepARG table" bin_arg_split.py test_sample2 test_sample2_contig_bins.tsv \
+    test_sample2.faa.gz test_sample2_contigs_deep_arg.out.mapping.ARG
+if [ ! -s "${BAS_NOGENE}/test_sample2_bins_proteins/test_sample2_binette_bin1_proteins.faa" ] && \
+   [ "$(cat "${BAS_NOGENE}/test_sample2_deeparg_results/test_sample2_binette_bin1_deep_arg.out.mapping.ARG")" = \
+     "$(head -1 "${REPO_DIR}/tests/data/reports/test_sample2_contigs_deep_arg.out.mapping.ARG")" ]; then
+    echo "✓ bin_arg_split: no gene: empty bin proteins, header-only bin tables"; PASS=$((PASS + 1))
+else
+    echo "✗ bin_arg_split: no gene: empty bin proteins, header-only bin tables"; FAIL=$((FAIL + 1))
+fi
 
 #
 # arg_contig_level_report.py with geNomad (Phase 9b, L6 d): synthetic geNomad

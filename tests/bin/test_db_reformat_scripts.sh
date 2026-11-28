@@ -849,6 +849,44 @@ expect_err "gunc: corrupt gzip with a matching md5 fails" "gzip: gunc_corrupt.dm
 expect_err "gunc: 404 URL fails" "ERROR 404: File not found." gunc_db_reformat.sh "${BASE_URL}/no_such_gunc.dmnd.gz" "${GUNC_GZ_MD5}" gunc_db_test.dmnd "${GUNC_MD5}"
 
 #
+# bin/db_tool_version.sh (roadmap Phase 29, CL1): the tool versions each
+# database process writes to its stored versions file, in the image it runs
+# in. GNU tools give their version, BusyBox applets "busybox <version>" (the
+# woltka image's wget, the biocontainers' tar), a missing tool "not found";
+# the script never fails
+#
+echo "--- db_tool_version.sh in the format_db images ---"
+dtv() {
+    # dtv <image> <tool>: the version the script prints in the image
+    docker run --rm -v "${REPO_DIR}/bin/db_tool_version.sh:/usr/local/bin/db_tool_version.sh:ro" \
+        "$1" sh -c "db_tool_version.sh $2"
+}
+check_dtv() {
+    # check_dtv <description> <image> <tool> <extended regex for the whole output>
+    local got
+    got=$(dtv "$2" "$3" 2>&1) || got="exit $?: ${got}"
+    if printf '%s\n' "${got}" | grep -qxE "$4"; then
+        echo "✓ $1 (${got})"
+        PASS=$((PASS + 1))
+    else
+        echo "✗ $1: got '${got}'"
+        FAIL=$((FAIL + 1))
+    fi
+}
+check_dtv "wget image: GNU wget version" "${DOWNLOAD_IMG}" wget '[0-9]+\.[0-9]+(\.[0-9]+)?'
+check_dtv "wget image: GNU tar version" "${DOWNLOAD_IMG}" tar '[0-9]+\.[0-9]+'
+check_dtv "wget image: gzip version" "${DOWNLOAD_IMG}" gzip '[0-9]+\.[0-9]+'
+check_dtv "woltka image: busybox wget" "${WOLTKA_IMG}" wget 'busybox [0-9]+(\.[0-9]+)+'
+check_dtv "woltka image: xz version" "${WOLTKA_IMG}" xz '[0-9]+(\.[0-9]+)+'
+check_dtv "bakta image: busybox tar" "${BAKTA_IMG}" tar 'busybox [0-9]+(\.[0-9]+)+'
+check_dtv "bakta image: amrfinder version" "${BAKTA_IMG}" amrfinder '[0-9]+(\.[0-9]+)+'
+check_dtv "checkv image: diamond version" "${CHECKV_IMG}" diamond '[0-9]+(\.[0-9]+)+'
+check_dtv "superfocus image: unzip version" "${SF_IMG}" unzip '[0-9]+\.[0-9]+'
+check_dtv "kmarvel image: makeblastdb version" "${KMARVEL_IMG}" makeblastdb '[0-9]+(\.[0-9]+)+\+?'
+check_dtv "kmarvel image: bzip2 version" "${KMARVEL_IMG}" bzip2 '[0-9]+(\.[0-9]+)+'
+check_dtv "a missing tool: 'not found', exit 0" "${DOWNLOAD_IMG}" makeblastdb 'not found'
+
+#
 # Report image smoke test (audit #21): all libraries importable, no runtime pip
 #
 echo "--- report container image ---"

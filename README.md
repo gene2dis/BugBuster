@@ -108,7 +108,7 @@ Start with `results/00_summary/`: `results_summary.html` opens the report (it wo
 
 ## Citation
 
-If you use BugBuster, please cite the pipeline with its version (`nextflow run main.nf --version`) and repository, https://github.com/gene2dis/BugBuster, and cite the tools that ran: the Methods page of the run's report (`00_summary/report/`, and the PDF) lists every tool and database with its version and reference.
+If you use BugBuster, please cite the pipeline with its version (`nextflow run main.nf --version`) and repository, https://github.com/gene2dis/BugBuster, and cite the tools that ran: the Methods page of the run's report (`00_summary/report/`, and the PDF) lists every tool and database with its version and reference. [`CITATIONS.md`](CITATIONS.md) lists the references of every tool and database the pipeline can run, by pipeline step.
 
 ## Licence
 

@@ -1,0 +1,134 @@
+/*
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    decontaminationIndexError(): the --custom_decontamination_index launch check
+    for both aligners (roadmap Phase 29, CL3; issue #29)
+
+    main.nf wrote the check out twice, once per aligner. The one helper must
+    give the same messages: each test builds an index directory with the file
+    names the aligners write and checks the exact message (or null for a
+    matching index).
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+*/
+
+nextflow_function {
+
+    name "Decontamination index launch check"
+    script "subworkflows/local/utils_params.nf"
+    function "decontaminationIndexError"
+
+    test("bwamem3 accepts a bwa-mem3 / bwa-mem2 index") {
+        when {
+            function {
+                """
+                def dir = java.nio.file.Files.createTempDirectory('bwamem3_idx').toFile()
+                ['contaminants.0123', 'contaminants.amb', 'contaminants.ann', 'contaminants.bwt.2bit.64', 'contaminants.pac'].each { n -> new File(dir, n).text = '' }
+                input[0] = 'bwamem3'
+                input[1] = dir.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("bwamem3 rejects a Bowtie2 index and says how to keep using it") {
+        when {
+            function {
+                """
+                def dir = java.nio.file.Files.createTempDirectory('bt2_idx').toFile()
+                ['contaminants.1.bt2', 'contaminants.2.bt2', 'contaminants.rev.1.bt2'].each { n -> new File(dir, n).text = '' }
+                input[0] = 'bwamem3'
+                input[1] = dir.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==~ /--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3\/bwa-mem2 index \(\*\.bwt\.2bit\.64\): \/.*bt2_idx[0-9]+\. It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 \(or bwa-mem2\), or drop --custom_decontamination_index and pass --custom_host_fasta\./
+        }
+    }
+
+    test("bwamem3 rejects a directory with no index, without a hint") {
+        when {
+            function {
+                """
+                def dir = java.nio.file.Files.createTempDirectory('no_idx').toFile()
+                new File(dir, 'contaminants.fa').text = ''
+                input[0] = 'bwamem3'
+                input[1] = dir.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==~ /--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3\/bwa-mem2 index \(\*\.bwt\.2bit\.64\): \/.*no_idx[0-9]+\./
+        }
+    }
+
+    test("bowtie2 accepts a Bowtie2 index, large (.bt2l) included") {
+        when {
+            function {
+                """
+                def dir = java.nio.file.Files.createTempDirectory('bt2l_idx').toFile()
+                ['contaminants.1.bt2l', 'contaminants.2.bt2l', 'contaminants.rev.1.bt2l'].each { n -> new File(dir, n).text = '' }
+                input[0] = 'bowtie2'
+                input[1] = dir.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == null
+        }
+    }
+
+    test("bowtie2 rejects a bwa-mem3 index and points to the default aligner") {
+        when {
+            function {
+                """
+                def dir = java.nio.file.Files.createTempDirectory('bwamem3_idx').toFile()
+                ['contaminants.bwt.2bit.64', 'contaminants.pac'].each { n -> new File(dir, n).text = '' }
+                input[0] = 'bowtie2'
+                input[1] = dir.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==~ /--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index \(\*\.bt2\): \/.*bwamem3_idx[0-9]+\. It holds a bwa-mem3\/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index\./
+        }
+    }
+
+    test("bowtie2 rejects a single file, without a hint") {
+        when {
+            function {
+                """
+                def f = java.nio.file.Files.createTempFile('index', '.1.bt2').toFile()
+                input[0] = 'bowtie2'
+                input[1] = f.absolutePath
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result ==~ /--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index \(\*\.bt2\): \/.*index[0-9]+\.1\.bt2\./
+        }
+    }
+
+    test("an aligner without a check gives a readable error, not an exception") {
+        when {
+            function {
+                """
+                input[0] = 'minimap2'
+                input[1] = '/nonexistent'
+                """
+            }
+        }
+        then {
+            assert function.success
+            assert function.result == "--read_aligner minimap2 has no decontamination index check (known: bwamem3, bowtie2)"
+        }
+    }
+}

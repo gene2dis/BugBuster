@@ -1662,6 +1662,50 @@ assert "kept no contig" not in open("st_asm_out/README.md").read()
 assert "kept no contig" not in open("st_asm_out/report/assembly.html").read()
 PYEOF
 
+# An assembly whose contigs pass the length filter but give Pyrodigal no gene (roadmap Phase 29, CL5; design doc
+# Q24): its contig-stage tools wrote header-only outputs. DeepARG's table holds its header row alone, featureCounts'
+# summary is all zero, AGGREGATE_FUNCTIONS gave the sample no gene row and an annotated-fraction row of 0 genes, and
+# the contig report lists its contigs with empty ARG columns. The summary is built as for any assembly
+mkdir -p st_nogene
+cp -r st_asm/results st_nogene/results
+NG=st_nogene/results
+f="${NG}/05_arg_prediction/contig_level/deeparg/sampleB/sampleB_contigs_deep_arg.out.mapping.ARG"
+head -1 "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}"
+f="${NG}/07_functional_annotation/gene_abundance/sampleB/sampleB.featureCounts.txt.summary"
+awk -F '\t' -v OFS='\t' 'NR > 1 { $2 = 0 } { print }' "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}"
+for t in gene_abundance function_abundance; do
+    f="${NG}/07_functional_annotation/summary/${t}.tsv"
+    awk -F '\t' '$1 != "sampleB"' "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}"
+done
+f="${NG}/07_functional_annotation/summary/annotated_fraction.tsv"
+awk -F '\t' -v OFS='\t' '$1 == "sampleB" { $3 = 0; $4 = 0; $5 = ""; $6 = "" } { print }' "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}"
+f="${NG}/05_arg_prediction/contig_level/summary/Contig_tax_and_arg_prediction.tsv"
+awk -F '\t' -v OFS='\t' 'NR == 1 { for (i = 1; i <= NF; i++) if ($i == "ARG_gene") first = i; print; next }
+    $1 == "sampleB" { for (i = first; i <= NF; i++) $i = ""; if (seen[$0]++) next } { print }' "${f}" > "${f}.tmp" && mv "${f}.tmp" "${f}"
+check "an assembly without genes: the summary is built, every column documented" \
+    documented st_nogene_out --results st_nogene/results --min-clean-pairs 10000
+check "an assembly without genes: no ARG or gene of it, its sample kept" py - <<'PYEOF'
+import os
+import pandas as pd
+t = "st_nogene_out/tables"
+checked = []
+samples = pd.read_csv(f"{t}/samples_qc.tsv", sep="\t", dtype=str)["sample"].tolist()
+assert "sampleB" in samples, samples
+for name in sorted(os.listdir(t)):
+    if not name.endswith(".tsv") or not (name.startswith("arg_contig") or name.startswith("function_contig")):
+        continue
+    d = pd.read_csv(f"{t}/{name}", sep="\t", dtype=str, keep_default_na=False)
+    key = "sample" if "sample" in d.columns else "assembly" if "assembly" in d.columns else None
+    if key:
+        assert "sampleB" not in set(d[key]), (name, d[d[key] == "sampleB"].head())
+        checked.append(name)
+    elif "sampleB" in d.columns:  # a wide matrix: no positive value for sampleB (0, empty or an NA_ code)
+        values = pd.to_numeric(d["sampleB"], errors="coerce").dropna()
+        assert (values == 0).all(), (name, values[values != 0].head())
+        checked.append(name)
+assert {"arg_contig_long.tsv", "arg_contig_mobile.tsv", "arg_contig_abundance.tsv", "function_contig_long.tsv"} <= set(checked), checked
+PYEOF
+
 # ---- the report documents (roadmap Phase 11d): a PDF and an HTML site with a page per section that ran
 pages() { (cd "$1/report" && ls -- *.html | sort | tr '\n' ' '); }
 check "QC only: the report has the overview, methods and dictionary pages only" \

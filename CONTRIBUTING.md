@@ -290,7 +290,9 @@ Every tool name a module writes there needs a row in `assets/report/tool_referen
 name and cite tools from it. `tests/bin/test_tool_references.sh` (run in CI) fails on a key
 without a row (it reads versions.yml heredocs, `printf` and Python `f.write` lines, and
 nf-core topic tuples); a key built at run time (`${aligner}:`) is listed in that script with
-the names it can take.
+the names it can take. A `tool` or `database` row also names its `section`, the pipeline step
+`CITATIONS.md` lists it under: after changing either file, run `tests/bin/make_citations.py`
+and commit `CITATIONS.md`, which the same test checks against the two files.
 
 ### Databases
 
@@ -327,7 +329,16 @@ withName: 'FORMAT_TOOL_DB' {
   declare them as their own output or change the key. Otherwise a store filled before
   the change still passes the check and is reused without them.
 - **A `versions.yml` output is stored with the database** and re-emitted when the process
-  is skipped, so `software_versions.yml` reports the versions that built it.
+  is skipped, so `software_versions.yml` reports the versions that built it. Declare it
+  `optional: true` when you add it to an existing database process (as the `FORMAT_*` /
+  `DOWNLOAD_*` processes of `modules/local/format_db/main.nf` do): a store filled before it
+  lacks the file, and a required output missing from the store would make every existing
+  `databases_dir` download the database again. `prepare_databases.nf` turns a missing file
+  into a "not recorded" line (`storedVersions()`). Write the file first in the script, with
+  `bin/db_tool_version.sh <tool>` (one version per tool, `busybox <version>` for a BusyBox
+  applet, never an error), so a version line cannot fail a finished download; two processes
+  that share a store need different file names (`versions_sylph_db.yml`,
+  `versions_sylph_taxonomy.yml`).
 - **A build from the user's own files** (`--custom_host_fasta`, `--custom_rgi_wildcard`,
   a `--custom_sourmash_db` lineages file) has no version to key on. It runs every time
   and keeps a `publishDir` copy in `databases_dir`, for reuse through the matching
@@ -602,7 +613,7 @@ reverted) before relying on it.
   (`test_profile_config.sh`).
 - **Lint, config and schema checks**: the commands under [Linting](#linting).
 - **nf-test suite** on Nextflow 25.10.7 and the newest release.
-- **The `tests/bin` suites** (35 today), in two jobs: the database reformat scripts, and
+- **The `tests/bin` suites** (36 today), in two jobs: the database reformat scripts, and
   the taxonomy, report, summary and wrapper scripts. These include three repository
   consistency checks that a docs-only or metadata-only change can fail:
   `test_module_meta.sh` (every module's `meta.yml` against its process, a `tag` and a

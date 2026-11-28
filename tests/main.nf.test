@@ -526,6 +526,12 @@ nextflow_pipeline {
             assert vtext.contains("metabat2:")
             // Pins the GTDB-Tk container/stub version bump in lockstep
             assert vtext.contains("gtdbtk: 2.8.0")
+            // The database processes record the tools that download and
+            // format the databases (roadmap Phase 29, CL1; issue #24)
+            assert vtext.contains('"PREPARE_DATABASES:FORMAT_CHECKM2_DB":\n    tar: 1.35\n    wget: 1.21.4\n') ||
+                vtext.contains('"PREPARE_DATABASES:FORMAT_CHECKM2_DB":\n    wget: 1.21.4\n    tar: 1.35\n')
+            assert vtext.contains('"PREPARE_DATABASES:DOWNLOAD_GTDBTK_DB":')
+            assert !vtext.contains("not recorded")
             // Every versions.yml heredoc must close: a script line below the
             // block's base indentation left END_VERSIONS indented, so the
             // terminator was written into versions.yml and the aggregate was
@@ -1129,10 +1135,15 @@ nextflow_pipeline {
     }
 
     test("Stub run skips a database already stored in databases_dir") {
-        // FORMAT_KMARVEL_DB's and RGI_LOAD's storeDirs already hold their
-        // databases (as a previous run leaves them): both tasks are skipped,
-        // KMARVEL and RGI read the stored copies, and RGI_LOAD's stored
-        // versions.yml reaches software_versions.yml (roadmap M9)
+        // FORMAT_KMARVEL_DB's, FORMAT_SYLPH_*'s and RGI_LOAD's storeDirs already
+        // hold their databases (as a previous run leaves them): the tasks are
+        // skipped, KMARVEL, SYLPH_PROFILE and RGI read the stored copies, and
+        // RGI_LOAD's stored versions.yml reaches software_versions.yml (roadmap
+        // M9). The database processes' versions files (roadmap Phase 29, CL1)
+        // are optional outputs: the sylph store, as this version writes it,
+        // re-emits its stored versions files; the K-MARVEL store, as an earlier
+        // version left it (no versions file), is still reused, and
+        // software_versions.yml says its versions were not recorded
         options "-stub"
 
         when {
@@ -1149,11 +1160,16 @@ nextflow_pipeline {
                     new File(rgi, "card_db").mkdirs()
                     new File(rgi, "card_db/card.json").text = ''
                     new File(rgi, "versions.yml").text = '"PREPARE_DATABASES:RGI_LOAD":\n    rgi: 6.0.8\n    card: 9.9.9-stored\n'
+                    def sylph = new File(store, "stub/sylph/gtdb_r232")
+                    new File(sylph, "sylph_db").mkdirs()
+                    ['gtdb-r232-c200-dbv2.syl2db', 'gtdb_r232_metadata.tsv.gz'].each { name -> new File(sylph, "sylph_db/${name}").text = '' }
+                    new File(sylph, "versions_sylph_db.yml").text = '"PREPARE_DATABASES:FORMAT_SYLPH_DB":\n    wget: 9.9.8-stored\n'
+                    new File(sylph, "versions_sylph_taxonomy.yml").text = '"PREPARE_DATABASES:FORMAT_SYLPH_TAXONOMY":\n    wget: 9.9.8-stored\n    gzip: 1.12\n'
                     store.absolutePath
                 }()
                 quality_control    = true
                 assembly_mode      = "none"
-                taxonomic_profiler = "none"
+                taxonomic_profiler = "sylph"
                 kmarvel_prediction = true
                 rgi_prediction     = true
                 custom_phiX_fasta = "${projectDir}/tests/data/decontamination/phiX174.fasta"
@@ -1169,6 +1185,13 @@ nextflow_pipeline {
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_LOAD") } == 0
             assert workflow.trace.tasks().count { task -> task.name.contains("RGI_BWT") } == 2
             assert path("${outputDir}/pipeline_info/software_versions.yml").text.contains("9.9.9-stored")
+            assert workflow.trace.tasks().count { task -> task.name.contains("FORMAT_SYLPH") } == 0
+            assert workflow.trace.tasks().count { task -> task.name.contains("SYLPH_PROFILE") } == 2
+            def versions = path("${outputDir}/pipeline_info/software_versions.yml").text
+            assert versions.contains('"PREPARE_DATABASES:FORMAT_SYLPH_DB":\n    wget: 9.9.8-stored\n')
+            assert versions.contains('"PREPARE_DATABASES:FORMAT_SYLPH_TAXONOMY":\n    gzip: 1.12\n    wget: 9.9.8-stored\n') ||
+                versions.contains('"PREPARE_DATABASES:FORMAT_SYLPH_TAXONOMY":\n    wget: 9.9.8-stored\n    gzip: 1.12\n')
+            assert versions.contains('"PREPARE_DATABASES:FORMAT_KMARVEL_DB":\n    versions: not recorded (database stored by an earlier run)\n')
             assert workflow.trace.tasks().count { task -> task.name.contains("KMARVEL (") } == 2
             assert path("${outputDir}/05_arg_prediction/read_level/kmarvel_summary/KMARVEL_gene_family_matrix.tsv").exists()
         }

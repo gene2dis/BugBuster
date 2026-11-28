@@ -3,7 +3,7 @@
 Report Unify
 Consolidates the QC reports of fastp and the host-removal step (the
 decontamination aligner, bwa-mem3 by default or Bowtie2 with --read_aligner
-bowtie2; the variables are still named bowtie_* from the Bowtie2-only days).
+bowtie2; both write the same <id>_<filter>_decontamination_report.tsv).
 Generates CSV summary and high-quality scientific boxplot visualization.
 
 Python port of Report_unify.R.
@@ -51,15 +51,15 @@ def read_tsv_files(pattern):
 
 def process_reports_with_filtering(filter_args):
     """Process reports when QC filtering was performed."""
-    # Read bowtie reports for each filter type
-    bowtie_dfs = {}
+    # Read the decontamination reports of each filter type
+    decontam_dfs = {}
     for arg in filter_args:
         # the decontamination report's own suffix: a substring match on the
         # whole name also caught a sample named after the alias (R6-09)
         pattern = f"*_{arg}_decontamination_report.tsv"
         df = read_tsv_files(pattern)
         if not df.empty:
-            bowtie_dfs[f"bowtie_{arg}"] = df
+            decontam_dfs[f"decontam_{arg}"] = df
     
     # Read fastp reports
     fastp_reports = read_tsv_files("*fastp_report.tsv")
@@ -68,17 +68,17 @@ def process_reports_with_filtering(filter_args):
         print("Error: No fastp reports found", file=sys.stderr)
         return None, None
     
-    # Merge all bowtie reports
-    if bowtie_dfs:
-        all_bowtie = None
-        for df in bowtie_dfs.values():
-            if all_bowtie is None:
-                all_bowtie = df
+    # Merge all decontamination reports
+    if decontam_dfs:
+        all_decontam = None
+        for df in decontam_dfs.values():
+            if all_decontam is None:
+                all_decontam = df
             else:
-                all_bowtie = pd.merge(all_bowtie, df, on='Id', how='left')
+                all_decontam = pd.merge(all_decontam, df, on='Id', how='left')
         
         # Merge with fastp reports
-        all_reports = pd.merge(fastp_reports, all_bowtie, on='Id', how='left')
+        all_reports = pd.merge(fastp_reports, all_decontam, on='Id', how='left')
     else:
         all_reports = fastp_reports
     

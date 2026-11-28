@@ -458,7 +458,7 @@
                 },
                 "custom_decontamination_index": {
                     "type": "string",
-                    "description": "Path to a pre-built combined phiX + host index directory matching --read_aligner: a Bowtie2 index, or a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64) under bwamem3 (skips the local build).",
+                    "description": "Path to a pre-built combined phiX + host index directory matching --read_aligner: a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64) under bwamem3 (the default), or a Bowtie2 index (*.bt2) under bowtie2 (skips the local build).",
                     "format": "path",
                     "fa_icon": "fas fa-folder-open"
                 },

@@ -41,4 +41,55 @@ nextflow_process {
             assert path(process.out.versions.get(0)).text.contains('eggnog-mapper:')
         }
     }
+
+    test("seed orthologs of a skipped search: header-only annotations without the database") {
+        // Roadmap Phase 29, CL5 (design doc Q24): EGGNOG_MAPPER_SEARCH's
+        // short-circuit on an empty FAA, then the annotation step in the image,
+        // on a directory that is not an eggNOG database. A search that ran
+        // without hits has no "## search skipped" line and goes through emapper,
+        // which writes the same header (checked against the eggNOG 7 data)
+        setup {
+            run("EGGNOG_MAPPER_SEARCH") {
+                script "../../modules/local/eggnog_mapper_search/main.nf"
+                process {
+                    """
+                    input[0] = [
+                        [ id: 'nogenes' ],
+                        file("${projectDir}/tests/data/functional/empty.faa.gz", checkIfExists: true),
+                        file("${projectDir}/tests/data/functional", checkIfExists: true)
+                    ]
+                    """
+                }
+            }
+        }
+
+        when {
+            params {
+                max_cpus   = 2
+                max_memory = "6.GB"
+            }
+            process {
+                """
+                input[0] = EGGNOG_MAPPER_SEARCH.out.seed_orthologs.combine(
+                    channel.fromPath("${projectDir}/tests/data/functional", checkIfExists: true))
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            def lines = path(process.out.annotations.get(0).get(1)).readLines()
+            assert lines[0] == "## emapper-3.0.0-beta6"
+            // the exact 22-column v3 header bin/aggregate_functions.py checks
+            def header = lines.find { line -> line.startsWith('#query') }.split('\t') as List
+            assert header == ['#query', 'seed_ortholog', 'evalue', 'score', 'eggNOG_OGs', 'tax_ceiling',
+                              'farthest_donor_lineage', 'COG_category', 'Preferred_name', 'GOs', 'EC', 'KEGG_ko',
+                              'KEGG_Pathway', 'KEGG_Module', 'KEGG_Reaction', 'KEGG_rclass', 'BRITE', 'KEGG_TC',
+                              'CAZy', 'BiGG_Reaction', 'PFAMs', 'annotation_confidence']
+            assert lines.every { line -> line.startsWith('#') }
+            def versions = path(process.out.versions.get(0)).text
+            assert versions.contains("eggnog-mapper: 3.0.0-beta6")
+            assert versions.contains("eggnog_db: unknown")
+        }
+    }
 }

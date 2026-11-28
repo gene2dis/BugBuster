@@ -2540,6 +2540,8 @@ If you use BugBuster in your research, please cite the pipeline with its version
 (`nextflow run main.nf --version`) and repository, and cite the tools that ran: the
 Methods page of the run's report (`00_summary/report/`, and `results_summary.pdf`)
 lists every tool and database with its version and reference.
+[`CITATIONS.md`](../CITATIONS.md) lists the references of every tool and database the
+pipeline can run, by pipeline step.
 
 ```
 BugBuster: Bacterial Unraveling and metaGenomic Binning with Up-Scale Throughput, Efficient and Reproducible

@@ -43,7 +43,15 @@ processes:
       - db:
           type: value
           description: Kraken2 database tarball URL (params.kraken_ref_db[params.kraken2_db].url)
-    output: []
+    output:
+      - kraken_db:
+          type: directory
+          description: Kraken2 database directory
+          pattern: "k2_ref_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_SYLPH_DB
     description: Runs bin/sylph_db_reformat.sh db - downloads the sylph genome database (.syldb or two-stage .syl2db) into sylph_db/ under its URL name, which carries the release, and checks it is non-empty
@@ -56,6 +64,10 @@ processes:
           type: file
           description: sylph genome database
           pattern: "sylph_db/*.syl*db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions_sylph_db.yml"
 
   - name: FORMAT_SYLPH_TAXONOMY
     description: Runs bin/sylph_db_reformat.sh taxonomy - downloads the sylph-tax metadata file matching the database into sylph_db/, checks the gzip stream and the accession <TAB> lineage layout
@@ -68,6 +80,10 @@ processes:
           type: file
           description: sylph-tax metadata file (e.g. gtdb_r232_metadata.tsv.gz)
           pattern: "sylph_db/*.tsv.gz"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions_sylph_taxonomy.yml"
 
   - name: FORMAT_METABULI_DB
     description: Runs bin/metabuli_db_reformat.sh - downloads the Metabuli database tarball, extracts it, checks that it holds db.parameters, diffIdx, info, taxonomyDB and a taxdump (nodes.dmp, names.dmp), and moves it to metabuli_db/
@@ -80,6 +96,10 @@ processes:
           type: directory
           description: Metabuli database directory
           pattern: "metabuli_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_GENOMAD_DB
     description: Runs bin/genomad_db_reformat.sh - downloads the pinned geNomad database release (Zenodo), checks its md5, extracts it, checks version.txt against the registry's version and the main database files, and moves it to genomad_db/
@@ -92,6 +112,10 @@ processes:
           type: directory
           description: geNomad database directory
           pattern: "genomad_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_GUNC_DB
     description: Runs bin/gunc_db_reformat.sh - downloads the GUNC DIAMOND reference GUNC 1.1.1's download_db fetches (Zenodo), checks the md5 of the .gz and of the unpacked .dmnd, which keeps GUNC's file name (GUNC reads the reference from it)
@@ -104,6 +128,10 @@ processes:
           type: file
           description: GUNC DIAMOND reference
           pattern: "gunc_db_*.dmnd"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_CHECKV_DB
     description: Runs bin/checkv_db_reformat.sh in the CheckV image - downloads the pinned CheckV database release (NERSC), checks its byte count (CheckV publishes no checksum), extracts it, checks the release in README.txt, builds the DIAMOND index of checkv_reps.faa as checkv download_database does, and checks the files CheckV needs
@@ -116,6 +144,10 @@ processes:
           type: directory
           description: CheckV database directory (genome_db/, hmm_db/, README.txt)
           pattern: "checkv_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: DOWNLOAD_DEEPARG_DB
     description: Downloads the DeepARG data with deeparg download_data into deeparg_db/; the download is unversioned, so versions.yml records the tool version and the download date
@@ -136,7 +168,15 @@ processes:
       - db:
           type: value
           description: CheckM2 database tarball URL (params.checkm2_ref_db[params.checkm2_db].url)
-    output: []
+    output:
+      - checkm2_db:
+          type: file
+          description: CheckM2 DIAMOND database
+          pattern: "*.dmnd"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: DOWNLOAD_GTDBTK_DB
     description: Runs bin/gtdb-tk_db_reformat.sh - downloads the GTDB-Tk reference data package, extracts its release directory as gtdbtk_db/ and checks it is not empty
@@ -144,7 +184,15 @@ processes:
       - db:
           type: value
           description: GTDB-Tk data package URL (params.gtdbtk_ref_db[params.gtdbtk_db].url)
-    output: []
+    output:
+      - gtdbtk_db:
+          type: directory
+          description: GTDB-Tk reference data directory
+          pattern: "gtdbtk_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_EGGNOG_DB
     description: Runs bin/eggnog_db_reformat.sh - downloads the seven eggNOG-mapper v3 data files (eggnog.db and its .bin indices, eggnog.taxa.db and traverse.pkl, eggnog_proteins.dmnd, go-basic.obo) into eggnog_db/ and checks each is non-empty
@@ -152,7 +200,15 @@ processes:
       - db:
           type: value
           description: eggNOG-mapper 3.0 data base URL (params.eggnog_ref_db[params.eggnog_db].url)
-    output: []
+    output:
+      - eggnog_db:
+          type: directory
+          description: eggNOG 7 data directory (emapper-3.0 layout)
+          pattern: "eggnog_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_DBCAN_DB
     description: Runs bin/dbcan_db_reformat.sh - downloads CAZy.dmnd, dbCAN.hmm, dbCAN_sub.hmm (saved as dbCAN-sub.hmm) and fam-substrate-mapping.tsv into dbcan_db/ and writes the release name to DB_VERSION
@@ -160,7 +216,15 @@ processes:
       - db:
           type: value
           description: dbCAN release base URL (params.dbcan_ref_db[params.dbcan_db].url)
-    output: []
+    output:
+      - dbcan_db:
+          type: directory
+          description: dbCAN database directory
+          pattern: "dbcan_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_BAKTA_DB
     description: Runs bin/bakta_db_reformat.sh in the bakta image - downloads and extracts the Bakta database tarball into bakta_db/, checks the schema-6 version.json and the bundled AMRFinderPlus database, refreshes it with amrfinder_update --force_update and writes DB_VERSION
@@ -168,7 +232,15 @@ processes:
       - db:
           type: value
           description: Bakta database tarball URL (params.bakta_ref_db[params.bakta_db].url)
-    output: []
+    output:
+      - bakta_db:
+          type: directory
+          description: Bakta database directory
+          pattern: "bakta_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_COG_DB
     description: Runs bin/cog_db_reformat.sh - downloads the COG definition table, verifies it against the release's checksums.md5 and validates its COG id / functional category columns
@@ -176,7 +248,15 @@ processes:
       - db:
           type: value
           description: COG definition table URL (params.cog_ref_db[params.cog_db].url)
-    output: []
+    output:
+      - cog_def:
+          type: file
+          description: NCBI COG definition table
+          pattern: "cog-*.def.tab"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_WOLTKA_DB
     description: Runs bin/woltka_db_reformat.sh in the woltka image - downloads the WoLr2 Bowtie2 index, protein coordinates and KEGG/MetaCyc/Pfam function maps into woltka_db/ with retries, verifies the md5 of the xz-compressed files on their uncompressed content and writes DB_VERSION
@@ -184,7 +264,15 @@ processes:
       - db:
           type: value
           description: WoLr2 base URL (params.woltka_ref_db[params.woltka_db].url)
-    output: []
+    output:
+      - woltka_db:
+          type: directory
+          description: WoLr2 database directory (FTP layout)
+          pattern: "woltka_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_HUMANN_DB
     description: Runs bin/humann_db_reformat.sh - downloads and extracts the ChocoPhlAn, UniRef90 and utility mapping databases and the md5-verified MetaPhlAn index and Bowtie2 tarballs into humann_db/, checks the required files and writes DB_VERSION
@@ -192,7 +280,15 @@ processes:
       - key:
           type: value
           description: HUMAnN database key (params.humann_db); selects the params.humann_ref_db entry whose URLs, MetaPhlAn index name and provenance are passed to the script
-    output: []
+    output:
+      - humann_db:
+          type: directory
+          description: HUMAnN database root
+          pattern: "humann_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_SUPERFOCUS_DB
     description: Runs bin/superfocus_db_reformat.sh in the SUPER-FOCUS image - downloads and md5-verifies database_PKs.txt and the DB_90 archive for the selected aligner, unzips it into superfocus_db/db/static/<aligner>/ and writes DB_VERSION
@@ -200,7 +296,15 @@ processes:
       - aligner:
           type: value
           description: SUPER-FOCUS aligner (diamond or mmseqs2; params.superfocus_aligner); only that aligner's archive is downloaded
-    output: []
+    output:
+      - superfocus_db:
+          type: directory
+          description: SUPER-FOCUS database root
+          pattern: "superfocus_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: FORMAT_KMARVEL_DB
     description: Runs bin/kmarvel_db_reformat.sh in the K-MARVEL image - downloads and md5-verifies the CARD data tarball, concatenates the protein homolog, overexpression and variant model FASTAs into kmarvel_db/CARD_protein_all.fasta, keeps aro_index.tsv as metadata.tsv and snps.txt, and writes DB_VERSION (no BLAST index; KMARVEL indexes per task)
@@ -208,7 +312,15 @@ processes:
       - key:
           type: value
           description: K-MARVEL database registry key (params.kmarvel_db)
-    output: []
+    output:
+      - kmarvel_db:
+          type: directory
+          description: K-MARVEL CARD database with its BLAST index
+          pattern: "kmarvel_db"
+      - versions:
+          type: file
+          description: Tool versions of the download and formatting, stored with the database and re-emitted when the store is reused; absent for a store built before BugBuster recorded them (software_versions.yml then says not recorded)
+          pattern: "versions.yml"
 
   - name: SOURMASH_TAX_PREPARE
     description: Converts the sourmash lineage CSV into a SQLite taxonomy database with sourmash tax prepare (once per run, not per sample)

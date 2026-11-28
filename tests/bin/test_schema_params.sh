@@ -10,7 +10,8 @@
 #      schema entry has a param, and every map-valued param (the database
 #      registry maps, read from config/databases.config) is in
 #      validation.defaultIgnoreParams (a map missing there stops every run
-#      with an "unrecognised parameter" error).
+#      with an "unrecognised parameter" error). A param in that list needs no
+#      schema entry (the deprecated bowtie_ref_* registry names, null by default).
 #   3. Every default agrees: a schema default equals the config's, and the
 #      config value validates against its schema entry (type, enum, pattern).
 #      A param without a schema default has a null or empty config value,
@@ -120,8 +121,11 @@ for line in open(flat_path):
         flat[key] = value(text)
 
 check(bool(flat), f"config has top-level params ({len(flat)})")
-check(sorted(set(flat) - set(props)) == [], "every config param has a schema entry",
-      ", ".join(sorted(set(flat) - set(props))))
+# an ignored param with no value needs no entry: the deprecated registry names
+# (bowtie_ref_*, null unless a -c file sets them; validation.defaultIgnoreParams)
+exempt = {name for name in ignore if flat.get(name) is None}
+check(sorted(set(flat) - set(props) - exempt) == [], "every config param has a schema entry (a null one in validation.defaultIgnoreParams excepted)",
+      ", ".join(sorted(set(flat) - set(props) - exempt)))
 check(sorted(set(props) - set(flat)) == [], "every schema entry is a config param",
       ", ".join(sorted(set(props) - set(flat))))
 check(isinstance(ignore, list) and bool(ignore), "validation.defaultIgnoreParams read from the config", repr(ignore))

@@ -33,6 +33,17 @@ bold label names the full entry below (search for it).
 
 ### Added
 
+- `pipeline_info/software_versions.yml` lists the tools that download and format each
+  database (`FORMAT_*` / `DOWNLOAD_*`: wget, tar, gzip, xz, bzip2, unzip, DIAMOND,
+  makeblastdb, amrfinder, as each process runs them; issue #24). The versions are stored
+  with the database and re-emitted when a later run reuses it. A database stored by an
+  earlier version is still reused (nothing downloads again); its process shows
+  `versions: not recorded (database stored by an earlier run)`.
+- `CITATIONS.md`: the references of every tool and database the pipeline can run, by
+  pipeline step, linked from the README and the manual (issue #25). It is written by
+  `tests/bin/make_citations.py` from the report's curated references
+  (`assets/report/tool_references.tsv`, which gains a `section` column, and
+  `references.yml`), and `tests/bin/test_tool_references.sh` fails when it differs.
 - **argNorm: ARGs-OAP and DeepARG hits mapped to CARD** (roadmap Phase 27b).
   argNorm 1.1.0 (`quay.io/biocontainers/argnorm:1.1.0--pyhdfd78af_0`, local
   module `ARGNORM`) maps every ARGs-OAP stage two hit (`ARGNORM_SARG`, on
@@ -621,6 +632,11 @@ bold label names the full entry below (search for it).
 
 ### Changed
 
+- The decontamination genome registries of `config/databases.config` are renamed
+  `host_ref_db` (was `bowtie_ref_host_index`) and `phix_ref_db` (was
+  `bowtie_ref_genomes_for_build`): both aligners build their index from them (issue
+  #27). A `-c` config that sets an old name keeps working: its entries are used, with a
+  launch warning to rename it.
 - **ARG tiers are presented as pipeline-defined reporting tiers** (roadmap
   Phase 27b, AR1): tier 1 is now "High-concern acquired" (was "Clinical
   priority") in the tables' documentation, README, LLM guide, report and
@@ -1413,6 +1429,10 @@ bold label names the full entry below (search for it).
 
 ### Removed
 
+- `assets/schema_input.json`, the samplesheet schema no parameter referenced (issue #33):
+  nothing validated against it, and its sample-name rule was looser than the checks
+  that run. `subworkflows/local/input_check.nf` is the samplesheet check, and the
+  manual (section 4) and `docs/parameters.md` describe its rules.
 - `bin/r_scripts_temp/`: the legacy R report scripts (and the Dockerfile of
   the old `r_reports` image), kept as the reference for the R→Python port.
   Where their inputs still exist, they were run against their Python
@@ -1464,6 +1484,18 @@ bold label names the full entry below (search for it).
 
 ### Fixed
 
+- An assembly whose contigs pass `--bbmap_length` but give Pyrodigal no gene no longer
+  stops the run: EGGNOG_MAPPER_SEARCH, EGGNOG_MAPPER_ANNOTATE and DEEPARG_CONTIGS write
+  the header-only tables of a run without hits instead of running their tool on an empty
+  protein file, as RUN_DBCAN and FEATURECOUNTS_GENES already did, and the functional
+  aggregation, argNorm, the contig ARG report, the bin ARG split and the summary take
+  them (design doc Q24).
+- SEMIBIN no longer stops the run on an assembly where SemiBin2 2.6.0 finds no bins
+  for want of long contigs: every contig of 1,000-2,500 bp ("all are shorter than 2500
+  basepairs"), and, for a co-assembly with `--semibin_coassembly_mode train_self`, no
+  contig of 4,000 bp (its first step stopped before the no-bins check). Both now give an
+  empty bin set with `SKIPPED.txt`, as the other no-bins cases did. The check is one
+  script for both modes, `bin/semibin_collect_bins.sh` (issue #30).
 - **Databases** (roadmap Phase 22):
   - A downloaded database was also copied into the results directory: the
     first run that downloaded one wrote it to `--databases_dir` and a second

@@ -190,7 +190,7 @@ include { COVERM_GENOME            } from './modules/local/coverm_genome/main'
 include { CHECKV_ENDTOEND          } from './modules/local/checkv_endtoend/main'
 include { BIN_ARG_SPLIT            } from './modules/local/bin_arg_split/main'
 include { CLUSTERING               } from './modules/local/clustering/main'
-include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError; argNormCardNeeded } from './subworkflows/local/utils_params'
+include { flagOn; sylphDbLabel; parseBinners; hasFastaRecord; sourmashCustomFiles; cloudWorkdirError; argNormCardNeeded; decontaminationIndexError } from './subworkflows/local/utils_params'
 include { coassemblyGroups; multisampleGroups } from './subworkflows/local/utils_coassembly'
 include { ARG_BLOBPLOT             } from './modules/local/arg_blobplot/main'
 
@@ -274,6 +274,17 @@ workflow {
                 error("--${old_name} ${old_value} and --${new_name} ${new_value} disagree: --${old_name} is a deprecated alias of --${new_name}; pass only --${new_name}")
             }
             log.warn "--${old_name} is deprecated (MetaWRAP was replaced by Binette): using ${old_value} as --${new_name}. Pass --${new_name} instead"
+        }
+    }
+
+    // The decontamination genome registries were renamed (roadmap Phase 29,
+    // CL2): an old name set in a -c file is still read (hostRefDb() / phixRefDb())
+    [
+        [params.bowtie_ref_host_index, 'bowtie_ref_host_index', 'host_ref_db'],
+        [params.bowtie_ref_genomes_for_build, 'bowtie_ref_genomes_for_build', 'phix_ref_db'],
+    ].each { old_value, old_name, new_name ->
+        if (old_value != null) {
+            log.warn "params.${old_name} is deprecated (it serves both aligners): its entries are used as params.${new_name}. Rename it to ${new_name} in your config"
         }
     }
 
@@ -472,24 +483,9 @@ workflow {
     // INPUT_CHECK's samplesheet channel was starting, the error could be
     // reported as "Cannot find samplesheet file" instead
     if (flagOn(params.quality_control) && params.custom_decontamination_index) {
-        if ( params.read_aligner == 'bwamem3' ) {
-            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
-            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
-            if ( !index_files.any { name -> name.endsWith('.bwt.2bit.64') } ) {
-                def bowtie2_hint = index_files.any { name -> name ==~ /.*\.bt2l?$/ } ?
-                    " It holds a Bowtie2 index: run with --read_aligner bowtie2 to keep using it, rebuild it with bwa-mem3 (or bwa-mem2), or drop --custom_decontamination_index and pass --custom_host_fasta." : ""
-                error "--read_aligner bwamem3 needs --custom_decontamination_index to be a directory with a bwa-mem3/bwa-mem2 index (*.bwt.2bit.64): ${params.custom_decontamination_index}.${bowtie2_hint}"
-            }
-        } else {
-            // The reverse mix-up: the index the pipeline publishes by
-            // default (bwamem3_index/) passed under the bowtie2 fallback
-            def index_dir = file(params.custom_decontamination_index, checkIfExists: true)
-            def index_files = index_dir.isDirectory() ? index_dir.listFiles().collect { f -> f.name } : []
-            if ( !index_files.any { name -> name ==~ /.*\.[0-9]\.bt2l?$/ } ) {
-                def bwamem3_hint = index_files.any { name -> name.endsWith('.bwt.2bit.64') } ?
-                    " It holds a bwa-mem3/bwa-mem2 index: drop --read_aligner bowtie2 to use it with the default aligner, or point the option at a Bowtie2 index." : ""
-                error "--read_aligner bowtie2 needs --custom_decontamination_index to be a directory with a Bowtie2 index (*.bt2): ${params.custom_decontamination_index}.${bwamem3_hint}"
-            }
+        def index_error = decontaminationIndexError(params.read_aligner, params.custom_decontamination_index)
+        if ( index_error ) {
+            error index_error
         }
     }
 
@@ -532,7 +528,7 @@ workflow {
     // SUBWORKFLOW: Validate and parse input samplesheet
     //
     INPUT_CHECK(file(params.input, checkIfExists: true))
-    ch_reads = INPUT_CHECK.out.reads
+    ch_reads = INPUT_CHECK.out
 
     //
     // SUBWORKFLOW: Prepare all databases
@@ -1172,7 +1168,7 @@ workflow {
     // that emits the topic is not also mixed into ch_versions)
     //
     SOFTWARE_VERSIONS( ch_versions, channel.topic('versions') )
-    ch_software_versions = SOFTWARE_VERSIONS.out.yml
+    ch_software_versions = SOFTWARE_VERSIONS.out
 
     //
     // MODULE: Run-level summary (00_summary/): tables, Excel workbook,

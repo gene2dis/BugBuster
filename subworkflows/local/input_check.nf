@@ -16,8 +16,8 @@ workflow INPUT_CHECK {
     check_sample_ids(samplesheet)
 
     emit:
-    // channel: [ val(meta), [ reads ] ]
-    reads = channel
+    // channel: [ val(meta), [ reads ] ] (the one emit, unnamed: INPUT_CHECK.out)
+    channel
         .fromPath(samplesheet)
         .ifEmpty { error "Cannot find samplesheet file: ${samplesheet}" }
         .splitCsv(header: true, sep: ',', strip: true)
